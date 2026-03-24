@@ -22,6 +22,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0"
@@ -45,12 +46,22 @@
                           FontSize="14"
                           Foreground="#1F2937"
                           SelectedItemChanged="NotesTree_SelectedItemChanged">
-                    <TreeViewItem Header="Notes" IsExpanded="True">
+                    <TreeViewItem x:Name="NotesRoot"
+                                  Header="Notes"
+                                  IsExpanded="True">
                         <TreeViewItem Header="Inbox" />
                         <TreeViewItem Header="Learning" />
                         <TreeViewItem Header="Projects" />
                     </TreeViewItem>
                 </TreeView>
+
+                <Button Grid.Row="2"
+                        Content="Add Note"
+                        Height="36"
+                        Margin="0,18,0,0"
+                        HorizontalContentAlignment="Left"
+                        Padding="12,0"
+                        Click="AddNoteButton_Click" />
             </Grid>
         </Border>
 

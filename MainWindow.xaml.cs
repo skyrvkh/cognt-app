@@ -53,6 +53,23 @@ public partial class MainWindow : Window
         ViewHost.Content = decksView;
     }
 
+    private void AddNoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        const string noteName = "Untitled";
+
+        noteContent[noteName] = noteName;
+
+        TreeViewItem noteItem = new()
+        {
+            Header = noteName,
+        };
+
+        NotesRoot.Items.Add(noteItem);
+        NotesRoot.IsExpanded = true;
+        noteItem.IsSelected = true;
+        ShowEditorView(noteName);
+    }
+
     private void ShowEditorView(string noteName = "Notes")
     {
         string content = noteContent.GetValueOrDefault(noteName, string.Empty);
