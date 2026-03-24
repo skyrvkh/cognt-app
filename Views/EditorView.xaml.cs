@@ -1,5 +1,4 @@
 using System.Windows.Controls;
-using System.Windows.Documents;
 
 namespace CogntApp.Views;
 
@@ -12,19 +11,12 @@ public partial class EditorView : UserControl
 
     public void ShowNote(string title, string content)
     {
-        NoteEditor.Document = new FlowDocument(
-            new Paragraph(
-                new Run(title)
-                {
-                    FontSize = 22,
-                    FontWeight = System.Windows.FontWeights.SemiBold,
-                }));
-
-        NoteEditor.Document.Blocks.Add(new Paragraph(new Run(content)));
+        NoteTitle.Text = title;
+        NoteEditor.Text = content;
     }
 
     public string GetContent()
     {
-        return new TextRange(NoteEditor.Document.ContentStart, NoteEditor.Document.ContentEnd).Text.TrimEnd('\r', '\n');
+        return NoteEditor.Text;
     }
 }

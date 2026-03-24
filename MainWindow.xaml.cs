@@ -1,13 +1,6 @@
-﻿using System.Text;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using CogntApp.Views;
 
 namespace CogntApp;
@@ -17,31 +10,37 @@ namespace CogntApp;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly Dictionary<string, string> noteContent = new()
-    {
-        ["Notes"] = "Select a note from the tree to begin writing.",
-        ["Inbox"] = "Capture loose thoughts here before organizing them.",
-        ["Learning"] = "Keep study notes, concepts, and active recall prompts here.",
-        ["Projects"] = "Collect project notes, decisions, and next actions here.",
-    };
-
     private readonly EditorView editorView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
-    private string currentNoteName = "Notes";
+    private string currentNotesDirectory = string.Empty;
+    private string? currentNotePath;
 
     public MainWindow()
     {
         InitializeComponent();
-        ShowEditorView();
+        LoadNotesDirectory(ResolveDefaultNotesDirectory());
     }
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (e.NewValue is TreeViewItem selectedItem && selectedItem.Header is string noteName)
+        if (e.NewValue is not TreeViewItem selectedItem)
         {
-            ShowEditorView(noteName);
+            return;
         }
+
+        if (selectedItem.Tag is string notePath)
+        {
+            ShowEditorView(notePath);
+            return;
+        }
+
+        ShowDirectoryOverview();
+    }
+
+    private void LoadDirectoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        LoadNotesDirectory(NotesDirectoryTextBox.Text);
     }
 
     private void ReviewButton_Click(object sender, RoutedEventArgs e)
@@ -56,19 +55,15 @@ public partial class MainWindow : Window
 
     private void AddNoteButton_Click(object sender, RoutedEventArgs e)
     {
-        const string noteName = "Untitled";
-
-        noteContent[noteName] = noteName;
-
-        TreeViewItem noteItem = new()
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
         {
-            Header = noteName,
-        };
+            return;
+        }
 
-        NotesRoot.Items.Add(noteItem);
-        NotesRoot.IsExpanded = true;
-        noteItem.IsSelected = true;
-        ShowEditorView(noteName);
+        string notePath = CreateUniqueNotePath();
+        File.WriteAllText(notePath, "# Untitled" + Environment.NewLine);
+        LoadNotesDirectory(currentNotesDirectory);
+        SelectNote(notePath);
     }
 
     private void SaveNoteButton_Click(object sender, RoutedEventArgs e)
@@ -76,16 +71,135 @@ public partial class MainWindow : Window
         SaveCurrentNote();
     }
 
-    private void ShowEditorView(string noteName = "Notes")
+    private void LoadNotesDirectory(string directoryPath)
     {
-        currentNoteName = noteName;
-        string content = noteContent.GetValueOrDefault(noteName, string.Empty);
-        editorView.ShowNote(noteName, content);
+        string fullPath;
+
+        try
+        {
+            fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(directoryPath.Trim()));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"The notes directory path is invalid: {ex.Message}", "Invalid Directory", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!Directory.Exists(fullPath))
+        {
+            MessageBox.Show($"The notes directory does not exist:{Environment.NewLine}{fullPath}", "Directory Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        currentNotesDirectory = fullPath;
+        currentNotePath = null;
+        NotesDirectoryTextBox.Text = currentNotesDirectory;
+        NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
+        NotesRoot.Items.Clear();
+
+        foreach (string filePath in Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+                     .OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
+        {
+            NotesRoot.Items.Add(new TreeViewItem
+            {
+                Header = Path.GetRelativePath(currentNotesDirectory, filePath),
+                Tag = filePath,
+            });
+        }
+
+        NotesRoot.IsExpanded = true;
+
+        if (NotesRoot.Items.OfType<TreeViewItem>().FirstOrDefault() is { } firstNote)
+        {
+            firstNote.IsSelected = true;
+        }
+        else
+        {
+            ShowDirectoryOverview();
+        }
+    }
+
+    private void ShowEditorView(string notePath)
+    {
+        currentNotePath = notePath;
+        editorView.ShowNote(Path.GetFileName(notePath), File.ReadAllText(notePath));
+        ViewHost.Content = editorView;
+    }
+
+    private void ShowDirectoryOverview()
+    {
+        currentNotePath = null;
+        int noteCount = NotesRoot.Items.Count;
+        string title = GetDirectoryName(currentNotesDirectory);
+        string content = noteCount == 1
+            ? "1 Markdown file found."
+            : $"{noteCount} Markdown files found.";
+
+        editorView.ShowNote(title, content);
         ViewHost.Content = editorView;
     }
 
     private void SaveCurrentNote()
     {
-        noteContent[currentNoteName] = editorView.GetContent();
+        if (string.IsNullOrWhiteSpace(currentNotePath))
+        {
+            return;
+        }
+
+        File.WriteAllText(currentNotePath, editorView.GetContent());
+    }
+
+    private void SelectNote(string notePath)
+    {
+        foreach (TreeViewItem item in NotesRoot.Items.OfType<TreeViewItem>())
+        {
+            if (string.Equals(item.Tag as string, notePath, StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsSelected = true;
+                item.Focus();
+                return;
+            }
+        }
+    }
+
+    private string CreateUniqueNotePath()
+    {
+        string notePath = Path.Combine(currentNotesDirectory, "untitled.md");
+        int suffix = 2;
+
+        while (File.Exists(notePath))
+        {
+            notePath = Path.Combine(currentNotesDirectory, $"untitled-{suffix}.md");
+            suffix++;
+        }
+
+        return notePath;
+    }
+
+    private static string ResolveDefaultNotesDirectory()
+    {
+        foreach (string root in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            DirectoryInfo? directory = new(root);
+
+            while (directory is not null)
+            {
+                string samplesPath = Path.Combine(directory.FullName, "Samples");
+
+                if (Directory.Exists(samplesPath))
+                {
+                    return samplesPath;
+                }
+
+                directory = directory.Parent;
+            }
+        }
+
+        return Path.Combine(Environment.CurrentDirectory, "Samples");
+    }
+
+    private static string GetDirectoryName(string directoryPath)
+    {
+        return new DirectoryInfo(directoryPath).Name;
     }
 }

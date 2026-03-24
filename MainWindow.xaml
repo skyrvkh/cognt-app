@@ -27,6 +27,21 @@
 
                 <StackPanel Grid.Row="0"
                             Margin="0,0,0,18">
+                    <TextBlock Text="Notes Directory"
+                               FontSize="12"
+                               Foreground="#64748B"
+                               Margin="0,0,0,6" />
+                    <TextBox x:Name="NotesDirectoryTextBox"
+                             Height="32"
+                             Margin="0,0,0,8"
+                             Padding="8,4"
+                             VerticalContentAlignment="Center" />
+                    <Button Content="Load Directory"
+                            Height="36"
+                            Margin="0,0,0,14"
+                            HorizontalContentAlignment="Left"
+                            Padding="12,0"
+                            Click="LoadDirectoryButton_Click" />
                     <Button Content="Review"
                             Height="36"
                             Margin="0,0,0,8"
@@ -48,11 +63,7 @@
                           SelectedItemChanged="NotesTree_SelectedItemChanged">
                     <TreeViewItem x:Name="NotesRoot"
                                   Header="Notes"
-                                  IsExpanded="True">
-                        <TreeViewItem Header="Inbox" />
-                        <TreeViewItem Header="Learning" />
-                        <TreeViewItem Header="Projects" />
-                    </TreeViewItem>
+                                  IsExpanded="True" />
                 </TreeView>
 
                 <StackPanel Grid.Row="2"
@@ -73,7 +84,6 @@
         </Border>
 
         <ContentControl x:Name="ViewHost"
-                        Grid.Column="1"
-                        Margin="24" />
+                        Grid.Column="1" />
     </Grid>
 </Window>
