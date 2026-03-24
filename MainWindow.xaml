@@ -5,25 +5,61 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CogntApp"
         mc:Ignorable="d"
-        Title="Cognt App" Height="450" Width="800" MinHeight="360" MinWidth="560"
+        Title="Cognt App" Height="560" Width="960" MinHeight="420" MinWidth="720"
         WindowStartupLocation="CenterScreen">
     <Grid Background="#F7F9FC">
-        <Border Width="420"
-                Padding="32"
-                Background="White"
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="#FFFFFF"
                 BorderBrush="#D7DEE8"
-                BorderThickness="1"
-                CornerRadius="8"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
-            <StackPanel>
-                <TextBlock Text="Cognt App"
-                           FontSize="32"
-                           FontWeight="SemiBold"
-                           Foreground="#1F2937"
-                           HorizontalAlignment="Center" />
-            </StackPanel>
+                BorderThickness="0,0,1,0"
+                Padding="20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Margin="0,0,0,18">
+                    <Button Content="Review"
+                            Height="36"
+                            Margin="0,0,0,8"
+                            HorizontalContentAlignment="Left"
+                            Padding="12,0" />
+                    <Button Content="Decks"
+                            Height="36"
+                            HorizontalContentAlignment="Left"
+                            Padding="12,0" />
+                </StackPanel>
+
+                <TreeView Grid.Row="1"
+                          BorderThickness="0"
+                          Background="Transparent"
+                          FontSize="14"
+                          Foreground="#1F2937">
+                    <TreeViewItem Header="Notes" IsExpanded="True">
+                        <TreeViewItem Header="Inbox" />
+                        <TreeViewItem Header="Learning" />
+                        <TreeViewItem Header="Projects" />
+                    </TreeViewItem>
+                </TreeView>
+            </Grid>
         </Border>
 
+        <RichTextBox Grid.Column="1"
+                     Margin="24"
+                     Padding="20"
+                     BorderBrush="#D7DEE8"
+                     BorderThickness="1"
+                     Background="#FFFFFF"
+                     FontFamily="Segoe UI"
+                     FontSize="15"
+                     VerticalScrollBarVisibility="Auto"
+                     AcceptsTab="True" />
     </Grid>
 </Window>
