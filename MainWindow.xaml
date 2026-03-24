@@ -152,8 +152,12 @@
                                    Margin="8,18,0,8" />
                         <StackPanel x:Name="RecentNotesPanel" />
 
+                        <Border Height="1"
+                                Background="#E1E6F0"
+                                Margin="8,14,8,12" />
+
                         <TreeView BorderThickness="0"
-                                  Margin="0,18,0,0"
+                                  Margin="0"
                                   Background="Transparent"
                                   FontSize="13"
                                   Foreground="#586078"
