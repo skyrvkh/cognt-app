@@ -22,4 +22,9 @@ public partial class EditorView : UserControl
 
         NoteEditor.Document.Blocks.Add(new Paragraph(new Run(content)));
     }
+
+    public string GetContent()
+    {
+        return new TextRange(NoteEditor.Document.ContentStart, NoteEditor.Document.ContentEnd).Text.TrimEnd('\r', '\n');
+    }
 }

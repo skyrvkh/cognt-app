@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly EditorView editorView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
+    private string currentNoteName = "Notes";
 
     public MainWindow()
     {
@@ -70,10 +71,21 @@ public partial class MainWindow : Window
         ShowEditorView(noteName);
     }
 
+    private void SaveNoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentNote();
+    }
+
     private void ShowEditorView(string noteName = "Notes")
     {
+        currentNoteName = noteName;
         string content = noteContent.GetValueOrDefault(noteName, string.Empty);
         editorView.ShowNote(noteName, content);
         ViewHost.Content = editorView;
+    }
+
+    private void SaveCurrentNote()
+    {
+        noteContent[currentNoteName] = editorView.GetContent();
     }
 }
