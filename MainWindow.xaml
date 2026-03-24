@@ -7,77 +7,168 @@
         mc:Ignorable="d"
         Title="Cognt App" Height="560" Width="960" MinHeight="420" MinWidth="720"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#78809A" />
+            <Setter Property="Margin" Value="0,18,0,8" />
+        </Style>
+
+        <Style x:Key="SidebarButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="#586078" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF2FF" />
+                    <Setter Property="Foreground" Value="#3156D4" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PrimarySidebarButtonStyle"
+               BasedOn="{StaticResource SidebarButtonStyle}"
+               TargetType="Button">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#D8DEEC" />
+            <Setter Property="Foreground" Value="#3156D4" />
+        </Style>
+
+        <Style TargetType="TreeViewItem">
+            <Setter Property="Foreground" Value="#586078" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="0,1" />
+        </Style>
+    </Window.Resources>
+
     <Grid Background="#F7F9FC">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="300" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0"
-                Background="#FFFFFF"
-                BorderBrush="#D7DEE8"
+                Background="#FBFCFF"
+                BorderBrush="#E1E6F0"
                 BorderThickness="0,0,1,0"
-                Padding="20">
+                Padding="12,14">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0"
-                            Margin="0,0,0,18">
-                    <TextBlock Text="Notes Directory"
-                               FontSize="12"
-                               Foreground="#64748B"
-                               Margin="0,0,0,6" />
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="28"
+                            Height="28"
+                            Background="#EEF2FF"
+                            CornerRadius="8">
+                        <TextBlock Text="*"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#4C6FFF" />
+                    </Border>
+                    <TextBlock Grid.Column="1"
+                               Text="Cognt"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#1F2433" />
+                    <TextBlock Grid.Column="2"
+                               Text="&lt;&lt;"
+                               VerticalAlignment="Center"
+                               Foreground="#8A91A8"
+                               FontSize="12" />
+                </Grid>
+
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="DIRECTORY"
+                               Style="{StaticResource SectionHeaderStyle}"
+                               Margin="8,0,0,8" />
+
                     <TextBox x:Name="NotesDirectoryTextBox"
                              Height="32"
                              Margin="0,0,0,8"
-                             Padding="8,4"
+                             Padding="10,4"
+                             Background="#FFFFFF"
+                             BorderBrush="#D8DEEC"
+                             Foreground="#586078"
+                             FontSize="12"
                              VerticalContentAlignment="Center" />
+
                     <Button Content="Load Directory"
-                            Height="36"
-                            Margin="0,0,0,14"
-                            HorizontalContentAlignment="Left"
-                            Padding="12,0"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Margin="0,0,0,10"
                             Click="LoadDirectoryButton_Click" />
-                    <Button Content="Review"
-                            Height="36"
-                            Margin="0,0,0,8"
-                            HorizontalContentAlignment="Left"
-                            Padding="12,0"
-                            Click="ReviewButton_Click" />
-                    <Button Content="Decks"
-                            Height="36"
-                            HorizontalContentAlignment="Left"
-                            Padding="12,0"
-                            Click="DecksButton_Click" />
                 </StackPanel>
 
-                <TreeView Grid.Row="1"
-                          BorderThickness="0"
-                          Background="Transparent"
-                          FontSize="14"
-                          Foreground="#1F2937"
-                          SelectedItemChanged="NotesTree_SelectedItemChanged">
-                    <TreeViewItem x:Name="NotesRoot"
-                                  Header="Notes"
-                                  IsExpanded="True" />
-                </TreeView>
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <Button Content="All Documents"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                Click="LoadDirectoryButton_Click" />
+                        <Button Content="Flashcards"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                Click="DecksButton_Click" />
 
-                <StackPanel Grid.Row="2"
-                            Margin="0,18,0,0">
-                    <Button Content="Save Note"
-                            Height="36"
-                            Margin="0,0,0,8"
-                            HorizontalContentAlignment="Left"
-                            Padding="12,0"
-                            Click="SaveNoteButton_Click" />
-                    <Button Content="Add Note"
-                            Height="36"
-                            HorizontalContentAlignment="Left"
-                            Padding="12,0"
+                        <TextBlock Text="RECENT"
+                                   Style="{StaticResource SectionHeaderStyle}"
+                                   Margin="8,18,0,8" />
+                        <StackPanel x:Name="RecentNotesPanel" />
+
+                        <TreeView BorderThickness="0"
+                                  Margin="0,18,0,0"
+                                  Background="Transparent"
+                                  FontSize="13"
+                                  Foreground="#586078"
+                                  SelectedItemChanged="NotesTree_SelectedItemChanged">
+                            <TreeViewItem x:Name="NotesRoot"
+                                          Header="Notes"
+                                          IsExpanded="True" />
+                        </TreeView>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="3"
+                            Margin="0,14,0,0">
+                    <Button Content="+ Create Document"
+                            Style="{StaticResource PrimarySidebarButtonStyle}"
                             Click="AddNoteButton_Click" />
                 </StackPanel>
             </Grid>

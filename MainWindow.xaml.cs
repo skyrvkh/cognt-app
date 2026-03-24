@@ -97,8 +97,12 @@ public partial class MainWindow : Window
         NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
         NotesRoot.Items.Clear();
 
-        foreach (string filePath in Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-                     .OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
+        List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+            .ToList();
+
+        PopulateRecentNotes(noteFiles);
+
+        foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
         {
             NotesRoot.Items.Add(new TreeViewItem
             {
@@ -147,6 +151,36 @@ public partial class MainWindow : Window
         }
 
         File.WriteAllText(currentNotePath, editorView.GetContent());
+    }
+
+    private void RecentNoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string notePath })
+        {
+            ShowEditorView(notePath);
+            SelectNote(notePath);
+        }
+    }
+
+    private void PopulateRecentNotes(IEnumerable<string> noteFiles)
+    {
+        RecentNotesPanel.Children.Clear();
+
+        foreach (string filePath in noteFiles
+                     .OrderByDescending(File.GetLastWriteTime)
+                     .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                     .Take(5))
+        {
+            Button recentButton = new()
+            {
+                Content = Path.GetFileNameWithoutExtension(filePath),
+                Tag = filePath,
+                Style = (Style)FindResource("SidebarButtonStyle"),
+            };
+
+            recentButton.Click += RecentNoteButton_Click;
+            RecentNotesPanel.Children.Add(recentButton);
+        }
     }
 
     private void SelectNote(string notePath)
