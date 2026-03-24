@@ -6,6 +6,45 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EditorWebSource Include="EditorWeb\index.html" />
+    <EditorWebSource Include="EditorWeb\package.json" />
+    <EditorWebSource Include="EditorWeb\tsconfig.json" />
+    <EditorWebSource Include="EditorWeb\vite.config.js" />
+    <EditorWebSource Include="EditorWeb\src\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+  </ItemGroup>
+
+  <Target Name="BuildEditorWeb"
+          BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="RestoreEditorWeb"
+          Inputs="@(EditorWebSource)"
+          Outputs="$(EditorWebDirectory)\dist\index.html"
+          Condition="Exists('$(EditorWebDirectory)\package.json')">
+    <Exec WorkingDirectory="$(EditorWebDirectory)" Command="npm run build" />
+  </Target>
+
+  <Target Name="RestoreEditorWeb"
+          Condition="Exists('$(EditorWebDirectory)\package.json') and !Exists('$(EditorWebDirectory)\node_modules')">
+    <Exec WorkingDirectory="$(EditorWebDirectory)" Command="npm install" />
+  </Target>
+
+  <Target Name="CopyEditorWebOutput"
+          AfterTargets="Build"
+          DependsOnTargets="BuildEditorWeb"
+          Condition="Exists('$(EditorWebDirectory)\dist\index.html')">
+    <ItemGroup>
+      <EditorWebOutput Include="$(EditorWebDirectory)\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(EditorWebOutput)"
+          DestinationFiles="@(EditorWebOutput->'$(TargetDir)EditorWeb\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

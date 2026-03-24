@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              mc:Ignorable="d"
              d:DesignHeight="450"
              d:DesignWidth="650">
@@ -24,19 +25,11 @@
                        TextTrimming="CharacterEllipsis" />
         </Border>
 
-        <TextBox x:Name="NoteEditor"
-                 Grid.Row="1"
-                 Padding="16"
-                 BorderBrush="#D7DEE8"
-                 BorderThickness="1"
-                 Background="#FFFFFF"
-                 FontFamily="Consolas"
-                 FontSize="14"
-                 Foreground="#1F2937"
-                 HorizontalScrollBarVisibility="Disabled"
-                 VerticalScrollBarVisibility="Auto"
-                 AcceptsReturn="True"
-                 AcceptsTab="True"
-                 TextWrapping="Wrap" />
+        <Border Grid.Row="1"
+                BorderBrush="#D7DEE8"
+                BorderThickness="1"
+                Background="#FFFFFF">
+            <wv2:WebView2 x:Name="BlockSuiteEditor" />
+        </Border>
     </Grid>
 </UserControl>

@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        editorView.ContentChanged += EditorView_ContentChanged;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
     }
 
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
 
         if (selectedItem.Tag is string notePath)
         {
+            SaveCurrentNote();
             ShowEditorView(notePath);
             return;
         }
@@ -45,11 +47,13 @@ public partial class MainWindow : Window
 
     private void ReviewButton_Click(object sender, RoutedEventArgs e)
     {
+        SaveCurrentNote();
         ViewHost.Content = reviewView;
     }
 
     private void DecksButton_Click(object sender, RoutedEventArgs e)
     {
+        SaveCurrentNote();
         ViewHost.Content = decksView;
     }
 
@@ -157,8 +161,17 @@ public partial class MainWindow : Window
     {
         if (sender is Button { Tag: string notePath })
         {
+            SaveCurrentNote();
             ShowEditorView(notePath);
             SelectNote(notePath);
+        }
+    }
+
+    private void EditorView_ContentChanged(object? sender, string content)
+    {
+        if (!string.IsNullOrWhiteSpace(currentNotePath))
+        {
+            File.WriteAllText(currentNotePath, content);
         }
     }
 

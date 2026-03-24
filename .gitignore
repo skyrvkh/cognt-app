@@ -3,3 +3,6 @@ obj/
 .vs/
 *.user
 *.suo
+.npm-cache/
+EditorWeb/node_modules/
+EditorWeb/dist/
