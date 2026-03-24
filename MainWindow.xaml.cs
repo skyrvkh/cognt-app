@@ -17,6 +17,14 @@ namespace CogntApp;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly Dictionary<string, string> noteContent = new()
+    {
+        ["Notes"] = "Select a note from the tree to begin writing.",
+        ["Inbox"] = "Capture loose thoughts here before organizing them.",
+        ["Learning"] = "Keep study notes, concepts, and active recall prompts here.",
+        ["Projects"] = "Collect project notes, decisions, and next actions here.",
+    };
+
     private readonly EditorView editorView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
@@ -29,7 +37,10 @@ public partial class MainWindow : Window
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        ShowEditorView();
+        if (e.NewValue is TreeViewItem selectedItem && selectedItem.Header is string noteName)
+        {
+            ShowEditorView(noteName);
+        }
     }
 
     private void ReviewButton_Click(object sender, RoutedEventArgs e)
@@ -42,8 +53,10 @@ public partial class MainWindow : Window
         ViewHost.Content = decksView;
     }
 
-    private void ShowEditorView()
+    private void ShowEditorView(string noteName = "Notes")
     {
+        string content = noteContent.GetValueOrDefault(noteName, string.Empty);
+        editorView.ShowNote(noteName, content);
         ViewHost.Content = editorView;
     }
 }

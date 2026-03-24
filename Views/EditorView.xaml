@@ -6,7 +6,8 @@
              mc:Ignorable="d"
              d:DesignHeight="450"
              d:DesignWidth="650">
-    <RichTextBox Padding="20"
+    <RichTextBox x:Name="NoteEditor"
+                 Padding="20"
                  BorderBrush="#D7DEE8"
                  BorderThickness="1"
                  Background="#FFFFFF"
