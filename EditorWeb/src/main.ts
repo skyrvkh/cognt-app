@@ -1,6 +1,8 @@
+import '@toeverything/theme/fonts.css';
+import '@toeverything/theme/style.css';
+import './styles.css';
 import { MarkdownBlockSuiteEditor } from './blocksuite-editor';
 import { addHostMessageListener, installHostDiagnostics, isHostedInWebView, postHost, reportDiagnostic } from './host';
-import './styles.css';
 
 installHostDiagnostics();
 

@@ -1,8 +1,8 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #ffffff;
-  color: #111827;
+  font-family: var(--affine-font-family);
+  background: var(--affine-background-primary-color);
+  color: var(--affine-text-primary-color);
 }
 
 html,
@@ -17,7 +17,7 @@ body,
 #app {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  background: #ffffff;
+  background: var(--affine-background-primary-color);
 }
 
 #editor-host,
@@ -35,13 +35,12 @@ page-editor {
 page-editor {
   box-sizing: border-box;
   overflow: auto;
-  background: #ffffff;
-  --affine-font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--affine-background-primary-color);
 }
 
 ::selection {
-  color: #111827;
-  background: #bfdbfe;
+  color: var(--affine-text-primary-color);
+  background: var(--affine-blue-100);
 }
 
 #editor-status {
@@ -51,11 +50,11 @@ page-editor {
   bottom: 14px;
   max-width: min(420px, calc(100vw - 28px));
   padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--affine-border-color);
   border-radius: 6px;
-  background: #ffffff;
-  color: #334155;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  background: var(--affine-background-overlay-panel-color);
+  color: var(--affine-text-secondary-color);
+  box-shadow: var(--affine-shadow-2);
   font-size: 12px;
   line-height: 1.35;
   opacity: 0;

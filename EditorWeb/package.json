@@ -10,7 +10,8 @@
     "@blocksuite/blocks": "0.19.5",
     "@blocksuite/icons": "2.1.75",
     "@blocksuite/presets": "0.19.5",
-    "@blocksuite/store": "0.19.5"
+    "@blocksuite/store": "0.19.5",
+    "@toeverything/theme": "1.1.23"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
