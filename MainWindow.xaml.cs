@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using CogntApp.Services;
 using CogntApp.Views;
 
 namespace CogntApp;
@@ -13,15 +14,25 @@ public partial class MainWindow : Window
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
+    private readonly IMarkdownNoteService noteService;
     private string currentNotesDirectory = string.Empty;
     private string? currentNotePath;
+    private string lastSavedContent = string.Empty;
     private bool loadingNotesDirectory;
     private int editorOpenRequestId;
 
     public MainWindow()
+        : this(new MarkdownNoteService())
     {
+    }
+
+    internal MainWindow(IMarkdownNoteService noteService)
+    {
+        this.noteService = noteService;
+
         InitializeComponent();
         EditorViewControl.ContentChanged += EditorView_ContentChanged;
+        EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
         ShowDashboardView();
         _ = EditorViewControl.WarmUpAsync();
@@ -70,6 +81,7 @@ public partial class MainWindow : Window
         SaveCurrentNote();
         editorOpenRequestId++;
         currentNotePath = null;
+        lastSavedContent = string.Empty;
         ShowOverlay(reviewView);
     }
 
@@ -78,6 +90,7 @@ public partial class MainWindow : Window
         SaveCurrentNote();
         editorOpenRequestId++;
         currentNotePath = null;
+        lastSavedContent = string.Empty;
         ShowOverlay(decksView);
     }
 
@@ -88,8 +101,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        string notePath = CreateUniqueNotePath();
-        File.WriteAllText(notePath, "# Untitled" + Environment.NewLine);
+        string notePath = noteService.CreateUniqueNotePath(currentNotesDirectory);
+        noteService.SaveNote(notePath, "# Untitled" + Environment.NewLine);
         LoadNotesDirectory(currentNotesDirectory);
         SelectNote(notePath);
     }
@@ -121,35 +134,10 @@ public partial class MainWindow : Window
 
         currentNotesDirectory = fullPath;
         currentNotePath = null;
+        lastSavedContent = string.Empty;
         NotesDirectoryTextBox.Text = currentNotesDirectory;
         NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
-        loadingNotesDirectory = true;
-
-        try
-        {
-            NotesRoot.Items.Clear();
-
-            List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-                .ToList();
-
-            PopulateRecentNotes(noteFiles);
-
-            foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
-            {
-                NotesRoot.Items.Add(new TreeViewItem
-                {
-                    Header = Path.GetRelativePath(currentNotesDirectory, filePath),
-                    Tag = filePath,
-                });
-            }
-
-            NotesRoot.IsExpanded = true;
-            NotesRoot.IsSelected = true;
-        }
-        finally
-        {
-            loadingNotesDirectory = false;
-        }
+        RefreshNotesTree();
 
         ShowDirectoryOverview();
     }
@@ -161,7 +149,7 @@ public partial class MainWindow : Window
 
         try
         {
-            await EditorViewControl.LoadNoteAsync(Path.GetFileName(notePath), content);
+            await EditorViewControl.LoadNoteAsync(Path.GetFileName(notePath), content, notePath);
         }
         catch (Exception ex)
         {
@@ -179,6 +167,7 @@ public partial class MainWindow : Window
         }
 
         currentNotePath = notePath;
+        lastSavedContent = content;
         HideOverlay();
     }
 
@@ -186,6 +175,7 @@ public partial class MainWindow : Window
     {
         editorOpenRequestId++;
         currentNotePath = null;
+        lastSavedContent = string.Empty;
         ShowOverlay(dashboardView);
     }
 
@@ -193,6 +183,7 @@ public partial class MainWindow : Window
     {
         editorOpenRequestId++;
         currentNotePath = null;
+        lastSavedContent = string.Empty;
         int noteCount = NotesRoot.Items.Count;
         string title = GetDirectoryName(currentNotesDirectory);
         string content = noteCount == 1
@@ -236,7 +227,27 @@ public partial class MainWindow : Window
             return;
         }
 
-        File.WriteAllText(currentNotePath, EditorViewControl.GetContent());
+        SaveNoteIfChanged(EditorViewControl.GetContent());
+    }
+
+    private void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
+    {
+        string? sourcePath = e.SourcePath;
+
+        try
+        {
+            string createdPath = noteService.CreateExtractFile(new CreateExtractFileRequest(
+                currentNotesDirectory,
+                currentNotePath ?? string.Empty,
+                sourcePath ?? string.Empty,
+                e.SelectedMarkdown));
+            RefreshNotesTree(selectPath: currentNotePath);
+            EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
+        }
+        catch (Exception ex)
+        {
+            EditorViewControl.PostExtractResult(sourcePath, ok: false, error: ex.Message);
+        }
     }
 
     private async void RecentNoteButton_Click(object sender, RoutedEventArgs e)
@@ -253,7 +264,7 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrWhiteSpace(currentNotePath))
         {
-            File.WriteAllText(currentNotePath, content);
+            SaveNoteIfChanged(content);
         }
     }
 
@@ -278,6 +289,58 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RefreshNotesTree(string? selectPath = null)
+    {
+        loadingNotesDirectory = true;
+
+        try
+        {
+            NotesRoot.Items.Clear();
+
+            List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+                .ToList();
+
+            PopulateRecentNotes(noteFiles);
+
+            string? fullSelectPath = string.IsNullOrWhiteSpace(selectPath)
+                ? null
+                : Path.GetFullPath(selectPath);
+            TreeViewItem? itemToSelect = null;
+            foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
+            {
+                TreeViewItem item = new()
+                {
+                    Header = Path.GetRelativePath(currentNotesDirectory, filePath),
+                    Tag = filePath,
+                };
+
+                NotesRoot.Items.Add(item);
+
+                if (fullSelectPath is not null
+                    && string.Equals(Path.GetFullPath(filePath), fullSelectPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    itemToSelect = item;
+                }
+            }
+
+            NotesRoot.IsExpanded = true;
+
+            if (itemToSelect is not null)
+            {
+                itemToSelect.IsSelected = true;
+                itemToSelect.Focus();
+            }
+            else
+            {
+                NotesRoot.IsSelected = true;
+            }
+        }
+        finally
+        {
+            loadingNotesDirectory = false;
+        }
+    }
+
     private void SelectNote(string notePath)
     {
         foreach (TreeViewItem item in NotesRoot.Items.OfType<TreeViewItem>())
@@ -291,18 +354,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private string CreateUniqueNotePath()
+    private void SaveNoteIfChanged(string content)
     {
-        string notePath = Path.Combine(currentNotesDirectory, "untitled.md");
-        int suffix = 2;
-
-        while (File.Exists(notePath))
+        if (string.IsNullOrWhiteSpace(currentNotePath)
+            || string.Equals(content, lastSavedContent, StringComparison.Ordinal))
         {
-            notePath = Path.Combine(currentNotesDirectory, $"untitled-{suffix}.md");
-            suffix++;
+            return;
         }
 
-        return notePath;
+        noteService.SaveNote(currentNotePath, content);
+        lastSavedContent = content;
     }
 
     private static string ResolveDefaultNotesDirectory()
