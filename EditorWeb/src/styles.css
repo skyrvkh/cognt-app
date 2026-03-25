@@ -36,6 +36,16 @@ page-editor {
   box-sizing: border-box;
   overflow: auto;
   background: var(--affine-background-primary-color);
+  --affine-editor-width: none;
+  --affine-editor-side-padding: clamp(24px, 5vw, 96px);
+}
+
+.affine-page-root-block-container,
+.doc-title-container,
+rich-text,
+.inline-editor {
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 ::selection {
