@@ -1,9 +1,24 @@
-export type HostMessage = {
-  type: 'load';
-  loadId?: number;
-  title?: string;
-  content?: string;
-};
+export type HostMessage =
+  | {
+      type: 'load';
+      loadId?: number;
+      path?: string;
+      title?: string;
+      content?: string;
+    }
+  | {
+      type: 'saveResult';
+      path?: string;
+      ok: boolean;
+      error?: string;
+    }
+  | {
+      type: 'extractResult';
+      path?: string;
+      ok: boolean;
+      createdPath?: string;
+      error?: string;
+    };
 
 type WebViewHost = {
   postMessage(message: unknown): void;

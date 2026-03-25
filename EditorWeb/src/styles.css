@@ -53,6 +53,13 @@ rich-text,
   background: var(--affine-blue-100);
 }
 
+::highlight(cognt-cloze) {
+  color: transparent;
+  background: #dbe4ee;
+  text-shadow: none;
+  text-decoration: none;
+}
+
 #editor-status {
   position: fixed;
   z-index: 1000;

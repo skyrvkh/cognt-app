@@ -17,6 +17,8 @@ const editor = new MarkdownBlockSuiteEditor({
   hostElement: editorHost,
   statusElement: editorStatusElement,
   onContentChanged: content => postHost({ type: 'contentChanged', content }),
+  onCreateExtract: message => postHost(message),
+  onSaveCloze: message => postHost(message),
 });
 
 addHostMessageListener(message => {
@@ -27,6 +29,20 @@ addHostMessageListener(message => {
 
       postHost({ type: 'loaded', loadId: message.loadId });
     });
+    return;
+  }
+
+  if (message.type === 'saveResult') {
+    editor.showStatus(message.ok ? 'Saved.' : `Save failed: ${message.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  if (message.type === 'extractResult') {
+    editor.showStatus(
+      message.ok
+        ? `Created ${message.createdPath?.split(/[\\/]/).pop() ?? 'extract file'}.`
+        : `Extract failed: ${message.error ?? 'Unknown error'}`
+    );
   }
 });
 

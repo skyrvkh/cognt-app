@@ -13,10 +13,27 @@ blockEffects();
 presetEffects();
 patchBlockStdRender();
 
+export type CreateExtractMessage = {
+  type: 'createExtract';
+  sourcePath: string;
+  selectedMarkdown: string;
+  selectedPlainText: string;
+};
+
+export type SaveClozeMessage = {
+  type: 'saveCloze';
+  sourcePath: string;
+  selectedPlainText: string;
+  clozeText: string;
+  markdown: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
   onContentChanged(content: string): void;
+  onCreateExtract(message: CreateExtractMessage): void;
+  onSaveCloze(message: SaveClozeMessage): void;
 };
 
 export type LoadMarkdownOptions = {
@@ -28,6 +45,8 @@ export class MarkdownBlockSuiteEditor {
   private readonly editor: PageEditor;
   private readonly statusElement: HTMLElement;
   private readonly onContentChanged: (content: string) => void;
+  private readonly onCreateExtract: (message: CreateExtractMessage) => void;
+  private readonly onSaveCloze: (message: SaveClozeMessage) => void;
   private currentDoc: Doc | null = null;
   private loadingDocument = false;
   private saveTimer: number | undefined;
@@ -37,6 +56,8 @@ export class MarkdownBlockSuiteEditor {
   public constructor(options: MarkdownEditorOptions) {
     this.statusElement = options.statusElement;
     this.onContentChanged = options.onContentChanged;
+    this.onCreateExtract = options.onCreateExtract;
+    this.onSaveCloze = options.onSaveCloze;
     this.editor = document.createElement('page-editor') as PageEditor;
     this.editor.id = 'editor';
     this.editor.specs = PageEditorBlockSpecs;
@@ -112,7 +133,7 @@ export class MarkdownBlockSuiteEditor {
     }, saveDebounceMs);
   }
 
-  private showStatus(message: string) {
+  public showStatus(message: string) {
     this.statusElement.textContent = message;
     this.statusElement.dataset.visible = 'true';
     window.clearTimeout(this.statusTimer);
