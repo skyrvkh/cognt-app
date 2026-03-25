@@ -19,7 +19,9 @@ const editor = new MarkdownBlockSuiteEditor({
 
 addHostMessageListener(message => {
   if (message.type === 'load') {
-    void editor.load(message);
+    void editor.load(message).finally(() => {
+      postHost({ type: 'loaded', loadId: message.loadId });
+    });
   }
 });
 

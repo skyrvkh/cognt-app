@@ -1,5 +1,6 @@
 export type HostMessage = {
   type: 'load';
+  loadId?: number;
   title?: string;
   content?: string;
 };

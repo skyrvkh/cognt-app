@@ -12,33 +12,53 @@ public partial class EditorView : UserControl
     private const string EditorOutputDirectoryName = "EditorWeb";
     private const string LoadMessageType = "load";
     private const string ReadyMessageType = "ready";
+    private const string LoadedMessageType = "loaded";
     private const string ContentChangedMessageType = "contentChanged";
     private const string DiagnosticMessageType = "diagnostic";
 
+    private readonly TaskCompletionSource editorReadyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource? currentLoadCompletion;
+    private Task? initializeEditorTask;
     private string currentContent = string.Empty;
     private string pendingTitle = string.Empty;
     private string pendingContent = string.Empty;
-    private bool editorReady;
+    private int loadRequestId;
+    private int lastSentLoadRequestId;
 
     public event EventHandler<string>? ContentChanged;
 
     public EditorView()
     {
         InitializeComponent();
-        _ = InitializeEditorAsync();
+        BlockSuiteEditor.DefaultBackgroundColor = System.Drawing.Color.White;
     }
 
-    public void ShowNote(string title, string content)
+    public async Task WarmUpAsync()
     {
+        await EnsureEditorLoadingAsync();
+        await editorReadyCompletion.Task;
+    }
+
+    public async Task LoadNoteAsync(string title, string content)
+    {
+        int requestId = ++loadRequestId;
         NoteTitle.Text = title;
         currentContent = content;
         pendingTitle = title;
         pendingContent = content;
+        ShowLoadingState($"Opening {title}...");
 
-        if (editorReady)
+        await WarmUpAsync();
+
+        if (requestId != loadRequestId)
         {
-            SendLoadMessage();
+            return;
         }
+
+        currentLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        SendLoadMessage(requestId);
+        await currentLoadCompletion.Task;
+        HideLoadingState();
     }
 
     public string GetContent()
@@ -53,17 +73,26 @@ public partial class EditorView : UserControl
         if (!EditorBundleExists(editorFolder))
         {
             ShowMissingEditorBundleMessage(editorFolder);
+            editorReadyCompletion.TrySetException(new FileNotFoundException("The BlockSuite editor bundle was not found.", editorFolder));
             return;
         }
 
-        CoreWebView2Environment environment = await CreateEditorEnvironmentAsync();
-        await BlockSuiteEditor.EnsureCoreWebView2Async(environment);
+        try
+        {
+            CoreWebView2Environment environment = await CreateEditorEnvironmentAsync();
+            await BlockSuiteEditor.EnsureCoreWebView2Async(environment);
 
-        CoreWebView2 webView = BlockSuiteEditor.CoreWebView2;
-        await InstallDiagnosticsAsync(webView);
-        webView.WebMessageReceived += BlockSuiteEditor_WebMessageReceived;
-        webView.SetVirtualHostNameToFolderMapping(EditorHostName, editorFolder, CoreWebView2HostResourceAccessKind.Allow);
-        BlockSuiteEditor.Source = new Uri($"https://{EditorHostName}/index.html");
+            CoreWebView2 webView = BlockSuiteEditor.CoreWebView2;
+            await InstallDiagnosticsAsync(webView);
+            webView.WebMessageReceived += BlockSuiteEditor_WebMessageReceived;
+            webView.SetVirtualHostNameToFolderMapping(EditorHostName, editorFolder, CoreWebView2HostResourceAccessKind.Allow);
+            BlockSuiteEditor.Source = new Uri($"https://{EditorHostName}/index.html");
+        }
+        catch (Exception ex)
+        {
+            editorReadyCompletion.TrySetException(ex);
+            System.Diagnostics.Debug.WriteLine($"BlockSuite editor failed to start: {ex}");
+        }
     }
 
     private void BlockSuiteEditor_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -80,8 +109,18 @@ public partial class EditorView : UserControl
 
         if (type == ReadyMessageType)
         {
-            editorReady = true;
-            SendLoadMessage();
+            editorReadyCompletion.TrySetResult();
+            return;
+        }
+
+        if (type == LoadedMessageType)
+        {
+            if (TryGetLoadId(root, out int loadedRequestId) && loadedRequestId != lastSentLoadRequestId)
+            {
+                return;
+            }
+
+            currentLoadCompletion?.TrySetResult();
             return;
         }
 
@@ -98,21 +137,39 @@ public partial class EditorView : UserControl
         }
     }
 
-    private void SendLoadMessage()
+    private void SendLoadMessage(int requestId)
     {
         if (BlockSuiteEditor.CoreWebView2 is null)
         {
             return;
         }
 
+        lastSentLoadRequestId = requestId;
+
         string payload = JsonSerializer.Serialize(new
         {
             type = LoadMessageType,
+            loadId = requestId,
             title = pendingTitle,
             content = pendingContent,
         });
 
         BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(payload);
+    }
+
+    private Task EnsureEditorLoadingAsync()
+    {
+        return initializeEditorTask ??= InitializeEditorAsync();
+    }
+
+    private void ShowLoadingState(string message)
+    {
+        NoteTitle.Text = message;
+    }
+
+    private void HideLoadingState()
+    {
+        NoteTitle.Text = pendingTitle;
     }
 
     private static bool EditorBundleExists(string editorFolder)
@@ -137,6 +194,14 @@ public partial class EditorView : UserControl
             "window.addEventListener('unhandledrejection', event => chrome.webview.postMessage({ type: 'diagnostic', level: 'error', message: String(event.reason) }));";
 
         await webView.AddScriptToExecuteOnDocumentCreatedAsync(script);
+    }
+
+    private static bool TryGetLoadId(JsonElement root, out int loadId)
+    {
+        loadId = 0;
+
+        return root.TryGetProperty("loadId", out JsonElement loadIdElement)
+            && loadIdElement.TryGetInt32(out loadId);
     }
 
     private static void ShowMissingEditorBundleMessage(string editorFolder)

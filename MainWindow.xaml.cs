@@ -16,13 +16,17 @@ public partial class MainWindow : Window
     private readonly ReviewView reviewView = new();
     private string currentNotesDirectory = string.Empty;
     private string? currentNotePath;
+    private bool loadingNotesDirectory;
+    private int editorOpenRequestId;
 
     public MainWindow()
     {
         InitializeComponent();
         editorView.ContentChanged += EditorView_ContentChanged;
+        EditorHost.Content = editorView;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
         ShowDashboardView();
+        _ = editorView.WarmUpAsync();
     }
 
     private void DashboardButton_Click(object sender, RoutedEventArgs e)
@@ -31,8 +35,13 @@ public partial class MainWindow : Window
         ShowDashboardView();
     }
 
-    private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private async void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
+        if (loadingNotesDirectory)
+        {
+            return;
+        }
+
         if (e.NewValue is not TreeViewItem selectedItem)
         {
             return;
@@ -40,8 +49,13 @@ public partial class MainWindow : Window
 
         if (selectedItem.Tag is string notePath)
         {
+            if (string.Equals(currentNotePath, notePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             SaveCurrentNote();
-            ShowEditorView(notePath);
+            await ShowEditorViewAsync(notePath);
             return;
         }
 
@@ -57,12 +71,14 @@ public partial class MainWindow : Window
     {
         SaveCurrentNote();
         ViewHost.Content = reviewView;
+        HideEditorHost();
     }
 
     private void DecksButton_Click(object sender, RoutedEventArgs e)
     {
         SaveCurrentNote();
         ViewHost.Content = decksView;
+        HideEditorHost();
     }
 
     private void AddNoteButton_Click(object sender, RoutedEventArgs e)
@@ -107,49 +123,72 @@ public partial class MainWindow : Window
         currentNotePath = null;
         NotesDirectoryTextBox.Text = currentNotesDirectory;
         NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
-        NotesRoot.Items.Clear();
+        loadingNotesDirectory = true;
 
-        List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-            .ToList();
-
-        PopulateRecentNotes(noteFiles);
-
-        foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
+        try
         {
-            NotesRoot.Items.Add(new TreeViewItem
+            NotesRoot.Items.Clear();
+
+            List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+                .ToList();
+
+            PopulateRecentNotes(noteFiles);
+
+            foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
             {
-                Header = Path.GetRelativePath(currentNotesDirectory, filePath),
-                Tag = filePath,
-            });
+                NotesRoot.Items.Add(new TreeViewItem
+                {
+                    Header = Path.GetRelativePath(currentNotesDirectory, filePath),
+                    Tag = filePath,
+                });
+            }
+
+            NotesRoot.IsExpanded = true;
+            NotesRoot.IsSelected = true;
+        }
+        finally
+        {
+            loadingNotesDirectory = false;
         }
 
-        NotesRoot.IsExpanded = true;
-
-        if (NotesRoot.Items.OfType<TreeViewItem>().FirstOrDefault() is { } firstNote)
-        {
-            firstNote.IsSelected = true;
-        }
-        else
-        {
-            ShowDirectoryOverview();
-        }
+        ShowDirectoryOverview();
     }
 
-    private void ShowEditorView(string notePath)
+    private async Task ShowEditorViewAsync(string notePath)
     {
+        int requestId = ++editorOpenRequestId;
+        string content = File.ReadAllText(notePath);
+
+        try
+        {
+            await editorView.LoadNoteAsync(Path.GetFileName(notePath), content);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"The editor could not open this note: {ex.Message}", "Editor Not Ready", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (requestId != editorOpenRequestId)
+        {
+            return;
+        }
+
         currentNotePath = notePath;
-        editorView.ShowNote(Path.GetFileName(notePath), File.ReadAllText(notePath));
-        ViewHost.Content = editorView;
+        ShowEditorHost();
     }
 
     private void ShowDashboardView()
     {
+        editorOpenRequestId++;
         currentNotePath = null;
         ViewHost.Content = dashboardView;
+        HideEditorHost();
     }
 
     private void ShowDirectoryOverview()
     {
+        editorOpenRequestId++;
         currentNotePath = null;
         int noteCount = NotesRoot.Items.Count;
         string title = GetDirectoryName(currentNotesDirectory);
@@ -157,8 +196,35 @@ public partial class MainWindow : Window
             ? "1 Markdown file found."
             : $"{noteCount} Markdown files found.";
 
-        editorView.ShowNote(title, content);
-        ViewHost.Content = editorView;
+        ViewHost.Content = new Border
+        {
+            Background = System.Windows.Media.Brushes.White,
+            BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(215, 222, 232)),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(24),
+            Padding = new Thickness(24),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = title,
+                        FontSize = 20,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 41, 55)),
+                    },
+                    new TextBlock
+                    {
+                        Text = content,
+                        Margin = new Thickness(0, 12, 0, 0),
+                        FontSize = 14,
+                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(88, 96, 120)),
+                    },
+                },
+            },
+        };
+        HideEditorHost();
     }
 
     private void SaveCurrentNote()
@@ -171,12 +237,12 @@ public partial class MainWindow : Window
         File.WriteAllText(currentNotePath, editorView.GetContent());
     }
 
-    private void RecentNoteButton_Click(object sender, RoutedEventArgs e)
+    private async void RecentNoteButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string notePath })
         {
             SaveCurrentNote();
-            ShowEditorView(notePath);
+            await ShowEditorViewAsync(notePath);
             SelectNote(notePath);
         }
     }
@@ -262,5 +328,17 @@ public partial class MainWindow : Window
     private static string GetDirectoryName(string directoryPath)
     {
         return new DirectoryInfo(directoryPath).Name;
+    }
+
+    private void ShowEditorHost()
+    {
+        EditorHostTransform.X = 0;
+        EditorHost.IsHitTestVisible = true;
+    }
+
+    private void HideEditorHost()
+    {
+        EditorHostTransform.X = -10000;
+        EditorHost.IsHitTestVisible = false;
     }
 }

@@ -183,7 +183,23 @@
             </Grid>
         </Border>
 
-        <ContentControl x:Name="ViewHost"
-                        Grid.Column="1" />
+        <Grid Grid.Column="1"
+              ClipToBounds="True">
+            <ContentControl x:Name="ViewHost" />
+
+            <ContentControl x:Name="EditorHost"
+                            Width="{Binding ActualWidth, ElementName=ViewHost}"
+                            Height="{Binding ActualHeight, ElementName=ViewHost}"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            IsHitTestVisible="False"
+                            Focusable="False"
+                            Panel.ZIndex="1">
+                <ContentControl.RenderTransform>
+                    <TranslateTransform x:Name="EditorHostTransform"
+                                        X="-10000" />
+                </ContentControl.RenderTransform>
+            </ContentControl>
+        </Grid>
     </Grid>
 </Window>
