@@ -19,7 +19,10 @@ const editor = new MarkdownBlockSuiteEditor({
 
 addHostMessageListener(message => {
   if (message.type === 'load') {
-    void editor.load(message).finally(() => {
+    void editor.load(message).finally(async () => {
+      await nextFrame();
+      await nextFrame();
+
       postHost({ type: 'loaded', loadId: message.loadId });
     });
   }
@@ -32,5 +35,11 @@ if (!isHostedInWebView()) {
   void editor.load({
     title: 'Preview',
     content: '# BlockSuite preview\n\nThis preview is loaded outside the WPF host.\n\n- **Bold text**\n- *Italic text*\n',
+  });
+}
+
+function nextFrame() {
+  return new Promise<void>(resolve => {
+    requestAnimationFrame(() => resolve());
   });
 }

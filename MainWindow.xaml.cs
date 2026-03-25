@@ -11,7 +11,6 @@ namespace CogntApp;
 public partial class MainWindow : Window
 {
     private readonly DashboardView dashboardView = new();
-    private readonly EditorView editorView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
     private string currentNotesDirectory = string.Empty;
@@ -22,11 +21,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        editorView.ContentChanged += EditorView_ContentChanged;
-        EditorHost.Content = editorView;
+        EditorViewControl.ContentChanged += EditorView_ContentChanged;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
         ShowDashboardView();
-        _ = editorView.WarmUpAsync();
+        _ = EditorViewControl.WarmUpAsync();
     }
 
     private void DashboardButton_Click(object sender, RoutedEventArgs e)
@@ -70,15 +68,17 @@ public partial class MainWindow : Window
     private void ReviewButton_Click(object sender, RoutedEventArgs e)
     {
         SaveCurrentNote();
-        ViewHost.Content = reviewView;
-        HideEditorHost();
+        editorOpenRequestId++;
+        currentNotePath = null;
+        ShowOverlay(reviewView);
     }
 
     private void DecksButton_Click(object sender, RoutedEventArgs e)
     {
         SaveCurrentNote();
-        ViewHost.Content = decksView;
-        HideEditorHost();
+        editorOpenRequestId++;
+        currentNotePath = null;
+        ShowOverlay(decksView);
     }
 
     private void AddNoteButton_Click(object sender, RoutedEventArgs e)
@@ -161,11 +161,15 @@ public partial class MainWindow : Window
 
         try
         {
-            await editorView.LoadNoteAsync(Path.GetFileName(notePath), content);
+            await EditorViewControl.LoadNoteAsync(Path.GetFileName(notePath), content);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"The editor could not open this note: {ex.Message}", "Editor Not Ready", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (requestId == editorOpenRequestId)
+            {
+                MessageBox.Show($"The editor could not open this note: {ex.Message}", "Editor Not Ready", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
             return;
         }
 
@@ -175,15 +179,14 @@ public partial class MainWindow : Window
         }
 
         currentNotePath = notePath;
-        ShowEditorHost();
+        HideOverlay();
     }
 
     private void ShowDashboardView()
     {
         editorOpenRequestId++;
         currentNotePath = null;
-        ViewHost.Content = dashboardView;
-        HideEditorHost();
+        ShowOverlay(dashboardView);
     }
 
     private void ShowDirectoryOverview()
@@ -196,7 +199,7 @@ public partial class MainWindow : Window
             ? "1 Markdown file found."
             : $"{noteCount} Markdown files found.";
 
-        ViewHost.Content = new Border
+        ShowOverlay(new Border
         {
             Background = System.Windows.Media.Brushes.White,
             BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(215, 222, 232)),
@@ -223,8 +226,7 @@ public partial class MainWindow : Window
                     },
                 },
             },
-        };
-        HideEditorHost();
+        });
     }
 
     private void SaveCurrentNote()
@@ -234,7 +236,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        File.WriteAllText(currentNotePath, editorView.GetContent());
+        File.WriteAllText(currentNotePath, EditorViewControl.GetContent());
     }
 
     private async void RecentNoteButton_Click(object sender, RoutedEventArgs e)
@@ -330,15 +332,17 @@ public partial class MainWindow : Window
         return new DirectoryInfo(directoryPath).Name;
     }
 
-    private void ShowEditorHost()
+    private void ShowOverlay(UIElement overlay)
     {
-        EditorHostTransform.X = 0;
-        EditorHost.IsHitTestVisible = true;
+        OverlayHost.Content = overlay;
+        OverlayHost.Visibility = Visibility.Visible;
+        OverlayHost.IsHitTestVisible = true;
     }
 
-    private void HideEditorHost()
+    private void HideOverlay()
     {
-        EditorHostTransform.X = -10000;
-        EditorHost.IsHitTestVisible = false;
+        OverlayHost.Content = null;
+        OverlayHost.Visibility = Visibility.Collapsed;
+        OverlayHost.IsHitTestVisible = false;
     }
 }

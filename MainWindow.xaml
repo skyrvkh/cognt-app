@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CogntApp"
+        xmlns:views="clr-namespace:CogntApp.Views"
         mc:Ignorable="d"
         Title="Cognt App" Height="860" Width="1320" MinHeight="720" MinWidth="980"
         WindowStartupLocation="CenterScreen"
@@ -185,21 +186,10 @@
 
         <Grid Grid.Column="1"
               ClipToBounds="True">
-            <ContentControl x:Name="ViewHost" />
+            <views:EditorView x:Name="EditorViewControl" />
 
-            <ContentControl x:Name="EditorHost"
-                            Width="{Binding ActualWidth, ElementName=ViewHost}"
-                            Height="{Binding ActualHeight, ElementName=ViewHost}"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            IsHitTestVisible="False"
-                            Focusable="False"
-                            Panel.ZIndex="1">
-                <ContentControl.RenderTransform>
-                    <TranslateTransform x:Name="EditorHostTransform"
-                                        X="-10000" />
-                </ContentControl.RenderTransform>
-            </ContentControl>
+            <ContentControl x:Name="OverlayHost"
+                            Panel.ZIndex="10" />
         </Grid>
     </Grid>
 </Window>

@@ -20,8 +20,6 @@ public partial class EditorView : UserControl
     private TaskCompletionSource? currentLoadCompletion;
     private Task? initializeEditorTask;
     private string currentContent = string.Empty;
-    private string pendingTitle = string.Empty;
-    private string pendingContent = string.Empty;
     private int loadRequestId;
     private int lastSentLoadRequestId;
 
@@ -36,7 +34,10 @@ public partial class EditorView : UserControl
     public async Task WarmUpAsync()
     {
         await EnsureEditorLoadingAsync();
-        await editorReadyCompletion.Task;
+        await WaitWithTimeoutAsync(
+            editorReadyCompletion.Task,
+            TimeSpan.FromSeconds(8),
+            "The editor did not finish starting.");
     }
 
     public async Task LoadNoteAsync(string title, string content)
@@ -44,9 +45,6 @@ public partial class EditorView : UserControl
         int requestId = ++loadRequestId;
         NoteTitle.Text = title;
         currentContent = content;
-        pendingTitle = title;
-        pendingContent = content;
-        ShowLoadingState($"Opening {title}...");
 
         await WarmUpAsync();
 
@@ -56,9 +54,11 @@ public partial class EditorView : UserControl
         }
 
         currentLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        SendLoadMessage(requestId);
-        await currentLoadCompletion.Task;
-        HideLoadingState();
+        SendLoadMessage(requestId, title, content);
+        await WaitWithTimeoutAsync(
+            currentLoadCompletion.Task,
+            TimeSpan.FromSeconds(8),
+            "The editor did not finish loading the note.");
     }
 
     public string GetContent()
@@ -137,7 +137,7 @@ public partial class EditorView : UserControl
         }
     }
 
-    private void SendLoadMessage(int requestId)
+    private void SendLoadMessage(int requestId, string title, string content)
     {
         if (BlockSuiteEditor.CoreWebView2 is null)
         {
@@ -150,8 +150,8 @@ public partial class EditorView : UserControl
         {
             type = LoadMessageType,
             loadId = requestId,
-            title = pendingTitle,
-            content = pendingContent,
+            title,
+            content,
         });
 
         BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(payload);
@@ -160,16 +160,6 @@ public partial class EditorView : UserControl
     private Task EnsureEditorLoadingAsync()
     {
         return initializeEditorTask ??= InitializeEditorAsync();
-    }
-
-    private void ShowLoadingState(string message)
-    {
-        NoteTitle.Text = message;
-    }
-
-    private void HideLoadingState()
-    {
-        NoteTitle.Text = pendingTitle;
     }
 
     private static bool EditorBundleExists(string editorFolder)
@@ -202,6 +192,18 @@ public partial class EditorView : UserControl
 
         return root.TryGetProperty("loadId", out JsonElement loadIdElement)
             && loadIdElement.TryGetInt32(out loadId);
+    }
+
+    private static async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
+    {
+        Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
+
+        if (completedTask != task)
+        {
+            throw new TimeoutException(timeoutMessage);
+        }
+
+        await task;
     }
 
     private static void ShowMissingEditorBundleMessage(string editorFolder)
