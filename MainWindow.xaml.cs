@@ -10,6 +10,7 @@ namespace CogntApp;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly DashboardView dashboardView = new();
     private readonly EditorView editorView = new();
     private readonly DecksView decksView = new();
     private readonly ReviewView reviewView = new();
@@ -21,6 +22,13 @@ public partial class MainWindow : Window
         InitializeComponent();
         editorView.ContentChanged += EditorView_ContentChanged;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
+        ShowDashboardView();
+    }
+
+    private void DashboardButton_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentNote();
+        ShowDashboardView();
     }
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -132,6 +140,12 @@ public partial class MainWindow : Window
         currentNotePath = notePath;
         editorView.ShowNote(Path.GetFileName(notePath), File.ReadAllText(notePath));
         ViewHost.Content = editorView;
+    }
+
+    private void ShowDashboardView()
+    {
+        currentNotePath = null;
+        ViewHost.Content = dashboardView;
     }
 
     private void ShowDirectoryOverview()
