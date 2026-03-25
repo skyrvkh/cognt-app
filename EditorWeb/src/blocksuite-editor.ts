@@ -4,6 +4,7 @@ import { BlockStdScope, type EditorHost } from '@blocksuite/block-std';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { createEmptyDoc, type PageEditor } from '@blocksuite/presets';
 import { Job, type Doc, type DraftModel } from '@blocksuite/store';
+import { replaceSelectionWithCloze, updateClozeHighlights, type TextSelection } from './cloze';
 import { reportDiagnostic } from './host';
 
 const saveDebounceMs = 500;
@@ -37,6 +38,8 @@ export type MarkdownEditorOptions = {
 };
 
 export type LoadMarkdownOptions = {
+  loadId?: number;
+  path?: string;
   title?: string;
   content?: string;
 };
@@ -48,9 +51,11 @@ export class MarkdownBlockSuiteEditor {
   private readonly onCreateExtract: (message: CreateExtractMessage) => void;
   private readonly onSaveCloze: (message: SaveClozeMessage) => void;
   private currentDoc: Doc | null = null;
+  private currentPath = '';
   private loadingDocument = false;
   private saveTimer: number | undefined;
   private statusTimer: number | undefined;
+  private clozeHighlightFrame: number | undefined;
   private blockUpdatedDisposable: { dispose(): void } | null = null;
 
   public constructor(options: MarkdownEditorOptions) {
@@ -70,6 +75,8 @@ export class MarkdownBlockSuiteEditor {
   public async load(options: LoadMarkdownOptions) {
     this.loadingDocument = true;
     window.clearTimeout(this.saveTimer);
+    this.cancelScheduledClozeHighlightUpdate();
+    this.currentPath = options.path ?? '';
 
     try {
       const markdown = options.content ?? '';
@@ -79,6 +86,7 @@ export class MarkdownBlockSuiteEditor {
       this.editor.hasViewport = true;
       this.bindDocChangeEvents(nextDoc);
       await this.flushHost();
+      this.refreshClozeHighlights();
       reportDiagnostic('info', `Imported Markdown into BlockSuite (${markdown.length} characters).`);
       this.showStatus(`Opened ${options.title ?? 'document'}.`);
     } catch (error) {
@@ -90,9 +98,49 @@ export class MarkdownBlockSuiteEditor {
     }
   }
 
+  public showStatus(message: string) {
+    this.statusElement.textContent = message;
+    this.statusElement.dataset.visible = 'true';
+    window.clearTimeout(this.statusTimer);
+    this.statusTimer = window.setTimeout(() => {
+      this.statusElement.dataset.visible = 'false';
+    }, statusHideMs);
+  }
+
   private bindEditorEvents() {
-    this.editor.addEventListener('input', () => this.scheduleContentChanged());
-    this.editor.addEventListener('keyup', () => this.scheduleContentChanged());
+    document.addEventListener(
+      'keydown',
+      event => {
+        if (!this.currentDoc || !this.currentPath) {
+          return;
+        }
+
+        if (isEditorShortcut(event, 'x')) {
+          void this.handleCreateExtractShortcut(event);
+          return;
+        }
+
+        if (isEditorShortcut(event, 'z')) {
+          void this.handleClozeShortcut(event);
+        }
+      },
+      true
+    );
+
+    document.addEventListener('selectionchange', () => {
+      if (this.currentDoc) {
+        this.scheduleClozeHighlightUpdate();
+      }
+    });
+
+    this.editor.addEventListener('input', () => {
+      this.scheduleClozeHighlightUpdate();
+      this.scheduleContentChanged();
+    });
+    this.editor.addEventListener('keyup', () => {
+      this.scheduleClozeHighlightUpdate();
+      this.scheduleContentChanged();
+    });
     this.editor.addEventListener('paste', () => this.scheduleContentChanged());
   }
 
@@ -128,19 +176,147 @@ export class MarkdownBlockSuiteEditor {
 
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(async () => {
+      this.saveTimer = undefined;
+      this.refreshClozeHighlights();
       const content = await exportDocMarkdown(this.currentDoc);
       this.onContentChanged(content);
     }, saveDebounceMs);
   }
 
-  public showStatus(message: string) {
-    this.statusElement.textContent = message;
-    this.statusElement.dataset.visible = 'true';
-    window.clearTimeout(this.statusTimer);
-    this.statusTimer = window.setTimeout(() => {
-      this.statusElement.dataset.visible = 'false';
-    }, statusHideMs);
+  private cancelPendingContentChanged() {
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
   }
+
+  private scheduleClozeHighlightUpdate() {
+    if (this.clozeHighlightFrame !== undefined) {
+      return;
+    }
+
+    this.clozeHighlightFrame = window.requestAnimationFrame(() => {
+      this.clozeHighlightFrame = undefined;
+      if (this.currentDoc) {
+        updateClozeHighlights(this.editor);
+      }
+    });
+  }
+
+  private refreshClozeHighlights() {
+    this.cancelScheduledClozeHighlightUpdate();
+    updateClozeHighlights(this.editor);
+  }
+
+  private cancelScheduledClozeHighlightUpdate() {
+    if (this.clozeHighlightFrame === undefined) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.clozeHighlightFrame);
+    this.clozeHighlightFrame = undefined;
+  }
+
+  private async handleCreateExtractShortcut(event: KeyboardEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const selection = getCurrentSelection();
+    if (!selection) {
+      this.showStatus('Ctrl+X needs selected text.');
+      return;
+    }
+
+    this.onCreateExtract({
+      type: 'createExtract',
+      sourcePath: this.currentPath,
+      selectedMarkdown: selection.markdown,
+      selectedPlainText: selection.plainText,
+    });
+    this.showStatus('Creating Markdown extract...');
+  }
+
+  private async handleClozeShortcut(event: KeyboardEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const selection = getCurrentSelection();
+    if (!selection) {
+      this.showStatus('Ctrl+Z is disabled unless text is selected.');
+      return;
+    }
+
+    let clozeText: string;
+    try {
+      clozeText = replaceSelectionWithCloze(this.createClozeContext(), selection.plainText);
+    } catch (error) {
+      this.showStatus(
+        error instanceof Error ? error.message : 'Could not hide the selected text in place.'
+      );
+      return;
+    }
+
+    this.editor.host?.selection.clear(['text']);
+    window.getSelection()?.removeAllRanges();
+    await this.flushHost();
+    await new Promise(resolve => window.requestAnimationFrame(resolve));
+    this.refreshClozeHighlights();
+    this.cancelPendingContentChanged();
+    const markdown = await exportDocMarkdown(this.currentDoc);
+    this.onSaveCloze({
+      type: 'saveCloze',
+      sourcePath: this.currentPath,
+      selectedPlainText: selection.plainText,
+      clozeText,
+      markdown,
+    });
+    this.showStatus('Selection hidden in place with cloze.');
+  }
+
+  private getTextSelection() {
+    return this.editor.std?.selection.find('text') as TextSelection | null | undefined;
+  }
+
+  private createClozeContext() {
+    return {
+      doc: this.currentDoc,
+      textSelection: this.getTextSelection(),
+    };
+  }
+}
+
+type ShortcutKey = 'x' | 'z';
+
+function isEditorShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>,
+  key: ShortcutKey
+) {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === key
+  );
+}
+
+function getCurrentSelection() {
+  const selectedText = window.getSelection()?.toString() ?? '';
+  const plainText = normalizeSelectionText(selectedText);
+
+  if (plainText.length === 0) {
+    return null;
+  }
+
+  return {
+    plainText,
+    markdown: ensureTrailingNewline(selectedText.trim()),
+  };
+}
+
+function normalizeSelectionText(text: string) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function ensureTrailingNewline(text: string) {
+  return text.endsWith('\n') ? text : `${text}\n`;
 }
 
 function patchBlockStdRender() {
