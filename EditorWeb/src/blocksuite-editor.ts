@@ -198,7 +198,7 @@ export class MarkdownBlockSuiteEditor {
       }
 
       if (this.mentions.isShowingPreview()) {
-        this.mentions.hidePreview();
+        this.mentions.schedulePreviewHide();
       }
     });
     this.editor.addEventListener('paste', () => {

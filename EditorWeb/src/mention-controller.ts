@@ -10,6 +10,7 @@ import {
 } from './mentions';
 
 const previewDelayMs = 220;
+const previewDismissDelayMs = 200;
 const previewMaxCharacters = 0;
 const highlightName = 'cognt-mention';
 const maxNativeMentionItems = 8;
@@ -85,6 +86,7 @@ export class MentionController {
   private targets: MentionTarget[] = [];
   private highlightFrame: number | undefined;
   private hoverTimer: number | undefined;
+  private previewHideTimer: number | undefined;
   private hoverPath = '';
   private pendingPreviewRequestId = '';
   private activeViewMode: MentionViewMode | null = null;
@@ -95,6 +97,8 @@ export class MentionController {
     this.options = options;
     this.editor = options.editor;
     this.previewElement = options.previewElement;
+    this.previewElement.addEventListener('mouseenter', () => this.cancelScheduledPreviewHide());
+    this.previewElement.addEventListener('mouseleave', () => this.schedulePreviewHide());
   }
 
   public setTargets(targets: MentionTarget[]) {
@@ -120,6 +124,7 @@ export class MentionController {
       return;
     }
 
+    this.cancelScheduledPreviewHide();
     const mode = result.mode ?? this.activeViewMode ?? 'preview';
     this.activeViewMode = mode;
     this.previewElement.dataset.mode = mode;
@@ -170,14 +175,20 @@ export class MentionController {
     const mention = this.getHitFromPoint(event.clientX, event.clientY);
     if (!mention) {
       this.clearHoverTimer();
+      this.hoverPath = '';
 
       if (this.activeViewMode === 'preview') {
-        this.hidePreview();
+        this.schedulePreviewHide();
       }
       return;
     }
 
-    if (mention.relativePath === this.hoverPath) {
+    this.cancelScheduledPreviewHide();
+
+    if (
+      mention.relativePath === this.hoverPath &&
+      (this.hoverTimer !== undefined || this.activeViewMode === 'preview')
+    ) {
       return;
     }
 
@@ -223,9 +234,34 @@ export class MentionController {
     this.viewAnchor = null;
     this.hoverPath = '';
     this.clearHoverTimer();
+    this.cancelScheduledPreviewHide();
     this.previewElement.dataset.visible = 'false';
     this.previewElement.dataset.mode = '';
     this.previewElement.innerHTML = '';
+  }
+
+  public schedulePreviewHide() {
+    if (this.activeViewMode !== 'preview' || this.previewHideTimer !== undefined) {
+      return;
+    }
+
+    this.clearHoverTimer();
+    this.previewHideTimer = window.setTimeout(() => {
+      this.previewHideTimer = undefined;
+
+      if (this.activeViewMode === 'preview') {
+        this.hidePreview();
+      }
+    }, previewDismissDelayMs);
+  }
+
+  public cancelScheduledPreviewHide() {
+    if (this.previewHideTimer === undefined) {
+      return;
+    }
+
+    window.clearTimeout(this.previewHideTimer);
+    this.previewHideTimer = undefined;
   }
 
   public containsFloatingUi(target: Node) {
@@ -342,12 +378,13 @@ export class MentionController {
       return;
     }
 
+    this.cancelScheduledPreviewHide();
     const requestId = this.makeRequestId();
     this.pendingPreviewRequestId = requestId;
     this.activeViewMode = mode;
     this.viewAnchor = anchor;
     this.previewElement.dataset.mode = mode;
-    this.previewElement.innerHTML = `<div class="mention-preview-body"><p>${
+    this.previewElement.innerHTML = `<div class="mention-preview-body mention-preview-body--static"><p>${
       mode === 'full' ? 'Opening document...' : 'Loading preview...'
     }</p></div>`;
     this.previewElement.dataset.visible = 'true';

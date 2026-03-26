@@ -56,9 +56,9 @@ export function findMentionAtOffset(text: string, offset: number) {
 
 export function buildMentionPreviewHtml(result: MentionPreviewResult) {
   if (!result.ok) {
-    return `<div class="mention-preview-error">${escapeHtml(
+    return `<div class="mention-preview-body mention-preview-body--static"><p class="mention-preview-error">${escapeHtml(
       result.error ?? 'Preview unavailable.'
-    )}</div>`;
+    )}</p></div>`;
   }
 
   const body = renderPreviewMarkdown(result.markdownExcerpt ?? '');
@@ -218,7 +218,7 @@ function renderPreviewMarkdown(markdown: string) {
   }
 
   flushOpenBlocks();
-  return html.join('') || '<p>Empty note.</p>';
+  return html.join('') || '<p class="mention-preview-empty">Empty note.</p>';
 }
 
 function renderInlineMarkdown(value: string) {
@@ -230,8 +230,8 @@ function renderInlineMarkdown(value: string) {
   });
 
   let rendered = escapeHtml(withCodePlaceholders);
-  rendered = rendered.replace(/!\[([^\]]*)\]\([^)]+\)/g, '<em>$1</em>');
-  rendered = rendered.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  rendered = rendered.replace(/!\[([^\]]*)\]\([^)]+\)/g, '<em class="mention-preview-image">$1</em>');
+  rendered = rendered.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="mention-preview-link">$1</span>');
   rendered = rendered.replace(/~~([^~]+)~~/g, '<del>$1</del>');
   rendered = rendered.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   rendered = rendered.replace(/__([^_]+)__/g, '<strong>$1</strong>');
