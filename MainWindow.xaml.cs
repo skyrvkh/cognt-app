@@ -33,6 +33,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         EditorViewControl.ContentChanged += EditorView_ContentChanged;
         EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
+        EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
+        EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
         LoadNotesDirectory(ResolveDefaultNotesDirectory());
         ShowDashboardView();
         _ = EditorViewControl.WarmUpAsync();
@@ -138,6 +140,7 @@ public partial class MainWindow : Window
         NotesDirectoryTextBox.Text = currentNotesDirectory;
         NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
         RefreshNotesTree();
+        SendMentionTargets();
 
         ShowDirectoryOverview();
     }
@@ -168,6 +171,7 @@ public partial class MainWindow : Window
 
         currentNotePath = notePath;
         lastSavedContent = content;
+        SendMentionTargets();
         HideOverlay();
     }
 
@@ -242,11 +246,57 @@ public partial class MainWindow : Window
                 sourcePath ?? string.Empty,
                 e.SelectedMarkdown));
             RefreshNotesTree(selectPath: currentNotePath);
+            SendMentionTargets();
             EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
         }
         catch (Exception ex)
         {
             EditorViewControl.PostExtractResult(sourcePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void EditorView_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
+    {
+        try
+        {
+            MarkdownMentionPreview preview = noteService.ReadMentionPreview(
+                currentNotesDirectory,
+                e.RelativePath,
+                e.MaxCharacters);
+
+            EditorViewControl.PostMentionPreviewResult(
+                e.RequestId,
+                preview.RelativePath,
+                e.Mode,
+                ok: true,
+                title: preview.Title,
+                markdownExcerpt: preview.MarkdownExcerpt);
+        }
+        catch (Exception ex)
+        {
+            EditorViewControl.PostMentionPreviewResult(
+                e.RequestId,
+                e.RelativePath,
+                e.Mode,
+                ok: false,
+                error: ex.Message);
+        }
+    }
+
+    private async void EditorView_OpenMentionRequested(object? sender, OpenMentionRequestedEventArgs e)
+    {
+        try
+        {
+            SaveMentionSource(e);
+
+            string targetPath = noteService.ResolveMentionPath(currentNotesDirectory, e.RelativePath);
+            await ShowEditorViewAsync(targetPath);
+            SelectNote(targetPath);
+            EditorViewControl.PostMentionOpenResult(e.RelativePath, ok: true);
+        }
+        catch (Exception ex)
+        {
+            EditorViewControl.PostMentionOpenResult(e.RelativePath, ok: false, error: ex.Message);
         }
     }
 
@@ -364,6 +414,54 @@ public partial class MainWindow : Window
 
         noteService.SaveNote(currentNotePath, content);
         lastSavedContent = content;
+    }
+
+    private void SaveMentionSource(OpenMentionRequestedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotePath)
+            || !string.Equals(
+                Path.GetFullPath(e.SourcePath),
+                Path.GetFullPath(currentNotePath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The mention source is not the current Markdown file.");
+        }
+
+        SaveNoteIfChanged(e.Markdown);
+    }
+
+    private void SendMentionTargets()
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
+        {
+            return;
+        }
+
+        IReadOnlyList<MarkdownMentionTarget> targets = noteService.ListMentionTargets(
+            currentNotesDirectory,
+            CreateRecentMentionRanks());
+
+        EditorViewControl.PostMentionTargets(currentNotesDirectory, targets);
+    }
+
+    private IReadOnlyDictionary<string, int> CreateRecentMentionRanks()
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
+        {
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return Directory
+            .EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+            .OrderByDescending(File.GetLastWriteTime)
+            .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .Select((path, index) => new
+            {
+                Path = Path.GetFullPath(path),
+                Rank = index,
+            })
+            .ToDictionary(item => item.Path, item => item.Rank, StringComparer.OrdinalIgnoreCase);
     }
 
     private static string ResolveDefaultNotesDirectory()

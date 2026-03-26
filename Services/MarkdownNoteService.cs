@@ -14,6 +14,13 @@ public interface IMarkdownNoteService
     IReadOnlyList<MarkdownMentionTarget> ListMentionTargets(
         string notesDirectory,
         IReadOnlyDictionary<string, int>? recentRanks = null);
+
+    MarkdownMentionPreview ReadMentionPreview(
+        string notesDirectory,
+        string relativePath,
+        int maxCharacters);
+
+    string ResolveMentionPath(string notesDirectory, string relativePath);
 }
 
 public sealed record CreateExtractFileRequest(
@@ -28,6 +35,11 @@ public sealed record MarkdownMentionTarget(
     string FileName,
     string Title,
     int? RecentRank);
+
+public sealed record MarkdownMentionPreview(
+    string RelativePath,
+    string Title,
+    string MarkdownExcerpt);
 
 public sealed class MarkdownNoteService : IMarkdownNoteService
 {
@@ -103,6 +115,52 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
             .ToArray();
     }
 
+    public MarkdownMentionPreview ReadMentionPreview(
+        string notesDirectory,
+        string relativePath,
+        int maxCharacters)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string path = ResolveMentionPath(root, relativePath);
+        string content = File.ReadAllText(path);
+
+        return new MarkdownMentionPreview(
+            NormalizeRelativePath(Path.GetRelativePath(root, path)),
+            ExtractTitle(content, Path.GetFileName(path)),
+            CreateExcerpt(content, Math.Max(0, maxCharacters)));
+    }
+
+    public string ResolveMentionPath(string notesDirectory, string relativePath)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new ArgumentException("Mention path is required.", nameof(relativePath));
+        }
+
+        string platformRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+        if (Path.IsPathRooted(platformRelativePath))
+        {
+            throw new UnauthorizedAccessException("Mention paths must be relative to the open Markdown root.");
+        }
+
+        string fullPath = Path.GetFullPath(Path.Combine(root, platformRelativePath));
+        if (!IsPathInsideRoot(fullPath, root))
+        {
+            throw new UnauthorizedAccessException("Mention path is outside the open Markdown root.");
+        }
+
+        EnsureMarkdownPath(fullPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The mentioned Markdown file does not exist.", fullPath);
+        }
+
+        return fullPath;
+    }
+
     private static void ValidateExtractRequest(CreateExtractFileRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.SelectedMarkdown))
@@ -164,9 +222,30 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
             : null;
     }
 
+    private static string GetExistingNotesRoot(string notesDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(notesDirectory))
+        {
+            throw new InvalidOperationException("No Markdown root is open.");
+        }
+
+        string root = NormalizeRoot(notesDirectory);
+        return Directory.Exists(root)
+            ? root
+            : throw new DirectoryNotFoundException($"The notes directory does not exist: {root}");
+    }
+
     private static string NormalizeRoot(string path)
     {
         return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+    }
+
+    private static void EnsureMarkdownPath(string path)
+    {
+        if (!string.Equals(Path.GetExtension(path), ".md", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Mentions can only open Markdown files.");
+        }
     }
 
     private static bool IsPathInsideRoot(string fullPath, string fullRoot)
@@ -221,5 +300,23 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         }
 
         return Path.GetFileNameWithoutExtension(fileName);
+    }
+
+    private static string CreateExcerpt(string markdown, int maxCharacters)
+    {
+        string normalized = markdown.Trim();
+        if (maxCharacters == 0 || normalized.Length <= maxCharacters)
+        {
+            return normalized;
+        }
+
+        string candidate = normalized[..maxCharacters];
+        int lastLineBreak = candidate.LastIndexOf('\n');
+        if (lastLineBreak >= 200)
+        {
+            candidate = candidate[..lastLineBreak];
+        }
+
+        return $"{candidate.TrimEnd()}...";
     }
 }
