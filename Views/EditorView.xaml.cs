@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using CogntApp.Services;
 using Microsoft.Web.WebView2.Core;
 
 namespace CogntApp.Views;
@@ -22,6 +23,8 @@ public partial class EditorView : UserControl
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
+    public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
+    public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
 
     public EditorView()
     {
@@ -128,6 +131,14 @@ public partial class EditorView : UserControl
                 HandleSaveClozeMessage(root);
                 return;
 
+            case EditorWebMessageTypes.RequestMentionPreview:
+                HandleMentionPreviewMessage(root);
+                return;
+
+            case EditorWebMessageTypes.OpenMention:
+                HandleOpenMentionMessage(root);
+                return;
+
             case EditorWebMessageTypes.Diagnostic:
                 WriteDiagnosticMessage(root);
                 return;
@@ -142,6 +153,56 @@ public partial class EditorView : UserControl
             path,
             ok,
             createdPath,
+            error,
+        });
+    }
+
+    public void PostMentionTargets(string rootPath, IEnumerable<MarkdownMentionTarget> targets)
+    {
+        PostMessage(new
+        {
+            type = EditorWebMessageTypes.SetMentionTargets,
+            rootPath,
+            files = targets.Select(target => new
+            {
+                path = target.Path,
+                relativePath = target.RelativePath,
+                fileName = target.FileName,
+                title = target.Title,
+                recentRank = target.RecentRank,
+            }),
+        });
+    }
+
+    public void PostMentionPreviewResult(
+        string requestId,
+        string relativePath,
+        string mode,
+        bool ok,
+        string? title = null,
+        string? markdownExcerpt = null,
+        string? error = null)
+    {
+        PostMessage(new
+        {
+            type = EditorWebMessageTypes.MentionPreviewResult,
+            requestId,
+            ok,
+            relativePath,
+            mode,
+            title,
+            markdownExcerpt,
+            error,
+        });
+    }
+
+    public void PostMentionOpenResult(string relativePath, bool ok, string? error = null)
+    {
+        PostMessage(new
+        {
+            type = EditorWebMessageTypes.MentionOpenResult,
+            ok,
+            relativePath,
             error,
         });
     }
@@ -225,6 +286,77 @@ public partial class EditorView : UserControl
         catch (Exception ex)
         {
             PostSaveResult(sourcePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void HandleMentionPreviewMessage(JsonElement root)
+    {
+        string requestId = GetOptionalString(root, "requestId") ?? Guid.NewGuid().ToString("N");
+        string sourcePath = GetOptionalString(root, "sourcePath") ?? string.Empty;
+        string relativePath = GetOptionalString(root, "relativePath") ?? string.Empty;
+        string mode = GetOptionalString(root, "mode") ?? "preview";
+        int maxCharacters = GetOptionalInt(root, "maxCharacters") ?? (mode == "full" ? 8000 : 1200);
+
+        if (!IsCurrentSourcePath(sourcePath))
+        {
+            PostMentionPreviewResult(
+                requestId,
+                relativePath,
+                mode,
+                ok: false,
+                error: "The mention preview source is not the current Markdown file.");
+            return;
+        }
+
+        EventHandler<MentionPreviewRequestedEventArgs>? handler = MentionPreviewRequested;
+        if (handler is null)
+        {
+            PostMentionPreviewResult(requestId, relativePath, mode, ok: false, error: "No mention preview handler is registered.");
+            return;
+        }
+
+        try
+        {
+            handler.Invoke(this, new MentionPreviewRequestedEventArgs(
+                requestId,
+                sourcePath,
+                relativePath,
+                mode,
+                maxCharacters));
+        }
+        catch (Exception ex)
+        {
+            PostMentionPreviewResult(requestId, relativePath, mode, ok: false, error: ex.Message);
+        }
+    }
+
+    private void HandleOpenMentionMessage(JsonElement root)
+    {
+        string sourcePath = GetOptionalString(root, "sourcePath") ?? string.Empty;
+        string relativePath = GetOptionalString(root, "relativePath") ?? string.Empty;
+        string markdown = GetOptionalString(root, "markdown") ?? currentContent;
+
+        if (!IsCurrentSourcePath(sourcePath))
+        {
+            PostMentionOpenResult(relativePath, ok: false, error: "The mention source is not the current Markdown file.");
+            return;
+        }
+
+        EventHandler<OpenMentionRequestedEventArgs>? handler = OpenMentionRequested;
+        if (handler is null)
+        {
+            PostMentionOpenResult(relativePath, ok: false, error: "No mention open handler is registered.");
+            return;
+        }
+
+        try
+        {
+            currentContent = markdown;
+            handler.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, markdown));
+        }
+        catch (Exception ex)
+        {
+            PostMentionOpenResult(relativePath, ok: false, error: ex.Message);
         }
     }
 
@@ -315,6 +447,13 @@ public partial class EditorView : UserControl
     {
         return root.TryGetProperty(propertyName, out JsonElement property)
             ? property.GetString()
+            : null;
+    }
+
+    private static int? GetOptionalInt(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out JsonElement property) && property.TryGetInt32(out int value)
+            ? value
             : null;
     }
 
