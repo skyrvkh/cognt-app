@@ -1,3 +1,5 @@
+import type { MentionPreviewResult, MentionTarget } from './mentions';
+
 export type HostMessage =
   | {
       type: 'load';
@@ -17,6 +19,19 @@ export type HostMessage =
       path?: string;
       ok: boolean;
       createdPath?: string;
+      error?: string;
+    }
+  | {
+      type: 'setMentionTargets';
+      files: MentionTarget[];
+    }
+  | MentionPreviewResult & {
+      type: 'mentionPreviewResult';
+    }
+  | {
+      type: 'mentionOpenResult';
+      ok: boolean;
+      relativePath?: string;
       error?: string;
     };
 

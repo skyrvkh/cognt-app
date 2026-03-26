@@ -18,6 +18,7 @@ public partial class EditorView : UserControl
     private Task? initializeEditorTask;
     private string currentContent = string.Empty;
     private string? currentSourcePath;
+    private string? mentionTargetsJson;
     private int loadRequestId;
     private int lastSentLoadRequestId;
 
@@ -113,10 +114,12 @@ public partial class EditorView : UserControl
         {
             case EditorWebMessageTypes.Ready:
                 editorReadyCompletion.TrySetResult();
+                FlushMentionTargets();
                 return;
 
             case EditorWebMessageTypes.Loaded:
                 CompleteLoadMessage(root);
+                FlushMentionTargets();
                 return;
 
             case EditorWebMessageTypes.ContentChanged:
@@ -157,21 +160,21 @@ public partial class EditorView : UserControl
         });
     }
 
-    public void PostMentionTargets(string rootPath, IEnumerable<MarkdownMentionTarget> targets)
+    public void PostMentionTargets(IEnumerable<MarkdownMentionTarget> targets)
     {
-        PostMessage(new
+        string payload = JsonSerializer.Serialize(new
         {
             type = EditorWebMessageTypes.SetMentionTargets,
-            rootPath,
             files = targets.Select(target => new
             {
-                path = target.Path,
                 relativePath = target.RelativePath,
                 fileName = target.FileName,
-                title = target.Title,
                 recentRank = target.RecentRank,
             }),
         });
+
+        mentionTargetsJson = payload;
+        FlushMentionTargets();
     }
 
     public void PostMentionPreviewResult(
@@ -397,6 +400,16 @@ public partial class EditorView : UserControl
         }
 
         BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
+    }
+
+    private void FlushMentionTargets()
+    {
+        if (BlockSuiteEditor.CoreWebView2 is null || string.IsNullOrWhiteSpace(mentionTargetsJson))
+        {
+            return;
+        }
+
+        BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(mentionTargetsJson);
     }
 
     private Task EnsureEditorLoadingAsync()

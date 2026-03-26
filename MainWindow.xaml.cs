@@ -441,7 +441,7 @@ public partial class MainWindow : Window
             currentNotesDirectory,
             CreateRecentMentionRanks());
 
-        EditorViewControl.PostMentionTargets(currentNotesDirectory, targets);
+        EditorViewControl.PostMentionTargets(targets);
     }
 
     private IReadOnlyDictionary<string, int> CreateRecentMentionRanks()

@@ -30,10 +30,8 @@ public sealed record CreateExtractFileRequest(
     string SelectedMarkdown);
 
 public sealed record MarkdownMentionTarget(
-    string Path,
     string RelativePath,
     string FileName,
-    string Title,
     int? RecentRank);
 
 public sealed record MarkdownMentionPreview(
@@ -185,7 +183,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
 
         string fullPath = Path.GetFullPath(path);
         string fullCurrentPath = Path.GetFullPath(currentPath);
-        string fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        string fullRoot = NormalizeRoot(root);
 
         return string.Equals(fullPath, fullCurrentPath, StringComparison.OrdinalIgnoreCase)
             && IsPathInsideRoot(fullPath, fullRoot)
@@ -203,10 +201,8 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         int? recentRank = TryGetRecentRank(fullPath, recentRanks);
 
         return new MarkdownMentionTarget(
-            fullPath,
             relativePath,
             fileName,
-            ExtractTitle(File.ReadAllText(fullPath), fileName),
             recentRank);
     }
 

@@ -1,14 +1,7 @@
 export type MentionTarget = {
-  path: string;
   relativePath: string;
   fileName: string;
-  title: string;
   recentRank?: number | null;
-};
-
-export type MentionTrigger = {
-  query: string;
-  startIndex: number;
 };
 
 export type MentionViewMode = 'preview' | 'full';
@@ -23,38 +16,22 @@ export type MentionPreviewResult = {
   error?: string;
 };
 
-export function getMentionTrigger(textBeforeCaret: string): MentionTrigger | null {
-  const match = /(?:^|[\s([{])\[\[([^\]\[\n]{0,80})$/.exec(textBeforeCaret);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    query: match[1],
-    startIndex: match.index + match[0].lastIndexOf('[['),
-  };
-}
-
-export function filterMentionTargets(targets: MentionTarget[], query: string, limit = 8) {
+export function filterMentionTargets(targets: MentionTarget[], query: string, limit?: number) {
   const normalizedQuery = query.trim().toLowerCase();
 
   if (normalizedQuery.length === 0) {
-    return [...targets].sort(compareMentionTargetsByRecentThenPath).slice(0, limit);
+    return limitMentionTargets([...targets].sort(compareMentionTargetsByRecentThenPath), limit);
   }
 
-  return [...targets]
+  const matches = [...targets]
     .filter(target => {
       const relativePath = target.relativePath.toLowerCase();
       const fileName = target.fileName.toLowerCase();
-      const title = target.title.toLowerCase();
-      return (
-        relativePath.includes(normalizedQuery) ||
-        fileName.includes(normalizedQuery) ||
-        title.includes(normalizedQuery)
-      );
+      return relativePath.includes(normalizedQuery) || fileName.includes(normalizedQuery);
     })
-    .sort((left, right) => left.relativePath.localeCompare(right.relativePath))
-    .slice(0, limit);
+    .sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+
+  return limitMentionTargets(matches, limit);
 }
 
 export function findMentionAtOffset(text: string, offset: number) {
@@ -108,6 +85,10 @@ function compareMentionTargetsByRecentThenPath(left: MentionTarget, right: Menti
   }
 
   return left.relativePath.localeCompare(right.relativePath);
+}
+
+function limitMentionTargets(targets: MentionTarget[], limit: number | undefined) {
+  return typeof limit === 'number' ? targets.slice(0, limit) : targets;
 }
 
 function renderPreviewMarkdown(markdown: string) {

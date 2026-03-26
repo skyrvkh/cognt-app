@@ -8,17 +8,21 @@ installHostDiagnostics();
 
 const editorHost = document.querySelector<HTMLElement>('#editor-host');
 const editorStatusElement = document.querySelector<HTMLElement>('#editor-status');
+const mentionPreviewElement = document.querySelector<HTMLElement>('#mention-preview');
 
-if (!editorHost || !editorStatusElement) {
+if (!editorHost || !editorStatusElement || !mentionPreviewElement) {
   throw new Error('Editor host elements are missing.');
 }
 
 const editor = new MarkdownBlockSuiteEditor({
   hostElement: editorHost,
   statusElement: editorStatusElement,
+  mentionPreviewElement,
   onContentChanged: content => postHost({ type: 'contentChanged', content }),
   onCreateExtract: message => postHost(message),
   onSaveCloze: message => postHost(message),
+  onRequestMentionPreview: message => postHost(message),
+  onOpenMention: message => postHost(message),
 });
 
 addHostMessageListener(message => {
@@ -34,6 +38,21 @@ addHostMessageListener(message => {
 
   if (message.type === 'saveResult') {
     editor.showStatus(message.ok ? 'Saved.' : `Save failed: ${message.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  if (message.type === 'setMentionTargets') {
+    editor.setMentionTargets(message.files);
+    return;
+  }
+
+  if (message.type === 'mentionPreviewResult') {
+    editor.handleMentionPreviewResult(message);
+    return;
+  }
+
+  if (message.type === 'mentionOpenResult') {
+    editor.handleMentionOpenResult(message.ok, message.error);
     return;
   }
 

@@ -1,11 +1,19 @@
 import { MarkdownAdapter, MarkdownTransformer, PageEditorBlockSpecs } from '@blocksuite/blocks';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
-import { BlockStdScope, type EditorHost } from '@blocksuite/block-std';
+import { BlockStdScope, ConfigExtension, type EditorHost } from '@blocksuite/block-std';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { createEmptyDoc, type PageEditor } from '@blocksuite/presets';
 import { Job, type Doc, type DraftModel } from '@blocksuite/store';
 import { replaceSelectionWithCloze, updateClozeHighlights, type TextSelection } from './cloze';
 import { reportDiagnostic } from './host';
+import {
+  MentionController,
+  type NativeInlineEditor,
+  type NativeLinkedMenuGroup,
+  type OpenMentionMessage,
+  type RequestMentionPreviewMessage,
+} from './mention-controller';
+import type { MentionPreviewResult, MentionTarget } from './mentions';
 
 const saveDebounceMs = 500;
 const statusHideMs = 2600;
@@ -32,9 +40,12 @@ export type SaveClozeMessage = {
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
+  mentionPreviewElement: HTMLElement;
   onContentChanged(content: string): void;
   onCreateExtract(message: CreateExtractMessage): void;
   onSaveCloze(message: SaveClozeMessage): void;
+  onRequestMentionPreview(message: RequestMentionPreviewMessage): void;
+  onOpenMention(message: OpenMentionMessage): void;
 };
 
 export type LoadMarkdownOptions = {
@@ -47,6 +58,7 @@ export type LoadMarkdownOptions = {
 export class MarkdownBlockSuiteEditor {
   private readonly editor: PageEditor;
   private readonly statusElement: HTMLElement;
+  private readonly mentions: MentionController;
   private readonly onContentChanged: (content: string) => void;
   private readonly onCreateExtract: (message: CreateExtractMessage) => void;
   private readonly onSaveCloze: (message: SaveClozeMessage) => void;
@@ -65,9 +77,22 @@ export class MarkdownBlockSuiteEditor {
     this.onSaveCloze = options.onSaveCloze;
     this.editor = document.createElement('page-editor') as PageEditor;
     this.editor.id = 'editor';
-    this.editor.specs = PageEditorBlockSpecs;
     this.editor.doc = createEmptyMarkdownDoc();
     this.editor.hasViewport = true;
+    this.mentions = new MentionController({
+      editor: this.editor,
+      previewElement: options.mentionPreviewElement,
+      getCurrentPath: () => this.currentPath,
+      exportMarkdown: () => exportDocMarkdown(this.currentDoc),
+      flushHost: () => this.flushHost(),
+      scheduleContentChanged: () => this.scheduleContentChanged(),
+      showStatus: message => this.showStatus(message),
+      onRequestPreview: options.onRequestMentionPreview,
+      onOpenMention: options.onOpenMention,
+    });
+    this.editor.specs = createEditorSpecs((query, abort, inlineEditor) =>
+      this.mentions.getNativeMentionMenus(query, abort, inlineEditor)
+    );
     options.hostElement.append(this.editor);
     this.bindEditorEvents();
   }
@@ -76,6 +101,8 @@ export class MarkdownBlockSuiteEditor {
     this.loadingDocument = true;
     window.clearTimeout(this.saveTimer);
     this.cancelScheduledClozeHighlightUpdate();
+    this.mentions.cancelScheduledHighlightUpdate();
+    this.mentions.hidePreview();
     this.currentPath = options.path ?? '';
 
     try {
@@ -87,6 +114,7 @@ export class MarkdownBlockSuiteEditor {
       this.bindDocChangeEvents(nextDoc);
       await this.flushHost();
       this.refreshClozeHighlights();
+      this.mentions.refreshHighlights();
       reportDiagnostic('info', `Imported Markdown into BlockSuite (${markdown.length} characters).`);
       this.showStatus(`Opened ${options.title ?? 'document'}.`);
     } catch (error) {
@@ -107,6 +135,19 @@ export class MarkdownBlockSuiteEditor {
     }, statusHideMs);
   }
 
+  public setMentionTargets(targets: MentionTarget[]) {
+    reportDiagnostic('info', `Received ${targets.length} Markdown mention target(s).`);
+    this.mentions.setTargets(targets);
+  }
+
+  public handleMentionPreviewResult(result: MentionPreviewResult) {
+    this.mentions.handlePreviewResult(result);
+  }
+
+  public handleMentionOpenResult(ok: boolean, error?: string) {
+    this.mentions.handleOpenResult(ok, error);
+  }
+
   private bindEditorEvents() {
     document.addEventListener(
       'keydown',
@@ -122,7 +163,9 @@ export class MarkdownBlockSuiteEditor {
 
         if (isEditorShortcut(event, 'z')) {
           void this.handleClozeShortcut(event);
+          return;
         }
+
       },
       true
     );
@@ -130,18 +173,43 @@ export class MarkdownBlockSuiteEditor {
     document.addEventListener('selectionchange', () => {
       if (this.currentDoc) {
         this.scheduleClozeHighlightUpdate();
+        this.mentions.scheduleHighlightUpdate();
       }
     });
 
     this.editor.addEventListener('input', () => {
       this.scheduleClozeHighlightUpdate();
+      this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
     });
     this.editor.addEventListener('keyup', () => {
       this.scheduleClozeHighlightUpdate();
+      this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
     });
-    this.editor.addEventListener('paste', () => this.scheduleContentChanged());
+    this.editor.addEventListener('click', event => {
+      void this.mentions.handleClick(event);
+    });
+    this.editor.addEventListener('mousemove', event => this.mentions.handleHover(event));
+    this.editor.addEventListener('mouseleave', () => {
+      if (this.mentions.isShowingPreview()) {
+        this.mentions.hidePreview();
+      }
+    });
+    this.editor.addEventListener('paste', () => {
+      this.scheduleContentChanged();
+    });
+
+    document.addEventListener('mousedown', event => {
+      const target = event.target as Node | null;
+      if (target && this.mentions.containsFloatingUi(target)) {
+        return;
+      }
+
+      if (this.mentions.isShowingPreview()) {
+        this.mentions.hidePreview();
+      }
+    });
   }
 
   private bindDocChangeEvents(doc: Doc) {
@@ -178,6 +246,7 @@ export class MarkdownBlockSuiteEditor {
     this.saveTimer = window.setTimeout(async () => {
       this.saveTimer = undefined;
       this.refreshClozeHighlights();
+      this.mentions.refreshHighlights();
       const content = await exportDocMarkdown(this.currentDoc);
       this.onContentChanged(content);
     }, saveDebounceMs);
@@ -284,6 +353,30 @@ export class MarkdownBlockSuiteEditor {
 }
 
 type ShortcutKey = 'x' | 'z';
+
+function createEditorSpecs(
+  getMenus: (
+    query: string,
+    abort: () => void,
+    inlineEditor: NativeInlineEditor
+  ) => NativeLinkedMenuGroup[]
+) {
+  return [
+    ...PageEditorBlockSpecs,
+    ConfigExtension('affine:page', {
+      linkedWidget: {
+        triggerKeys: ['@', '[['],
+        convertTriggerKey: false,
+        getMenus: (
+          query: string,
+          abort: () => void,
+          _editorHost: EditorHost,
+          inlineEditor: NativeInlineEditor
+        ) => getMenus(query, abort, inlineEditor),
+      },
+    }),
+  ];
+}
 
 function isEditorShortcut(
   event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>,
