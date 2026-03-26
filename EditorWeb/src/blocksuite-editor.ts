@@ -191,7 +191,12 @@ export class MarkdownBlockSuiteEditor {
       void this.mentions.handleClick(event);
     });
     this.editor.addEventListener('mousemove', event => this.mentions.handleHover(event));
-    this.editor.addEventListener('mouseleave', () => {
+    this.editor.addEventListener('mouseleave', event => {
+      const target = event.relatedTarget as Node | null;
+      if (target && this.mentions.containsFloatingUi(target)) {
+        return;
+      }
+
       if (this.mentions.isShowingPreview()) {
         this.mentions.hidePreview();
       }

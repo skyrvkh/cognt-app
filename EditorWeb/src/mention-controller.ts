@@ -10,6 +10,7 @@ import {
 } from './mentions';
 
 const previewDelayMs = 220;
+const previewMaxCharacters = 0;
 const highlightName = 'cognt-mention';
 const maxNativeMentionItems = 8;
 const markdownMentionGroupName = 'Markdown Files';
@@ -358,7 +359,7 @@ export class MentionController {
       sourcePath: currentPath,
       relativePath,
       mode,
-      maxCharacters: mode === 'full' ? 8000 : 1200,
+      maxCharacters: previewMaxCharacters,
     });
   }
 
