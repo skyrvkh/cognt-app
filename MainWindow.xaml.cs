@@ -1,7 +1,9 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using CogntApp.Services;
+using CogntApp.ViewModels;
 using CogntApp.Views;
 
 namespace CogntApp;
@@ -11,14 +13,11 @@ namespace CogntApp;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.MarkdownPath";
+
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
-    private readonly ReviewView reviewView = new();
-    private readonly IMarkdownNoteService noteService;
-    private string currentNotesDirectory = string.Empty;
-    private string? currentNotePath;
-    private string lastSavedContent = string.Empty;
-    private bool loadingNotesDirectory;
+    private readonly MainViewModel viewModel;
     private int editorOpenRequestId;
 
     public MainWindow()
@@ -27,211 +26,167 @@ public partial class MainWindow : Window
     }
 
     internal MainWindow(IMarkdownNoteService noteService)
+        : this(new MainViewModel(noteService))
     {
-        this.noteService = noteService;
+    }
+
+    internal MainWindow(MainViewModel viewModel)
+    {
+        this.viewModel = viewModel;
 
         InitializeComponent();
+        DataContext = viewModel;
+
+        viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
+        viewModel.OverlayRequested += ViewModel_OverlayRequested;
+        viewModel.ClearEditorRequested += ViewModel_ClearEditorRequested;
+        viewModel.OpenNoteRequested += ViewModel_OpenNoteRequested;
+        viewModel.NoteSelectionRequested += ViewModel_NoteSelectionRequested;
+        viewModel.MentionTargetsChanged += ViewModel_MentionTargetsChanged;
+        viewModel.UserMessageRequested += ViewModel_UserMessageRequested;
+
         EditorViewControl.ContentChanged += EditorView_ContentChanged;
         EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
-        LoadNotesDirectory(ResolveDefaultNotesDirectory());
-        ShowDashboardView();
+
+        viewModel.Initialize();
         _ = EditorViewControl.WarmUpAsync();
     }
 
-    private void DashboardButton_Click(object sender, RoutedEventArgs e)
+    private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        SaveCurrentNote();
-        ShowDashboardView();
-    }
-
-    private async void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-    {
-        if (loadingNotesDirectory)
+        if (viewModel.IsLoadingNotesDirectory)
         {
             return;
         }
 
-        if (e.NewValue is not TreeViewItem selectedItem)
-        {
-            return;
-        }
-
-        if (selectedItem.Tag is string notePath)
-        {
-            if (string.Equals(currentNotePath, notePath, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            SaveCurrentNote();
-            await ShowEditorViewAsync(notePath);
-            return;
-        }
-
-        ShowDirectoryOverview();
+        viewModel.SelectTreeNode(e.NewValue as NoteTreeNodeViewModel);
     }
 
-    private void LoadDirectoryButton_Click(object sender, RoutedEventArgs e)
+    private void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
     {
-        LoadNotesDirectory(NotesDirectoryTextBox.Text);
-    }
-
-    private void ReviewButton_Click(object sender, RoutedEventArgs e)
-    {
-        SaveCurrentNote();
         editorOpenRequestId++;
-        currentNotePath = null;
-        lastSavedContent = string.Empty;
-        ShowOverlay(reviewView);
-    }
 
-    private void DecksButton_Click(object sender, RoutedEventArgs e)
-    {
-        SaveCurrentNote();
-        editorOpenRequestId++;
-        currentNotePath = null;
-        lastSavedContent = string.Empty;
-        ShowOverlay(decksView);
-    }
-
-    private void AddNoteButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
+        UIElement overlay = e.ViewKind switch
         {
-            return;
-        }
+            OverlayViewKind.Decks => decksView,
+            _ => dashboardView,
+        };
 
-        string notePath = noteService.CreateUniqueNotePath(currentNotesDirectory);
-        noteService.SaveNote(notePath, "# Untitled" + Environment.NewLine);
-        LoadNotesDirectory(currentNotesDirectory);
-        SelectNote(notePath);
+        ShowOverlay(overlay);
     }
 
-    private void SaveNoteButton_Click(object sender, RoutedEventArgs e)
+    private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        SaveCurrentNote();
+        await ShowEmptyEditorViewAsync();
     }
 
-    private void LoadNotesDirectory(string directoryPath)
+    private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        string fullPath;
+        await OpenNoteAsync(e.NotePath, e.SelectInTree);
+    }
+
+    private void ViewModel_NoteSelectionRequested(object? sender, NoteSelectionRequestedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(
+            () => SelectNote(e.NotePath),
+            DispatcherPriority.Background);
+    }
+
+    private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
+    {
+        SendMentionTargets();
+    }
+
+    private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
+    {
+        MessageBox.Show(
+            e.Message,
+            e.Title,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private async Task<bool> OpenNoteAsync(string notePath, bool selectInTree)
+    {
+        PreparedNote? note;
 
         try
         {
-            fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(directoryPath.Trim()));
+            note = viewModel.PrepareNoteForOpen(notePath);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"The notes directory path is invalid: {ex.Message}", "Invalid Directory", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            MessageBox.Show(
+                $"The note could not be opened: {ex.Message}",
+                "Open Note Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
         }
 
-        if (!Directory.Exists(fullPath))
+        if (note is null)
         {
-            MessageBox.Show($"The notes directory does not exist:{Environment.NewLine}{fullPath}", "Directory Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            return true;
         }
 
-        currentNotesDirectory = fullPath;
-        currentNotePath = null;
-        lastSavedContent = string.Empty;
-        NotesDirectoryTextBox.Text = currentNotesDirectory;
-        NotesRoot.Header = GetDirectoryName(currentNotesDirectory);
-        RefreshNotesTree();
-        SendMentionTargets();
-
-        ShowDirectoryOverview();
-    }
-
-    private async Task ShowEditorViewAsync(string notePath)
-    {
         int requestId = ++editorOpenRequestId;
-        string content = File.ReadAllText(notePath);
 
         try
         {
-            await EditorViewControl.LoadNoteAsync(Path.GetFileName(notePath), content, notePath);
+            await EditorViewControl.LoadNoteAsync(note.Title, note.Content, note.NotePath);
         }
         catch (Exception ex)
         {
             if (requestId == editorOpenRequestId)
             {
-                MessageBox.Show($"The editor could not open this note: {ex.Message}", "Editor Not Ready", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    $"The editor could not open this note: {ex.Message}",
+                    "Editor Not Ready",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
 
-            return;
+            return false;
         }
 
         if (requestId != editorOpenRequestId)
         {
-            return;
+            return false;
         }
 
-        currentNotePath = notePath;
-        lastSavedContent = content;
-        SendMentionTargets();
+        viewModel.CompleteOpenNote(note);
         HideOverlay();
-    }
 
-    private void ShowDashboardView()
-    {
-        editorOpenRequestId++;
-        currentNotePath = null;
-        lastSavedContent = string.Empty;
-        ShowOverlay(dashboardView);
-    }
-
-    private void ShowDirectoryOverview()
-    {
-        editorOpenRequestId++;
-        currentNotePath = null;
-        lastSavedContent = string.Empty;
-        int noteCount = NotesRoot.Items.Count;
-        string title = GetDirectoryName(currentNotesDirectory);
-        string content = noteCount == 1
-            ? "1 Markdown file found."
-            : $"{noteCount} Markdown files found.";
-
-        ShowOverlay(new Border
+        if (selectInTree)
         {
-            Background = System.Windows.Media.Brushes.White,
-            BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(215, 222, 232)),
-            BorderThickness = new Thickness(1),
-            Margin = new Thickness(24),
-            Padding = new Thickness(24),
-            Child = new StackPanel
-            {
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = title,
-                        FontSize = 20,
-                        FontWeight = FontWeights.SemiBold,
-                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(31, 41, 55)),
-                    },
-                    new TextBlock
-                    {
-                        Text = content,
-                        Margin = new Thickness(0, 12, 0, 0),
-                        FontSize = 14,
-                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(88, 96, 120)),
-                    },
-                },
-            },
-        });
-    }
-
-    private void SaveCurrentNote()
-    {
-        if (string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            return;
+            SelectNote(note.NotePath);
         }
 
-        SaveNoteIfChanged(EditorViewControl.GetContent());
+        return true;
+    }
+
+    private async Task ShowEmptyEditorViewAsync()
+    {
+        int requestId = ++editorOpenRequestId;
+        HideOverlay();
+
+        try
+        {
+            await EditorViewControl.ClearNoteAsync();
+        }
+        catch (Exception ex)
+        {
+            if (requestId == editorOpenRequestId)
+            {
+                MessageBox.Show(
+                    $"The editor could not be cleared: {ex.Message}",
+                    "Editor Not Ready",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
     }
 
     private void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
@@ -240,13 +195,7 @@ public partial class MainWindow : Window
 
         try
         {
-            string createdPath = noteService.CreateExtractFile(new CreateExtractFileRequest(
-                currentNotesDirectory,
-                currentNotePath ?? string.Empty,
-                sourcePath ?? string.Empty,
-                e.SelectedMarkdown));
-            RefreshNotesTree(selectPath: currentNotePath);
-            SendMentionTargets();
+            string createdPath = viewModel.CreateExtractFile(sourcePath, e.SelectedMarkdown);
             EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
         }
         catch (Exception ex)
@@ -259,10 +208,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            MarkdownMentionPreview preview = noteService.ReadMentionPreview(
-                currentNotesDirectory,
-                e.RelativePath,
-                e.MaxCharacters);
+            MarkdownMentionPreview preview = viewModel.ReadMentionPreview(e.RelativePath, e.MaxCharacters);
 
             EditorViewControl.PostMentionPreviewResult(
                 e.RequestId,
@@ -287,12 +233,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            SaveMentionSource(e);
-
-            string targetPath = noteService.ResolveMentionPath(currentNotesDirectory, e.RelativePath);
-            await ShowEditorViewAsync(targetPath);
-            SelectNote(targetPath);
-            EditorViewControl.PostMentionOpenResult(e.RelativePath, ok: true);
+            viewModel.SaveMentionSource(e.SourcePath, e.Markdown);
+            string targetPath = viewModel.ResolveMentionPath(e.RelativePath);
+            bool opened = await OpenNoteAsync(targetPath, selectInTree: true);
+            EditorViewControl.PostMentionOpenResult(e.RelativePath, opened, opened ? null : "The mentioned note could not be opened.");
         }
         catch (Exception ex)
         {
@@ -300,102 +244,105 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void RecentNoteButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button { Tag: string notePath })
-        {
-            SaveCurrentNote();
-            await ShowEditorViewAsync(notePath);
-            SelectNote(notePath);
-        }
-    }
-
     private void EditorView_ContentChanged(object? sender, string content)
     {
-        if (!string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            SaveNoteIfChanged(content);
-        }
+        viewModel.SaveNoteIfChanged(content);
     }
 
-    private void PopulateRecentNotes(IEnumerable<string> noteFiles)
+    private void NoteTreeItem_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        RecentNotesPanel.Children.Clear();
-
-        foreach (string filePath in noteFiles
-                     .OrderByDescending(File.GetLastWriteTime)
-                     .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-                     .Take(5))
+        if (e.LeftButton != MouseButtonState.Pressed
+            || sender is not TreeViewItem item
+            || !TryGetMarkdownNodePath(item, requireFile: true, out string notePath))
         {
-            Button recentButton = new()
-            {
-                Content = Path.GetFileNameWithoutExtension(filePath),
-                Tag = filePath,
-                Style = (Style)FindResource("SidebarButtonStyle"),
-            };
-
-            recentButton.Click += RecentNoteButton_Click;
-            RecentNotesPanel.Children.Add(recentButton);
+            return;
         }
+
+        DragDrop.DoDragDrop(item, new DataObject(NoteTreeDragDataFormat, notePath), DragDropEffects.Move);
     }
 
-    private void RefreshNotesTree(string? selectPath = null)
+    private void NoteTreeItem_DragOver(object sender, DragEventArgs e)
     {
-        loadingNotesDirectory = true;
+        e.Effects = CanDropNoteOnTarget(sender, e, out _, out _)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void NoteTreeItem_Drop(object sender, DragEventArgs e)
+    {
+        if (!CanDropNoteOnTarget(sender, e, out string droppedNotePath, out string targetNotePath))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
 
         try
         {
-            NotesRoot.Items.Clear();
-
-            List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-                .ToList();
-
-            PopulateRecentNotes(noteFiles);
-
-            string? fullSelectPath = string.IsNullOrWhiteSpace(selectPath)
-                ? null
-                : Path.GetFullPath(selectPath);
-            TreeViewItem? itemToSelect = null;
-            foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
-            {
-                TreeViewItem item = new()
-                {
-                    Header = Path.GetRelativePath(currentNotesDirectory, filePath),
-                    Tag = filePath,
-                };
-
-                NotesRoot.Items.Add(item);
-
-                if (fullSelectPath is not null
-                    && string.Equals(Path.GetFullPath(filePath), fullSelectPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    itemToSelect = item;
-                }
-            }
-
-            NotesRoot.IsExpanded = true;
-
-            if (itemToSelect is not null)
-            {
-                itemToSelect.IsSelected = true;
-                itemToSelect.Focus();
-            }
-            else
-            {
-                NotesRoot.IsSelected = true;
-            }
+            MarkdownNoteGroupResult result = viewModel.GroupNoteWithTarget(droppedNotePath, targetNotePath);
+            await OpenNoteAsync(result.TargetNotePath, selectInTree: true);
         }
-        finally
+        catch (Exception ex)
         {
-            loadingNotesDirectory = false;
+            MessageBox.Show(
+                $"The notes could not be grouped:{Environment.NewLine}{ex.Message}",
+                "Drag and Drop Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
+    }
+
+    private static bool CanDropNoteOnTarget(
+        object sender,
+        DragEventArgs e,
+        out string droppedNotePath,
+        out string targetNotePath)
+    {
+        droppedNotePath = string.Empty;
+        targetNotePath = string.Empty;
+
+        if (sender is not TreeViewItem targetItem
+            || !TryGetMarkdownNodePath(targetItem, requireFile: true, out targetNotePath)
+            || !e.Data.GetDataPresent(NoteTreeDragDataFormat)
+            || e.Data.GetData(NoteTreeDragDataFormat) is not string draggedPath
+            || string.IsNullOrWhiteSpace(draggedPath)
+            || string.Equals(draggedPath, targetNotePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        droppedNotePath = draggedPath;
+        return true;
+    }
+
+    private static bool TryGetMarkdownNodePath(
+        TreeViewItem item,
+        bool requireFile,
+        out string notePath)
+    {
+        notePath = string.Empty;
+
+        if (item.DataContext is not NoteTreeNodeViewModel node
+            || string.IsNullOrWhiteSpace(node.NotePath)
+            || (requireFile && !node.IsMarkdownFile))
+        {
+            return false;
+        }
+
+        notePath = node.NotePath;
+        return true;
     }
 
     private void SelectNote(string notePath)
     {
-        foreach (TreeViewItem item in NotesRoot.Items.OfType<TreeViewItem>())
+        foreach (TreeViewItem item in EnumerateTreeItems(NotesTree))
         {
-            if (string.Equals(item.Tag as string, notePath, StringComparison.OrdinalIgnoreCase))
+            if (item.DataContext is NoteTreeNodeViewModel { NotePath: string itemNotePath }
+                && string.Equals(itemNotePath, notePath, StringComparison.OrdinalIgnoreCase))
             {
                 item.IsSelected = true;
                 item.Focus();
@@ -404,91 +351,29 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveNoteIfChanged(string content)
+    private static IEnumerable<TreeViewItem> EnumerateTreeItems(ItemsControl parent)
     {
-        if (string.IsNullOrWhiteSpace(currentNotePath)
-            || string.Equals(content, lastSavedContent, StringComparison.Ordinal))
+        parent.UpdateLayout();
+
+        foreach (object dataItem in parent.Items)
         {
-            return;
+            if (parent.ItemContainerGenerator.ContainerFromItem(dataItem) is not TreeViewItem item)
+            {
+                continue;
+            }
+
+            yield return item;
+
+            foreach (TreeViewItem child in EnumerateTreeItems(item))
+            {
+                yield return child;
+            }
         }
-
-        noteService.SaveNote(currentNotePath, content);
-        lastSavedContent = content;
-    }
-
-    private void SaveMentionSource(OpenMentionRequestedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(currentNotePath)
-            || !string.Equals(
-                Path.GetFullPath(e.SourcePath),
-                Path.GetFullPath(currentNotePath),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("The mention source is not the current Markdown file.");
-        }
-
-        SaveNoteIfChanged(e.Markdown);
     }
 
     private void SendMentionTargets()
     {
-        if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
-        {
-            return;
-        }
-
-        IReadOnlyList<MarkdownMentionTarget> targets = noteService.ListMentionTargets(
-            currentNotesDirectory,
-            CreateRecentMentionRanks());
-
-        EditorViewControl.PostMentionTargets(targets);
-    }
-
-    private IReadOnlyDictionary<string, int> CreateRecentMentionRanks()
-    {
-        if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
-        {
-            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        return Directory
-            .EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-            .OrderByDescending(File.GetLastWriteTime)
-            .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
-            .Select((path, index) => new
-            {
-                Path = Path.GetFullPath(path),
-                Rank = index,
-            })
-            .ToDictionary(item => item.Path, item => item.Rank, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string ResolveDefaultNotesDirectory()
-    {
-        foreach (string root in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
-        {
-            DirectoryInfo? directory = new(root);
-
-            while (directory is not null)
-            {
-                string samplesPath = Path.Combine(directory.FullName, "Samples");
-
-                if (Directory.Exists(samplesPath))
-                {
-                    return samplesPath;
-                }
-
-                directory = directory.Parent;
-            }
-        }
-
-        return Path.Combine(Environment.CurrentDirectory, "Samples");
-    }
-
-    private static string GetDirectoryName(string directoryPath)
-    {
-        return new DirectoryInfo(directoryPath).Name;
+        EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
     }
 
     private void ShowOverlay(UIElement overlay)

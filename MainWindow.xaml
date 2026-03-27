@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CogntApp"
         xmlns:views="clr-namespace:CogntApp.Views"
+        xmlns:viewModels="clr-namespace:CogntApp.ViewModels"
         mc:Ignorable="d"
         Title="Cognt App" Height="860" Width="1320" MinHeight="720" MinWidth="980"
         WindowStartupLocation="CenterScreen"
@@ -57,7 +58,7 @@
             <Setter Property="Foreground" Value="#3156D4" />
         </Style>
 
-        <Style TargetType="TreeViewItem">
+        <Style x:Key="NoteTreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="#586078" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Padding" Value="8,4" />
@@ -130,12 +131,13 @@
                              BorderBrush="#D8DEEC"
                              Foreground="#586078"
                              FontSize="12"
-                             VerticalContentAlignment="Center" />
+                             VerticalContentAlignment="Center"
+                             Text="{Binding NotesDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
                     <Button Content="Load Directory"
                             Style="{StaticResource SidebarButtonStyle}"
                             Margin="0,0,0,10"
-                            Click="LoadDirectoryButton_Click" />
+                            Command="{Binding LoadDirectoryCommand}" />
                 </StackPanel>
 
                 <ScrollViewer Grid.Row="2"
@@ -145,32 +147,61 @@
                         <Button Content="Dashboard"
                                 Style="{StaticResource PrimarySidebarButtonStyle}"
                                 Margin="0,0,0,8"
-                                Click="DashboardButton_Click" />
+                                Command="{Binding ShowDashboardCommand}" />
                         <Button Content="All Documents"
                                 Style="{StaticResource SidebarButtonStyle}"
-                                Click="LoadDirectoryButton_Click" />
+                                Command="{Binding LoadDirectoryCommand}" />
                         <Button Content="Flashcards"
                                 Style="{StaticResource SidebarButtonStyle}"
-                                Click="DecksButton_Click" />
+                                Command="{Binding ShowDecksCommand}" />
 
                         <TextBlock Text="RECENT"
                                    Style="{StaticResource SectionHeaderStyle}"
                                    Margin="8,18,0,8" />
-                        <StackPanel x:Name="RecentNotesPanel" />
+                        <ItemsControl ItemsSource="{Binding RecentNotes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type viewModels:RecentNoteViewModel}">
+                                    <Button Content="{Binding DisplayName}"
+                                            Command="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding NotePath}"
+                                            Style="{StaticResource SidebarButtonStyle}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <Border Height="1"
                                 Background="#E1E6F0"
                                 Margin="8,14,8,12" />
 
-                        <TreeView BorderThickness="0"
+                        <TreeView x:Name="NotesTree"
+                                  BorderThickness="0"
                                   Margin="0"
                                   Background="Transparent"
                                   FontSize="13"
                                   Foreground="#586078"
+                                  ItemsSource="{Binding NoteRoots}"
                                   SelectedItemChanged="NotesTree_SelectedItemChanged">
-                            <TreeViewItem x:Name="NotesRoot"
-                                          Header="Notes"
-                                          IsExpanded="True" />
+                            <TreeView.Resources>
+                                <HierarchicalDataTemplate DataType="{x:Type viewModels:NoteTreeNodeViewModel}"
+                                                          ItemsSource="{Binding Children}">
+                                    <TextBlock Text="{Binding Header}" />
+                                </HierarchicalDataTemplate>
+                            </TreeView.Resources>
+                            <TreeView.ItemContainerStyle>
+                                <Style TargetType="{x:Type TreeViewItem}"
+                                       BasedOn="{StaticResource NoteTreeViewItemStyle}">
+                                    <Setter Property="IsExpanded"
+                                            Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                    <Setter Property="AllowDrop"
+                                            Value="{Binding IsMarkdownFile}" />
+                                    <EventSetter Event="PreviewMouseMove"
+                                                 Handler="NoteTreeItem_PreviewMouseMove" />
+                                    <EventSetter Event="DragOver"
+                                                 Handler="NoteTreeItem_DragOver" />
+                                    <EventSetter Event="Drop"
+                                                 Handler="NoteTreeItem_Drop" />
+                                </Style>
+                            </TreeView.ItemContainerStyle>
                         </TreeView>
                     </StackPanel>
                 </ScrollViewer>
@@ -179,7 +210,7 @@
                             Margin="0,14,0,0">
                     <Button Content="+ Create Document"
                             Style="{StaticResource PrimarySidebarButtonStyle}"
-                            Click="AddNoteButton_Click" />
+                            Command="{Binding AddNoteCommand}" />
                 </StackPanel>
             </Grid>
         </Border>

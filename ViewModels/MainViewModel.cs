@@ -5,6 +5,8 @@ using CogntApp.Services;
 
 namespace CogntApp.ViewModels;
 
+public sealed record NoteGroupResult(string TargetNotePath);
+
 public sealed class MainViewModel : ObservableObject
 {
     private readonly IMarkdownNoteService noteService;
