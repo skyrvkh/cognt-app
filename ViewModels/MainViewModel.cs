@@ -9,6 +9,7 @@ public sealed record NoteGroupResult(string TargetNotePath);
 
 public sealed class MainViewModel : ObservableObject
 {
+
     private readonly IMarkdownNoteService noteService;
     private string notesDirectory = string.Empty;
     private string currentNotesDirectory = string.Empty;
@@ -176,6 +177,11 @@ public sealed class MainViewModel : ObservableObject
         return CanModifyNode(node);
     }
 
+    public bool CanDeleteNode(NoteTreeNodeViewModel? node)
+    {
+        return CanModifyNode(node);
+    }
+
     public string GetEditableName(NoteTreeNodeViewModel node)
     {
         return node.IsMarkdownFile && !string.IsNullOrWhiteSpace(node.NotePath)
@@ -204,6 +210,36 @@ public sealed class MainViewModel : ObservableObject
         {
             ClearCurrentNoteState();
             OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(noteToOpen, SelectInTree: true));
+        }
+        else if (!string.IsNullOrWhiteSpace(currentNotePath))
+        {
+            NoteSelectionRequested?.Invoke(this, new NoteSelectionRequestedEventArgs(currentNotePath));
+        }
+    }
+
+    public void DeleteNode(NoteTreeNodeViewModel node)
+    {
+        EnsureCanModifyNode(node, "deleted");
+        SaveCurrentNoteFromEditor();
+
+        bool deletesCurrentNote = CurrentNoteIsInsideNode(node);
+
+        if (node.IsMarkdownFile)
+        {
+            noteService.DeleteMarkdownFile(currentNotesDirectory, node.NotePath ?? node.Path);
+        }
+        else
+        {
+            noteService.DeleteFolder(currentNotesDirectory, node.Path);
+        }
+
+        RefreshNotesTree();
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+
+        if (deletesCurrentNote)
+        {
+            ClearCurrentNoteState();
+            ClearEditorRequested?.Invoke(this, EventArgs.Empty);
         }
         else if (!string.IsNullOrWhiteSpace(currentNotePath))
         {
@@ -392,6 +428,18 @@ public sealed class MainViewModel : ObservableObject
                 Path.TrimEndingDirectorySeparator(Path.GetFullPath(node.Path)),
                 Path.TrimEndingDirectorySeparator(Path.GetFullPath(currentNotesDirectory)),
                 StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CurrentNoteIsInsideNode(NoteTreeNodeViewModel node)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotePath))
+        {
+            return false;
+        }
+
+        return node.IsMarkdownFile
+            ? PathsEqual(currentNotePath, node.NotePath ?? node.Path)
+            : IsPathInsideFolder(currentNotePath, node.Path);
     }
 
     private bool TryGetPrimaryNoteFolder(string notePath, out string folderPath)

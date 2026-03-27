@@ -190,6 +190,8 @@
                                 <ContextMenu>
                                     <MenuItem Header="Rename"
                                               Click="RenameTreeItem_Click" />
+                                    <MenuItem Header="Delete"
+                                              Click="DeleteTreeItem_Click" />
                                 </ContextMenu>
                             </TreeView.ContextMenu>
                             <TreeView.Resources>

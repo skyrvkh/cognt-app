@@ -73,6 +73,12 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+
+        if (e.Key == Key.Delete)
+        {
+            DeleteSelectedTreeNode();
+            e.Handled = true;
+        }
     }
 
     private void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
@@ -274,12 +280,20 @@ public partial class MainWindow : Window
         RenameSelectedTreeNode();
     }
 
+    private void DeleteTreeItem_Click(object sender, RoutedEventArgs e)
+    {
+        DeleteSelectedTreeNode();
+    }
 
     private void RenameSelectedTreeNode()
     {
         RenameTreeNode(NotesTree.SelectedItem as NoteTreeNodeViewModel);
     }
 
+    private void DeleteSelectedTreeNode()
+    {
+        DeleteTreeNode(NotesTree.SelectedItem as NoteTreeNodeViewModel);
+    }
 
     private void RenameTreeNode(NoteTreeNodeViewModel? node)
     {
@@ -318,6 +332,53 @@ public partial class MainWindow : Window
             MessageBox.Show(
                 $"The {itemKind} could not be renamed:{Environment.NewLine}{ex.Message}",
                 "Rename Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void DeleteTreeNode(NoteTreeNodeViewModel? node)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        if (!viewModel.CanDeleteNode(node))
+        {
+            MessageBox.Show(
+                "This item cannot be deleted.",
+                "Delete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string itemKind = viewModel.GetNodeKind(node);
+        string message = node.IsMarkdownFile
+            ? $"Delete Markdown file \"{node.Header}\"?"
+            : $"Delete folder \"{node.Header}\" and everything inside it?";
+
+        MessageBoxResult result = MessageBox.Show(
+            message,
+            "Confirm Delete",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            viewModel.DeleteNode(node);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The {itemKind} could not be deleted:{Environment.NewLine}{ex.Message}",
+                "Delete Failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }

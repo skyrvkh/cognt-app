@@ -24,6 +24,13 @@ public interface IMarkdownNoteService
         string folderPath,
         string newName);
 
+    void DeleteMarkdownFile(
+        string notesDirectory,
+        string notePath);
+
+    void DeleteFolder(
+        string notesDirectory,
+        string folderPath);
 
     void SaveNote(string notePath, string content);
 
@@ -188,6 +195,24 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         return Path.GetFullPath(destinationPath);
     }
 
+    public void DeleteMarkdownFile(
+        string notesDirectory,
+        string notePath)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullPath = ResolveExistingMarkdownPathInRoot(root, notePath);
+        File.Delete(fullPath);
+    }
+
+    public void DeleteFolder(
+        string notesDirectory,
+        string folderPath)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullPath = ResolveExistingFolderPathInRoot(root, folderPath);
+        Directory.Delete(fullPath, recursive: true);
+    }
+
     private static string GetGroupFolderPath(string targetDirectory, string targetName)
     {
         string currentDirectoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(targetDirectory));
@@ -333,7 +358,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
                 Path.TrimEndingDirectorySeparator(root),
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("The open notes root cannot be renamed.");
+            throw new InvalidOperationException("The open notes root cannot be renamed or deleted.");
         }
 
         if (!IsPathInsideRoot(fullPath, root))
