@@ -66,6 +66,11 @@ public partial class EditorView : UserControl
             "The editor did not finish loading the note.");
     }
 
+    public Task ClearNoteAsync()
+    {
+        return LoadNoteAsync(string.Empty, string.Empty);
+    }
+
     public string GetContent()
     {
         return currentContent;

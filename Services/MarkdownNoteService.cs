@@ -9,6 +9,11 @@ public interface IMarkdownNoteService
 
     string CreateExtractFile(CreateExtractFileRequest request);
 
+    MarkdownNoteGroupResult GroupNoteWithTarget(
+        string notesDirectory,
+        string droppedNotePath,
+        string targetNotePath);
+
     void SaveNote(string notePath, string content);
 
     IReadOnlyList<MarkdownMentionTarget> ListMentionTargets(
@@ -38,6 +43,11 @@ public sealed record MarkdownMentionPreview(
     string RelativePath,
     string Title,
     string MarkdownExcerpt);
+
+public sealed record MarkdownNoteGroupResult(
+    string FolderPath,
+    string TargetNotePath,
+    string DroppedNotePath);
 
 public sealed class MarkdownNoteService : IMarkdownNoteService
 {
@@ -83,6 +93,77 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         }
 
         throw new InvalidOperationException("Could not create an extract file because all generated names are taken.");
+    }
+
+    public MarkdownNoteGroupResult GroupNoteWithTarget(
+        string notesDirectory,
+        string droppedNotePath,
+        string targetNotePath)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string droppedPath = ResolveExistingMarkdownPathInRoot(root, droppedNotePath);
+        string targetPath = ResolveExistingMarkdownPathInRoot(root, targetNotePath);
+
+        if (string.Equals(droppedPath, targetPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("A note cannot be dropped onto itself.");
+        }
+
+        string targetDirectory = Path.GetDirectoryName(targetPath)
+            ?? throw new InvalidOperationException("The target note does not have a parent directory.");
+        string targetName = Path.GetFileNameWithoutExtension(targetPath);
+        string folderPath = GetGroupFolderPath(targetDirectory, targetName);
+
+        Directory.CreateDirectory(folderPath);
+
+        string targetDestination = Path.Combine(folderPath, Path.GetFileName(targetPath));
+        string droppedDestination = Path.Combine(folderPath, Path.GetFileName(droppedPath));
+
+        EnsureMoveDestinationAvailable(targetPath, targetDestination);
+        EnsureMoveDestinationAvailable(droppedPath, droppedDestination);
+
+        string movedTargetPath = MoveMarkdownFile(targetPath, targetDestination);
+        string movedDroppedPath = MoveMarkdownFile(droppedPath, droppedDestination);
+
+        return new MarkdownNoteGroupResult(
+            folderPath,
+            movedTargetPath,
+            movedDroppedPath);
+    }
+
+    private static string GetGroupFolderPath(string targetDirectory, string targetName)
+    {
+        string currentDirectoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(targetDirectory));
+
+        return string.Equals(currentDirectoryName, targetName, StringComparison.OrdinalIgnoreCase)
+            ? targetDirectory
+            : Path.Combine(targetDirectory, targetName);
+    }
+
+    private static void EnsureMoveDestinationAvailable(string sourcePath, string destinationPath)
+    {
+        string fullSourcePath = Path.GetFullPath(sourcePath);
+        string fullDestinationPath = Path.GetFullPath(destinationPath);
+
+        if (!string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase)
+            && File.Exists(fullDestinationPath))
+        {
+            throw new IOException($"A Markdown file already exists at: {fullDestinationPath}");
+        }
+    }
+
+    private static string MoveMarkdownFile(string sourcePath, string destinationPath)
+    {
+        string fullSourcePath = Path.GetFullPath(sourcePath);
+        string fullDestinationPath = Path.GetFullPath(destinationPath);
+
+        if (string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return fullSourcePath;
+        }
+
+        File.Move(fullSourcePath, fullDestinationPath);
+        return fullDestinationPath;
     }
 
     public void SaveNote(string notePath, string content)
@@ -154,6 +235,29 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException("The mentioned Markdown file does not exist.", fullPath);
+        }
+
+        return fullPath;
+    }
+
+    private static string ResolveExistingMarkdownPathInRoot(string root, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Markdown path is required.", nameof(path));
+        }
+
+        string fullPath = Path.GetFullPath(path);
+        if (!IsPathInsideRoot(fullPath, root))
+        {
+            throw new UnauthorizedAccessException("Markdown files must be inside the open Markdown root.");
+        }
+
+        EnsureMarkdownPath(fullPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The Markdown file does not exist.", fullPath);
         }
 
         return fullPath;
