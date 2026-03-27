@@ -14,6 +14,17 @@ public interface IMarkdownNoteService
         string droppedNotePath,
         string targetNotePath);
 
+    string RenameMarkdownFile(
+        string notesDirectory,
+        string notePath,
+        string newName);
+
+    string RenameFolder(
+        string notesDirectory,
+        string folderPath,
+        string newName);
+
+
     void SaveNote(string notePath, string content);
 
     IReadOnlyList<MarkdownMentionTarget> ListMentionTargets(
@@ -129,6 +140,52 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
             folderPath,
             movedTargetPath,
             movedDroppedPath);
+    }
+
+    public string RenameMarkdownFile(
+        string notesDirectory,
+        string notePath,
+        string newName)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string sourcePath = ResolveExistingMarkdownPathInRoot(root, notePath);
+        string fileName = NormalizeMarkdownFileName(newName);
+        string destinationPath = Path.Combine(
+            Path.GetDirectoryName(sourcePath)
+                ?? throw new InvalidOperationException("The Markdown file does not have a parent directory."),
+            fileName);
+
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase))
+        {
+            return sourcePath;
+        }
+
+        EnsureMoveDestinationAvailable(sourcePath, destinationPath);
+        File.Move(sourcePath, destinationPath);
+        return Path.GetFullPath(destinationPath);
+    }
+
+    public string RenameFolder(
+        string notesDirectory,
+        string folderPath,
+        string newName)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string sourcePath = ResolveExistingFolderPathInRoot(root, folderPath);
+        string folderName = NormalizeFileSystemName(newName, "Folder name");
+        string destinationPath = Path.Combine(
+            Path.GetDirectoryName(sourcePath)
+                ?? throw new InvalidOperationException("The folder does not have a parent directory."),
+            folderName);
+
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase))
+        {
+            return sourcePath;
+        }
+
+        EnsureFolderDestinationAvailable(sourcePath, destinationPath);
+        Directory.Move(sourcePath, destinationPath);
+        return Path.GetFullPath(destinationPath);
     }
 
     private static string GetGroupFolderPath(string targetDirectory, string targetName)
@@ -263,6 +320,35 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         return fullPath;
     }
 
+    private static string ResolveExistingFolderPathInRoot(string root, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Folder path is required.", nameof(path));
+        }
+
+        string fullPath = Path.GetFullPath(path);
+        if (string.Equals(
+                Path.TrimEndingDirectorySeparator(fullPath),
+                Path.TrimEndingDirectorySeparator(root),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The open notes root cannot be renamed.");
+        }
+
+        if (!IsPathInsideRoot(fullPath, root))
+        {
+            throw new UnauthorizedAccessException("Folders must be inside the open Markdown root.");
+        }
+
+        if (!Directory.Exists(fullPath))
+        {
+            throw new DirectoryNotFoundException($"The folder does not exist: {fullPath}");
+        }
+
+        return fullPath;
+    }
+
     private static void ValidateExtractRequest(CreateExtractFileRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.SelectedMarkdown))
@@ -345,6 +431,57 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         if (!string.Equals(Path.GetExtension(path), ".md", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Mentions can only open Markdown files.");
+        }
+    }
+
+    private static string NormalizeMarkdownFileName(string name)
+    {
+        string fileName = NormalizeFileSystemName(name, "Markdown file name");
+
+        if (!string.Equals(Path.GetExtension(fileName), ".md", StringComparison.OrdinalIgnoreCase))
+        {
+            fileName += ".md";
+        }
+
+        EnsureMarkdownPath(fileName);
+        return fileName;
+    }
+
+    private static string NormalizeFileSystemName(string name, string label)
+    {
+        string fileName = name.Trim();
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new ArgumentException($"{label} is required.", nameof(name));
+        }
+
+        if (!string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal)
+            || fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new ArgumentException($"{label} contains invalid characters.", nameof(name));
+        }
+
+        if (fileName.EndsWith(".", StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"{label} cannot end with a period.", nameof(name));
+        }
+
+        return fileName;
+    }
+
+    private static void EnsureFolderDestinationAvailable(string sourcePath, string destinationPath)
+    {
+        string fullSourcePath = Path.GetFullPath(sourcePath);
+        string fullDestinationPath = Path.GetFullPath(destinationPath);
+
+        if (string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (Directory.Exists(fullDestinationPath) || File.Exists(fullDestinationPath))
+        {
+            throw new IOException($"A file or folder already exists at: {fullDestinationPath}");
         }
     }
 

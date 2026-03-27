@@ -180,7 +180,18 @@
                                   FontSize="13"
                                   Foreground="#586078"
                                   ItemsSource="{Binding NoteRoots}"
+                                  PreviewKeyDown="NotesTree_PreviewKeyDown"
+                                  PreviewMouseRightButtonDown="NotesTree_PreviewMouseRightButtonDown"
+                                  PreviewMouseMove="NotesTree_PreviewMouseMove"
+                                  DragOver="NotesTree_DragOver"
+                                  Drop="NotesTree_Drop"
                                   SelectedItemChanged="NotesTree_SelectedItemChanged">
+                            <TreeView.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Rename"
+                                              Click="RenameTreeItem_Click" />
+                                </ContextMenu>
+                            </TreeView.ContextMenu>
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type viewModels:NoteTreeNodeViewModel}"
                                                           ItemsSource="{Binding Children}">
@@ -194,12 +205,6 @@
                                             Value="{Binding IsExpanded, Mode=TwoWay}" />
                                     <Setter Property="AllowDrop"
                                             Value="{Binding IsMarkdownFile}" />
-                                    <EventSetter Event="PreviewMouseMove"
-                                                 Handler="NoteTreeItem_PreviewMouseMove" />
-                                    <EventSetter Event="DragOver"
-                                                 Handler="NoteTreeItem_DragOver" />
-                                    <EventSetter Event="Drop"
-                                                 Handler="NoteTreeItem_Drop" />
                                 </Style>
                             </TreeView.ItemContainerStyle>
                         </TreeView>

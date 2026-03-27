@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CogntApp.Services;
 using CogntApp.ViewModels;
@@ -62,6 +63,16 @@ public partial class MainWindow : Window
         }
 
         viewModel.SelectTreeNode(e.NewValue as NoteTreeNodeViewModel);
+    }
+
+    private void NotesTree_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F2)
+        {
+            RenameSelectedTreeNode();
+            e.Handled = true;
+            return;
+        }
     }
 
     private void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
@@ -249,10 +260,73 @@ public partial class MainWindow : Window
         viewModel.SaveNoteIfChanged(content);
     }
 
-    private void NoteTreeItem_PreviewMouseMove(object sender, MouseEventArgs e)
+    private void NotesTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (FindTreeViewItem(e.OriginalSource) is TreeViewItem item)
+        {
+            item.IsSelected = true;
+            item.Focus();
+        }
+    }
+
+    private void RenameTreeItem_Click(object sender, RoutedEventArgs e)
+    {
+        RenameSelectedTreeNode();
+    }
+
+
+    private void RenameSelectedTreeNode()
+    {
+        RenameTreeNode(NotesTree.SelectedItem as NoteTreeNodeViewModel);
+    }
+
+
+    private void RenameTreeNode(NoteTreeNodeViewModel? node)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        if (!viewModel.CanRenameNode(node))
+        {
+            MessageBox.Show(
+                "This item cannot be renamed.",
+                "Rename",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string itemKind = viewModel.GetNodeKind(node);
+        RenameItemDialog dialog = new(itemKind, viewModel.GetEditableName(node))
+        {
+            Owner = this,
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            viewModel.RenameNode(node, dialog.ItemName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The {itemKind} could not be renamed:{Environment.NewLine}{ex.Message}",
+                "Rename Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void NotesTree_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed
-            || sender is not TreeViewItem item
+            || FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
             || !TryGetMarkdownNodePath(item, requireFile: true, out string notePath))
         {
             return;
@@ -261,17 +335,19 @@ public partial class MainWindow : Window
         DragDrop.DoDragDrop(item, new DataObject(NoteTreeDragDataFormat, notePath), DragDropEffects.Move);
     }
 
-    private void NoteTreeItem_DragOver(object sender, DragEventArgs e)
+    private void NotesTree_DragOver(object sender, DragEventArgs e)
     {
-        e.Effects = CanDropNoteOnTarget(sender, e, out _, out _)
+        e.Effects = FindTreeViewItem(e.OriginalSource) is TreeViewItem item
+            && CanDropNoteOnTarget(item, e, out _, out _)
             ? DragDropEffects.Move
             : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private async void NoteTreeItem_Drop(object sender, DragEventArgs e)
+    private async void NotesTree_Drop(object sender, DragEventArgs e)
     {
-        if (!CanDropNoteOnTarget(sender, e, out string droppedNotePath, out string targetNotePath))
+        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
+            || !CanDropNoteOnTarget(item, e, out string droppedNotePath, out string targetNotePath))
         {
             e.Effects = DragDropEffects.None;
             e.Handled = true;
@@ -294,6 +370,23 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    private static TreeViewItem? FindTreeViewItem(object? source)
+    {
+        DependencyObject? current = source as DependencyObject;
+
+        while (current is not null)
+        {
+            if (current is TreeViewItem item)
+            {
+                return item;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private static bool CanDropNoteOnTarget(
