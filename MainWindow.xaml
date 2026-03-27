@@ -119,7 +119,7 @@
                 </Grid>
 
                 <StackPanel Grid.Row="1">
-                    <TextBlock Text="DIRECTORY"
+                    <TextBlock Text="COLLECTION"
                                Style="{StaticResource SectionHeaderStyle}"
                                Margin="8,0,0,8" />
 
@@ -134,7 +134,7 @@
                              VerticalContentAlignment="Center"
                              Text="{Binding NotesDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <Button Content="Load Directory"
+                    <Button Content="Load Collection"
                             Style="{StaticResource SidebarButtonStyle}"
                             Margin="0,0,0,10"
                             Command="{Binding LoadDirectoryCommand}" />

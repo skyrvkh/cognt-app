@@ -9,6 +9,7 @@ public sealed record NoteGroupResult(string TargetNotePath);
 
 public sealed class MainViewModel : ObservableObject
 {
+    private const string CollectionDirectoryExtension = ".cognt";
 
     private readonly IMarkdownNoteService noteService;
     private string notesDirectory = string.Empty;
@@ -74,7 +75,14 @@ public sealed class MainViewModel : ObservableObject
 
     public void Initialize()
     {
-        LoadNotesDirectory(ResolveDefaultNotesDirectory(), clearEditor: false);
+        string defaultCollectionPath = ResolveDefaultNotesDirectory();
+        NotesDirectory = defaultCollectionPath;
+
+        if (Directory.Exists(defaultCollectionPath) && IsCognCollectionPath(defaultCollectionPath))
+        {
+            LoadNotesDirectory(defaultCollectionPath, clearEditor: false);
+        }
+
         ShowDashboard();
     }
 
@@ -88,13 +96,21 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            RaiseMessage("Invalid Directory", $"The notes directory path is invalid: {ex.Message}");
+            RaiseMessage("Invalid Collection", $"The collection path is invalid: {ex.Message}");
+            return;
+        }
+
+        if (!IsCognCollectionPath(fullPath))
+        {
+            RaiseMessage(
+                "Invalid Collection",
+                $"Only collection folders ending with \"{CollectionDirectoryExtension}\" can be opened.");
             return;
         }
 
         if (!Directory.Exists(fullPath))
         {
-            RaiseMessage("Directory Not Found", $"The notes directory does not exist:{Environment.NewLine}{fullPath}");
+            RaiseMessage("Collection Not Found", $"The collection folder does not exist:{Environment.NewLine}{fullPath}");
             return;
         }
 
@@ -695,19 +711,52 @@ public sealed class MainViewModel : ObservableObject
 
             while (directory is not null)
             {
-                string samplesPath = Path.Combine(directory.FullName, "Samples");
-
-                if (Directory.Exists(samplesPath))
+                string samplesCollectionPath = Path.Combine(directory.FullName, $"Samples{CollectionDirectoryExtension}");
+                if (Directory.Exists(samplesCollectionPath))
                 {
-                    return samplesPath;
+                    return samplesCollectionPath;
+                }
+
+                string? firstCollectionPath = FindFirstCollectionPath(directory.FullName);
+
+                if (!string.IsNullOrWhiteSpace(firstCollectionPath))
+                {
+                    return firstCollectionPath;
                 }
 
                 directory = directory.Parent;
             }
         }
 
-        return Path.Combine(Environment.CurrentDirectory, "Samples");
+        return Path.Combine(Environment.CurrentDirectory, $"Samples{CollectionDirectoryExtension}");
     }
+
+    private static string? FindFirstCollectionPath(string directoryPath)
+    {
+        try
+        {
+            return Directory
+                .EnumerateDirectories(directoryPath, $"*{CollectionDirectoryExtension}", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsCognCollectionPath(string path)
+    {
+        string directoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+
+        return directoryName.EndsWith(CollectionDirectoryExtension, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string GetDirectoryName(string directoryPath)
     {
         return new DirectoryInfo(directoryPath).Name;
