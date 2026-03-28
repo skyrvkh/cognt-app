@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
+using CogntApp.Models.Markdown;
 using CogntApp.Services;
 
 namespace CogntApp.ViewModels;
