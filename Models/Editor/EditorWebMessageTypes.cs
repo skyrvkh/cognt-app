@@ -1,4 +1,4 @@
-namespace CogntApp.Views;
+namespace CogntApp.Models.Editor;
 
 internal static class EditorWebMessageTypes
 {

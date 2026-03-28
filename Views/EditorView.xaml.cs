@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using CogntApp.Models.Editor;
 using CogntApp.Services;
 using Microsoft.Web.WebView2.Core;
 
