@@ -131,20 +131,34 @@
             <Setter Property="FontSize" Value="10" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-<Style x:Key="FlashcardsDataGridStyle" TargetType="DataGrid">
+
+        <Style x:Key="GridTextBlockStyle" TargetType="TextBlock" BasedOn="{StaticResource TableTextStyle}">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="GridCenterTextBlockStyle" TargetType="TextBlock" BasedOn="{StaticResource GridTextBlockStyle}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="FlashcardsDataGridStyle" TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="False" />
             <Setter Property="CanUserAddRows" Value="False" />
             <Setter Property="CanUserDeleteRows" Value="False" />
             <Setter Property="CanUserReorderColumns" Value="False" />
+            <Setter Property="CanUserResizeColumns" Value="False" />
             <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="ColumnWidth" Value="SizeToCells" />
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
             <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource LineSoftBrush}" />
             <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="MinColumnWidth" Value="34" />
             <Setter Property="RowHeaderWidth" Value="0" />
             <Setter Property="RowHeight" Value="48" />
             <Setter Property="SelectionMode" Value="Single" />
             <Setter Property="SelectionUnit" Value="FullRow" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource LineSoftBrush}" />
             <Setter Property="BorderThickness" Value="0" />
@@ -324,12 +338,12 @@
         <ScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-            <Grid MinWidth="920"
+            <Grid MinWidth="1260"
                   Margin="16,16,16,22">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="260" />
                     <ColumnDefinition Width="14" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" MinWidth="940" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
@@ -585,12 +599,24 @@
                                       ItemsSource="{Binding DeckRows}"
                                       Style="{StaticResource FlashcardsDataGridStyle}">
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Binding="{Binding IsSelected}" Header="" Width="42" />
-                                    <DataGridTemplateColumn Header="Deck" Width="2.7*">
+                                    <DataGridTemplateColumn Header="" Width="38">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected}"
+                                                          IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Deck" Width="230">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource TableTextStyle}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Style="{StaticResource GridTextBlockStyle}"
+                                                               FontWeight="SemiBold"
+                                                               MaxWidth="126" />
                                                     <Border Margin="10,0,0,0"
                                                             Padding="7,3"
                                                             CornerRadius="4"
@@ -605,29 +631,38 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="New" Width=".7*">
+                                    <DataGridTemplateColumn Header="New" Width="56">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding NewCards}" Foreground="{StaticResource BlueBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                                <TextBlock Text="{Binding NewCards}"
+                                                           Foreground="{StaticResource BlueBrush}"
+                                                           Style="{StaticResource GridCenterTextBlockStyle}" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="Learning" Width=".85*">
+                                    <DataGridTemplateColumn Header="Learning" Width="76">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding LearningCards}" Foreground="{StaticResource OrangeBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                                <TextBlock Text="{Binding LearningCards}"
+                                                           Foreground="{StaticResource OrangeBrush}"
+                                                           Style="{StaticResource GridCenterTextBlockStyle}" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="Due" Width=".7*">
+                                    <DataGridTemplateColumn Header="Due" Width="56">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding DueCards}" Foreground="{StaticResource RedBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                                <TextBlock Text="{Binding DueCards}"
+                                                           Foreground="{StaticResource RedBrush}"
+                                                           Style="{StaticResource GridCenterTextBlockStyle}" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Binding="{Binding TotalCards}" Header="Total Cards" Width="1*" />
-                                    <DataGridTemplateColumn Header="Progress" Width="1.4*">
+                                    <DataGridTextColumn Binding="{Binding TotalCards}"
+                                                        Header="Total Cards"
+                                                        Width="86"
+                                                        ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
+                                    <DataGridTemplateColumn Header="Progress" Width="150">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -643,7 +678,7 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="Practice" Width="1.15*">
+                                    <DataGridTemplateColumn Header="Practice" Width="112">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Button Content="Practice"
@@ -654,7 +689,7 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTemplateColumn Header="" Width="42">
+                                    <DataGridTemplateColumn Header="" Width="44">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="..." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
@@ -719,9 +754,21 @@
                                       ItemsSource="{Binding CardRows}"
                                       Style="{StaticResource FlashcardsDataGridStyle}">
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Binding="{Binding IsSelected}" Header="" Width="42" />
-                                    <DataGridTextColumn Binding="{Binding Question}" Header="Front (Question)" Width="4*" />
-                                    <DataGridTemplateColumn Header="Status" Width="1.4*">
+                                    <DataGridTemplateColumn Header="" Width="38">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected}"
+                                                          IsHitTestVisible="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Binding="{Binding Question}"
+                                                        Header="Front (Question)"
+                                                        Width="430"
+                                                        ElementStyle="{StaticResource GridTextBlockStyle}" />
+                                    <DataGridTemplateColumn Header="Status" Width="130">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Border HorizontalAlignment="Left"
@@ -738,8 +785,11 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Binding="{Binding LastReviewed}" Header="Last Reviewed" Width="1.7*" />
-                                    <DataGridTemplateColumn Header="Actions" Width="150">
+                                    <DataGridTextColumn Binding="{Binding LastReviewed}"
+                                                        Header="Last Reviewed"
+                                                        Width="150"
+                                                        ElementStyle="{StaticResource GridTextBlockStyle}" />
+                                    <DataGridTemplateColumn Header="Actions" Width="160">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
