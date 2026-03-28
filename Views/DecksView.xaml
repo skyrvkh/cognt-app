@@ -549,14 +549,129 @@
                 </Border>
 
                 <StackPanel Grid.Column="2">
-                    <Border Style="{StaticResource PanelStyle}" Padding="22">
-                        <StackPanel>
-                            <TextBlock Text="Your Decks" Style="{StaticResource PanelTitleStyle}" />
-                            <TextBlock Text="Deck table will appear here."
-                                       Margin="0,8,0,0"
+                    <Border Style="{StaticResource PanelStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="58" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="42" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Margin="16,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Your Decks" Style="{StaticResource PanelTitleStyle}" />
+                                    <Border Margin="10,0,0,0"
+                                            Padding="7,2"
+                                            CornerRadius="6"
+                                            Background="#EEF2FF">
+                                        <TextBlock Text="6"
+                                                   Foreground="#344054"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Filter" Width="82" Style="{StaticResource OutlineButtonStyle}" />
+                                <Button Grid.Column="2" Content="Sort: Alphabetical" Width="150" Margin="12,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
+                                <Button Grid.Column="3" Content="..." Width="42" Margin="12,0,0,0" Style="{StaticResource IconButtonStyle}" />
+                            </Grid>
+
+                            <DataGrid Grid.Row="1"
+                                      ItemsSource="{Binding DeckRows}"
+                                      Style="{StaticResource FlashcardsDataGridStyle}">
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Binding="{Binding IsSelected}" Header="" Width="42" />
+                                    <DataGridTemplateColumn Header="Deck" Width="2.7*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource TableTextStyle}" FontWeight="SemiBold" />
+                                                    <Border Margin="10,0,0,0"
+                                                            Padding="7,3"
+                                                            CornerRadius="4"
+                                                            BorderBrush="{Binding BadgeBorder}"
+                                                            BorderThickness="1"
+                                                            Background="{Binding BadgeBackground}">
+                                                        <TextBlock Text="{Binding Category}"
+                                                                   Foreground="{Binding BadgeForeground}"
+                                                                   Style="{StaticResource BadgeTextStyle}" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="New" Width=".7*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding NewCards}" Foreground="{StaticResource BlueBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Learning" Width=".85*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding LearningCards}" Foreground="{StaticResource OrangeBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Due" Width=".7*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DueCards}" Foreground="{StaticResource RedBrush}" HorizontalAlignment="Center" Style="{StaticResource TableTextStyle}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Binding="{Binding TotalCards}" Header="Total Cards" Width="1*" />
+                                    <DataGridTemplateColumn Header="Progress" Width="1.4*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ProgressLabel}" Style="{StaticResource TableTextStyle}" Width="42" />
+                                                    <ProgressBar Width="92"
+                                                                 Height="5"
+                                                                 BorderThickness="0"
+                                                                 Background="#D8DEEA"
+                                                                 Foreground="{StaticResource AccentBrush}"
+                                                                 Maximum="100"
+                                                                 Value="{Binding Progress}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="Practice" Width="1.15*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="Practice"
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Style="{StaticResource OutlineButtonStyle}"
+                                                        Width="92"
+                                                        Height="32" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="" Width="42">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="..." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Center" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <TextBlock Grid.Row="2"
+                                       Text="Showing 1 to 6 of 6 decks"
+                                       Margin="16,0"
                                        Style="{StaticResource MutedTextStyle}" />
-                        </StackPanel>
+                        </Grid>
                     </Border>
+
+
                     <Border Margin="0,14,0,0" Style="{StaticResource PanelStyle}" Padding="22">
                         <StackPanel>
                             <TextBlock Text="Cards in Biology 101" Style="{StaticResource PanelTitleStyle}" />
