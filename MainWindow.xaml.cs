@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
+using CogntApp.Models.Navigation;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
