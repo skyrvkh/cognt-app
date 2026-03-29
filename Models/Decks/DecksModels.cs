@@ -84,3 +84,98 @@ public sealed record RecallDistributionRow(
 {
     public string PercentLabel => $"{Percent}%";
 }
+
+public sealed record CardLibraryRow(
+    bool IsSelected,
+    string Question,
+    string Deck,
+    string Status,
+    string Due,
+    string LastReviewed,
+    string Recall,
+    string StatusBackgroundColor,
+    string StatusBorderColor,
+    string StatusForegroundColor,
+    string RecallBackgroundColor,
+    string RecallBorderColor,
+    string RecallForegroundColor,
+    string RowBackgroundColor)
+{
+    public Brush StatusBackground => BrushFrom(StatusBackgroundColor);
+
+    public Brush StatusBorder => BrushFrom(StatusBorderColor);
+
+    public Brush StatusForeground => BrushFrom(StatusForegroundColor);
+
+    public Brush RecallBackground => BrushFrom(RecallBackgroundColor);
+
+    public Brush RecallBorder => BrushFrom(RecallBorderColor);
+
+    public Brush RecallForeground => BrushFrom(RecallForegroundColor);
+
+    public Brush RowBackground => BrushFrom(RowBackgroundColor);
+
+    public static CardLibraryRow Mastered(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    {
+        return Create(isSelected, question, deck, "Mastered", due, lastReviewed, recall, "#ECFDF3", "#A7F3D0", "#16A34A");
+    }
+
+    public static CardLibraryRow Learning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    {
+        return Create(isSelected, question, deck, "Learning", due, lastReviewed, recall, "#FFF7ED", "#FED7AA", "#D97706");
+    }
+
+    public static CardLibraryRow DueCard(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    {
+        return Create(isSelected, question, deck, "Due", due, lastReviewed, recall, "#FEF2F2", "#FECACA", "#DC2626");
+    }
+
+    public static CardLibraryRow New(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    {
+        return Create(isSelected, question, deck, "New", due, lastReviewed, recall, "#EFF6FF", "#BFDBFE", "#2563EB");
+    }
+
+    private static CardLibraryRow Create(
+        bool isSelected,
+        string question,
+        string deck,
+        string status,
+        string due,
+        string lastReviewed,
+        string recall,
+        string statusBackground,
+        string statusBorder,
+        string statusForeground)
+    {
+        var (recallBackground, recallBorder, recallForeground) = recall switch
+        {
+            "Easy" => ("#ECFDF3", "#A7F3D0", "#16A34A"),
+            "Good" => ("#EFF6FF", "#BFDBFE", "#2563EB"),
+            "Hard" => ("#FFF7ED", "#FED7AA", "#D97706"),
+            _ => ("#FFFFFF", "#D9E1EE", "#667085")
+        };
+
+        return new(
+            isSelected,
+            question,
+            deck,
+            status,
+            due,
+            lastReviewed,
+            recall,
+            statusBackground,
+            statusBorder,
+            statusForeground,
+            recallBackground,
+            recallBorder,
+            recallForeground,
+            isSelected ? "#EEF2FF" : "#FFFFFF");
+    }
+
+    private static Brush BrushFrom(string color)
+    {
+        return (Brush)new BrushConverter().ConvertFromString(color)!;
+    }
+}
+
+public sealed record CardFilterDeckRow(string Name, string Count);
