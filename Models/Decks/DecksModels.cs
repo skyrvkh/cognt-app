@@ -75,3 +75,12 @@ public sealed record CardRow(
         return (Brush)new BrushConverter().ConvertFromString(color)!;
     }
 }
+
+public sealed record RecallDistributionRow(
+    string Label,
+    int Count,
+    int Percent,
+    string BarColor)
+{
+    public string PercentLabel => $"{Percent}%";
+}
