@@ -1,7 +1,219 @@
 <UserControl x:Class="CogntApp.Views.Decks.StatisticsSubview"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Border Margin="16" Padding="24" Style="{StaticResource PanelStyle}">
-        <TextBlock Text="Statistics" Style="{StaticResource PanelTitleStyle}" />
-    </Border>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="860"
+             d:DesignWidth="1292">
+                <Grid
+                      MinWidth="1260"
+                      Margin="16,16,16,22">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <TextBlock Text="Statistics"
+                                   Style="{StaticResource PanelTitleStyle}"
+                                   FontSize="22" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ComboBox Width="110"
+                                      SelectedIndex="1"
+                                      Style="{StaticResource FilterComboBoxStyle}">
+                                <ComboBoxItem Content="7 days" />
+                                <ComboBoxItem Content="30 days" />
+                                <ComboBoxItem Content="90 days" />
+                                <ComboBoxItem Content="All time" />
+                            </ComboBox>
+                            <ComboBox Width="190"
+                                      Margin="12,0,0,0"
+                                      SelectedIndex="0"
+                                      Style="{StaticResource FilterComboBoxStyle}">
+                                <ComboBoxItem Content="Apr 22 - May 21, 2025" />
+                                <ComboBoxItem Content="Mar 23 - Apr 21, 2025" />
+                                <ComboBoxItem Content="Custom range" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <UniformGrid Grid.Row="1" Columns="5" Margin="0,18,0,14">
+                        <Border Margin="0,0,10,0" Padding="16" Style="{StaticResource PanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Time Studied" Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="18h 42m" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="22" />
+                                <TextBlock Text="+ 2h 34m vs previous 30 days" Margin="0,8,0,0" Foreground="{StaticResource GreenBrush}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="0,0,10,0" Padding="16" Style="{StaticResource PanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Cards Reviewed" Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="1,284" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="22" />
+                                <TextBlock Text="+ 356 vs previous 30 days" Margin="0,8,0,0" Foreground="{StaticResource GreenBrush}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="0,0,10,0" Padding="16" Style="{StaticResource PanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Study Streak" Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="12 days" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="22" />
+                                <TextBlock Text="Best: 18 days" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="0,0,10,0" Padding="16" Style="{StaticResource PanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Average Recall" Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="82%" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="22" />
+                                <TextBlock Text="+ 6% vs previous 30 days" Margin="0,8,0,0" Foreground="{StaticResource GreenBrush}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="16" Style="{StaticResource PanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Due Tomorrow" Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="74" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="22" />
+                                <TextBlock Text="Across 6 decks" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.55*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource PanelStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="58" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid Margin="16,0">
+                                    <TextBlock Text="Cards Reviewed &amp; Time Studied"
+                                               Style="{StaticResource PanelTitleStyle}" />
+                                    <ComboBox Width="92"
+                                              HorizontalAlignment="Right"
+                                              SelectedIndex="0"
+                                              Style="{StaticResource FilterComboBoxStyle}">
+                                        <ComboBoxItem Content="Daily" />
+                                        <ComboBoxItem Content="Weekly" />
+                                    </ComboBox>
+                                </Grid>
+                                <lvc:CartesianChart Grid.Row="1"
+                                                    Height="360"
+                                                    Margin="12,0,12,12"
+                                                    AnimationsSpeed="0:0:0.25"
+                                                    LegendPosition="Top"
+                                                    Series="{Binding DailyStatisticsSeries}"
+                                                    TooltipPosition="Top"
+                                                    XAxes="{Binding DailyStatisticsXAxes}"
+                                                    YAxes="{Binding DailyStatisticsYAxes}" />
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Column="2">
+                            <Border Style="{StaticResource PanelStyle}" Padding="16">
+                                <StackPanel>
+                                    <Grid>
+                                        <TextBlock Text="Recall Distribution" Style="{StaticResource PanelTitleStyle}" />
+                                        <ComboBox Width="118"
+                                                  HorizontalAlignment="Right"
+                                                  SelectedIndex="0"
+                                                  Style="{StaticResource FilterComboBoxStyle}">
+                                            <ComboBoxItem Content="This 30 Days" />
+                                            <ComboBoxItem Content="All Time" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <lvc:PieChart Height="220"
+                                                  Margin="0,10,0,0"
+                                                  AnimationsSpeed="0:0:0.25"
+                                                  LegendPosition="Right"
+                                                  Series="{Binding RecallDistributionSeries}"
+                                                  TooltipPosition="Hidden" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,14,0,0" Style="{StaticResource PanelStyle}" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Study Streak" Style="{StaticResource PanelTitleStyle}" />
+                                    <lvc:CartesianChart Height="160"
+                                                        Margin="0,10,0,0"
+                                                        AnimationsSpeed="0:0:0.25"
+                                                        LegendPosition="Hidden"
+                                                        Series="{Binding StudyStreakSeries}"
+                                                        TooltipPosition="Top"
+                                                        XAxes="{Binding StudyStreakXAxes}"
+                                                        YAxes="{Binding StudyStreakYAxes}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.55*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource PanelStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="58" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Deck Performance"
+                                           Margin="16,0"
+                                           Style="{StaticResource PanelTitleStyle}" />
+                                <DataGrid Grid.Row="1"
+                                          ItemsSource="{Binding DeckPerformanceRows}"
+                                          Style="{StaticResource FlashcardsDataGridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Binding="{Binding Deck}" Header="Deck" Width="220" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                                        <DataGridTextColumn Binding="{Binding CardsReviewed}" Header="Cards Reviewed" Width="130" ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
+                                        <DataGridTextColumn Binding="{Binding RetentionLabel}" Header="Retention" Width="110" ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
+                                        <DataGridTextColumn Binding="{Binding Due}" Header="Due" Width="70" ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
+                                        <DataGridTemplateColumn Header="Progress" Width="170">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <ProgressBar Width="92" Height="5" BorderThickness="0" Maximum="100" Value="{Binding Progress}" Foreground="{StaticResource AccentBrush}" Background="#D8DEEA" />
+                                                        <TextBlock Text="{Binding ProgressLabel}" Margin="10,0,0,0" Style="{StaticResource TableTextStyle}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource PanelStyle}" Padding="16">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Review Outcomes by Week" Style="{StaticResource PanelTitleStyle}" />
+                                    <ComboBox Width="118"
+                                              HorizontalAlignment="Right"
+                                              SelectedIndex="0"
+                                              Style="{StaticResource FilterComboBoxStyle}">
+                                        <ComboBoxItem Content="This 30 Days" />
+                                        <ComboBoxItem Content="All Time" />
+                                    </ComboBox>
+                                </Grid>
+                                <lvc:CartesianChart Height="245"
+                                                    Margin="0,10,0,0"
+                                                    AnimationsSpeed="0:0:0.25"
+                                                    LegendPosition="Top"
+                                                    Series="{Binding WeeklyOutcomeSeries}"
+                                                    TooltipPosition="Top"
+                                                    XAxes="{Binding WeeklyOutcomeXAxes}"
+                                                    YAxes="{Binding WeeklyOutcomeYAxes}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
 </UserControl>
