@@ -76,15 +76,6 @@ public sealed record CardRow(
     }
 }
 
-public sealed record RecallDistributionRow(
-    string Label,
-    int Count,
-    int Percent,
-    string BarColor)
-{
-    public string PercentLabel => $"{Percent}%";
-}
-
 public sealed record CardLibraryRow(
     bool IsSelected,
     string Question,
@@ -179,3 +170,55 @@ public sealed record CardLibraryRow(
 }
 
 public sealed record CardFilterDeckRow(string Name, string Count);
+
+public sealed record DeckPerformanceRow(
+    string Deck,
+    int CardsReviewed,
+    int Retention,
+    int Due,
+    int Progress)
+{
+    public string RetentionLabel => $"{Retention}%";
+
+    public string ProgressLabel => $"{Progress}%";
+}
+
+public sealed record DailyStatisticsRow(
+    string Date,
+    int CardsReviewed,
+    int MinutesStudied,
+    int Recall)
+{
+    public string RecallLabel => $"{Recall}%";
+}
+
+public sealed record RecallDistributionRow(
+    string Label,
+    int Count,
+    int Percent,
+    string BarColor)
+{
+    public string PercentLabel => $"{Percent}%";
+
+    public Brush BarBrush => (Brush)new BrushConverter().ConvertFromString(BarColor)!;
+}
+
+public sealed record WeeklyOutcomeRow(
+    string Week,
+    int Again,
+    int Hard,
+    int Good,
+    int Easy)
+{
+    public string AgainLabel => $"{Again}%";
+
+    public string HardLabel => $"{Hard}%";
+
+    public string GoodLabel => $"{Good}%";
+
+    public string EasyLabel => $"{Easy}%";
+}
+
+public sealed record StudyStreakRow(string Label, IReadOnlyList<StudyStreakCell> Cells);
+
+public sealed record StudyStreakCell(int Cards);
