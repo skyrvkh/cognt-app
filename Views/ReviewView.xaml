@@ -1,24 +1,464 @@
 <UserControl x:Class="CogntApp.Views.ReviewView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="450"
-             d:DesignWidth="650">
-    <Border Padding="28"
-            Background="#FFFFFF"
-            BorderBrush="#D7DEE8"
-            BorderThickness="1">
-        <StackPanel>
-            <TextBlock Text="Review"
-                       FontSize="24"
-                       FontWeight="SemiBold"
-                       Foreground="#1F2937" />
-            <TextBlock Text="Review sessions will appear here."
-                       Margin="0,10,0,0"
-                       FontSize="14"
-                       Foreground="#64748B" />
-        </StackPanel>
-    </Border>
+             d:DesignHeight="980"
+             d:DesignWidth="1680"
+             Background="#F7F9FC"
+             Loaded="ReviewView_Loaded"
+             SizeChanged="ReviewView_SizeChanged"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <UserControl.Resources>
+        <Style x:Key="ReviewRatingButtonStyle"
+               TargetType="Button">
+            <Setter Property="Height" Value="108" />
+            <Setter Property="Padding" Value="20,0" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ShortcutKeyStyle" TargetType="Border">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#CFD8E6" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource PageBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="72" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                BorderBrush="{StaticResource LineSoftBrush}"
+                BorderThickness="0,0,0,1"
+                Background="#FFFFFF">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="40" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="HeaderTitle"
+                           Text="Flashcards"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource InkBrush}"
+                           FontSize="22"
+                           FontWeight="SemiBold" />
+
+                <StackPanel x:Name="HeaderTabs"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Content="Decks"
+                            Click="ExitReview_Click"
+                            Margin="0,0,28,0"
+                            Style="{StaticResource HeaderTabButtonStyle}" />
+                    <Button Content="Cards"
+                            Click="ExitReview_Click"
+                            Margin="0,0,28,0"
+                            Style="{StaticResource HeaderTabButtonStyle}" />
+                    <Button Content="Statistics"
+                            Click="ExitReview_Click"
+                            Style="{StaticResource HeaderTabButtonStyle}" />
+                </StackPanel>
+
+                <Button x:Name="ExitReviewButton"
+                        Grid.Column="4"
+                        Width="128"
+                        Height="38"
+                        Click="ExitReview_Click"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource OutlineButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="ExitReviewGlyph"
+                                   Text="x"
+                                   Margin="0,0,8,0"
+                                   FontSize="15" />
+                        <TextBlock x:Name="ExitReviewLabel"
+                                   Text="Exit Review" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <ScrollViewer x:Name="ReviewContentScrollViewer"
+                      Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      CanContentScroll="False">
+            <Grid x:Name="StageContainer"
+                  Margin="36,26,36,30">
+                <Grid x:Name="StageRoot"
+                      MaxWidth="1520"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="StageGapBeforeShortcutsRow" Height="14" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="StageGapBeforeRatingsRow" Height="16" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border x:Name="CardFrame"
+                            Grid.Row="0"
+                            Height="660"
+                            HorizontalAlignment="Stretch"
+                            Background="#FFFFFF"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="22"
+                                              Direction="270"
+                                              Opacity="0.12"
+                                              ShadowDepth="6"
+                                              Color="#475467" />
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition x:Name="CardHeaderRow" Height="76" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition x:Name="CardFooterRow" Height="124" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock x:Name="CardSideLabel"
+                                       Text="FRONT"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Bottom"
+                                       Foreground="#667085"
+                                       FontSize="13"
+                                       FontWeight="SemiBold" />
+
+                            <wv2:WebView2CompositionControl x:Name="CardRenderer"
+                                                            Grid.Row="1"
+                                                            Margin="84,6,84,0"
+                                                            HorizontalAlignment="Stretch"
+                                                            VerticalAlignment="Stretch" />
+
+                            <Border Grid.Row="2"
+                                    BorderBrush="{StaticResource LineSoftBrush}"
+                                    BorderThickness="0,1,0,0">
+                                <Grid>
+                                    <StackPanel x:Name="RevealPromptPanel"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                        <WrapPanel x:Name="RevealPromptMessage"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,14"
+                                                   MaxWidth="420">
+                                            <Border Width="30"
+                                                    Height="30"
+                                                    CornerRadius="15"
+                                                    Background="#EEF2FF">
+                                                <TextBlock Text="?"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           FontSize="14"
+                                                           FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock x:Name="RevealPromptText"
+                                                      Text="Think before revealing the answer"
+                                                      Margin="10,0,0,0"
+                                                      VerticalAlignment="Center"
+                                                      Foreground="{StaticResource MutedBrush}"
+                                                      FontSize="14"
+                                                      TextAlignment="Center"
+                                                      TextWrapping="Wrap" />
+                                        </WrapPanel>
+                                        <Button x:Name="RevealAnswerButton"
+                                                Width="320"
+                                                MinWidth="180"
+                                                MaxWidth="320"
+                                                Height="50"
+                                                Click="RevealAnswer_Click"
+                                                Style="{StaticResource PrimaryButtonStyle}">
+                                            <TextBlock Text="Reveal Answer"
+                                                       HorizontalAlignment="Center" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="AnswerStatePanel"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Visibility="Collapsed">
+                                        <TextBlock Text="Answer revealed"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource InkBrush}"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="Choose a recall rating below"
+                                                   Margin="0,6,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="14"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="ShortcutStrip"
+                            Grid.Row="2"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Padding="18,0"
+                            Height="40"
+                            CornerRadius="8"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1"
+                            Background="#FFFFFF">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Key"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12" />
+                            <TextBlock Text="Use keyboard shortcuts"
+                                       Margin="8,0,18,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12" />
+                            <Border Style="{StaticResource ShortcutKeyStyle}">
+                                <TextBlock Text="1"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontSize="11" />
+                            </Border>
+                            <TextBlock Text="Again"
+                                       Margin="7,0,14,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <Border Style="{StaticResource ShortcutKeyStyle}">
+                                <TextBlock Text="2"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource OrangeBrush}"
+                                           FontSize="11" />
+                            </Border>
+                            <TextBlock Text="Hard"
+                                       Margin="7,0,14,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <Border Style="{StaticResource ShortcutKeyStyle}">
+                                <TextBlock Text="3"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource BlueBrush}"
+                                           FontSize="11" />
+                            </Border>
+                            <TextBlock Text="Good"
+                                       Margin="7,0,14,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <Border Style="{StaticResource ShortcutKeyStyle}">
+                                <TextBlock Text="4"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource GreenBrush}"
+                                           FontSize="11" />
+                            </Border>
+                            <TextBlock Text="Easy"
+                                       Margin="7,0,0,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                        </StackPanel>
+                    </Border>
+
+                    <UniformGrid x:Name="RatingsPanel"
+                                 Grid.Row="4"
+                                 Columns="4"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center">
+                        <Button Margin="6"
+                                Click="RatingButton_Click"
+                                Tag="Again"
+                                Background="#FFF5F5"
+                                BorderBrush="#FCA5A5"
+                                Style="{StaticResource ReviewRatingButtonStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Border Width="32"
+                                            Height="28"
+                                            CornerRadius="6"
+                                            BorderBrush="#FCA5A5"
+                                            BorderThickness="1"
+                                            Background="#FFFFFF">
+                                        <TextBlock Text="1"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource RedBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                    <TextBlock Text="Again"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource RedBrush}"
+                                               FontSize="19"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Incorrect"
+                                           Margin="0,10,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#475467"
+                                           FontSize="13" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Margin="6"
+                                Click="RatingButton_Click"
+                                Tag="Hard"
+                                Background="#FFF8ED"
+                                BorderBrush="#FDBA74"
+                                Style="{StaticResource ReviewRatingButtonStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Border Width="32"
+                                            Height="28"
+                                            CornerRadius="6"
+                                            BorderBrush="#FDBA74"
+                                            BorderThickness="1"
+                                            Background="#FFFFFF">
+                                        <TextBlock Text="2"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource OrangeBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                    <TextBlock Text="Hard"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource OrangeBrush}"
+                                               FontSize="19"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Difficult"
+                                           Margin="0,10,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#475467"
+                                           FontSize="13" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Margin="6"
+                                Click="RatingButton_Click"
+                                Tag="Good"
+                                Background="#F5F8FF"
+                                BorderBrush="#93B4FF"
+                                Style="{StaticResource ReviewRatingButtonStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Border Width="32"
+                                            Height="28"
+                                            CornerRadius="6"
+                                            BorderBrush="#93B4FF"
+                                            BorderThickness="1"
+                                            Background="#FFFFFF">
+                                        <TextBlock Text="3"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource BlueBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                    <TextBlock Text="Good"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource BlueBrush}"
+                                               FontSize="19"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Correct"
+                                           Margin="0,10,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#475467"
+                                           FontSize="13" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Margin="6"
+                                Click="RatingButton_Click"
+                                Tag="Easy"
+                                Background="#F0FDF4"
+                                BorderBrush="#86EFAC"
+                                Style="{StaticResource ReviewRatingButtonStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Border Width="32"
+                                            Height="28"
+                                            CornerRadius="6"
+                                            BorderBrush="#86EFAC"
+                                            BorderThickness="1"
+                                            Background="#FFFFFF">
+                                        <TextBlock Text="4"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource GreenBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                    <TextBlock Text="Easy"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource GreenBrush}"
+                                               FontSize="19"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Very easy"
+                                           Margin="0,10,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#475467"
+                                           FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                    </UniformGrid>
+                </Grid>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
