@@ -190,7 +190,8 @@
                       VerticalScrollBarVisibility="Auto">
             <Grid MinWidth="{Binding ViewportWidth, ElementName=FlashcardsBodyScrollViewer}">
                 <ContentControl Content="{Binding CurrentSubview}"
-                                HorizontalAlignment="Center" />
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch" />
             </Grid>
         </ScrollViewer>
     </Grid>
