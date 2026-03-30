@@ -181,13 +181,22 @@ public sealed class MainViewModel : ObservableObject
 
     public void SelectTreeNode(NoteTreeNodeViewModel? node)
     {
-        if (node?.NotePath is string notePath)
+        if (node is null)
         {
-            OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(notePath, SelectInTree: false));
+            ClearCurrentNote();
             return;
         }
 
-        ClearCurrentNote();
+        if (!string.IsNullOrWhiteSpace(node.NotePath))
+        {
+            OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(node.NotePath, SelectInTree: false));
+            return;
+        }
+
+        if (IsOpenRootFolder(node))
+        {
+            ShowDashboard();
+        }
     }
 
     public bool CanRenameNode(NoteTreeNodeViewModel? node)

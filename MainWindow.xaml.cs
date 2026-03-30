@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
@@ -17,11 +18,20 @@ namespace CogntApp;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private const double CollapsedSidebarWidth = 88;
+    private const double DesktopSidebarWidth = 300;
+    private const double CompactNavigationBreakpoint = 1180;
     private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.MarkdownPath";
+    private static readonly Geometry ChevronLeftIcon = CreateFrozenGeometry("M11.5,4 L5.5,10 L11.5,16");
+    private static readonly Geometry ChevronRightIcon = CreateFrozenGeometry("M5.5,4 L11.5,10 L5.5,16");
+    private static readonly Geometry CloseIcon = CreateFrozenGeometry("M4,4 L14,14 M14,4 L4,14");
 
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
     private readonly MainViewModel viewModel;
+    private bool isDesktopSidebarCollapsed;
+    private bool isCompactNavigationMode;
+    private bool isSidebarSheetOpen;
     private int editorOpenRequestId;
 
     public MainWindow()
@@ -65,7 +75,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        viewModel.SelectTreeNode(e.NewValue as NoteTreeNodeViewModel);
+        NoteTreeNodeViewModel? selectedNode = e.NewValue as NoteTreeNodeViewModel;
+        viewModel.SelectTreeNode(selectedNode);
+
+        if (!string.IsNullOrWhiteSpace(selectedNode?.NotePath))
+        {
+            CloseSidebarSheet();
+        }
     }
 
     private void NotesTree_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -84,9 +100,199 @@ public partial class MainWindow : Window
         }
     }
 
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        ApplyResponsiveNavigation(animate: false);
+    }
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!IsLoaded || !e.WidthChanged)
+        {
+            return;
+        }
+
+        ApplyResponsiveNavigation(animate: true);
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || !isCompactNavigationMode || !isSidebarSheetOpen)
+        {
+            return;
+        }
+
+        CloseSidebarSheet();
+        e.Handled = true;
+    }
+
+    private void NavigationToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!isCompactNavigationMode)
+        {
+            return;
+        }
+
+        isSidebarSheetOpen = !isSidebarSheetOpen;
+        ApplyResponsiveNavigation(animate: true);
+    }
+
+    private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (isCompactNavigationMode)
+        {
+            CloseSidebarSheet();
+            return;
+        }
+
+        isDesktopSidebarCollapsed = !isDesktopSidebarCollapsed;
+        ApplyResponsiveNavigation(animate: false);
+    }
+
+    private void SidebarBackdrop_Click(object sender, RoutedEventArgs e)
+    {
+        CloseSidebarSheet();
+    }
+
+    private void SidebarActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloseSidebarSheet();
+    }
+
+    private void CloseSidebarSheet()
+    {
+        if (!isCompactNavigationMode || !isSidebarSheetOpen)
+        {
+            return;
+        }
+
+        isSidebarSheetOpen = false;
+        ApplyResponsiveNavigation(animate: true);
+    }
+
+    private void ApplyResponsiveNavigation(bool animate)
+    {
+        bool shouldUseCompactNavigation = ActualWidth < CompactNavigationBreakpoint;
+
+        if (shouldUseCompactNavigation != isCompactNavigationMode)
+        {
+            isCompactNavigationMode = shouldUseCompactNavigation;
+
+            if (!isCompactNavigationMode)
+            {
+                isSidebarSheetOpen = false;
+            }
+        }
+
+        bool showExpandedSidebarContent = isCompactNavigationMode || !isDesktopSidebarCollapsed;
+        double targetDesktopSidebarWidth = isDesktopSidebarCollapsed
+            ? CollapsedSidebarWidth
+            : DesktopSidebarWidth;
+        double targetSidebarWidth = isCompactNavigationMode
+            ? DesktopSidebarWidth
+            : targetDesktopSidebarWidth;
+
+        SidebarHost.Width = targetSidebarWidth;
+        SidebarSpacerColumn.Width = isCompactNavigationMode
+            ? ResponsiveLayout.Zero
+            : ResponsiveLayout.Pixel(targetSidebarWidth);
+        MobileHeaderRow.Height = isCompactNavigationMode
+            ? GridLength.Auto
+            : ResponsiveLayout.Zero;
+        MobileHeader.Visibility = ResponsiveLayout.VisibleWhen(isCompactNavigationMode);
+        SidebarBackdrop.Visibility = ResponsiveLayout.VisibleWhen(isCompactNavigationMode);
+        SidebarBackdrop.IsHitTestVisible = isCompactNavigationMode && isSidebarSheetOpen;
+        SidebarHost.IsEnabled = !isCompactNavigationMode || isSidebarSheetOpen;
+        SidebarHost.IsHitTestVisible = !isCompactNavigationMode || isSidebarSheetOpen;
+        SidebarHost.CornerRadius = isCompactNavigationMode
+            ? new CornerRadius(0, 18, 18, 0)
+            : new CornerRadius(0);
+        SidebarShadowEffect.Opacity = isCompactNavigationMode ? 0.45 : 0;
+        SidebarHeader.Margin = showExpandedSidebarContent
+            ? new Thickness(0, 0, 0, 12)
+            : new Thickness(0);
+        Visibility expandedSidebarVisibility = ResponsiveLayout.VisibleWhen(showExpandedSidebarContent);
+        SidebarBrandText.Visibility = expandedSidebarVisibility;
+        SidebarCollectionSection.Visibility = expandedSidebarVisibility;
+        SidebarScrollContent.Visibility = expandedSidebarVisibility;
+        SidebarFooterSection.Visibility = expandedSidebarVisibility;
+
+        SidebarToggleIcon.Data = isCompactNavigationMode
+            ? CloseIcon
+            : isDesktopSidebarCollapsed
+                ? ChevronRightIcon
+                : ChevronLeftIcon;
+        SidebarToggleButton.ToolTip = isCompactNavigationMode
+            ? "Close navigation"
+            : isDesktopSidebarCollapsed
+                ? "Show navigation"
+                : "Hide navigation";
+
+        double targetSidebarOffset = isCompactNavigationMode
+            ? (isSidebarSheetOpen ? 0 : -(DesktopSidebarWidth + 24))
+            : 0;
+        double targetBackdropOpacity = isCompactNavigationMode && isSidebarSheetOpen
+            ? 1
+            : 0;
+
+        AnimateDouble(SidebarSheetTransform, TranslateTransform.XProperty, targetSidebarOffset, animate);
+        AnimateDouble(SidebarBackdrop, UIElement.OpacityProperty, targetBackdropOpacity, animate);
+    }
+
+    private static Geometry CreateFrozenGeometry(string pathData)
+    {
+        Geometry geometry = Geometry.Parse(pathData);
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private static void AnimateDouble(
+        DependencyObject target,
+        DependencyProperty property,
+        double value,
+        bool animate)
+    {
+        if (!animate)
+        {
+            if (target is Animatable nonAnimatedTarget)
+            {
+                nonAnimatedTarget.BeginAnimation(property, null);
+            }
+
+            target.SetValue(property, value);
+            return;
+        }
+
+        DoubleAnimation animation = new()
+        {
+            To = value,
+            Duration = TimeSpan.FromMilliseconds(180),
+            EasingFunction = new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            },
+        };
+
+        if (target is Animatable animatable)
+        {
+            animatable.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
+        }
+        else
+        {
+            if (target.GetValue(property) is double currentValue
+                && Math.Abs(currentValue - value) < 0.1)
+            {
+                return;
+            }
+
+            target.SetValue(property, value);
+        }
+    }
+
     private void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
     {
         editorOpenRequestId++;
+        CloseSidebarSheet();
 
         UIElement overlay = e.ViewKind switch
         {
@@ -96,7 +302,6 @@ public partial class MainWindow : Window
 
         ShowOverlay(overlay);
     }
-
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
         await ShowEmptyEditorViewAsync();
