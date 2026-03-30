@@ -6,43 +6,331 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="860"
-             d:DesignWidth="1512"
-             HorizontalAlignment="Center"
-             Width="1512">
-                <Grid
-                      MinWidth="1480"
-                      Margin="16,16,16,22">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="230" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" MinWidth="940" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="276" />
-                    </Grid.ColumnDefinitions>
+             d:DesignWidth="1292"
+             HorizontalAlignment="Stretch"
+             Loaded="CardsSubview_Loaded"
+             SizeChanged="CardsSubview_SizeChanged"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+    <Grid x:Name="LayoutRoot"
+          MaxWidth="1292"
+          Margin="16,16,16,22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="LayoutGapColumnDefinition" Width="14" />
+            <ColumnDefinition x:Name="PreviewColumnDefinition" Width="276" />
+        </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0"
-                            Style="{StaticResource PanelStyle}"
-                            Padding="14">
+        <StackPanel Grid.Row="0"
+                    Grid.Column="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Cards"
+                           Style="{StaticResource PanelTitleStyle}"
+                           FontSize="22" />
+
+                <WrapPanel x:Name="HeaderActionsPanel"
+                           Grid.Column="1"
+                           Margin="12,0,0,0"
+                           HorizontalAlignment="Right"
+                           ItemHeight="36">
+                    <Button Content="Filter"
+                            Width="92"
+                            Click="OpenFilters_Click"
+                            Style="{StaticResource OutlineButtonStyle}" />
+                    <Button Content="Export"
+                            Width="96"
+                            Margin="12,0,0,0"
+                            Style="{StaticResource OutlineButtonStyle}" />
+                    <Button Content="+ Add Card"
+                            Width="110"
+                            Margin="12,0,0,0"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                </WrapPanel>
+            </Grid>
+
+            <UniformGrid x:Name="SummaryMetricsGrid"
+                         Columns="5"
+                         Margin="-6,18,-6,14">
+                <Border Margin="6,0"
+                        Padding="14"
+                        Style="{StaticResource PanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Total Cards" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="1,248" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="6,0"
+                        Padding="14"
+                        Style="{StaticResource PanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="New" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="142" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="6,0"
+                        Padding="14"
+                        Style="{StaticResource PanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Learning" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="231" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="6,0"
+                        Padding="14"
+                        Style="{StaticResource PanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Due Today" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="342" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                    </StackPanel>
+                </Border>
+                <Border Margin="6,0"
+                        Padding="14"
+                        Style="{StaticResource PanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Mastered" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="533" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource PanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid x:Name="TableStatusGrid"
+                          Margin="14,14,14,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="1 selected"
+                                   Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock x:Name="FilteredSummaryText"
+                                   Text="Filtered by due cards"
+                                   Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   Style="{StaticResource MutedTextStyle}" />
+                    </Grid>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding CardLibraryRows}"
+                              RowHeight="58"
+                              HorizontalScrollBarVisibility="Auto"
+                              Style="{StaticResource FlashcardsDataGridStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="" Width="36">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected}"
+                                                  IsHitTestVisible="False"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Binding="{Binding Question}" Header="Front Preview" Width="250" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                            <DataGridTextColumn Binding="{Binding Deck}" Header="Deck" Width="150" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                            <DataGridTemplateColumn Header="Status" Width="110">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border HorizontalAlignment="Left"
+                                                VerticalAlignment="Center"
+                                                Padding="7,3"
+                                                CornerRadius="4"
+                                                BorderBrush="{Binding StatusBorder}"
+                                                BorderThickness="1"
+                                                Background="{Binding StatusBackground}">
+                                            <TextBlock Text="{Binding Status}" Foreground="{Binding StatusForeground}" FontSize="12" />
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Binding="{Binding Due}" Header="Due" Width="100" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                            <DataGridTextColumn Binding="{Binding LastReviewed}" Header="Last Reviewed" Width="130" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                            <DataGridTemplateColumn Header="Recall" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border HorizontalAlignment="Left"
+                                                VerticalAlignment="Center"
+                                                Padding="7,3"
+                                                CornerRadius="4"
+                                                BorderBrush="{Binding RecallBorder}"
+                                                BorderThickness="1"
+                                                Background="{Binding RecallBackground}">
+                                            <TextBlock Text="{Binding Recall}" Foreground="{Binding RecallForeground}" FontSize="12" />
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Actions" Width="70">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="..." HorizontalAlignment="Center" Style="{StaticResource MutedTextStyle}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <Grid Grid.Row="2"
+                          Margin="14,12,14,14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Showing 1 to 7 of 1,248 cards"
+                                   Style="{StaticResource MutedTextStyle}" />
+                        <WrapPanel x:Name="PaginationButtonsPanel"
+                                   Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   ItemHeight="34">
+                            <Button Content="1" Width="38" Height="34" Style="{StaticResource PrimaryButtonStyle}" />
+                            <Button Content="2" Width="38" Height="34" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
+                            <TextBlock Text="..." Margin="14,0" Style="{StaticResource TableTextStyle}" />
+                            <Button Content="50" Width="44" Height="34" Style="{StaticResource OutlineButtonStyle}" />
+                        </WrapPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <Border x:Name="PreviewPanel"
+                Grid.Row="0"
+                Grid.Column="2"
+                Height="660"
+                VerticalAlignment="Top"
+                Style="{StaticResource PanelStyle}"
+                Padding="16">
+            <StackPanel>
+                <TextBlock Text="Card Preview" Style="{StaticResource PanelTitleStyle}" />
+                <TextBlock Text="FRONT" Margin="0,18,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
+                <TextBox Text="What is the powerhouse of the cell?"
+                         MinHeight="96"
+                         Padding="14"
+                         IsReadOnly="True"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap"
+                         VerticalContentAlignment="Center"
+                         Style="{StaticResource InputTextBoxStyle}" />
+                <TextBlock Text="BACK" Margin="0,18,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
+                <TextBox Text="Mitochondria are the organelles responsible for producing energy in the form of ATP through cellular respiration."
+                         MinHeight="120"
+                         Padding="14"
+                         IsReadOnly="True"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap"
+                         VerticalContentAlignment="Center"
+                         Style="{StaticResource InputTextBoxStyle}" />
+
+                <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="Deck" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="Intro to Biology" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
+                </Grid>
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="Status" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="Mastered" HorizontalAlignment="Right" Foreground="{StaticResource GreenBrush}" />
+                </Grid>
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="Difficulty" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="Easy" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
+                </Grid>
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="Updated" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="May 20, 2025" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
+                </Grid>
+
+                <TextBlock Text="REVIEW HISTORY" Margin="0,10,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
+                <TextBlock Text="May 20, 2025        Good         3.5 days" Style="{StaticResource MutedTextStyle}" />
+                <TextBlock Text="May 16, 2025        Easy          5 days" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" />
+                <TextBlock Text="May 11, 2025        Hard          3 days" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" />
+
+                <WrapPanel Margin="0,28,0,0"
+                           ItemHeight="36">
+                    <Button Content="Edit" Width="64" Style="{StaticResource OutlineButtonStyle}" />
+                    <Button Content="Practice" Width="84" Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button Content="More" Width="64" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <Grid x:Name="FiltersModalOverlay"
+              Grid.RowSpan="2"
+              Grid.ColumnSpan="3"
+              Panel.ZIndex="20"
+              Background="#660F172A"
+              Visibility="Collapsed">
+            <Border MaxWidth="430"
+                    MaxHeight="700"
+                    Margin="16"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center"
+                    Padding="18"
+                    Style="{StaticResource PanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <TextBlock Text="Filters"
+                                   Style="{StaticResource PanelTitleStyle}"
+                                   FontSize="18" />
+                        <Button Content="x"
+                                Width="34"
+                                Height="32"
+                                HorizontalAlignment="Right"
+                                Click="CloseFilters_Click"
+                                Style="{StaticResource IconButtonStyle}" />
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  Margin="0,18,0,16"
+                                  VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <Grid>
-                                <TextBlock Text="Filters"
-                                           Style="{StaticResource PanelTitleStyle}"
-                                           FontSize="15" />
-                                <TextBlock Text="Reset"
-                                           HorizontalAlignment="Right"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           FontSize="12" />
-                            </Grid>
-
                             <TextBox Text="Search cards..."
                                      IsReadOnly="True"
-                                     Margin="0,18,0,18"
                                      Style="{StaticResource InputTextBoxStyle}" />
 
-                            <TextBlock Text="DECKS" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
+                            <TextBlock Text="DECKS"
+                                       Margin="0,18,0,0"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
                             <ListBox ItemsSource="{Binding CardFilterDeckRows}"
                                      SelectedIndex="0"
                                      Margin="0,8,0,0"
+                                     MaxHeight="170"
                                      Style="{StaticResource FilterListBoxStyle}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
@@ -66,329 +354,110 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,22,0,18" />
+                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
 
-                            <TextBlock Text="STATUS" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource BlueBrush}" />
-                                        <TextBlock Text="New" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="142" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource OrangeBrush}" />
-                                        <TextBlock Text="Learning" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="231" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource RedBrush}" />
-                                        <TextBlock Text="Due" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="342" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource GreenBrush}" />
-                                        <TextBlock Text="Mastered" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="533" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
+                            <TextBlock Text="DUE"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
+                            <UniformGrid Columns="2" Margin="0,10,0,0">
+                                <CheckBox Content="Due today"
+                                          Margin="0,0,12,10"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Overdue"
+                                          Margin="0,0,0,10"
+                                          Foreground="{StaticResource MutedBrush}" />
+                                <CheckBox Content="This week"
+                                          Margin="0,0,12,0"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="No due date"
+                                          Foreground="{StaticResource MutedBrush}" />
+                            </UniformGrid>
 
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,22,0,18" />
+                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
 
-                            <TextBlock Text="TAGS" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
+                            <TextBlock Text="STATUS"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
+                            <UniformGrid Columns="2" Margin="0,10,0,0">
+                                <CheckBox Content="New"
+                                          Margin="0,0,12,10"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Learning"
+                                          Margin="0,0,0,10"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Due"
+                                          Margin="0,0,12,0"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Mastered"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                            </UniformGrid>
+
+                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
+
+                            <TextBlock Text="TAGS"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
                             <WrapPanel Margin="0,10,0,0">
                                 <CheckBox Content="Biology 168"
-                                          Margin="0,0,8,8"
+                                          Margin="0,0,14,10"
                                           Foreground="{StaticResource MutedBrush}"
                                           IsChecked="True" />
                                 <CheckBox Content="Chemistry 94"
-                                          Margin="0,0,8,8"
+                                          Margin="0,0,14,10"
                                           Foreground="{StaticResource MutedBrush}" />
                                 <CheckBox Content="Physics 73"
-                                          Margin="0,0,8,8"
+                                          Margin="0,0,14,10"
                                           Foreground="{StaticResource MutedBrush}" />
                             </WrapPanel>
 
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,18,0,18" />
+                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,10,0,16" />
 
-                            <TextBlock Text="DIFFICULTY" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource GreenBrush}" />
-                                        <TextBlock Text="Easy" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="421" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="#FBBF24" />
-                                        <TextBlock Text="Medium" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="587" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
-                            <CheckBox Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}" IsChecked="True">
-                                <Grid Width="160">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="8" Height="8" Fill="{StaticResource RedBrush}" />
-                                        <TextBlock Text="Hard" Margin="8,0,0,0" Style="{StaticResource MutedTextStyle}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="240" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </CheckBox>
+                            <TextBlock Text="DIFFICULTY"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
+                            <UniformGrid Columns="3" Margin="0,10,0,0">
+                                <CheckBox Content="Easy"
+                                          Margin="0,0,12,0"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Medium"
+                                          Margin="0,0,12,0"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                                <CheckBox Content="Hard"
+                                          Foreground="{StaticResource MutedBrush}"
+                                          IsChecked="True" />
+                            </UniformGrid>
+                        </StackPanel>
+                    </ScrollViewer>
 
-                            <Button Content="Save Filter View"
-                                    Margin="0,26,0,0"
+                    <Grid Grid.Row="2">
+                        <Button Content="Reset"
+                                Width="88"
+                                HorizontalAlignment="Left"
+                                Click="CloseFilters_Click"
+                                Style="{StaticResource OutlineButtonStyle}" />
+                        <WrapPanel HorizontalAlignment="Right"
+                                   ItemHeight="36">
+                            <Button Content="Cancel"
+                                    Width="88"
+                                    Click="CloseFilters_Click"
                                     Style="{StaticResource OutlineButtonStyle}" />
-                        </StackPanel>
-                    </Border>
-
-                    <StackPanel Grid.Column="2">
-                        <Grid>
-                            <TextBlock Text="Cards"
-                                       Style="{StaticResource PanelTitleStyle}"
-                                       FontSize="22" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="Export" Width="96" Style="{StaticResource OutlineButtonStyle}" />
-                                <Button Content="+ Add Card" Width="110" Margin="12,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
-                            </StackPanel>
-                        </Grid>
-
-                        <UniformGrid Columns="5" Margin="0,18,0,14">
-                            <Border Margin="0,0,10,0" Padding="14" Style="{StaticResource PanelStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="Total Cards" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="1,248" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
-                                </StackPanel>
-                            </Border>
-                            <Border Margin="0,0,10,0" Padding="14" Style="{StaticResource PanelStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="New" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="142" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
-                                </StackPanel>
-                            </Border>
-                            <Border Margin="0,0,10,0" Padding="14" Style="{StaticResource PanelStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="Learning" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="231" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
-                                </StackPanel>
-                            </Border>
-                            <Border Margin="0,0,10,0" Padding="14" Style="{StaticResource PanelStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="Due Today" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="342" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
-                                </StackPanel>
-                            </Border>
-                            <Border Padding="14" Style="{StaticResource PanelStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="Mastered" Style="{StaticResource MutedTextStyle}" />
-                                    <TextBlock Text="533" Margin="0,8,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
-                                </StackPanel>
-                            </Border>
-                        </UniformGrid>
-
-                        <Border Style="{StaticResource PanelStyle}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="54" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="50" />
-                                </Grid.RowDefinitions>
-
-                                <Grid Margin="14,0">
-                                    <TextBlock Text="1 selected"
-                                               Style="{StaticResource MutedTextStyle}"
-                                               VerticalAlignment="Center" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <ComboBox Width="124"
-                                                  SelectedIndex="0"
-                                                  Style="{StaticResource FilterComboBoxStyle}">
-                                            <ComboBoxItem Content="Due earliest" />
-                                            <ComboBoxItem Content="Last reviewed" />
-                                            <ComboBoxItem Content="Deck" />
-                                        </ComboBox>
-                                        <ComboBox Width="108"
-                                                  Margin="10,0,0,0"
-                                                  SelectedIndex="0"
-                                                  Style="{StaticResource FilterComboBoxStyle}">
-                                            <ComboBoxItem Content="Columns" />
-                                            <ComboBoxItem Content="Compact" />
-                                            <ComboBoxItem Content="Detailed" />
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Grid>
-
-                                <DataGrid Grid.Row="1"
-                                          ItemsSource="{Binding CardLibraryRows}"
-                                          RowHeight="58"
-                                          Style="{StaticResource FlashcardsDataGridStyle}">
-                                    <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="" Width="36">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsSelected}"
-                                                              IsHitTestVisible="False"
-                                                              HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center" />
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Binding="{Binding Question}" Header="Front Preview" Width="250" ElementStyle="{StaticResource GridTextBlockStyle}" />
-                                        <DataGridTextColumn Binding="{Binding Deck}" Header="Deck" Width="150" ElementStyle="{StaticResource GridTextBlockStyle}" />
-                                        <DataGridTemplateColumn Header="Status" Width="110">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border HorizontalAlignment="Left"
-                                                            VerticalAlignment="Center"
-                                                            Padding="7,3"
-                                                            CornerRadius="4"
-                                                            BorderBrush="{Binding StatusBorder}"
-                                                            BorderThickness="1"
-                                                            Background="{Binding StatusBackground}">
-                                                        <TextBlock Text="{Binding Status}" Foreground="{Binding StatusForeground}" FontSize="12" />
-                                                    </Border>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Binding="{Binding Due}" Header="Due" Width="100" ElementStyle="{StaticResource GridTextBlockStyle}" />
-                                        <DataGridTextColumn Binding="{Binding LastReviewed}" Header="Last Reviewed" Width="130" ElementStyle="{StaticResource GridTextBlockStyle}" />
-                                        <DataGridTemplateColumn Header="Recall" Width="90">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border HorizontalAlignment="Left"
-                                                            VerticalAlignment="Center"
-                                                            Padding="7,3"
-                                                            CornerRadius="4"
-                                                            BorderBrush="{Binding RecallBorder}"
-                                                            BorderThickness="1"
-                                                            Background="{Binding RecallBackground}">
-                                                        <TextBlock Text="{Binding Recall}" Foreground="{Binding RecallForeground}" FontSize="12" />
-                                                    </Border>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="Actions" Width="70">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="..." HorizontalAlignment="Center" Style="{StaticResource MutedTextStyle}" />
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-
-                                <Grid Grid.Row="2" Margin="14,0">
-                                    <TextBlock Text="Showing 1 to 7 of 1,248 cards"
-                                               Style="{StaticResource MutedTextStyle}"
-                                               HorizontalAlignment="Left" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <Button Content="1" Width="38" Height="34" Style="{StaticResource PrimaryButtonStyle}" />
-                                        <Button Content="2" Width="38" Height="34" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
-                                        <TextBlock Text="..." Margin="14,0" Style="{StaticResource TableTextStyle}" />
-                                        <Button Content="50" Width="44" Height="34" Style="{StaticResource OutlineButtonStyle}" />
-                                    </StackPanel>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
-
-                    <Border Grid.Column="4"
-                            Style="{StaticResource PanelStyle}"
-                            Padding="16">
-                        <StackPanel>
-                            <TextBlock Text="Card Preview" Style="{StaticResource PanelTitleStyle}" />
-                            <TextBlock Text="FRONT" Margin="0,18,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
-                            <TextBox Text="What is the powerhouse of the cell?"
-                                     MinHeight="96"
-                                     Padding="14"
-                                     IsReadOnly="True"
-                                     TextAlignment="Center"
-                                     TextWrapping="Wrap"
-                                     VerticalContentAlignment="Center"
-                                     Style="{StaticResource InputTextBoxStyle}" />
-                            <TextBlock Text="BACK" Margin="0,18,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
-                            <TextBox Text="Mitochondria are the organelles responsible for producing energy in the form of ATP through cellular respiration."
-                                     MinHeight="120"
-                                     Padding="14"
-                                     IsReadOnly="True"
-                                     TextAlignment="Center"
-                                     TextWrapping="Wrap"
-                                     VerticalContentAlignment="Center"
-                                     Style="{StaticResource InputTextBoxStyle}" />
-
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
-                            <Grid Margin="0,0,0,12">
-                                <TextBlock Text="Deck" Style="{StaticResource MutedTextStyle}" />
-                                <TextBlock Text="Intro to Biology" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
-                            </Grid>
-                            <Grid Margin="0,0,0,12">
-                                <TextBlock Text="Status" Style="{StaticResource MutedTextStyle}" />
-                                <TextBlock Text="Mastered" HorizontalAlignment="Right" Foreground="{StaticResource GreenBrush}" />
-                            </Grid>
-                            <Grid Margin="0,0,0,12">
-                                <TextBlock Text="Difficulty" Style="{StaticResource MutedTextStyle}" />
-                                <TextBlock Text="Easy" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
-                            </Grid>
-                            <Grid Margin="0,0,0,12">
-                                <TextBlock Text="Updated" Style="{StaticResource MutedTextStyle}" />
-                                <TextBlock Text="May 20, 2025" HorizontalAlignment="Right" Style="{StaticResource TableTextStyle}" />
-                            </Grid>
-
-                            <TextBlock Text="REVIEW HISTORY" Margin="0,10,0,8" Style="{StaticResource SmallMutedTextStyle}" FontWeight="SemiBold" />
-                            <TextBlock Text="May 20, 2025        Good         3.5 days" Style="{StaticResource MutedTextStyle}" />
-                            <TextBlock Text="May 16, 2025        Easy          5 days" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" />
-                            <TextBlock Text="May 11, 2025        Hard          3 days" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}" />
-
-                            <StackPanel Orientation="Horizontal" Margin="0,28,0,0">
-                                <Button Content="Edit" Width="64" Style="{StaticResource OutlineButtonStyle}" />
-                                <Button Content="Practice" Width="84" Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
-                                <Button Content="More" Width="64" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
+                            <Button Content="Apply Filters"
+                                    Width="118"
+                                    Margin="10,0,0,0"
+                                    Click="ApplyFilters_Click"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                        </WrapPanel>
+                    </Grid>
                 </Grid>
+            </Border>
+        </Grid>
+    </Grid>
 </UserControl>
