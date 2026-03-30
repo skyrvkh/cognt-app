@@ -7,18 +7,29 @@
              mc:Ignorable="d"
              d:DesignHeight="860"
              d:DesignWidth="1292"
-             HorizontalAlignment="Center"
-             Width="1292">
-                <Grid
-                      MinWidth="1260"
+             HorizontalAlignment="Stretch"
+             Loaded="DecksSubview_Loaded"
+             SizeChanged="DecksSubview_SizeChanged">
+                <Grid x:Name="LayoutRoot"
+                      MaxWidth="1292"
+                      HorizontalAlignment="Center"
                       Margin="16,16,16,22">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="LayoutGapRow" Height="0" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="260" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" MinWidth="940" />
+                        <ColumnDefinition x:Name="OverviewColumn" Width="260" />
+                        <ColumnDefinition x:Name="LayoutGapColumn" Width="14" />
+                        <ColumnDefinition x:Name="ContentColumn" Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0"
+                    <Border x:Name="OverviewPanel"
+                            Grid.Column="0"
+                            Grid.Row="0"
+                            Grid.RowSpan="3"
+                            VerticalAlignment="Top"
                             Style="{StaticResource PanelStyle}"
                             Padding="18">
                         <StackPanel>
@@ -217,20 +228,25 @@
                         </StackPanel>
                     </Border>
 
-                    <StackPanel Grid.Column="2">
+                    <StackPanel x:Name="ContentPanel"
+                                Grid.Column="2"
+                                Grid.Row="0"
+                                Grid.RowSpan="3">
                         <Border Style="{StaticResource PanelStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="58" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
-                                    <RowDefinition Height="42" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <Grid Margin="16,0">
+                                <Grid Margin="16,16,16,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition x:Name="DecksToolbarSpacerRow" Height="0" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -245,13 +261,20 @@
                                                        FontWeight="SemiBold" />
                                         </Border>
                                     </StackPanel>
-                                    <Button Grid.Column="1" Content="Filter" Width="82" Style="{StaticResource OutlineButtonStyle}" />
-                                    <Button Grid.Column="2" Content="Sort: Alphabetical" Width="150" Margin="12,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
-                                    <Button Grid.Column="3" Content="..." Width="42" Margin="12,0,0,0" Style="{StaticResource IconButtonStyle}" />
+                                    <WrapPanel x:Name="DecksToolbarActionsPanel"
+                                               Grid.Column="1"
+                                               Orientation="Horizontal"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center">
+                                        <Button Content="Filter" Width="82" Style="{StaticResource OutlineButtonStyle}" />
+                                        <Button Content="Sort: Alphabetical" Width="150" Margin="12,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
+                                        <Button Content="..." Width="42" Margin="12,0,0,0" Style="{StaticResource IconButtonStyle}" />
+                                    </WrapPanel>
                                 </Grid>
 
                                 <DataGrid Grid.Row="1"
                                           ItemsSource="{Binding DeckRows}"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                           Style="{StaticResource FlashcardsDataGridStyle}">
                                     <DataGrid.Columns>
                                         <DataGridTemplateColumn Header="" Width="38">
@@ -264,14 +287,15 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="Deck" Width="230">
+                                        <DataGridTemplateColumn Header="Deck" Width="2*" MinWidth="220">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding Name}"
                                                                    Style="{StaticResource GridTextBlockStyle}"
                                                                    FontWeight="SemiBold"
-                                                                   MaxWidth="126" />
+                                                                   MaxWidth="150"
+                                                                   TextTrimming="CharacterEllipsis" />
                                                         <Border Margin="10,0,0,0"
                                                                 Padding="7,3"
                                                                 CornerRadius="4"
@@ -356,7 +380,7 @@
 
                                 <TextBlock Grid.Row="2"
                                            Text="Showing 1 to 6 of 6 decks"
-                                           Margin="16,0"
+                                           Margin="16,10,16,12"
                                            Style="{StaticResource MutedTextStyle}" />
                             </Grid>
                         </Border>
@@ -364,16 +388,18 @@
                         <Border Margin="0,14,0,0" Style="{StaticResource PanelStyle}">
                             <Grid>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="60" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
-                                    <RowDefinition Height="50" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <Grid Margin="16,0">
+                                <Grid Margin="16,16,16,12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition x:Name="CardsToolbarSpacerRow" Height="0" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -389,24 +415,31 @@
                                         </Border>
                                     </StackPanel>
 
-                                    <Border Grid.Column="1"
-                                            Width="220"
-                                            Height="36"
-                                            CornerRadius="6"
-                                            BorderBrush="#D9E1EE"
-                                            BorderThickness="1"
-                                            Background="#FFFFFF"
-                                            Margin="0,0,10,0">
-                                        <TextBlock Text="Search cards..."
-                                                   Margin="18,0,0,0"
-                                                   Style="{StaticResource MutedTextStyle}" />
-                                    </Border>
-                                    <Button Grid.Column="2" Content="Filter" Width="92" Style="{StaticResource OutlineButtonStyle}" />
-                                    <Button Grid.Column="3" Content="+ Add Cards" Width="118" Margin="10,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
+                                    <WrapPanel x:Name="CardsToolbarActionsPanel"
+                                               Grid.Column="1"
+                                               Orientation="Horizontal"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center">
+                                        <Border Width="220"
+                                                MinWidth="180"
+                                                Height="36"
+                                                CornerRadius="6"
+                                                BorderBrush="#D9E1EE"
+                                                BorderThickness="1"
+                                                Background="#FFFFFF"
+                                                Margin="0,0,10,0">
+                                            <TextBlock Text="Search cards..."
+                                                       Margin="18,0,0,0"
+                                                       Style="{StaticResource MutedTextStyle}" />
+                                        </Border>
+                                        <Button Content="Filter" Width="92" Style="{StaticResource OutlineButtonStyle}" />
+                                        <Button Content="+ Add Cards" Width="118" Margin="10,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
+                                    </WrapPanel>
                                 </Grid>
 
                                 <DataGrid Grid.Row="1"
                                           ItemsSource="{Binding CardRows}"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                           Style="{StaticResource FlashcardsDataGridStyle}">
                                     <DataGrid.Columns>
                                         <DataGridTemplateColumn Header="" Width="38">
@@ -421,7 +454,8 @@
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Binding="{Binding Question}"
                                                             Header="Front (Question)"
-                                                            Width="430"
+                                                            Width="*"
+                                                            MinWidth="300"
                                                             ElementStyle="{StaticResource GridTextBlockStyle}" />
                                         <DataGridTemplateColumn Header="Status" Width="130">
                                             <DataGridTemplateColumn.CellTemplate>
@@ -458,11 +492,23 @@
                                     </DataGrid.Columns>
                                 </DataGrid>
 
-                                <Grid Grid.Row="2" Margin="16,0">
+                                <Grid Grid.Row="2" Margin="16,10,16,14">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition x:Name="CardsPaginationSpacerRow" Height="0" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
                                     <TextBlock Text="Showing 1 to 5 of 152 cards"
                                                Style="{StaticResource MutedTextStyle}"
                                                HorizontalAlignment="Left" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <StackPanel x:Name="CardsPaginationPanel"
+                                                Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
                                         <Button Content="&lt;" Width="38" Height="34" Style="{StaticResource IconButtonStyle}" />
                                         <Button Content="1" Width="38" Height="34" Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}" />
                                         <Button Content="2" Width="38" Height="34" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}" />
