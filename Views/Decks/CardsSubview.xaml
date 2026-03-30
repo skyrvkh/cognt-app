@@ -6,7 +6,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="860"
-             d:DesignWidth="1512">
+             d:DesignWidth="1512"
+             HorizontalAlignment="Center"
+             Width="1512">
                 <Grid
                       MinWidth="1480"
                       Margin="16,16,16,22">
@@ -270,6 +272,7 @@
                                                 <DataTemplate>
                                                     <CheckBox IsChecked="{Binding IsSelected}"
                                                               IsHitTestVisible="False"
+                                                              HorizontalAlignment="Center"
                                                               VerticalAlignment="Center" />
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
