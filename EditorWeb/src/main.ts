@@ -2,7 +2,14 @@ import '@toeverything/theme/fonts.css';
 import '@toeverything/theme/style.css';
 import './styles.css';
 import { MarkdownBlockSuiteEditor } from './blocksuite-editor';
-import { addHostMessageListener, installHostDiagnostics, isHostedInWebView, postHost, reportDiagnostic } from './host';
+import {
+  addHostMessageListener,
+  installHostDiagnostics,
+  isHostedInWebView,
+  postHost,
+  reportDiagnostic,
+  waitForAnimationFrames,
+} from './host';
 
 installHostDiagnostics();
 
@@ -28,8 +35,7 @@ const editor = new MarkdownBlockSuiteEditor({
 addHostMessageListener(message => {
   if (message.type === 'load') {
     void editor.load(message).finally(async () => {
-      await nextFrame();
-      await nextFrame();
+      await waitForAnimationFrames(2);
 
       postHost({ type: 'loaded', loadId: message.loadId });
     });
@@ -72,11 +78,5 @@ if (!isHostedInWebView()) {
   void editor.load({
     title: 'Preview',
     content: '# BlockSuite preview\n\nThis preview is loaded outside the WPF host.\n\n- **Bold text**\n- *Italic text*\n',
-  });
-}
-
-function nextFrame() {
-  return new Promise<void>(resolve => {
-    requestAnimationFrame(() => resolve());
   });
 }

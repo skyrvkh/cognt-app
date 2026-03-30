@@ -9,6 +9,12 @@ export type HostMessage =
       content?: string;
     }
   | {
+      type: 'loadCard';
+      loadId?: number;
+      side?: 'front' | 'back';
+      markdown?: string;
+    }
+  | {
       type: 'saveResult';
       path?: string;
       ok: boolean;
@@ -74,6 +80,14 @@ export function installHostDiagnostics() {
 
 export function isHostedInWebView() {
   return Boolean(window.chrome?.webview);
+}
+
+export async function waitForAnimationFrames(count: number) {
+  for (let frame = 0; frame < count; frame++) {
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
 }
 
 function errorDetail(error: unknown, fallback: string) {

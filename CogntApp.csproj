@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EditorWebSource Include="EditorWeb\index.html" />
+    <EditorWebSource Include="EditorWeb\*.html" />
     <EditorWebSource Include="EditorWeb\package.json" />
     <EditorWebSource Include="EditorWeb\tsconfig.json" />
     <EditorWebSource Include="EditorWeb\vite.config.js" />
