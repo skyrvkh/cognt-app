@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
              mc:Ignorable="d"
              d:DesignHeight="450"
              d:DesignWidth="650">
@@ -25,11 +25,14 @@
                        TextTrimming="CharacterEllipsis" />
         </Border>
 
-        <Border Grid.Row="1"
+        <Border x:Name="EditorWebViewFrame"
+                Grid.Row="1"
                 BorderBrush="#D7DEE8"
                 BorderThickness="1"
                 Background="#FFFFFF">
-            <wv2:WebView2CompositionControl x:Name="BlockSuiteEditor" />
+            <blazor:BlazorWebView x:Name="BlockSuiteHostView"
+                                  Focusable="True"
+                                  HostPage="wwwroot\index.html" />
         </Border>
     </Grid>
 </UserControl>

@@ -1,54 +1,87 @@
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
+using CogntApp.Components;
 using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
-using Microsoft.Web.WebView2.Core;
+using CogntApp.Services;
+using Microsoft.AspNetCore.Components.WebView.Wpf;
 
 namespace CogntApp.Views;
 
 public partial class EditorView : UserControl
 {
-    private const string EditorHostName = "cognt-editor.local";
-    private const string EditorOutputDirectoryName = "EditorWeb";
     private static readonly TimeSpan EditorOperationTimeout = TimeSpan.FromSeconds(8);
 
-    private readonly TaskCompletionSource editorReadyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private TaskCompletionSource? currentLoadCompletion;
-    private Task? initializeEditorTask;
+    private readonly BlockSuiteHostBridge blockSuiteBridge = new();
+    private IReadOnlyList<MarkdownMentionTarget> mentionTargets = [];
     private string currentContent = string.Empty;
+    private string currentTitle = string.Empty;
     private string? currentSourcePath;
-    private string? mentionTargetsJson;
+    private Action<string>? transientContentChanged;
     private int loadRequestId;
-    private int lastSentLoadRequestId;
+    private bool isShowingCardSide;
+    private bool isShowingTransientEditor;
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
 
+    public bool IsShowingTransientEditor => isShowingTransientEditor;
+
     public EditorView()
     {
         InitializeComponent();
-        BlockSuiteEditor.DefaultBackgroundColor = System.Drawing.Color.White;
+        ConfigureBlockSuiteHost();
+        BindBlockSuiteBridge();
     }
 
     public async Task WarmUpAsync()
     {
-        await EnsureEditorLoadingAsync();
         await WaitWithTimeoutAsync(
-            editorReadyCompletion.Task,
+            blockSuiteBridge.WaitUntilReadyAsync(),
             EditorOperationTimeout,
-            "The editor did not finish starting.");
+            "The BlockSuite host did not finish starting.");
     }
 
     public async Task LoadNoteAsync(string title, string content, string? path = null)
     {
+        ClearTransientEditorState();
         int requestId = ++loadRequestId;
         NoteTitle.Text = title;
+        currentTitle = title;
         currentContent = content;
         currentSourcePath = path;
+
+        await WarmUpAsync();
+
+        if (requestId != loadRequestId)
+        {
+            ClearTransientEditorState();
+            return;
+        }
+
+        await WaitWithTimeoutAsync(
+            blockSuiteBridge.LoadNoteAsync(path, title, content),
+            EditorOperationTimeout,
+            "The editor did not finish loading the note.");
+        isShowingCardSide = false;
+        SetBlockSuiteHostVisible(true);
+        await FlushMentionTargetsAsync();
+    }
+
+    public Task ClearNoteAsync()
+    {
+        return LoadNoteAsync(string.Empty, string.Empty);
+    }
+
+    public async Task RenderCardInHostAsync(ContentControl host, string markdown)
+    {
+        ClearTransientEditorState();
+        int requestId = ++loadRequestId;
 
         await WarmUpAsync();
 
@@ -57,19 +90,166 @@ public partial class EditorView : UserControl
             return;
         }
 
-        currentLoadCompletion?.TrySetResult();
-        TaskCompletionSource loadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        currentLoadCompletion = loadCompletion;
-        SendLoadMessage(requestId, path, title, content);
-        await WaitWithTimeoutAsync(
-            loadCompletion.Task,
-            EditorOperationTimeout,
-            "The editor did not finish loading the note.");
+        SetBlockSuiteHostVisible(false);
+
+        try
+        {
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.BeginCardRenderAsync(),
+                EditorOperationTimeout,
+                "The shared BlockSuite host did not enter review rendering mode.");
+
+            if (requestId != loadRequestId)
+            {
+                return;
+            }
+
+            AttachBlockSuiteHostTo(host);
+
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.LoadCardAsync(markdown),
+                EditorOperationTimeout,
+                "The shared BlockSuite host did not finish loading the review card.");
+
+            if (requestId == loadRequestId)
+            {
+                isShowingCardSide = true;
+            }
+        }
+        finally
+        {
+            if (requestId == loadRequestId)
+            {
+                SetBlockSuiteHostVisible(true);
+            }
+        }
     }
 
-    public Task ClearNoteAsync()
+    public async Task EditTransientNoteInHostAsync(
+        ContentControl host,
+        string title,
+        string content,
+        Action<string> contentChanged)
     {
-        return LoadNoteAsync(string.Empty, string.Empty);
+        int requestId = ++loadRequestId;
+
+        await WarmUpAsync();
+
+        if (requestId != loadRequestId)
+        {
+            return;
+        }
+
+        SetBlockSuiteHostVisible(false);
+        AttachBlockSuiteHostTo(host);
+        PrepareInteractiveBlockSuiteHost(host);
+        transientContentChanged = contentChanged;
+
+        try
+        {
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.ActivateEditorAsync(),
+                EditorOperationTimeout,
+                "The shared BlockSuite editor did not leave read-only mode.");
+
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.LoadNoteAsync("card-workbench.md", title, content),
+                EditorOperationTimeout,
+                "The shared BlockSuite editor did not finish loading the card text.");
+
+            if (requestId != loadRequestId)
+            {
+                ClearTransientEditorState();
+                return;
+            }
+
+            SetBlockSuiteHostVisible(true);
+            await FocusBlockSuiteHostAsync(host);
+
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.FocusEditorAsync(),
+                EditorOperationTimeout,
+                "The shared BlockSuite editor did not accept focus.");
+
+            if (requestId == loadRequestId)
+            {
+                isShowingCardSide = false;
+                isShowingTransientEditor = true;
+            }
+        }
+        catch
+        {
+            if (requestId == loadRequestId)
+            {
+                ClearTransientEditorState();
+                AttachBlockSuiteHostToEditor();
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (requestId == loadRequestId)
+            {
+                SetBlockSuiteHostVisible(true);
+            }
+        }
+    }
+
+    public async Task RestoreNoteAfterTransientEditorAsync()
+    {
+        bool shouldRestore = isShowingTransientEditor;
+        if (!shouldRestore)
+        {
+            return;
+        }
+
+        if (shouldRestore)
+        {
+            SetBlockSuiteHostVisible(false);
+        }
+
+        ClearTransientEditorState();
+        AttachBlockSuiteHostToEditor();
+
+        try
+        {
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent),
+                EditorOperationTimeout,
+                "The editor did not restore the current note after card editing.");
+            await FlushMentionTargetsAsync();
+        }
+        finally
+        {
+            SetBlockSuiteHostVisible(true);
+        }
+    }
+
+    public async Task RestoreNoteAfterCardPreviewAsync()
+    {
+        bool shouldHideStaleCard = isShowingCardSide;
+        if (shouldHideStaleCard)
+        {
+            SetBlockSuiteHostVisible(false);
+        }
+
+        AttachBlockSuiteHostToEditor();
+
+        if (!isShowingCardSide)
+        {
+            SetBlockSuiteHostVisible(true);
+            return;
+        }
+
+        try
+        {
+            await LoadNoteAsync(currentTitle, currentContent, currentSourcePath);
+        }
+        finally
+        {
+            SetBlockSuiteHostVisible(true);
+        }
     }
 
     public string GetContent()
@@ -77,110 +257,41 @@ public partial class EditorView : UserControl
         return currentContent;
     }
 
-    private async Task InitializeEditorAsync()
+    private void AttachBlockSuiteHostTo(ContentControl host)
     {
-        string editorFolder = Path.Combine(AppContext.BaseDirectory, EditorOutputDirectoryName);
-
-        if (!EditorBundleExists(editorFolder))
-        {
-            ShowMissingEditorBundleMessage(editorFolder);
-            editorReadyCompletion.TrySetException(new FileNotFoundException("The BlockSuite editor bundle was not found.", editorFolder));
-            return;
-        }
-
-        try
-        {
-            CoreWebView2Environment environment = await CreateEditorEnvironmentAsync();
-            await BlockSuiteEditor.EnsureCoreWebView2Async(environment);
-
-            CoreWebView2 webView = BlockSuiteEditor.CoreWebView2;
-            await InstallDiagnosticsAsync(webView);
-            webView.WebMessageReceived += BlockSuiteEditor_WebMessageReceived;
-            webView.SetVirtualHostNameToFolderMapping(EditorHostName, editorFolder, CoreWebView2HostResourceAccessKind.Allow);
-            BlockSuiteEditor.Source = new Uri($"https://{EditorHostName}/index.html");
-        }
-        catch (Exception ex)
-        {
-            editorReadyCompletion.TrySetException(ex);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite editor failed to start: {ex}");
-        }
+        RemoveBlockSuiteHostFromParent();
+        host.Content = BlockSuiteHostView;
+        PrepareInteractiveBlockSuiteHost(host);
     }
 
-    private void BlockSuiteEditor_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    public void AttachBlockSuiteHostToEditor()
     {
-        using JsonDocument message = JsonDocument.Parse(e.WebMessageAsJson);
-        JsonElement root = message.RootElement;
-
-        if (!root.TryGetProperty("type", out JsonElement typeElement))
+        if (ReferenceEquals(EditorWebViewFrame.Child, BlockSuiteHostView))
         {
             return;
         }
 
-        switch (typeElement.GetString())
-        {
-            case EditorWebMessageTypes.Ready:
-                editorReadyCompletion.TrySetResult();
-                FlushMentionTargets();
-                return;
+        RemoveBlockSuiteHostFromParent();
+        EditorWebViewFrame.Child = BlockSuiteHostView;
+    }
 
-            case EditorWebMessageTypes.Loaded:
-                CompleteLoadMessage(root);
-                FlushMentionTargets();
-                return;
-
-            case EditorWebMessageTypes.ContentChanged:
-                HandleContentChangedMessage(root);
-                return;
-
-            case EditorWebMessageTypes.CreateExtract:
-                HandleCreateExtractMessage(root);
-                return;
-
-            case EditorWebMessageTypes.SaveCloze:
-                HandleSaveClozeMessage(root);
-                return;
-
-            case EditorWebMessageTypes.RequestMentionPreview:
-                HandleMentionPreviewMessage(root);
-                return;
-
-            case EditorWebMessageTypes.OpenMention:
-                HandleOpenMentionMessage(root);
-                return;
-
-            case EditorWebMessageTypes.Diagnostic:
-                WriteDiagnosticMessage(root);
-                return;
-        }
+    public void DetachBlockSuiteHost()
+    {
+        SetBlockSuiteHostVisible(false);
+        RemoveBlockSuiteHostFromParent();
     }
 
     public void PostExtractResult(string? path, bool ok, string? createdPath = null, string? error = null)
     {
-        PostMessage(new
-        {
-            type = EditorWebMessageTypes.ExtractResult,
-            path,
-            ok,
-            createdPath,
-            error,
-        });
+        RunBlockSuiteCommand(
+            blockSuiteBridge.ShowExtractResultAsync(ok, createdPath, error),
+            "show extract result");
     }
 
     public void PostMentionTargets(IEnumerable<MarkdownMentionTarget> targets)
     {
-        string payload = JsonSerializer.Serialize(new
-        {
-            type = EditorWebMessageTypes.SetMentionTargets,
-            files = targets.Select(target => new
-            {
-                relativePath = target.RelativePath,
-                fileName = target.FileName,
-                recentRank = target.RecentRank,
-            }),
-        });
-
-        mentionTargetsJson = payload;
-        FlushMentionTargets();
+        mentionTargets = targets.ToList();
+        RunBlockSuiteCommand(FlushMentionTargetsAsync(), "flush mention targets");
     }
 
     public void PostMentionPreviewResult(
@@ -192,126 +303,124 @@ public partial class EditorView : UserControl
         string? markdownExcerpt = null,
         string? error = null)
     {
-        PostMessage(new
-        {
-            type = EditorWebMessageTypes.MentionPreviewResult,
-            requestId,
-            ok,
-            relativePath,
-            mode,
-            title,
-            markdownExcerpt,
-            error,
-        });
+        RunBlockSuiteCommand(
+            blockSuiteBridge.HandleMentionPreviewResultAsync(
+                requestId,
+                relativePath,
+                mode,
+                ok,
+                title,
+                markdownExcerpt,
+                error),
+            "post mention preview result");
     }
 
     public void PostMentionOpenResult(string relativePath, bool ok, string? error = null)
     {
-        PostMessage(new
-        {
-            type = EditorWebMessageTypes.MentionOpenResult,
-            ok,
-            relativePath,
-            error,
-        });
+        RunBlockSuiteCommand(
+            blockSuiteBridge.HandleMentionOpenResultAsync(ok, error),
+            "post mention open result");
     }
 
     public void PostSaveResult(string? path, bool ok, string? error = null)
     {
-        PostMessage(new
+        RunBlockSuiteCommand(
+            blockSuiteBridge.ShowSaveResultAsync(ok, error),
+            "show save result");
+    }
+
+    private void ConfigureBlockSuiteHost()
+    {
+        BlockSuiteHostView.Services = BlazorHybridServices.Services;
+        BlockSuiteHostView.RootComponents.Add(new RootComponent
         {
-            type = EditorWebMessageTypes.SaveResult,
-            path,
-            ok,
-            error,
+            Selector = "#app",
+            ComponentType = typeof(BlockSuiteHost),
+            Parameters = new Dictionary<string, object?>
+            {
+                [nameof(BlockSuiteHost.Bridge)] = blockSuiteBridge,
+            },
         });
     }
 
-    private void HandleCreateExtractMessage(JsonElement root)
+    private void BindBlockSuiteBridge()
     {
-        string? sourcePath = GetOptionalString(root, "sourcePath");
-        string selectedMarkdown = GetOptionalString(root, "selectedMarkdown") ?? string.Empty;
-        string selectedPlainText = GetOptionalString(root, "selectedPlainText") ?? string.Empty;
+        blockSuiteBridge.ContentChanged += BlockSuiteBridge_ContentChanged;
+        blockSuiteBridge.CreateExtractRequested += BlockSuiteBridge_CreateExtractRequested;
+        blockSuiteBridge.SaveClozeRequested += BlockSuiteBridge_SaveClozeRequested;
+        blockSuiteBridge.MentionPreviewRequested += BlockSuiteBridge_MentionPreviewRequested;
+        blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
+        blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
+    }
+
+    private void BlockSuiteBridge_ContentChanged(object? sender, string content)
+    {
+        try
+        {
+            if (transientContentChanged is not null)
+            {
+                transientContentChanged(content);
+                return;
+            }
+
+            currentContent = content;
+            ContentChanged?.Invoke(this, currentContent);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"BlockSuite content change handling failed: {ex}");
+            PostSaveResult(currentSourcePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void BlockSuiteBridge_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
+    {
         EventHandler<CreateExtractRequestedEventArgs>? handler = CreateExtractRequested;
 
         if (handler is null)
         {
-            PostExtractResult(sourcePath, ok: false, error: "No extract handler is registered.");
+            PostExtractResult(e.SourcePath, ok: false, error: "No extract handler is registered.");
             return;
         }
 
         try
         {
-            handler.Invoke(this, new CreateExtractRequestedEventArgs(
-                sourcePath ?? string.Empty,
-                selectedMarkdown,
-                selectedPlainText));
+            handler.Invoke(this, e);
         }
         catch (Exception ex)
         {
-            PostExtractResult(sourcePath, ok: false, error: ex.Message);
+            PostExtractResult(e.SourcePath, ok: false, error: ex.Message);
         }
     }
 
-    private void CompleteLoadMessage(JsonElement root)
+    private void BlockSuiteBridge_SaveClozeRequested(object? sender, SaveClozeRequestedEventArgs e)
     {
-        if (TryGetLoadId(root, out int loadedRequestId) && loadedRequestId != lastSentLoadRequestId)
+        if (!IsCurrentSourcePath(e.SourcePath))
         {
-            return;
-        }
-
-        currentLoadCompletion?.TrySetResult();
-        currentLoadCompletion = null;
-    }
-
-    private void HandleContentChangedMessage(JsonElement root)
-    {
-        if (!root.TryGetProperty("content", out JsonElement contentElement))
-        {
-            return;
-        }
-
-        currentContent = contentElement.GetString() ?? string.Empty;
-        ContentChanged?.Invoke(this, currentContent);
-    }
-
-    private void HandleSaveClozeMessage(JsonElement root)
-    {
-        string? sourcePath = GetOptionalString(root, "sourcePath");
-        string markdown = GetOptionalString(root, "markdown") ?? currentContent;
-
-        if (!IsCurrentSourcePath(sourcePath))
-        {
-            PostSaveResult(sourcePath, ok: false, error: "The cloze source is not the current Markdown file.");
+            PostSaveResult(e.SourcePath, ok: false, error: "The cloze source is not the current Markdown file.");
             return;
         }
 
         try
         {
-            currentContent = markdown;
+            currentContent = e.Markdown;
             ContentChanged?.Invoke(this, currentContent);
-            PostSaveResult(sourcePath, ok: true);
+            PostSaveResult(e.SourcePath, ok: true);
         }
         catch (Exception ex)
         {
-            PostSaveResult(sourcePath, ok: false, error: ex.Message);
+            PostSaveResult(e.SourcePath, ok: false, error: ex.Message);
         }
     }
 
-    private void HandleMentionPreviewMessage(JsonElement root)
+    private void BlockSuiteBridge_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
     {
-        string requestId = GetOptionalString(root, "requestId") ?? Guid.NewGuid().ToString("N");
-        string sourcePath = GetOptionalString(root, "sourcePath") ?? string.Empty;
-        string relativePath = GetOptionalString(root, "relativePath") ?? string.Empty;
-        string mode = GetOptionalString(root, "mode") ?? "preview";
-        int maxCharacters = GetOptionalInt(root, "maxCharacters") ?? (mode == "full" ? 8000 : 1200);
-
-        if (!IsCurrentSourcePath(sourcePath))
+        if (!IsCurrentSourcePath(e.SourcePath))
         {
             PostMentionPreviewResult(
-                requestId,
-                relativePath,
-                mode,
+                e.RequestId,
+                e.RelativePath,
+                e.Mode,
                 ok: false,
                 error: "The mention preview source is not the current Markdown file.");
             return;
@@ -320,139 +429,107 @@ public partial class EditorView : UserControl
         EventHandler<MentionPreviewRequestedEventArgs>? handler = MentionPreviewRequested;
         if (handler is null)
         {
-            PostMentionPreviewResult(requestId, relativePath, mode, ok: false, error: "No mention preview handler is registered.");
+            PostMentionPreviewResult(
+                e.RequestId,
+                e.RelativePath,
+                e.Mode,
+                ok: false,
+                error: "No mention preview handler is registered.");
             return;
         }
 
         try
         {
-            handler.Invoke(this, new MentionPreviewRequestedEventArgs(
-                requestId,
-                sourcePath,
-                relativePath,
-                mode,
-                maxCharacters));
+            handler.Invoke(this, e);
         }
         catch (Exception ex)
         {
-            PostMentionPreviewResult(requestId, relativePath, mode, ok: false, error: ex.Message);
+            PostMentionPreviewResult(e.RequestId, e.RelativePath, e.Mode, ok: false, error: ex.Message);
         }
     }
 
-    private void HandleOpenMentionMessage(JsonElement root)
+    private void BlockSuiteBridge_OpenMentionRequested(object? sender, OpenMentionRequestedEventArgs e)
     {
-        string sourcePath = GetOptionalString(root, "sourcePath") ?? string.Empty;
-        string relativePath = GetOptionalString(root, "relativePath") ?? string.Empty;
-        string markdown = GetOptionalString(root, "markdown") ?? currentContent;
-
-        if (!IsCurrentSourcePath(sourcePath))
+        if (!IsCurrentSourcePath(e.SourcePath))
         {
-            PostMentionOpenResult(relativePath, ok: false, error: "The mention source is not the current Markdown file.");
+            PostMentionOpenResult(e.RelativePath, ok: false, error: "The mention source is not the current Markdown file.");
             return;
         }
 
         EventHandler<OpenMentionRequestedEventArgs>? handler = OpenMentionRequested;
         if (handler is null)
         {
-            PostMentionOpenResult(relativePath, ok: false, error: "No mention open handler is registered.");
+            PostMentionOpenResult(e.RelativePath, ok: false, error: "No mention open handler is registered.");
             return;
         }
 
         try
         {
-            currentContent = markdown;
-            handler.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, markdown));
+            currentContent = e.Markdown;
+            handler.Invoke(this, e);
         }
         catch (Exception ex)
         {
-            PostMentionOpenResult(relativePath, ok: false, error: ex.Message);
+            PostMentionOpenResult(e.RelativePath, ok: false, error: ex.Message);
         }
     }
 
-    private static void WriteDiagnosticMessage(JsonElement root)
+    private static void BlockSuiteBridge_DiagnosticReceived(object? sender, string message)
     {
-        if (root.TryGetProperty("message", out JsonElement diagnosticElement))
+        if (!string.IsNullOrWhiteSpace(message))
         {
-            System.Diagnostics.Debug.WriteLine($"BlockSuite editor: {diagnosticElement.GetString()}");
+            System.Diagnostics.Debug.WriteLine($"BlockSuite host: {message}");
         }
     }
 
-    private void SendLoadMessage(int requestId, string? path, string title, string content)
+    private async Task FlushMentionTargetsAsync()
     {
-        if (BlockSuiteEditor.CoreWebView2 is null)
-        {
-            return;
-        }
-
-        lastSentLoadRequestId = requestId;
-
-        string payload = JsonSerializer.Serialize(new
-        {
-            type = EditorWebMessageTypes.Load,
-            loadId = requestId,
-            path,
-            title,
-            content,
-        });
-
-        BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(payload);
-    }
-
-    private void PostMessage(object message)
-    {
-        if (BlockSuiteEditor.CoreWebView2 is null)
+        if (mentionTargets.Count == 0)
         {
             return;
         }
 
-        BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
-    }
-
-    private void FlushMentionTargets()
-    {
-        if (BlockSuiteEditor.CoreWebView2 is null || string.IsNullOrWhiteSpace(mentionTargetsJson))
+        try
         {
-            return;
+            await blockSuiteBridge.SetMentionTargetsAsync(mentionTargets);
         }
-
-        BlockSuiteEditor.CoreWebView2.PostWebMessageAsJson(mentionTargetsJson);
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"BlockSuite mention target update failed: {ex}");
+        }
     }
 
-    private Task EnsureEditorLoadingAsync()
+    private void RemoveBlockSuiteHostFromParent()
     {
-        return initializeEditorTask ??= InitializeEditorAsync();
+        switch (BlockSuiteHostView.Parent)
+        {
+            case Border border when ReferenceEquals(border.Child, BlockSuiteHostView):
+                border.Child = null;
+                break;
+
+            case ContentControl contentControl when ReferenceEquals(contentControl.Content, BlockSuiteHostView):
+                contentControl.Content = null;
+                break;
+
+            case Panel panel:
+                panel.Children.Remove(BlockSuiteHostView);
+                break;
+        }
     }
 
-    private static bool EditorBundleExists(string editorFolder)
+    private void SetBlockSuiteHostVisible(bool isVisible)
     {
-        return File.Exists(Path.Combine(editorFolder, "index.html"));
+        BlockSuiteHostView.Visibility = Visibility.Visible;
+        BlockSuiteHostView.IsEnabled = true;
+        BlockSuiteHostView.Focusable = true;
+        BlockSuiteHostView.Opacity = isVisible ? 1 : 0;
+        BlockSuiteHostView.IsHitTestVisible = isVisible;
     }
 
-    private static async Task<CoreWebView2Environment> CreateEditorEnvironmentAsync()
+    private void ClearTransientEditorState()
     {
-        string userDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CogntApp",
-            "WebView2");
-
-        return await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
-    }
-
-    private static async Task InstallDiagnosticsAsync(CoreWebView2 webView)
-    {
-        const string script =
-            "window.addEventListener('error', event => chrome.webview.postMessage({ type: 'diagnostic', level: 'error', message: event.message }));" +
-            "window.addEventListener('unhandledrejection', event => chrome.webview.postMessage({ type: 'diagnostic', level: 'error', message: String(event.reason) }));";
-
-        await webView.AddScriptToExecuteOnDocumentCreatedAsync(script);
-    }
-
-    private static bool TryGetLoadId(JsonElement root, out int loadId)
-    {
-        loadId = 0;
-
-        return root.TryGetProperty("loadId", out JsonElement loadIdElement)
-            && loadIdElement.TryGetInt32(out loadId);
+        transientContentChanged = null;
+        isShowingTransientEditor = false;
     }
 
     private bool IsCurrentSourcePath(string? path)
@@ -462,18 +539,26 @@ public partial class EditorView : UserControl
             && string.Equals(Path.GetFullPath(path), Path.GetFullPath(currentSourcePath), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? GetOptionalString(JsonElement root, string propertyName)
+    private void PrepareInteractiveBlockSuiteHost(ContentControl host)
     {
-        return root.TryGetProperty(propertyName, out JsonElement property)
-            ? property.GetString()
-            : null;
+        host.Focusable = true;
+        host.IsEnabled = true;
+        host.IsHitTestVisible = true;
+        BlockSuiteHostView.Visibility = Visibility.Visible;
+        BlockSuiteHostView.IsEnabled = true;
+        BlockSuiteHostView.Focusable = true;
     }
 
-    private static int? GetOptionalInt(JsonElement root, string propertyName)
+    private async Task FocusBlockSuiteHostAsync(ContentControl host)
     {
-        return root.TryGetProperty(propertyName, out JsonElement property) && property.TryGetInt32(out int value)
-            ? value
-            : null;
+        PrepareInteractiveBlockSuiteHost(host);
+        host.UpdateLayout();
+        BlockSuiteHostView.UpdateLayout();
+        await Dispatcher.Yield(DispatcherPriority.Input);
+        host.Focus();
+        BlockSuiteHostView.Focus();
+        Keyboard.Focus(BlockSuiteHostView);
+        FocusManager.SetFocusedElement(host, BlockSuiteHostView);
     }
 
     private static async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
@@ -488,12 +573,20 @@ public partial class EditorView : UserControl
         await task;
     }
 
-    private static void ShowMissingEditorBundleMessage(string editorFolder)
+    private static void RunBlockSuiteCommand(Task task, string operation)
     {
-        MessageBox.Show(
-            $"The BlockSuite editor bundle was not found:{Environment.NewLine}{editorFolder}{Environment.NewLine}{Environment.NewLine}Run npm install and npm run build in EditorWeb, then build the app again.",
-            "Editor Bundle Missing",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        _ = ObserveBlockSuiteCommandAsync(task, operation);
+    }
+
+    private static async Task ObserveBlockSuiteCommandAsync(Task task, string operation)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"BlockSuite {operation} failed: {ex}");
+        }
     }
 }
