@@ -173,6 +173,15 @@
                   ClipToBounds="True">
                 <views:EditorView x:Name="EditorViewControl" />
 
+                <ContentControl x:Name="ReviewPreloadHost"
+                                Width="1"
+                                Height="1"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Opacity="0"
+                                IsHitTestVisible="False"
+                                Panel.ZIndex="5" />
+
                 <ContentControl x:Name="OverlayHost"
                                 Panel.ZIndex="10" />
             </Grid>

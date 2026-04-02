@@ -14,4 +14,5 @@ public enum OverlayViewKind
 {
     Dashboard,
     Decks,
+    Review,
 }

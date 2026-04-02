@@ -166,7 +166,8 @@
                 <StackPanel Grid.Column="4"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <Button Style="{StaticResource PrimaryButtonStyle}">
+                    <Button Click="PracticeButton_Click"
+                            Style="{StaticResource PrimaryButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Practice" />
                             <Border Margin="10,0,0,0"

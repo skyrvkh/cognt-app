@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
+    private ReviewView? reviewView;
+    private Task? reviewWarmUpTask;
     private int editorOpenRequestId;
 
     public MainWindow()
@@ -63,6 +65,7 @@ public partial class MainWindow : Window
         EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
+        decksView.PracticeRequested += DecksView_PracticeRequested;
 
         viewModel.Initialize();
         _ = EditorViewControl.WarmUpAsync();
@@ -294,14 +297,61 @@ public partial class MainWindow : Window
         editorOpenRequestId++;
         CloseSidebarSheet();
 
-        UIElement overlay = e.ViewKind switch
+        switch (e.ViewKind)
         {
-            OverlayViewKind.Decks => decksView,
-            _ => dashboardView,
-        };
+            case OverlayViewKind.Decks:
+                ShowOverlay(decksView);
+                EnsureReviewViewPreloading();
+                return;
 
-        ShowOverlay(overlay);
+            case OverlayViewKind.Review:
+                ShowReviewOverlay(EnsureReviewViewPreloading());
+                return;
+
+            default:
+                ShowOverlay(dashboardView);
+                return;
+        }
     }
+
+    private async void DecksView_PracticeRequested(object? sender, EventArgs e)
+    {
+        viewModel.SaveCurrentNoteFromEditor();
+        int requestId = ++editorOpenRequestId;
+        ReviewView review = EnsureReviewViewPreloading();
+        ShowReviewOverlay(review);
+
+        try
+        {
+            if (reviewWarmUpTask is not null)
+            {
+                await reviewWarmUpTask;
+            }
+
+            await review.StartReviewAsync();
+        }
+        catch (Exception ex)
+        {
+            if (requestId == editorOpenRequestId)
+            {
+                MessageBox.Show(
+                    $"Review mode could not start: {ex.Message}",
+                    "Review Not Ready",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                ShowOverlay(decksView);
+                ReleaseReviewView();
+            }
+        }
+    }
+
+    private void ReviewView_ExitReviewRequested(object? sender, EventArgs e)
+    {
+        editorOpenRequestId++;
+        ShowOverlay(decksView);
+        ReleaseReviewView();
+    }
+
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
         await ShowEmptyEditorViewAsync();
@@ -736,6 +786,74 @@ public partial class MainWindow : Window
     private void SendMentionTargets()
     {
         EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
+    }
+
+    private ReviewView EnsureReviewViewPreloading()
+    {
+        if (reviewView is null)
+        {
+            reviewView = new ReviewView();
+            reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
+        }
+
+        if (!ReferenceEquals(OverlayHost.Content, reviewView)
+            && !ReferenceEquals(ReviewPreloadHost.Content, reviewView))
+        {
+            ReviewPreloadHost.Content = reviewView;
+        }
+
+        reviewWarmUpTask ??= WarmReviewViewAsync(reviewView);
+        return reviewView;
+    }
+
+    private async Task WarmReviewViewAsync(ReviewView review)
+    {
+        try
+        {
+            await review.PrimeAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Review renderer warmup failed: {ex}");
+        }
+    }
+
+    private void ShowReviewOverlay(ReviewView review)
+    {
+        if (ReferenceEquals(ReviewPreloadHost.Content, review))
+        {
+            ReviewPreloadHost.Content = null;
+        }
+
+        ShowOverlay(review);
+    }
+
+    private void ReleaseReviewView()
+    {
+        if (reviewView is null)
+        {
+            return;
+        }
+
+        ReviewView view = reviewView;
+        reviewView = null;
+        reviewWarmUpTask = null;
+
+        if (ReferenceEquals(ReviewPreloadHost.Content, view))
+        {
+            ReviewPreloadHost.Content = null;
+        }
+
+        if (ReferenceEquals(OverlayHost.Content, view))
+        {
+            OverlayHost.Content = null;
+        }
+
+        view.ExitReviewRequested -= ReviewView_ExitReviewRequested;
+        view.DisposeReview();
     }
 
     private void ShowOverlay(UIElement overlay)
