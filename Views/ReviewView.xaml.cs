@@ -37,11 +37,6 @@ public partial class ReviewView : UserControl
 
     public ContentControl CardRendererHostControl => CardRendererHost;
 
-    public Task PrimeAsync()
-    {
-        return StartReviewAsync();
-    }
-
     public ReviewView()
     {
         InitializeComponent();

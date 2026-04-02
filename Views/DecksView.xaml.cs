@@ -1,10 +1,15 @@
 using System.Windows.Controls;
+using CogntApp.Models.Decks;
 
 namespace CogntApp.Views;
 
 public partial class DecksView : UserControl
 {
     public event EventHandler? PracticeRequested;
+
+    public event EventHandler<CreateCardEditorHostRequestedEventArgs>? CreateCardEditorHostRequested;
+
+    public event EventHandler? CreateCardEditorReleased;
 
     public DecksView()
     {

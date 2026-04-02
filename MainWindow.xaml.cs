@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using CogntApp.Models.Decks;
 using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
@@ -33,7 +34,6 @@ public partial class MainWindow : Window
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
     private ReviewView? reviewView;
-    private Task? reviewWarmUpTask;
     private int editorOpenRequestId;
 
     public MainWindow()
@@ -66,6 +66,8 @@ public partial class MainWindow : Window
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
         decksView.PracticeRequested += DecksView_PracticeRequested;
+        decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
+        decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
 
         viewModel.Initialize();
         _ = EditorViewControl.WarmUpAsync();
@@ -79,7 +81,19 @@ public partial class MainWindow : Window
         }
 
         NoteTreeNodeViewModel? selectedNode = e.NewValue as NoteTreeNodeViewModel;
-        viewModel.SelectTreeNode(selectedNode);
+        try
+        {
+            viewModel.SelectTreeNode(selectedNode);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The selected note could not be opened: {ex.Message}",
+                "Open Note Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         if (!string.IsNullOrWhiteSpace(selectedNode?.NotePath))
         {
@@ -292,43 +306,67 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
+    private async void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
     {
-        editorOpenRequestId++;
-        CloseSidebarSheet();
-
-        switch (e.ViewKind)
+        try
         {
-            case OverlayViewKind.Decks:
-                ShowOverlay(decksView);
-                EnsureReviewViewPreloading();
-                return;
+            editorOpenRequestId++;
+            CloseSidebarSheet();
 
-            case OverlayViewKind.Review:
-                ShowReviewOverlay(EnsureReviewViewPreloading());
-                return;
+            switch (e.ViewKind)
+            {
+                case OverlayViewKind.Decks:
+                    await CloseReviewIfActiveAsync();
+                    ShowOverlay(decksView);
+                    return;
 
-            default:
-                ShowOverlay(dashboardView);
-                return;
+                case OverlayViewKind.Review:
+                    try
+                    {
+                        await CloseCreateCardEditorIfActiveAsync();
+                        await ShowReviewOverlayAsync(EnsureReviewView());
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            $"Review mode could not start: {ex.Message}",
+                            "Review Not Ready",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        await CloseReviewIfActiveAsync();
+                        ShowOverlay(decksView);
+                    }
+
+                    return;
+
+                default:
+                    await CloseReviewIfActiveAsync();
+                    await CloseCreateCardEditorIfActiveAsync();
+                    ShowOverlay(dashboardView);
+                    return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The view could not be changed: {ex.Message}",
+                "Navigation Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            EditorViewControl.AttachBlockSuiteHostToEditor();
         }
     }
 
     private async void DecksView_PracticeRequested(object? sender, EventArgs e)
     {
-        viewModel.SaveCurrentNoteFromEditor();
         int requestId = ++editorOpenRequestId;
-        ReviewView review = EnsureReviewViewPreloading();
-        ShowReviewOverlay(review);
 
         try
         {
-            if (reviewWarmUpTask is not null)
-            {
-                await reviewWarmUpTask;
-            }
-
-            await review.StartReviewAsync();
+            viewModel.SaveCurrentNoteFromEditor();
+            ReviewView review = EnsureReviewView();
+            await CloseCreateCardEditorIfActiveAsync();
+            await ShowReviewOverlayAsync(review);
         }
         catch (Exception ex)
         {
@@ -339,27 +377,103 @@ public partial class MainWindow : Window
                     "Review Not Ready",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+                await CloseReviewIfActiveAsync();
                 ShowOverlay(decksView);
-                ReleaseReviewView();
             }
         }
     }
 
-    private void ReviewView_ExitReviewRequested(object? sender, EventArgs e)
+    private async void DecksView_CreateCardEditorHostRequested(
+        object? sender,
+        CreateCardEditorHostRequestedEventArgs e)
     {
-        editorOpenRequestId++;
-        ShowOverlay(decksView);
-        ReleaseReviewView();
+        int requestId = ++editorOpenRequestId;
+
+        try
+        {
+            await CloseReviewIfActiveAsync();
+            await EditorViewControl.EditTransientNoteInHostAsync(
+                e.Host,
+                "Card Text",
+                e.Markdown,
+                e.ContentChanged);
+        }
+        catch (Exception ex)
+        {
+            if (requestId == editorOpenRequestId)
+            {
+                MessageBox.Show(
+                    $"The card editor could not start: {ex.Message}",
+                    "Card Editor Not Ready",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private async void DecksView_CreateCardEditorReleased(object? sender, EventArgs e)
+    {
+        try
+        {
+            await CloseCreateCardEditorIfActiveAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Card editor restore failed: {ex}");
+            EditorViewControl.AttachBlockSuiteHostToEditor();
+        }
+    }
+
+    private async void ReviewView_ExitReviewRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            editorOpenRequestId++;
+            await CloseReviewIfActiveAsync();
+            ShowOverlay(decksView);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Review mode could not close cleanly: {ex.Message}",
+                "Review",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            EditorViewControl.AttachBlockSuiteHostToEditor();
+            ShowOverlay(decksView);
+        }
     }
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        await ShowEmptyEditorViewAsync();
+        try
+        {
+            await ShowEmptyEditorViewAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The editor could not be cleared: {ex.Message}",
+                "Editor Not Ready",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        await OpenNoteAsync(e.NotePath, e.SelectInTree);
+        try
+        {
+            await OpenNoteAsync(e.NotePath, e.SelectInTree);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The note could not be opened: {ex.Message}",
+                "Open Note Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void ViewModel_NoteSelectionRequested(object? sender, NoteSelectionRequestedEventArgs e)
@@ -407,9 +521,11 @@ public partial class MainWindow : Window
         }
 
         int requestId = ++editorOpenRequestId;
+        await CloseReviewIfActiveAsync();
 
         try
         {
+            EditorViewControl.AttachBlockSuiteHostToEditor();
             await EditorViewControl.LoadNoteAsync(note.Title, note.Content, note.NotePath);
         }
         catch (Exception ex)
@@ -445,10 +561,12 @@ public partial class MainWindow : Window
     private async Task ShowEmptyEditorViewAsync()
     {
         int requestId = ++editorOpenRequestId;
+        await CloseReviewIfActiveAsync();
         HideOverlay();
 
         try
         {
+            EditorViewControl.AttachBlockSuiteHostToEditor();
             await EditorViewControl.ClearNoteAsync();
         }
         catch (Exception ex)
@@ -521,7 +639,14 @@ public partial class MainWindow : Window
 
     private void EditorView_ContentChanged(object? sender, string content)
     {
-        viewModel.SaveNoteIfChanged(content);
+        try
+        {
+            viewModel.SaveNoteIfChanged(content);
+        }
+        catch (Exception ex)
+        {
+            EditorViewControl.PostSaveResult(viewModel.CurrentNotePath, ok: false, error: ex.Message);
+        }
     }
 
     private void NotesTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -785,53 +910,49 @@ public partial class MainWindow : Window
 
     private void SendMentionTargets()
     {
-        EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
+        try
+        {
+            EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Mention targets could not be refreshed: {ex.Message}",
+                "Mentions",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private ReviewView EnsureReviewViewPreloading()
+    private ReviewView EnsureReviewView()
     {
         if (reviewView is null)
         {
             reviewView = new ReviewView();
             reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
+            reviewView.RenderCardAsync = RenderReviewCardAsync;
         }
 
-        if (!ReferenceEquals(OverlayHost.Content, reviewView)
-            && !ReferenceEquals(ReviewPreloadHost.Content, reviewView))
-        {
-            ReviewPreloadHost.Content = reviewView;
-        }
-
-        reviewWarmUpTask ??= WarmReviewViewAsync(reviewView);
         return reviewView;
     }
 
-    private async Task WarmReviewViewAsync(ReviewView review)
+    private async Task RenderReviewCardAsync(string markdown)
     {
-        try
+        if (reviewView is null)
         {
-            await review.PrimeAsync();
+            throw new InvalidOperationException("Review mode is not active.");
         }
-        catch (ObjectDisposedException)
-        {
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Review renderer warmup failed: {ex}");
-        }
+
+        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, markdown);
     }
 
-    private void ShowReviewOverlay(ReviewView review)
+    private async Task ShowReviewOverlayAsync(ReviewView review)
     {
-        if (ReferenceEquals(ReviewPreloadHost.Content, review))
-        {
-            ReviewPreloadHost.Content = null;
-        }
-
         ShowOverlay(review);
+        await review.StartReviewAsync();
     }
 
-    private void ReleaseReviewView()
+    private async Task CloseReviewIfActiveAsync()
     {
         if (reviewView is null)
         {
@@ -840,24 +961,39 @@ public partial class MainWindow : Window
 
         ReviewView view = reviewView;
         reviewView = null;
-        reviewWarmUpTask = null;
-
-        if (ReferenceEquals(ReviewPreloadHost.Content, view))
-        {
-            ReviewPreloadHost.Content = null;
-        }
 
         if (ReferenceEquals(OverlayHost.Content, view))
         {
             OverlayHost.Content = null;
         }
 
+        try
+        {
+            await EditorViewControl.RestoreNoteAfterCardPreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Shared editor restore after review failed: {ex}");
+            EditorViewControl.AttachBlockSuiteHostToEditor();
+        }
+
         view.ExitReviewRequested -= ReviewView_ExitReviewRequested;
         view.DisposeReview();
     }
 
+    private Task CloseCreateCardEditorIfActiveAsync()
+    {
+        return EditorViewControl.IsShowingTransientEditor
+            ? EditorViewControl.RestoreNoteAfterTransientEditorAsync()
+            : Task.CompletedTask;
+    }
+
     private void ShowOverlay(UIElement overlay)
     {
+        EditorViewControl.DetachBlockSuiteHost();
+        EditorViewControl.Visibility = Visibility.Visible;
+        EditorViewControl.IsEnabled = true;
+        EditorViewControl.IsHitTestVisible = true;
         OverlayHost.Content = overlay;
         OverlayHost.Visibility = Visibility.Visible;
         OverlayHost.IsHitTestVisible = true;
@@ -868,5 +1004,8 @@ public partial class MainWindow : Window
         OverlayHost.Content = null;
         OverlayHost.Visibility = Visibility.Collapsed;
         OverlayHost.IsHitTestVisible = false;
+        EditorViewControl.Visibility = Visibility.Visible;
+        EditorViewControl.IsEnabled = true;
+        EditorViewControl.IsHitTestVisible = true;
     }
 }
