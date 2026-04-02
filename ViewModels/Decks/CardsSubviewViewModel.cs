@@ -1,9 +1,17 @@
 using CogntApp.Models.Decks;
+using System.Windows.Input;
 
 namespace CogntApp.ViewModels.Decks;
 
 public sealed class CardsSubviewViewModel
 {
+    public CardsSubviewViewModel(Action showCreateCardReview)
+    {
+        AddCardCommand = new RelayCommand(showCreateCardReview);
+    }
+
+    public ICommand AddCardCommand { get; }
+
     public IReadOnlyList<CardLibraryRow> CardLibraryRows { get; } =
     [
         CardLibraryRow.Mastered(true, "What is the powerhouse of the cell?", "Intro to Biology", "-", "May 20, 2025", "Good"),

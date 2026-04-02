@@ -10,7 +10,8 @@ public sealed class DecksViewModel : ObservableObject
     public DecksViewModel()
     {
         Decks = new DecksSubviewViewModel();
-        Cards = new CardsSubviewViewModel();
+        Cards = new CardsSubviewViewModel(ShowCreateCardReview);
+        CreateCardReview = new CreateCardReviewSubviewViewModel(() => SetActiveTab(FlashcardsTab.Cards));
         Statistics = new StatisticsSubviewViewModel();
 
         currentSubview = Decks;
@@ -23,6 +24,8 @@ public sealed class DecksViewModel : ObservableObject
 
     public CardsSubviewViewModel Cards { get; }
 
+    public CreateCardReviewSubviewViewModel CreateCardReview { get; }
+
     public StatisticsSubviewViewModel Statistics { get; }
 
     public ICommand ShowDecksCommand { get; }
@@ -34,8 +37,25 @@ public sealed class DecksViewModel : ObservableObject
     public object CurrentSubview
     {
         get => currentSubview;
-        private set => SetProperty(ref currentSubview, value);
+        private set
+        {
+            if (!SetProperty(ref currentSubview, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(ScrollableSubview));
+            OnPropertyChanged(nameof(DirectSubview));
+        }
     }
+
+    public object? ScrollableSubview => ReferenceEquals(CurrentSubview, CreateCardReview)
+        ? null
+        : CurrentSubview;
+
+    public object? DirectSubview => ReferenceEquals(CurrentSubview, CreateCardReview)
+        ? CurrentSubview
+        : null;
 
     public bool IsDecksSelected => activeTab == FlashcardsTab.Decks;
 
@@ -45,18 +65,30 @@ public sealed class DecksViewModel : ObservableObject
 
     private void SetActiveTab(FlashcardsTab tab)
     {
-        if (activeTab == tab)
-        {
-            return;
-        }
-
-        activeTab = tab;
-        CurrentSubview = tab switch
+        object targetSubview = tab switch
         {
             FlashcardsTab.Cards => Cards,
             FlashcardsTab.Statistics => Statistics,
             _ => Decks
         };
+
+        if (activeTab == tab && ReferenceEquals(CurrentSubview, targetSubview))
+        {
+            return;
+        }
+
+        activeTab = tab;
+        CurrentSubview = targetSubview;
+
+        OnPropertyChanged(nameof(IsDecksSelected));
+        OnPropertyChanged(nameof(IsCardsSelected));
+        OnPropertyChanged(nameof(IsStatisticsSelected));
+    }
+
+    private void ShowCreateCardReview()
+    {
+        activeTab = FlashcardsTab.Cards;
+        CurrentSubview = CreateCardReview;
 
         OnPropertyChanged(nameof(IsDecksSelected));
         OnPropertyChanged(nameof(IsCardsSelected));

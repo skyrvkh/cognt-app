@@ -58,6 +58,7 @@
                     <Button Content="+ Add Card"
                             Width="110"
                             Margin="12,0,0,0"
+                            Command="{Binding AddCardCommand}"
                             Style="{StaticResource PrimaryButtonStyle}" />
                 </WrapPanel>
             </Grid>

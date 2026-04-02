@@ -20,6 +20,10 @@
         <DataTemplate DataType="{x:Type deckViewModels:CardsSubviewViewModel}">
             <subviews:CardsSubview />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type deckViewModels:CreateCardReviewSubviewViewModel}">
+            <subviews:CreateCardReviewSubview CardEditorHostRequested="CreateCardReviewSubview_CardEditorHostRequested"
+                                              CardEditorReleased="CreateCardReviewSubview_CardEditorReleased" />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type deckViewModels:StatisticsSubviewViewModel}">
             <subviews:StatisticsSubview />
         </DataTemplate>
@@ -185,15 +189,42 @@
             </Grid>
         </Border>
 
-        <ScrollViewer x:Name="FlashcardsBodyScrollViewer"
-                      Grid.Row="1"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto">
-            <Grid MinWidth="{Binding ViewportWidth, ElementName=FlashcardsBodyScrollViewer}">
-                <ContentControl Content="{Binding CurrentSubview}"
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="FlashcardsBodyScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ScrollableSubview}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+                <Grid MinWidth="{Binding ViewportWidth, ElementName=FlashcardsBodyScrollViewer}">
+                    <ContentControl Content="{Binding ScrollableSubview}"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch" />
+                </Grid>
+            </ScrollViewer>
+
+            <Grid MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DirectSubview}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <ContentControl Content="{Binding DirectSubview}"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch" />
             </Grid>
-        </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>
