@@ -24,11 +24,16 @@ public sealed class MainViewModel : ObservableObject
     {
         this.noteService = noteService;
 
-        LoadDirectoryCommand = new RelayCommand(() => LoadNotesDirectory(NotesDirectory));
-        ShowDashboardCommand = new RelayCommand(ShowDashboard);
-        ShowDecksCommand = new RelayCommand(ShowDecks);
-        AddNoteCommand = new RelayCommand(AddNote);
-        OpenNoteCommand = new RelayCommand(OpenNoteFromCommand);
+        LoadDirectoryCommand = new RelayCommand(
+            () => RunUserAction("Load Collection Failed", () => LoadNotesDirectory(NotesDirectory)));
+        ShowDashboardCommand = new RelayCommand(
+            () => RunUserAction("Navigation Failed", ShowDashboard));
+        ShowDecksCommand = new RelayCommand(
+            () => RunUserAction("Navigation Failed", ShowDecks));
+        AddNoteCommand = new RelayCommand(
+            () => RunUserAction("Create Note Failed", AddNote));
+        OpenNoteCommand = new RelayCommand(
+            parameter => RunUserAction("Open Note Failed", () => OpenNoteFromCommand(parameter)));
     }
 
     public event EventHandler<OverlayRequestedEventArgs>? OverlayRequested;
@@ -336,7 +341,15 @@ public sealed class MainViewModel : ObservableObject
             return [];
         }
 
-        return noteService.ListMentionTargets(currentNotesDirectory, CreateRecentMentionRanks());
+        try
+        {
+            return noteService.ListMentionTargets(currentNotesDirectory, CreateRecentMentionRanks());
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            RaiseMessage("Mention Index Failed", $"Mentions could not be indexed: {ex.Message}");
+            return [];
+        }
     }
 
     private void ShowDashboard()
@@ -563,7 +576,8 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            List<string> noteFiles = Directory.EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+            List<string> noteFiles = Directory
+                .EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
                 .ToList();
 
             PopulateRecentNotes(noteFiles);
@@ -592,6 +606,12 @@ public sealed class MainViewModel : ObservableObject
                     fileParent.IsExpanded = true;
                 }
             }
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            NoteRoots.Clear();
+            RecentNotes.Clear();
+            RaiseMessage("Collection Load Failed", $"The collection could not be read: {ex.Message}");
         }
         finally
         {
@@ -712,6 +732,28 @@ public sealed class MainViewModel : ObservableObject
     private void RaiseMessage(string title, string message)
     {
         UserMessageRequested?.Invoke(this, new UserMessageRequestedEventArgs(title, message));
+    }
+
+    private void RunUserAction(string title, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            RaiseMessage(title, ex.Message);
+        }
+    }
+
+    private static bool IsRecoverableFileSystemException(Exception exception)
+    {
+        return exception is IOException
+            or UnauthorizedAccessException
+            or DirectoryNotFoundException
+            or FileNotFoundException
+            or PathTooLongException
+            or NotSupportedException;
     }
 
     private static string ResolveDefaultNotesDirectory()
