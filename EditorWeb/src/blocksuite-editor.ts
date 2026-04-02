@@ -1,4 +1,5 @@
 import { MarkdownAdapter, MarkdownTransformer, PageEditorBlockSpecs } from '@blocksuite/blocks';
+import { focusTextModel } from '@blocksuite/affine-components/rich-text';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
 import { BlockStdScope, ConfigExtension, type EditorHost } from '@blocksuite/block-std';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
@@ -56,6 +57,7 @@ export type LoadMarkdownOptions = {
 };
 
 export class MarkdownBlockSuiteEditor {
+  private readonly eventAbort = new AbortController();
   private readonly editor: PageEditor;
   private readonly statusElement: HTMLElement;
   private readonly mentions: MentionController;
@@ -65,6 +67,7 @@ export class MarkdownBlockSuiteEditor {
   private currentDoc: Doc | null = null;
   private currentPath = '';
   private loadingDocument = false;
+  private readOnlyMode = false;
   private saveTimer: number | undefined;
   private statusTimer: number | undefined;
   private clozeHighlightFrame: number | undefined;
@@ -99,6 +102,7 @@ export class MarkdownBlockSuiteEditor {
 
   public async load(options: LoadMarkdownOptions) {
     this.loadingDocument = true;
+    this.enableEditorMode();
     window.clearTimeout(this.saveTimer);
     this.cancelScheduledClozeHighlightUpdate();
     this.mentions.cancelScheduledHighlightUpdate();
@@ -110,9 +114,11 @@ export class MarkdownBlockSuiteEditor {
       const nextDoc = await createDocFromMarkdown(markdown);
       this.currentDoc = nextDoc;
       this.editor.doc = nextDoc;
+      this.enableEditorMode();
       this.editor.hasViewport = true;
       this.bindDocChangeEvents(nextDoc);
       await this.flushHost();
+      this.focusFirstTextBlock();
       this.refreshClozeHighlights();
       this.mentions.refreshHighlights();
       reportDiagnostic('info', `Imported Markdown into BlockSuite (${markdown.length} characters).`);
@@ -123,6 +129,108 @@ export class MarkdownBlockSuiteEditor {
       this.showStatus(`Could not load Markdown: ${message}`);
     } finally {
       this.loadingDocument = false;
+    }
+  }
+
+  public async focusEditor() {
+    await this.activateEditorMode();
+
+    const target =
+      findEditableElement(this.editor) ??
+      findEditableElement(this.editor.shadowRoot) ??
+      findEditableElement(document);
+
+    this.editor.focus();
+    target?.focus({ preventScroll: true });
+  }
+
+  public async activateEditorMode() {
+    this.enableEditorMode();
+    await this.flushHost();
+    await waitForNextAnimationFrame();
+    await this.forceEditableRichText();
+    this.focusFirstTextBlock();
+    reportDiagnostic(
+      'info',
+      `Editor mode active (${getInteractivityDiagnostic(this.currentDoc, document)}).`
+    );
+  }
+
+
+  public async loadCard(markdown: string) {
+    this.loadingDocument = true;
+    this.beginCardRender();
+
+    try {
+      const nextDoc = await createDocFromMarkdown(markdown);
+      this.currentDoc = nextDoc;
+      this.editor.doc = nextDoc;
+      this.editor.hasViewport = true;
+      this.bindDocChangeEvents(nextDoc);
+      await this.flushHost();
+      this.refreshClozeHighlights();
+      reportDiagnostic('info', `Rendered review card in shared editor (${markdown.length} characters).`);
+      this.editor.classList.remove('card-render-pending');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      reportDiagnostic('error', `Could not render review card: ${message}`);
+      throw error;
+    } finally {
+      this.loadingDocument = false;
+    }
+  }
+
+  public beginCardRender() {
+    this.readOnlyMode = true;
+    document.body.dataset.mode = 'review';
+    this.editor.classList.add('review-renderer', 'card-render-pending');
+    window.clearTimeout(this.saveTimer);
+    this.cancelScheduledClozeHighlightUpdate();
+    this.mentions.cancelScheduledHighlightUpdate();
+    this.mentions.hidePreview();
+    this.currentPath = '';
+  }
+
+  private enableEditorMode() {
+    this.readOnlyMode = false;
+    document.body.dataset.mode = 'editor';
+    this.editor.classList.remove('review-renderer', 'card-render-pending');
+    this.currentDoc?.awarenessStore.setReadonly(this.currentDoc.blockCollection, false);
+  }
+
+  private focusFirstTextBlock() {
+    if (!this.currentDoc || this.currentDoc.readonly) {
+      return;
+    }
+
+    const textBlock = this.currentDoc
+      .getBlocks()
+      .find(block => block.role === 'content' && block.text);
+
+    if (textBlock) {
+      focusTextModel(this.editor.std, textBlock.id, textBlock.text?.length ?? 0);
+    }
+  }
+
+  private async forceEditableRichText() {
+    for (const richText of findElementsDeep(this.editor, 'rich-text')) {
+      const editable = richText as HTMLElement & {
+        readonly?: boolean;
+        inlineEditor?: { setReadonly?: (readonly: boolean) => void };
+        requestUpdate?: (name?: string, oldValue?: unknown) => void;
+        updateComplete?: Promise<unknown>;
+      };
+
+      editable.readonly = false;
+      editable.inlineEditor?.setReadonly?.(false);
+      editable.requestUpdate?.('readonly', true);
+      await editable.updateComplete;
+
+      const inlineEditor = findEditableElement(editable.shadowRoot) ??
+        editable.shadowRoot?.querySelector<HTMLElement>('.inline-editor');
+
+      inlineEditor?.classList.remove('readonly');
+      inlineEditor?.setAttribute('contenteditable', 'true');
     }
   }
 
@@ -148,10 +256,28 @@ export class MarkdownBlockSuiteEditor {
     this.mentions.handleOpenResult(ok, error);
   }
 
+  public dispose() {
+    window.clearTimeout(this.saveTimer);
+    window.clearTimeout(this.statusTimer);
+    this.cancelScheduledClozeHighlightUpdate();
+    this.blockUpdatedDisposable?.dispose();
+    this.blockUpdatedDisposable = null;
+    this.mentions.dispose();
+    this.eventAbort.abort();
+    this.editor.remove();
+    this.currentDoc = null;
+    this.currentPath = '';
+  }
+
   private bindEditorEvents() {
     document.addEventListener(
       'keydown',
       event => {
+        if (this.readOnlyMode) {
+          preventReadOnlyKeyboardInput(event);
+          return;
+        }
+
         if (!this.currentDoc || !this.currentPath) {
           return;
         }
@@ -167,7 +293,17 @@ export class MarkdownBlockSuiteEditor {
         }
 
       },
-      true
+      { capture: true, signal: this.eventAbort.signal }
+    );
+
+    this.editor.addEventListener(
+      'beforeinput',
+      event => {
+        if (this.readOnlyMode) {
+          event.preventDefault();
+        }
+      },
+      { capture: true, signal: this.eventAbort.signal }
     );
 
     document.addEventListener('selectionchange', () => {
@@ -175,22 +311,26 @@ export class MarkdownBlockSuiteEditor {
         this.scheduleClozeHighlightUpdate();
         this.mentions.scheduleHighlightUpdate();
       }
-    });
+    }, { signal: this.eventAbort.signal });
 
     this.editor.addEventListener('input', () => {
       this.scheduleClozeHighlightUpdate();
       this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
-    });
+    }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('keyup', () => {
       this.scheduleClozeHighlightUpdate();
       this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
-    });
+    }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('click', event => {
       void this.mentions.handleClick(event);
-    });
-    this.editor.addEventListener('mousemove', event => this.mentions.handleHover(event));
+    }, { signal: this.eventAbort.signal });
+    this.editor.addEventListener(
+      'mousemove',
+      event => this.mentions.handleHover(event),
+      { signal: this.eventAbort.signal }
+    );
     this.editor.addEventListener('mouseleave', event => {
       const target = event.relatedTarget as Node | null;
       if (target && this.mentions.containsFloatingUi(target)) {
@@ -200,10 +340,15 @@ export class MarkdownBlockSuiteEditor {
       if (this.mentions.isShowingPreview()) {
         this.mentions.schedulePreviewHide();
       }
-    });
-    this.editor.addEventListener('paste', () => {
+    }, { signal: this.eventAbort.signal });
+    this.editor.addEventListener('paste', event => {
+      if (this.readOnlyMode) {
+        event.preventDefault();
+        return;
+      }
+
       this.scheduleContentChanged();
-    });
+    }, { signal: this.eventAbort.signal });
 
     document.addEventListener('mousedown', event => {
       const target = event.target as Node | null;
@@ -214,7 +359,7 @@ export class MarkdownBlockSuiteEditor {
       if (this.mentions.isShowingPreview()) {
         this.mentions.hidePreview();
       }
-    });
+    }, { signal: this.eventAbort.signal });
   }
 
   private bindDocChangeEvents(doc: Doc) {
@@ -243,7 +388,7 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private scheduleContentChanged() {
-    if (this.loadingDocument || !this.currentDoc) {
+    if (this.loadingDocument || this.readOnlyMode || !this.currentDoc) {
       return;
     }
 
@@ -393,6 +538,80 @@ function isEditorShortcut(
     !event.altKey &&
     event.key.toLowerCase() === key
   );
+}
+
+function preventReadOnlyKeyboardInput(event: KeyboardEvent) {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+
+  if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+    event.preventDefault();
+  }
+}
+
+function findEditableElement(root: ParentNode | ShadowRoot | null): HTMLElement | null {
+  if (!root) {
+    return null;
+  }
+
+  const editable = findElementDeep(root, '[contenteditable="true"], [contenteditable=""], textarea, input');
+  if (editable) {
+    return editable;
+  }
+
+  return findElementDeep(root, '.inline-editor, rich-text');
+}
+
+function getInteractivityDiagnostic(doc: Doc | null, root: ParentNode | ShadowRoot) {
+  const editable = findEditableElement(root);
+  const readOnlyRichTexts = findElementsDeep(root, 'rich-text')
+    .filter(element => (element as HTMLElement & { readonly?: boolean }).readonly);
+  const falseContentEditableCount = findElementsDeep(root, '[contenteditable="false"]').length;
+
+  return [
+    `docReadonly=${String(doc?.readonly ?? false)}`,
+    `editable=${String(!!editable)}`,
+    `editableTag=${editable?.tagName.toLowerCase() ?? 'none'}`,
+    `editableContentEditable=${editable?.getAttribute('contenteditable') ?? 'none'}`,
+    `readOnlyRichTexts=${readOnlyRichTexts.length}`,
+    `falseContentEditable=${falseContentEditableCount}`,
+  ].join(', ');
+}
+
+function findElementDeep(root: ParentNode | ShadowRoot, selector: string): HTMLElement | null {
+  const direct = root.querySelector<HTMLElement>(selector);
+
+  if (direct) {
+    return direct;
+  }
+
+  for (const element of root.querySelectorAll<HTMLElement>('*')) {
+    const found = element.shadowRoot ? findElementDeep(element.shadowRoot, selector) : null;
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function findElementsDeep(root: ParentNode | ShadowRoot, selector: string): HTMLElement[] {
+  const elements = Array.from(root.querySelectorAll<HTMLElement>(selector));
+
+  for (const element of root.querySelectorAll<HTMLElement>('*')) {
+    if (element.shadowRoot) {
+      elements.push(...findElementsDeep(element.shadowRoot, selector));
+    }
+  }
+
+  return elements;
+}
+
+function waitForNextAnimationFrame() {
+  return new Promise<void>(resolve => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }
 
 function getCurrentSelection() {

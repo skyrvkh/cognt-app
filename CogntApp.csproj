@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <RootNamespace>CogntApp</RootNamespace>
     <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
   </PropertyGroup>
 
   <ItemGroup>
-    <EditorWebSource Include="EditorWeb\*.html" />
     <EditorWebSource Include="EditorWeb\package.json" />
     <EditorWebSource Include="EditorWeb\tsconfig.json" />
     <EditorWebSource Include="EditorWeb\vite.config.js" />
@@ -18,15 +18,21 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.4" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.70" />
   </ItemGroup>
 
   <Target Name="BuildEditorWeb"
           BeforeTargets="AssignTargetPaths"
           DependsOnTargets="RestoreEditorWeb"
           Inputs="@(EditorWebSource)"
-          Outputs="$(EditorWebDirectory)\dist\index.html"
+          Outputs="$(EditorWebDirectory)\dist\assets\blazor-blocksuite.js"
           Condition="Exists('$(EditorWebDirectory)\package.json')">
     <Exec WorkingDirectory="$(EditorWebDirectory)" Command="npm run build" />
   </Target>
@@ -39,12 +45,16 @@
   <Target Name="CopyEditorWebOutput"
           AfterTargets="Build"
           DependsOnTargets="BuildEditorWeb"
-          Condition="Exists('$(EditorWebDirectory)\dist\index.html')">
+          Condition="Exists('$(EditorWebDirectory)\dist\assets\blazor-blocksuite.js')">
     <ItemGroup>
       <EditorWebOutput Include="$(EditorWebDirectory)\dist\**\*" />
     </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)EditorWeb"
+               Condition="Exists('$(TargetDir)EditorWeb')" />
+    <RemoveDir Directories="$(TargetDir)wwwroot\editorweb"
+               Condition="Exists('$(TargetDir)wwwroot\editorweb')" />
     <Copy SourceFiles="@(EditorWebOutput)"
-          DestinationFiles="@(EditorWebOutput->'$(TargetDir)EditorWeb\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(EditorWebOutput->'$(TargetDir)wwwroot\editorweb\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 

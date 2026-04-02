@@ -8,10 +8,18 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     target: 'es2022',
+    cssCodeSplit: false,
     rollupOptions: {
+      preserveEntrySignatures: 'strict',
       input: {
-        editor: fileURLToPath(new URL('./index.html', import.meta.url)),
-        review: fileURLToPath(new URL('./review.html', import.meta.url)),
+        blazorBlocksuite: fileURLToPath(new URL('./src/blazor-blocksuite.ts', import.meta.url)),
+      },
+      output: {
+        entryFileNames: 'assets/blazor-blocksuite.js',
+        assetFileNames: assetInfo =>
+          assetInfo.name === 'style.css'
+            ? 'assets/style.css'
+            : 'assets/[name]-[hash][extname]',
       },
     },
   },

@@ -48,6 +48,7 @@ type WebViewHost = {
 
 declare global {
   interface Window {
+    __cogntPostHost?: (message: unknown) => void;
     chrome?: {
       webview?: WebViewHost;
     };
@@ -55,6 +56,11 @@ declare global {
 }
 
 export function postHost(message: unknown) {
+  if (window.__cogntPostHost) {
+    window.__cogntPostHost(message);
+    return;
+  }
+
   window.chrome?.webview?.postMessage(message);
 }
 

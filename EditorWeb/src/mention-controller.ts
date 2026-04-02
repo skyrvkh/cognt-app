@@ -80,6 +80,7 @@ type Point = {
 };
 
 export class MentionController {
+  private readonly eventAbort = new AbortController();
   private readonly editor: PageEditor;
   private readonly previewElement: HTMLElement;
   private readonly options: MentionControllerOptions;
@@ -97,8 +98,16 @@ export class MentionController {
     this.options = options;
     this.editor = options.editor;
     this.previewElement = options.previewElement;
-    this.previewElement.addEventListener('mouseenter', () => this.cancelScheduledPreviewHide());
-    this.previewElement.addEventListener('mouseleave', () => this.schedulePreviewHide());
+    this.previewElement.addEventListener(
+      'mouseenter',
+      () => this.cancelScheduledPreviewHide(),
+      { signal: this.eventAbort.signal }
+    );
+    this.previewElement.addEventListener(
+      'mouseleave',
+      () => this.schedulePreviewHide(),
+      { signal: this.eventAbort.signal }
+    );
   }
 
   public setTargets(targets: MentionTarget[]) {
@@ -272,6 +281,13 @@ export class MentionController {
     return this.activeViewMode === 'preview';
   }
 
+  public dispose() {
+    this.hidePreview();
+    this.cancelScheduledHighlightUpdate();
+    this.clearMentionHighlights();
+    this.eventAbort.abort();
+  }
+
   private updateHighlights() {
     const cssWithHighlights = CSS as typeof CSS & {
       highlights?: {
@@ -308,6 +324,16 @@ export class MentionController {
     }
 
     cssWithHighlights.highlights.set(highlightName, new highlightConstructor(...ranges));
+  }
+
+  private clearMentionHighlights() {
+    const cssWithHighlights = CSS as typeof CSS & {
+      highlights?: {
+        delete(name: string): void;
+      };
+    };
+
+    cssWithHighlights.highlights?.delete(highlightName);
   }
 
   private insertNativeMention(inlineEditor: NativeInlineEditor, target: MentionTarget) {
