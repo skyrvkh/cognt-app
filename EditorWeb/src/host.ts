@@ -1,73 +1,11 @@
-import type { MentionPreviewResult, MentionTarget } from './mentions';
-
-export type HostMessage =
-  | {
-      type: 'load';
-      loadId?: number;
-      path?: string;
-      title?: string;
-      content?: string;
-    }
-  | {
-      type: 'loadCard';
-      loadId?: number;
-      side?: 'front' | 'back';
-      markdown?: string;
-    }
-  | {
-      type: 'saveResult';
-      path?: string;
-      ok: boolean;
-      error?: string;
-    }
-  | {
-      type: 'extractResult';
-      path?: string;
-      ok: boolean;
-      createdPath?: string;
-      error?: string;
-    }
-  | {
-      type: 'setMentionTargets';
-      files: MentionTarget[];
-    }
-  | MentionPreviewResult & {
-      type: 'mentionPreviewResult';
-    }
-  | {
-      type: 'mentionOpenResult';
-      ok: boolean;
-      relativePath?: string;
-      error?: string;
-    };
-
-type WebViewHost = {
-  postMessage(message: unknown): void;
-  addEventListener(type: 'message', listener: (event: { data: HostMessage }) => void): void;
-};
-
 declare global {
   interface Window {
     __cogntPostHost?: (message: unknown) => void;
-    chrome?: {
-      webview?: WebViewHost;
-    };
   }
 }
 
 export function postHost(message: unknown) {
-  if (window.__cogntPostHost) {
-    window.__cogntPostHost(message);
-    return;
-  }
-
-  window.chrome?.webview?.postMessage(message);
-}
-
-export function addHostMessageListener(handler: (message: HostMessage) => void) {
-  window.chrome?.webview?.addEventListener('message', event => {
-    handler(event.data);
-  });
+  window.__cogntPostHost?.(message);
 }
 
 export function reportDiagnostic(level: 'info' | 'warn' | 'error', message: string) {
@@ -82,10 +20,6 @@ export function installHostDiagnostics() {
   window.addEventListener('unhandledrejection', event => {
     reportDiagnostic('error', errorDetail(event.reason, 'Unhandled editor promise rejection.'));
   });
-}
-
-export function isHostedInWebView() {
-  return Boolean(window.chrome?.webview);
 }
 
 export async function waitForAnimationFrames(count: number) {

@@ -1,17 +1,11 @@
-using System.IO;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Web.WebView2.Core;
 
 namespace CogntApp.Views;
 
 public partial class ReviewView : UserControl
 {
-    private const string ReviewHostName = "cognt-review.local";
-    private const string EditorOutputDirectoryName = "EditorWeb";
     private const double HeaderHeight = 72;
-    private static readonly TimeSpan ReviewOperationTimeout = TimeSpan.FromSeconds(8);
 
     private static readonly ReviewSampleCard[] SampleCards =
     [
@@ -32,23 +26,25 @@ public partial class ReviewView : UserControl
             "An immutable value cannot be changed after it is created.")
     ];
 
-    private readonly TaskCompletionSource reviewReadyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private TaskCompletionSource? currentLoadCompletion;
-    private Task? initializeReviewTask;
-    private int loadRequestId;
-    private int lastSentLoadRequestId;
     private int currentCardIndex;
     private bool isAnswerVisible;
-    private bool isPrimed;
     private bool isDisposed;
     private Size lastLayoutSize = Size.Empty;
 
     public event EventHandler? ExitReviewRequested;
 
+    public Func<string, Task>? RenderCardAsync { get; set; }
+
+    public ContentControl CardRendererHostControl => CardRendererHost;
+
+    public Task PrimeAsync()
+    {
+        return StartReviewAsync();
+    }
+
     public ReviewView()
     {
         InitializeComponent();
-        CardRenderer.DefaultBackgroundColor = System.Drawing.Color.White;
     }
 
     private void ReviewView_Loaded(object sender, RoutedEventArgs e)
@@ -61,39 +57,13 @@ public partial class ReviewView : UserControl
         ApplyResponsiveLayout();
     }
 
-    public async Task WarmUpAsync()
-    {
-        ThrowIfDisposed();
-        await EnsureReviewLoadingAsync();
-        await WaitWithTimeoutAsync(
-            reviewReadyCompletion.Task,
-            ReviewOperationTimeout,
-            "The review renderer did not finish starting.");
-    }
-
-    public async Task PrimeAsync()
-    {
-        ThrowIfDisposed();
-
-        if (isPrimed)
-        {
-            return;
-        }
-
-        currentCardIndex = 0;
-        isAnswerVisible = false;
-        UpdateCardState();
-        await LoadCurrentCardSideAsync();
-        isPrimed = true;
-    }
-
     public async Task StartReviewAsync()
     {
         ThrowIfDisposed();
         currentCardIndex = 0;
         isAnswerVisible = false;
         UpdateCardState();
-        await LoadCurrentCardSideAsync();
+        await LoadCurrentCardAsync();
     }
 
     private async void RevealAnswer_Click(object sender, RoutedEventArgs e)
@@ -137,15 +107,8 @@ public partial class ReviewView : UserControl
         }
 
         isDisposed = true;
-        currentLoadCompletion?.TrySetCanceled();
-        currentLoadCompletion = null;
-
-        if (CardRenderer.CoreWebView2 is not null)
-        {
-            CardRenderer.CoreWebView2.WebMessageReceived -= CardRenderer_WebMessageReceived;
-        }
-
-        CardRenderer.Dispose();
+        RenderCardAsync = null;
+        CardRendererHost.Content = null;
     }
 
     private async Task RevealAnswerAsync()
@@ -157,7 +120,7 @@ public partial class ReviewView : UserControl
 
         isAnswerVisible = true;
         UpdateCardState();
-        await LoadCurrentCardSideAsync();
+        await LoadCurrentCardAsync();
     }
 
     private async Task MoveToNextCardAsync()
@@ -165,142 +128,25 @@ public partial class ReviewView : UserControl
         currentCardIndex = (currentCardIndex + 1) % SampleCards.Length;
         isAnswerVisible = false;
         UpdateCardState();
-        await LoadCurrentCardSideAsync();
+        await LoadCurrentCardAsync();
     }
 
-    private Task LoadCurrentCardSideAsync()
+    private Task LoadCurrentCardAsync()
     {
         ReviewSampleCard card = SampleCards[currentCardIndex];
-        return LoadCardSideAsync(
-            isAnswerVisible ? "back" : "front",
-            isAnswerVisible ? card.BackMarkdown : card.FrontMarkdown);
+        return LoadCardAsync(isAnswerVisible ? card.BackMarkdown : card.FrontMarkdown);
     }
 
-    private async Task LoadCardSideAsync(string side, string markdown)
+    private async Task LoadCardAsync(string markdown)
     {
         ThrowIfDisposed();
-        int requestId = ++loadRequestId;
-        await WarmUpAsync();
 
-        ThrowIfDisposed();
-
-        if (requestId != loadRequestId)
+        if (RenderCardAsync is null)
         {
-            return;
+            throw new InvalidOperationException("No shared BlockSuite renderer is attached.");
         }
 
-        currentLoadCompletion?.TrySetResult();
-        TaskCompletionSource loadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        currentLoadCompletion = loadCompletion;
-        if (!SendLoadCardMessage(requestId, side, markdown))
-        {
-            currentLoadCompletion = null;
-            throw new InvalidOperationException("The review renderer is not available.");
-        }
-
-        await WaitWithTimeoutAsync(
-            loadCompletion.Task,
-            ReviewOperationTimeout,
-            "The review renderer did not finish loading the card.");
-    }
-
-    private async Task InitializeReviewAsync()
-    {
-        string editorFolder = Path.Combine(AppContext.BaseDirectory, EditorOutputDirectoryName);
-
-        if (!ReviewBundleExists(editorFolder))
-        {
-            ShowMissingReviewBundleMessage(editorFolder);
-            reviewReadyCompletion.TrySetException(new FileNotFoundException("The review renderer bundle was not found.", editorFolder));
-            return;
-        }
-
-        try
-        {
-            CoreWebView2Environment environment = await CreateReviewEnvironmentAsync();
-            await CardRenderer.EnsureCoreWebView2Async(environment);
-
-            CoreWebView2 webView = CardRenderer.CoreWebView2;
-            await InstallDiagnosticsAsync(webView);
-            webView.WebMessageReceived += CardRenderer_WebMessageReceived;
-            webView.SetVirtualHostNameToFolderMapping(ReviewHostName, editorFolder, CoreWebView2HostResourceAccessKind.Allow);
-            CardRenderer.Source = new Uri($"https://{ReviewHostName}/review.html");
-        }
-        catch (Exception ex)
-        {
-            reviewReadyCompletion.TrySetException(ex);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite review renderer failed to start: {ex}");
-        }
-    }
-
-    private void CardRenderer_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        if (isDisposed)
-        {
-            return;
-        }
-
-        using JsonDocument message = JsonDocument.Parse(e.WebMessageAsJson);
-        JsonElement root = message.RootElement;
-
-        if (!root.TryGetProperty("type", out JsonElement typeElement))
-        {
-            return;
-        }
-
-        switch (typeElement.GetString())
-        {
-            case "ready":
-                reviewReadyCompletion.TrySetResult();
-                return;
-
-            case "loaded":
-                CompleteLoadMessage(root);
-                return;
-
-            case "diagnostic":
-                WriteDiagnosticMessage(root);
-                return;
-        }
-    }
-
-    private void CompleteLoadMessage(JsonElement root)
-    {
-        if (TryGetLoadId(root, out int loadedRequestId) && loadedRequestId != lastSentLoadRequestId)
-        {
-            return;
-        }
-
-        if (TryGetStringProperty(root, "error", out string error))
-        {
-            currentLoadCompletion?.TrySetException(new InvalidOperationException(error));
-        }
-        else
-        {
-            currentLoadCompletion?.TrySetResult();
-        }
-
-        currentLoadCompletion = null;
-    }
-
-    private bool SendLoadCardMessage(int requestId, string side, string markdown)
-    {
-        if (CardRenderer.CoreWebView2 is null)
-        {
-            return false;
-        }
-
-        lastSentLoadRequestId = requestId;
-        string payload = JsonSerializer.Serialize(new
-        {
-            type = "loadCard",
-            loadId = requestId,
-            side,
-            markdown,
-        });
-
-        CardRenderer.CoreWebView2.PostWebMessageAsJson(payload);
-        return true;
+        await RenderCardAsync(markdown);
     }
 
     private void UpdateCardState()
@@ -349,7 +195,7 @@ public partial class ReviewView : UserControl
                     ? new Thickness(20, 18, 20, 22)
                     : new Thickness(36, 26, 36, 30);
 
-        CardRenderer.Margin = ultraNarrow
+        CardRendererHost.Margin = ultraNarrow
             ? new Thickness(10, 4, 10, 0)
             : veryNarrow
                 ? new Thickness(18, 4, 18, 0)
@@ -408,86 +254,6 @@ public partial class ReviewView : UserControl
     private static double Clamp(double value, double minimum, double maximum)
     {
         return Math.Min(Math.Max(value, minimum), maximum);
-    }
-
-    private Task EnsureReviewLoadingAsync()
-    {
-        return initializeReviewTask ??= InitializeReviewAsync();
-    }
-
-    private static bool ReviewBundleExists(string editorFolder)
-    {
-        return File.Exists(Path.Combine(editorFolder, "review.html"));
-    }
-
-    private static async Task<CoreWebView2Environment> CreateReviewEnvironmentAsync()
-    {
-        string userDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CogntApp",
-            "WebView2");
-
-        return await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
-    }
-
-    private static async Task InstallDiagnosticsAsync(CoreWebView2 webView)
-    {
-        const string script =
-            "window.addEventListener('error', event => chrome.webview.postMessage({ type: 'diagnostic', level: 'error', message: event.message }));" +
-            "window.addEventListener('unhandledrejection', event => chrome.webview.postMessage({ type: 'diagnostic', level: 'error', message: String(event.reason) }));";
-
-        await webView.AddScriptToExecuteOnDocumentCreatedAsync(script);
-    }
-
-    private static bool TryGetLoadId(JsonElement root, out int loadId)
-    {
-        loadId = 0;
-
-        return root.TryGetProperty("loadId", out JsonElement loadIdElement)
-            && loadIdElement.TryGetInt32(out loadId);
-    }
-
-    private static bool TryGetStringProperty(JsonElement root, string propertyName, out string value)
-    {
-        value = string.Empty;
-
-        if (!root.TryGetProperty(propertyName, out JsonElement element)
-            || element.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        value = element.GetString() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(value);
-    }
-
-    private static void WriteDiagnosticMessage(JsonElement root)
-    {
-        if (root.TryGetProperty("message", out JsonElement diagnosticElement))
-        {
-            System.Diagnostics.Debug.WriteLine($"BlockSuite review renderer: {diagnosticElement.GetString()}");
-        }
-    }
-
-    private static async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
-    {
-        try
-        {
-            await task.WaitAsync(timeout);
-        }
-        catch (TimeoutException ex)
-        {
-            throw new TimeoutException(timeoutMessage, ex);
-        }
-    }
-
-    private static void ShowMissingReviewBundleMessage(string editorFolder)
-    {
-        MessageBox.Show(
-            $"The BlockSuite review bundle was not found:{Environment.NewLine}{editorFolder}{Environment.NewLine}{Environment.NewLine}Run npm install and npm run build in EditorWeb, then build the app again.",
-            "Review Bundle Missing",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
     }
 
     private void ThrowIfDisposed()
