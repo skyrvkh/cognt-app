@@ -186,11 +186,7 @@ public sealed record DeckPerformanceRow(
 public sealed record DailyStatisticsRow(
     string Date,
     int CardsReviewed,
-    int MinutesStudied,
-    int Recall)
-{
-    public string RecallLabel => $"{Recall}%";
-}
+    int MinutesStudied);
 
 public sealed record RecallDistributionRow(
     string Label,
@@ -199,8 +195,6 @@ public sealed record RecallDistributionRow(
     string BarColor)
 {
     public string PercentLabel => $"{Percent}%";
-
-    public Brush BarBrush => (Brush)new BrushConverter().ConvertFromString(BarColor)!;
 }
 
 public sealed record WeeklyOutcomeRow(
@@ -208,17 +202,4 @@ public sealed record WeeklyOutcomeRow(
     int Again,
     int Hard,
     int Good,
-    int Easy)
-{
-    public string AgainLabel => $"{Again}%";
-
-    public string HardLabel => $"{Hard}%";
-
-    public string GoodLabel => $"{Good}%";
-
-    public string EasyLabel => $"{Easy}%";
-}
-
-public sealed record StudyStreakRow(string Label, IReadOnlyList<StudyStreakCell> Cells);
-
-public sealed record StudyStreakCell(int Cards);
+    int Easy);

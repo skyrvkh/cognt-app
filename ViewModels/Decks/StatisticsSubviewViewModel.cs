@@ -186,8 +186,7 @@ public sealed class StatisticsSubviewViewModel
                 return new DailyStatisticsRow(
                     date.ToString("MMM d", CultureInfo.InvariantCulture),
                     cardCounts[index],
-                    studiedMinutes[index],
-                    78 + (index % 7));
+                    studiedMinutes[index]);
             })
             .ToArray();
     }
