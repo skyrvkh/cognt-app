@@ -129,10 +129,10 @@ public partial class ReviewView : UserControl
     private Task LoadCurrentCardAsync()
     {
         ReviewSampleCard card = SampleCards[currentCardIndex];
-        return LoadCardAsync(isAnswerVisible ? card.BackMarkdown : card.FrontMarkdown);
+        return LoadCardAsync(isAnswerVisible ? card.BackContent : card.FrontContent);
     }
 
-    private async Task LoadCardAsync(string markdown)
+    private async Task LoadCardAsync(string content)
     {
         ThrowIfDisposed();
 
@@ -141,7 +141,7 @@ public partial class ReviewView : UserControl
             throw new InvalidOperationException("No shared BlockSuite renderer is attached.");
         }
 
-        await RenderCardAsync(markdown);
+        await RenderCardAsync(content);
     }
 
     private void UpdateCardState()
@@ -269,6 +269,6 @@ public partial class ReviewView : UserControl
     }
 
     private sealed record ReviewSampleCard(
-        string FrontMarkdown,
-        string BackMarkdown);
+        string FrontContent,
+        string BackContent);
 }
