@@ -125,18 +125,18 @@ public sealed class BlockSuiteHostBridge
         ContentChanged?.Invoke(this, content);
     }
 
-    internal void RaiseCreateExtract(string sourcePath, string selectedMarkdown, string selectedPlainText)
+    internal void RaiseCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)
     {
         CreateExtractRequested?.Invoke(
             this,
-            new CreateExtractRequestedEventArgs(sourcePath, selectedMarkdown, selectedPlainText));
+            new CreateExtractRequestedEventArgs(sourcePath, selectedContent, selectedPlainText));
     }
 
-    internal void RaiseSaveCloze(string sourcePath, string selectedPlainText, string clozeText, string markdown)
+    internal void RaiseSaveCloze(string sourcePath, string selectedPlainText, string clozeText, string content)
     {
         SaveClozeRequested?.Invoke(
             this,
-            new SaveClozeRequestedEventArgs(sourcePath, selectedPlainText, clozeText, markdown));
+            new SaveClozeRequestedEventArgs(sourcePath, selectedPlainText, clozeText, content));
     }
 
     internal void RaiseMentionPreview(
@@ -151,9 +151,9 @@ public sealed class BlockSuiteHostBridge
             new MentionPreviewRequestedEventArgs(requestId, sourcePath, relativePath, mode, maxCharacters));
     }
 
-    internal void RaiseOpenMention(string sourcePath, string relativePath, string markdown)
+    internal void RaiseOpenMention(string sourcePath, string relativePath, string content)
     {
-        OpenMentionRequested?.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, markdown));
+        OpenMentionRequested?.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, content));
     }
 
     internal void RaiseHostMessage(JsonElement message)
@@ -179,4 +179,4 @@ public sealed record SaveClozeRequestedEventArgs(
     string SourcePath,
     string SelectedPlainText,
     string ClozeText,
-    string Markdown);
+    string Content);

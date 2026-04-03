@@ -4,12 +4,12 @@ namespace CogntApp.Models.Decks;
 
 public sealed class CreateCardEditorHostRequestedEventArgs(
     ContentControl host,
-    string markdown,
+    string content,
     Action<string> contentChanged) : EventArgs
 {
     public ContentControl Host { get; } = host;
 
-    public string Markdown { get; } = markdown;
+    public string Content { get; } = content;
 
     public Action<string> ContentChanged { get; } = contentChanged;
 }

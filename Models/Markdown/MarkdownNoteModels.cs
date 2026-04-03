@@ -4,7 +4,7 @@ public sealed record CreateExtractFileRequest(
     string RootDirectory,
     string CurrentNotePath,
     string SourcePath,
-    string SelectedMarkdown);
+    string SelectedContent);
 
 public sealed record MarkdownMentionTarget(
     string RelativePath,

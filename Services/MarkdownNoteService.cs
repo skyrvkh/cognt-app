@@ -79,7 +79,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         string directory = Path.GetDirectoryName(fullSourcePath)
             ?? throw new InvalidOperationException("The source file does not have a parent directory.");
         string sourceName = Path.GetFileNameWithoutExtension(fullSourcePath);
-        string content = EnsureTrailingNewline(request.SelectedMarkdown.Trim());
+        string content = EnsureTrailingNewline(request.SelectedContent.Trim());
 
         for (int index = 1; index < 10_000; index++)
         {
@@ -356,7 +356,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
 
     private static void ValidateExtractRequest(CreateExtractFileRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.SelectedMarkdown))
+        if (string.IsNullOrWhiteSpace(request.SelectedContent))
         {
             throw new InvalidOperationException("No selected Markdown content.");
         }

@@ -395,7 +395,7 @@ public partial class MainWindow : Window
             await EditorViewControl.EditTransientNoteInHostAsync(
                 e.Host,
                 "Card Text",
-                e.Markdown,
+                e.Content,
                 e.ContentChanged);
         }
         catch (Exception ex)
@@ -588,7 +588,7 @@ public partial class MainWindow : Window
 
         try
         {
-            string createdPath = viewModel.CreateExtractFile(sourcePath, e.SelectedMarkdown);
+            string createdPath = viewModel.CreateExtractFile(sourcePath, e.SelectedContent);
             EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
         }
         catch (Exception ex)
@@ -626,7 +626,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            viewModel.SaveMentionSource(e.SourcePath, e.Markdown);
+            viewModel.SaveMentionSource(e.SourcePath, e.Content);
             string targetPath = viewModel.ResolveMentionPath(e.RelativePath);
             bool opened = await OpenNoteAsync(targetPath, selectInTree: true);
             EditorViewControl.PostMentionOpenResult(e.RelativePath, opened, opened ? null : "The mentioned note could not be opened.");

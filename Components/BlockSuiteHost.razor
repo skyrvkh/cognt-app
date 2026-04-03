@@ -134,9 +134,9 @@
     }
 
     [JSInvokable]
-    public void HandleCreateExtract(string sourcePath, string selectedMarkdown, string selectedPlainText)
+    public void HandleCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)
     {
-        Bridge.RaiseCreateExtract(sourcePath, selectedMarkdown, selectedPlainText);
+        Bridge.RaiseCreateExtract(sourcePath, selectedContent, selectedPlainText);
     }
 
     [JSInvokable]
@@ -144,9 +144,9 @@
         string sourcePath,
         string selectedPlainText,
         string clozeText,
-        string markdown)
+        string content)
     {
-        Bridge.RaiseSaveCloze(sourcePath, selectedPlainText, clozeText, markdown);
+        Bridge.RaiseSaveCloze(sourcePath, selectedPlainText, clozeText, content);
     }
 
     [JSInvokable]
@@ -161,9 +161,9 @@
     }
 
     [JSInvokable]
-    public void HandleOpenMention(string sourcePath, string relativePath, string markdown)
+    public void HandleOpenMention(string sourcePath, string relativePath, string content)
     {
-        Bridge.RaiseOpenMention(sourcePath, relativePath, markdown);
+        Bridge.RaiseOpenMention(sourcePath, relativePath, content);
     }
 
     [JSInvokable]

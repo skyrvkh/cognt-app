@@ -403,7 +403,7 @@ public partial class EditorView : UserControl
 
         try
         {
-            currentContent = e.Markdown;
+            currentContent = e.Content;
             ContentChanged?.Invoke(this, currentContent);
             PostSaveResult(e.SourcePath, ok: true);
         }
@@ -465,7 +465,7 @@ public partial class EditorView : UserControl
 
         try
         {
-            currentContent = e.Markdown;
+            currentContent = e.Content;
             handler.Invoke(this, e);
         }
         catch (Exception ex)
