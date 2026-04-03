@@ -30,18 +30,3 @@ public sealed record CreatedNote(
     long ItemId,
     string NotePath,
     string FileRelPath);
-
-
-public sealed record CreateExtractFileRequest(
-    string NotesDirectory,
-    string CurrentNotePath,
-    string SourcePath,
-    string SelectedContent)
-{
-    public string RootDirectory => NotesDirectory;
-}
-
-public sealed record NoteGroupResult(
-    string GroupFolderPath,
-    string TargetNotePath,
-    string DroppedNotePath);

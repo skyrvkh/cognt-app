@@ -3,11 +3,12 @@ using System.IO;
 using System.Windows.Input;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
+using CogntApp.Models.Tree;
 using CogntApp.Services;
 
 namespace CogntApp.ViewModels;
 
-public sealed class MainViewModel : ObservableObject
+public sealed class MainViewModel : ObservableObject, IDisposable
 {
     private const string CollectionDirectoryExtension = ".cognt";
 
@@ -15,6 +16,8 @@ public sealed class MainViewModel : ObservableObject
     private string notesDirectory = string.Empty;
     private string currentNotesDirectory = string.Empty;
     private string? currentNotePath;
+    private long? currentNoteItemId;
+    private string currentNoteTitle = string.Empty;
     private string lastSavedContent = string.Empty;
     private bool isLoadingNotesDirectory;
 
@@ -40,11 +43,11 @@ public sealed class MainViewModel : ObservableObject
 
     public event EventHandler<OpenNoteRequestedEventArgs>? OpenNoteRequested;
 
-    public event EventHandler<NoteSelectionRequestedEventArgs>? NoteSelectionRequested;
-
     public event EventHandler? MentionTargetsChanged;
 
     public event EventHandler<UserMessageRequestedEventArgs>? UserMessageRequested;
+
+    public event EventHandler<string>? CurrentNoteTitleChanged;
 
     public Func<string>? GetCurrentEditorContent { get; set; }
 
@@ -119,10 +122,20 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        bool isSwitchingCollection =
+            !string.IsNullOrWhiteSpace(currentNotesDirectory)
+            && !string.Equals(currentNotesDirectory, fullPath, StringComparison.OrdinalIgnoreCase);
+
+        if (isSwitchingCollection)
+        {
+            SaveCurrentNoteFromEditor();
+            noteService.CloseCurrentCollection();
+        }
+
         currentNotesDirectory = fullPath;
         NotesDirectory = currentNotesDirectory;
         ClearCurrentNoteState();
-        RefreshNotesTree();
+        RefreshNotesTree(preserveExpansion: true);
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
 
         if (clearEditor)
@@ -140,16 +153,24 @@ public sealed class MainViewModel : ObservableObject
 
         SaveCurrentNoteFromEditor();
         string fullPath = Path.GetFullPath(notePath);
-        string content = File.ReadAllText(fullPath);
+        string content = noteService.ReadNoteFile(fullPath);
+        TreeItemRow? noteItem = string.IsNullOrWhiteSpace(currentNotesDirectory)
+            ? null
+            : noteService.FindNoteByPath(currentNotesDirectory, fullPath);
 
-        return new PreparedNote(fullPath, Path.GetFileName(fullPath), content);
+        return new PreparedNote(
+            fullPath,
+            noteItem?.Title ?? Path.GetFileNameWithoutExtension(fullPath),
+            content,
+            noteItem?.Id);
     }
 
     public void CompleteOpenNote(PreparedNote note)
     {
         currentNotePath = note.NotePath;
+        currentNoteItemId = note.ItemId;
+        currentNoteTitle = note.Title;
         lastSavedContent = note.Content;
-        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
         OnPropertyChanged(nameof(CurrentNotePath));
     }
 
@@ -184,7 +205,7 @@ public sealed class MainViewModel : ObservableObject
 
     public void SelectTreeNode(NoteTreeNodeViewModel? node)
     {
-        if (node is null)
+        if (node is null || node.IsPlaceholder)
         {
             ClearCurrentNote();
             return;
@@ -192,13 +213,9 @@ public sealed class MainViewModel : ObservableObject
 
         if (!string.IsNullOrWhiteSpace(node.NotePath))
         {
+            currentNoteItemId = node.Id;
             OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(node.NotePath, SelectInTree: false));
             return;
-        }
-
-        if (IsOpenRootFolder(node))
-        {
-            ShowDashboard();
         }
     }
 
@@ -214,37 +231,29 @@ public sealed class MainViewModel : ObservableObject
 
     public string GetEditableName(NoteTreeNodeViewModel node)
     {
-        return node.IsMarkdownFile && !string.IsNullOrWhiteSpace(node.NotePath)
-            ? Path.GetFileNameWithoutExtension(node.NotePath)
-            : Path.GetFileName(Path.TrimEndingDirectorySeparator(node.Path));
+        return node.Title;
     }
 
     public string GetNodeKind(NoteTreeNodeViewModel node)
     {
-        return node.IsMarkdownFile ? "Markdown file" : "folder";
+        return node.Kind == TreeItemKind.Note ? "note" : "folder";
     }
 
     public void RenameNode(NoteTreeNodeViewModel node, string newName)
     {
         EnsureCanModifyNode(node, "renamed");
-        SaveCurrentNoteFromEditor();
 
-        string? noteToOpen = node.IsMarkdownFile
-            ? RenameMarkdownNode(node, newName)
-            : RenameFolderNode(node, newName);
+        noteService.RenameItem(currentNotesDirectory, node.Id, newName);
+        node.UpdateTitle(newName);
 
-        RefreshNotesTree();
+        if (currentNoteItemId == node.Id)
+        {
+            currentNoteTitle = newName;
+            CurrentNoteTitleChanged?.Invoke(this, currentNoteTitle);
+        }
+
+        UpdateRecentNoteTitle(node.NotePath, newName);
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-
-        if (!string.IsNullOrWhiteSpace(noteToOpen))
-        {
-            ClearCurrentNoteState();
-            OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(noteToOpen, SelectInTree: true));
-        }
-        else if (!string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            NoteSelectionRequested?.Invoke(this, new NoteSelectionRequestedEventArgs(currentNotePath));
-        }
     }
 
     public void DeleteNode(NoteTreeNodeViewModel node)
@@ -252,18 +261,22 @@ public sealed class MainViewModel : ObservableObject
         EnsureCanModifyNode(node, "deleted");
         SaveCurrentNoteFromEditor();
 
-        bool deletesCurrentNote = CurrentNoteIsInsideNode(node);
+        string? currentNoteFullPath = string.IsNullOrWhiteSpace(currentNotePath)
+            ? null
+            : Path.GetFullPath(currentNotePath);
 
-        if (node.IsMarkdownFile)
-        {
-            noteService.DeleteMarkdownFile(currentNotesDirectory, node.NotePath ?? node.Path);
-        }
-        else
-        {
-            noteService.DeleteFolder(currentNotesDirectory, node.Path);
-        }
+        IReadOnlyList<string> deletedNotePaths = noteService.DeleteItem(currentNotesDirectory, node.Id);
+        bool deletesCurrentNote = currentNoteFullPath is not null
+            && deletedNotePaths.Any(path => string.Equals(
+                Path.GetFullPath(path),
+                currentNoteFullPath,
+                StringComparison.OrdinalIgnoreCase));
 
-        RefreshNotesTree();
+        RemoveLoadedTreeNode(node);
+        foreach (string notePath in deletedNotePaths)
+        {
+            RemoveRecentNote(notePath);
+        }
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
 
         if (deletesCurrentNote)
@@ -271,41 +284,132 @@ public sealed class MainViewModel : ObservableObject
             ClearCurrentNoteState();
             ClearEditorRequested?.Invoke(this, EventArgs.Empty);
         }
-        else if (!string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            NoteSelectionRequested?.Invoke(this, new NoteSelectionRequestedEventArgs(currentNotePath));
-        }
     }
 
-    public NoteGroupResult GroupNoteWithTarget(string droppedNotePath, string targetNotePath)
+    public IReadOnlyList<string> ImportDocuments(IEnumerable<string> sourcePaths)
     {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
+        {
+            throw new InvalidOperationException("No collection is open.");
+        }
+
         SaveCurrentNoteFromEditor();
-        NoteGroupResult result = noteService.GroupNoteWithTarget(
-            currentNotesDirectory,
-            droppedNotePath,
-            targetNotePath);
+        IReadOnlyList<string> importedPaths = noteService.ImportNoteFiles(currentNotesDirectory, sourcePaths);
 
-        RefreshNotesTree();
-        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-        return result;
-    }
-
-    public string CreateExtractFile(string? sourcePath, string selectedMarkdown)
-    {
-        string createdPath = noteService.CreateExtractFile(new CreateExtractFileRequest(
-            currentNotesDirectory,
-            currentNotePath ?? string.Empty,
-            sourcePath ?? string.Empty,
-            selectedMarkdown));
-
-        RefreshNotesTree();
-        if (!string.IsNullOrWhiteSpace(currentNotePath))
+        if (importedPaths.Count == 0)
         {
-            NoteSelectionRequested?.Invoke(this, new NoteSelectionRequestedEventArgs(currentNotePath));
+            return importedPaths;
+        }
+
+        foreach (string importedPath in importedPaths)
+        {
+            TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, importedPath);
+            AddLoadedTreeNode(item);
+            AddOrUpdateRecentNote(item, importedPath);
         }
 
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-        return createdPath;
+        OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(importedPaths[0], SelectInTree: true));
+
+        return importedPaths;
+    }
+
+    public bool CanCreateFolderInNode(NoteTreeNodeViewModel? node)
+    {
+        return !string.IsNullOrWhiteSpace(currentNotesDirectory)
+            && (node is null || node.CanContainChildren);
+    }
+
+    public string CreateFolder(NoteTreeNodeViewModel? node, string folderName)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
+        {
+            throw new InvalidOperationException("No collection is open.");
+        }
+
+        long folderId = noteService.CreateFolder(
+            currentNotesDirectory,
+            GetFolderCreationParentId(node),
+            folderName);
+
+        AddLoadedTreeNode(noteService.GetItem(currentNotesDirectory, folderId));
+        return folderId.ToString();
+    }
+
+    public bool CanMoveNode(NoteTreeNodeViewModel? node)
+    {
+        return node is not null
+            && !node.IsPlaceholder;
+    }
+
+    public void MoveTreeNode(
+        long itemId,
+        long? newParentId,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        NoteTreeNodeViewModel? node = FindTreeNode(itemId);
+        long? oldParentId = node?.ParentId;
+
+        PrepareLoadedParentForMove(newParentId);
+
+        noteService.MoveItem(
+            currentNotesDirectory,
+            itemId,
+            newParentId,
+            previousSiblingId,
+            nextSiblingId);
+
+        if (node is not null)
+        {
+            MoveLoadedTreeNode(node, oldParentId, newParentId, previousSiblingId, nextSiblingId);
+        }
+        else
+        {
+            RefreshNotesTree(preserveExpansion: true);
+        }
+
+    }
+
+    public string CreateExtractNote(string? sourcePath, string selectedContent, string selectedPlainText)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotePath)
+            || string.IsNullOrWhiteSpace(sourcePath)
+            || !string.Equals(
+                Path.GetFullPath(sourcePath),
+                Path.GetFullPath(currentNotePath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The extract source is not the current note file.");
+        }
+
+        long? parentId = currentNoteItemId;
+        NoteTreeNodeViewModel? parentNode = parentId.HasValue
+            ? FindTreeNode(parentId.Value)
+            : null;
+
+        if (parentNode is { CanContainChildren: true })
+        {
+            parentNode.IsExpanded = true;
+            LoadChildren(parentNode);
+        }
+
+        const string title = "Extract";
+        string content = string.IsNullOrWhiteSpace(selectedContent)
+            ? BlockSuiteDocumentContent.FromPlainText(selectedPlainText, title)
+            : selectedContent;
+        CreatedNote note = noteService.CreateExtractNote(
+            currentNotesDirectory,
+            parentId,
+            sourcePath,
+            title,
+            content);
+
+        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
+        AddLoadedTreeNode(item);
+        AddOrUpdateRecentNote(item, note.NotePath);
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+        return note.FileRelPath;
     }
 
     public MentionPreview ReadMentionPreview(string relativePath, int maxCharacters)
@@ -318,7 +422,7 @@ public sealed class MainViewModel : ObservableObject
         return noteService.ResolveMentionPath(currentNotesDirectory, relativePath);
     }
 
-    public void SaveMentionSource(string sourcePath, string markdown)
+    public LinkedNote CreateLinkedNote(string sourcePath, string viewMode)
     {
         if (string.IsNullOrWhiteSpace(currentNotePath)
             || !string.Equals(
@@ -326,10 +430,51 @@ public sealed class MainViewModel : ObservableObject
                 Path.GetFullPath(currentNotePath),
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("The mention source is not the current Markdown file.");
+            throw new InvalidOperationException("The linked note source is not the current note file.");
         }
 
-        SaveNoteIfChanged(markdown);
+        NoteTreeNodeViewModel? parentNode = currentNoteItemId.HasValue
+            ? FindTreeNode(currentNoteItemId.Value)
+            : null;
+
+        long? parentId = parentNode is { CanContainChildren: true }
+            ? parentNode.Id
+            : parentNode?.ParentId;
+
+        if (parentNode is { CanContainChildren: true })
+        {
+            parentNode.IsExpanded = true;
+            LoadChildren(parentNode);
+        }
+
+        const string title = "Untitled";
+        string documentContent = BlockSuiteDocumentContent.FromPlainText(string.Empty, title);
+        CreatedNote note = noteService.CreateNote(
+            currentNotesDirectory,
+            parentId,
+            title,
+            documentContent);
+
+        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
+        AddLoadedTreeNode(item);
+        AddOrUpdateRecentNote(item, note.NotePath);
+
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+        return new LinkedNote(note.NotePath, note.FileRelPath, title, documentContent);
+    }
+
+    public void SaveMentionSource(string sourcePath, string content)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotePath)
+            || !string.Equals(
+                Path.GetFullPath(sourcePath),
+                Path.GetFullPath(currentNotePath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The mention source is not the current note file.");
+        }
+
+        SaveNoteIfChanged(content);
     }
 
     public IReadOnlyList<MentionTarget> ListMentionTargets()
@@ -346,6 +491,24 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
             RaiseMessage("Mention Index Failed", $"Mentions could not be indexed: {ex.Message}");
+            return [];
+        }
+    }
+
+    public IReadOnlyList<MentionTarget> SearchMentionTargets(string query, int limit)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
+        {
+            return [];
+        }
+
+        try
+        {
+            return noteService.SearchMentionTargets(currentNotesDirectory, query, limit);
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            RaiseMessage("Mention Search Failed", $"Mentions could not be searched: {ex.Message}");
             return [];
         }
     }
@@ -371,10 +534,16 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        string notePath = noteService.CreateUniqueNotePath(currentNotesDirectory);
-        noteService.SaveNote(notePath, "# Untitled" + Environment.NewLine);
-        LoadNotesDirectory(currentNotesDirectory, clearEditor: false);
-        OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(notePath, SelectInTree: true));
+        CreatedNote note = noteService.CreateNote(
+            currentNotesDirectory,
+            parentId: null,
+            "Untitled",
+            BlockSuiteDocumentContent.FromPlainText(string.Empty, "Untitled"));
+        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
+        AddLoadedTreeNode(item);
+        AddOrUpdateRecentNote(item, note.NotePath);
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+        OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(note.NotePath, SelectInTree: true));
     }
 
     private void OpenNoteFromCommand(object? parameter)
@@ -385,184 +554,41 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string RenameMarkdownNode(NoteTreeNodeViewModel node, string newName)
-    {
-        string sourcePath = node.NotePath ?? node.Path;
-
-        if (TryGetPrimaryNoteFolder(sourcePath, out string? primaryFolderPath))
-        {
-            string folderName = GetMarkdownBaseName(newName);
-            string renamedFolderPath = noteService.RenameFolder(
-                currentNotesDirectory,
-                primaryFolderPath,
-                folderName);
-            string movedPrimaryPath = Path.Combine(renamedFolderPath, Path.GetFileName(sourcePath));
-            string renamedNotePath = noteService.RenameMarkdownFile(
-                currentNotesDirectory,
-                movedPrimaryPath,
-                newName);
-
-            return MapCurrentPathAfterCollectionRename(
-                primaryFolderPath,
-                renamedFolderPath,
-                sourcePath,
-                renamedNotePath)
-                ?? renamedNotePath;
-        }
-
-        return noteService.RenameMarkdownFile(currentNotesDirectory, sourcePath, newName);
-    }
-
-    private string? RenameFolderNode(NoteTreeNodeViewModel node, string newName)
-    {
-        string sourceFolderPath = node.Path;
-        string? primaryNotePath = node.NotePath;
-        string renamedFolderPath = noteService.RenameFolder(currentNotesDirectory, sourceFolderPath, newName);
-
-        if (!string.IsNullOrWhiteSpace(primaryNotePath))
-        {
-            string movedPrimaryPath = Path.Combine(renamedFolderPath, Path.GetFileName(primaryNotePath));
-            string renamedPrimaryPath = noteService.RenameMarkdownFile(
-                currentNotesDirectory,
-                movedPrimaryPath,
-                $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(renamedFolderPath))}.md");
-
-            return MapCurrentPathAfterCollectionRename(
-                sourceFolderPath,
-                renamedFolderPath,
-                primaryNotePath,
-                renamedPrimaryPath)
-                ?? renamedPrimaryPath;
-        }
-
-        return MapCurrentPathAfterFolderMove(sourceFolderPath, renamedFolderPath, currentNotePath);
-    }
-
     private bool CanModifyNode(NoteTreeNodeViewModel? node)
     {
         return node is not null
-            && !IsOpenRootFolder(node)
-            && (node.IsMarkdownFile || Directory.Exists(node.Path));
+            && !node.IsPlaceholder;
+    }
+
+    private static long? GetFolderCreationParentId(NoteTreeNodeViewModel? node)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        if (node.CanContainChildren)
+        {
+            return node.Id;
+        }
+
+        return node.ParentId;
     }
 
     private void EnsureCanModifyNode(NoteTreeNodeViewModel node, string operation)
     {
-        if (IsOpenRootFolder(node))
-        {
-            throw new InvalidOperationException($"The open notes root cannot be {operation}.");
-        }
-
         if (!CanModifyNode(node))
         {
             throw new InvalidOperationException($"This item cannot be {operation}.");
         }
     }
 
-    private bool IsOpenRootFolder(NoteTreeNodeViewModel node)
+    private void RefreshNotesTree(bool preserveExpansion = false)
     {
-        return !node.IsMarkdownFile
-            && !string.IsNullOrWhiteSpace(currentNotesDirectory)
-            && string.Equals(
-                Path.TrimEndingDirectorySeparator(Path.GetFullPath(node.Path)),
-                Path.TrimEndingDirectorySeparator(Path.GetFullPath(currentNotesDirectory)),
-                StringComparison.OrdinalIgnoreCase);
-    }
+        HashSet<long> expandedItemIds = preserveExpansion
+            ? CaptureExpandedItemIds()
+            : [];
 
-    private bool CurrentNoteIsInsideNode(NoteTreeNodeViewModel node)
-    {
-        if (string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            return false;
-        }
-
-        return node.IsMarkdownFile
-            ? PathsEqual(currentNotePath, node.NotePath ?? node.Path)
-            : IsPathInsideFolder(currentNotePath, node.Path);
-    }
-
-    private bool TryGetPrimaryNoteFolder(string notePath, out string folderPath)
-    {
-        folderPath = string.Empty;
-        string? parentFolder = Path.GetDirectoryName(notePath);
-        if (string.IsNullOrWhiteSpace(parentFolder)
-            || string.IsNullOrWhiteSpace(currentNotesDirectory)
-            || PathsEqual(parentFolder, currentNotesDirectory))
-        {
-            return false;
-        }
-
-        string folderName = Path.GetFileName(Path.TrimEndingDirectorySeparator(parentFolder));
-        string noteName = Path.GetFileNameWithoutExtension(notePath);
-        if (!string.Equals(folderName, noteName, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        folderPath = parentFolder;
-        return true;
-    }
-
-    private static string GetMarkdownBaseName(string newName)
-    {
-        string trimmedName = newName.Trim();
-        return string.Equals(Path.GetExtension(trimmedName), ".md", StringComparison.OrdinalIgnoreCase)
-            ? Path.GetFileNameWithoutExtension(trimmedName)
-            : trimmedName;
-    }
-
-    private string? MapCurrentPathAfterCollectionRename(
-        string sourceFolderPath,
-        string renamedFolderPath,
-        string sourcePrimaryNotePath,
-        string renamedPrimaryNotePath)
-    {
-        if (string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            return null;
-        }
-
-        if (PathsEqual(currentNotePath, sourcePrimaryNotePath))
-        {
-            return renamedPrimaryNotePath;
-        }
-
-        return MapCurrentPathAfterFolderMove(sourceFolderPath, renamedFolderPath, currentNotePath);
-    }
-
-    private static string? MapCurrentPathAfterFolderMove(
-        string sourceFolderPath,
-        string renamedFolderPath,
-        string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path) || !IsPathInsideFolder(path, sourceFolderPath))
-        {
-            return null;
-        }
-
-        return Path.Combine(
-            renamedFolderPath,
-            Path.GetRelativePath(sourceFolderPath, path));
-    }
-
-    private static bool IsPathInsideFolder(string path, string folderPath)
-    {
-        string fullPath = Path.GetFullPath(path);
-        string fullFolder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folderPath));
-        string folderWithSeparator = $"{fullFolder}{Path.DirectorySeparatorChar}";
-
-        return fullPath.StartsWith(folderWithSeparator, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool PathsEqual(string left, string right)
-    {
-        return string.Equals(
-            Path.GetFullPath(left),
-            Path.GetFullPath(right),
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void RefreshNotesTree()
-    {
         IsLoadingNotesDirectory = true;
 
         try
@@ -574,35 +600,18 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            List<string> noteFiles = Directory
-                .EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
-                .ToList();
+            List<string> noteFiles = EnumerateNoteFiles(currentNotesDirectory).ToList();
 
             PopulateRecentNotes(noteFiles);
 
-            NoteTreeNodeViewModel rootNode = new(GetDirectoryName(currentNotesDirectory), currentNotesDirectory, isMarkdownFile: false)
+            foreach (TreeItemRow item in noteService.LoadRootItems(currentNotesDirectory))
             {
-                IsExpanded = true,
-            };
+                NoteRoots.Add(CreateTreeNode(item));
+            }
 
-            NoteRoots.Add(rootNode);
-
-            Dictionary<string, NoteTreeNodeViewModel> folderItems = new(StringComparer.OrdinalIgnoreCase)
+            if (expandedItemIds.Count > 0)
             {
-                [currentNotesDirectory] = rootNode,
-            };
-
-            foreach (string filePath in noteFiles.OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase))
-            {
-                NoteTreeNodeViewModel fileParent = GetOrCreateParentFolderNode(filePath, rootNode, folderItems);
-                NoteTreeNodeViewModel item = CreateNoteFileNode(filePath);
-
-                fileParent.Children.Add(item);
-
-                if (TryAssignPrimaryFolderNote(fileParent, filePath))
-                {
-                    fileParent.IsExpanded = true;
-                }
+                RestoreExpandedNodes(NoteRoots, expandedItemIds);
             }
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
@@ -617,87 +626,436 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void AddOrUpdateRecentNote(TreeItemRow? item, string? notePath)
+    {
+        if (item is null
+            || item.Kind != TreeItemKind.Note
+            || string.IsNullOrWhiteSpace(notePath))
+        {
+            return;
+        }
+
+        RemoveRecentNote(notePath);
+        RecentNotes.Insert(0, new RecentNoteViewModel(item.Title, Path.GetFullPath(notePath)));
+
+        while (RecentNotes.Count > 5)
+        {
+            RecentNotes.RemoveAt(RecentNotes.Count - 1);
+        }
+    }
+
+    private void UpdateRecentNoteTitle(string? notePath, string title)
+    {
+        if (string.IsNullOrWhiteSpace(notePath))
+        {
+            return;
+        }
+
+        string fullPath = Path.GetFullPath(notePath);
+
+        for (int index = 0; index < RecentNotes.Count; index++)
+        {
+            RecentNoteViewModel recentNote = RecentNotes[index];
+            if (string.Equals(
+                    Path.GetFullPath(recentNote.NotePath),
+                    fullPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                RecentNotes[index] = recentNote with { DisplayName = title };
+                return;
+            }
+        }
+    }
+
+    private void RemoveRecentNote(string? notePath)
+    {
+        if (string.IsNullOrWhiteSpace(notePath))
+        {
+            return;
+        }
+
+        string fullPath = Path.GetFullPath(notePath);
+
+        for (int index = RecentNotes.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(
+                    Path.GetFullPath(RecentNotes[index].NotePath),
+                    fullPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                RecentNotes.RemoveAt(index);
+            }
+        }
+    }
+
     private void PopulateRecentNotes(IEnumerable<string> noteFiles)
     {
         RecentNotes.Clear();
 
         foreach (string filePath in noteFiles
                      .OrderByDescending(File.GetLastWriteTime)
-                     .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-                     .Take(5))
+                     .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
         {
-            RecentNotes.Add(new RecentNoteViewModel(
-                Path.GetFileNameWithoutExtension(filePath),
-                filePath));
-        }
-    }
-
-    private NoteTreeNodeViewModel GetOrCreateParentFolderNode(
-        string notePath,
-        NoteTreeNodeViewModel rootNode,
-        IDictionary<string, NoteTreeNodeViewModel> folderItems)
-    {
-        string relativeDirectory = Path.GetDirectoryName(Path.GetRelativePath(currentNotesDirectory, notePath))
-            ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(relativeDirectory))
-        {
-            return rootNode;
-        }
-
-        NoteTreeNodeViewModel parentItem = rootNode;
-        string currentDirectory = currentNotesDirectory;
-
-        foreach (string segment in relativeDirectory.Split(
-                     Path.DirectorySeparatorChar,
-                     Path.AltDirectorySeparatorChar))
-        {
-            if (string.IsNullOrWhiteSpace(segment))
+            TreeItemRow? noteItem = TryFindNoteMetadata(filePath);
+            if (noteItem is null)
             {
                 continue;
             }
 
-            currentDirectory = Path.Combine(currentDirectory, segment);
-            if (!folderItems.TryGetValue(currentDirectory, out NoteTreeNodeViewModel? folderItem))
+            RecentNotes.Add(new RecentNoteViewModel(
+                noteItem.Title,
+                filePath));
+
+            if (RecentNotes.Count >= 5)
             {
-                folderItem = new NoteTreeNodeViewModel(segment, currentDirectory, isMarkdownFile: false)
-                {
-                    IsExpanded = true,
-                };
-                folderItems[currentDirectory] = folderItem;
-                parentItem.Children.Add(folderItem);
+                break;
+            }
+        }
+    }
+
+    private TreeItemRow? TryFindNoteMetadata(string notePath)
+    {
+        try
+        {
+            return noteService.FindNoteByPath(currentNotesDirectory, notePath);
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            return null;
+        }
+    }
+
+    public void LoadChildren(NoteTreeNodeViewModel node)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory)
+            || node.IsPlaceholder
+            || !node.CanContainChildren
+            || node.AreChildrenLoaded)
+        {
+            return;
+        }
+
+        node.Children.Clear();
+
+        foreach (TreeItemRow child in noteService.LoadChildren(currentNotesDirectory, node.Id))
+        {
+            node.Children.Add(CreateTreeNode(child));
+        }
+
+        node.MarkChildrenLoaded();
+    }
+
+    private NoteTreeNodeViewModel CreateTreeNode(TreeItemRow item)
+    {
+        string? notePath = item.Kind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath)
+            ? Path.Combine(currentNotesDirectory, item.FileRelPath.Replace('/', Path.DirectorySeparatorChar))
+            : null;
+
+        NoteTreeNodeViewModel node = new(
+            item.Id,
+            item.ParentId,
+            item.Kind,
+            item.Title,
+            item.FileRelPath,
+            notePath,
+            item.ChildCount)
+        {
+            IsExpanded = false,
+        };
+
+        if (item.ChildCount > 0 && node.CanContainChildren)
+        {
+            node.Children.Add(NoteTreeNodeViewModel.CreatePlaceholder());
+        }
+
+        return node;
+    }
+
+    private void AddLoadedTreeNode(TreeItemRow? item)
+    {
+        if (item is null)
+        {
+            RefreshNotesTree(preserveExpansion: true);
+            return;
+        }
+
+        NoteTreeNodeViewModel node = CreateTreeNode(item);
+        ObservableCollection<NoteTreeNodeViewModel>? siblings = FindLoadedSiblingCollection(item.ParentId);
+
+        if (siblings is not null)
+        {
+            InsertNodeBySiblings(siblings, node, previousSiblingId: null, nextSiblingId: null);
+        }
+
+        UpdateParentChildCount(item.ParentId, delta: 1);
+    }
+
+    private void RemoveLoadedTreeNode(NoteTreeNodeViewModel node)
+    {
+        ObservableCollection<NoteTreeNodeViewModel>? siblings = FindOwningCollection(node);
+
+        if (siblings is not null)
+        {
+            siblings.Remove(node);
+        }
+
+        UpdateParentChildCount(node.ParentId, delta: -1);
+    }
+
+    private void MoveLoadedTreeNode(
+        NoteTreeNodeViewModel node,
+        long? oldParentId,
+        long? newParentId,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        ObservableCollection<NoteTreeNodeViewModel>? oldSiblings = FindOwningCollection(node);
+
+        if (oldSiblings is not null)
+        {
+            oldSiblings.Remove(node);
+        }
+
+        node.UpdateParent(newParentId);
+
+        ObservableCollection<NoteTreeNodeViewModel>? newSiblings = FindLoadedSiblingCollection(newParentId);
+        if (newSiblings is not null)
+        {
+            RemoveNodeById(newSiblings, node.Id);
+            InsertNodeBySiblings(newSiblings, node, previousSiblingId, nextSiblingId);
+        }
+
+        if (oldParentId != newParentId)
+        {
+            UpdateParentChildCount(oldParentId, delta: -1);
+            UpdateParentChildCount(newParentId, delta: 1);
+        }
+    }
+
+    private void PrepareLoadedParentForMove(long? parentId)
+    {
+        if (!parentId.HasValue)
+        {
+            return;
+        }
+
+        NoteTreeNodeViewModel? parent = FindTreeNode(parentId.Value);
+        if (parent is not { CanContainChildren: true })
+        {
+            return;
+        }
+
+        if (!parent.AreChildrenLoaded)
+        {
+            LoadChildren(parent);
+        }
+
+        parent.IsExpanded = true;
+    }
+
+    private void InsertNodeBySiblings(
+        ObservableCollection<NoteTreeNodeViewModel> siblings,
+        NoteTreeNodeViewModel node,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        RemovePlaceholders(siblings);
+
+        int insertIndex = siblings.Count;
+
+        if (previousSiblingId.HasValue)
+        {
+            int previousIndex = IndexOfNode(siblings, previousSiblingId.Value);
+            if (previousIndex >= 0)
+            {
+                insertIndex = previousIndex + 1;
+            }
+        }
+        else if (nextSiblingId.HasValue)
+        {
+            int nextIndex = IndexOfNode(siblings, nextSiblingId.Value);
+            if (nextIndex >= 0)
+            {
+                insertIndex = nextIndex;
+            }
+        }
+
+        siblings.Insert(Math.Clamp(insertIndex, 0, siblings.Count), node);
+    }
+
+    private ObservableCollection<NoteTreeNodeViewModel>? FindLoadedSiblingCollection(long? parentId)
+    {
+        if (parentId is null)
+        {
+            return NoteRoots;
+        }
+
+        NoteTreeNodeViewModel? parent = FindTreeNode(parentId.Value);
+        return parent is { AreChildrenLoaded: true } ? parent.Children : null;
+    }
+
+    private ObservableCollection<NoteTreeNodeViewModel>? FindOwningCollection(NoteTreeNodeViewModel target)
+    {
+        return FindOwningCollection(NoteRoots, target);
+    }
+
+    private static ObservableCollection<NoteTreeNodeViewModel>? FindOwningCollection(
+        ObservableCollection<NoteTreeNodeViewModel> nodes,
+        NoteTreeNodeViewModel target)
+    {
+        if (nodes.Contains(target))
+        {
+            return nodes;
+        }
+
+        foreach (NoteTreeNodeViewModel node in nodes)
+        {
+            ObservableCollection<NoteTreeNodeViewModel>? result = FindOwningCollection(node.Children, target);
+            if (result is not null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private static void RemoveNodeById(ObservableCollection<NoteTreeNodeViewModel> nodes, long id)
+    {
+        for (int index = nodes.Count - 1; index >= 0; index--)
+        {
+            NoteTreeNodeViewModel node = nodes[index];
+            if (!node.IsPlaceholder && node.Id == id)
+            {
+                nodes.RemoveAt(index);
+            }
+        }
+    }
+
+    private NoteTreeNodeViewModel? FindTreeNode(long id)
+    {
+        return FindTreeNode(NoteRoots, id);
+    }
+
+    private static NoteTreeNodeViewModel? FindTreeNode(IEnumerable<NoteTreeNodeViewModel> nodes, long id)
+    {
+        foreach (NoteTreeNodeViewModel node in nodes)
+        {
+            if (!node.IsPlaceholder && node.Id == id)
+            {
+                return node;
             }
 
-            parentItem = folderItem;
+            NoteTreeNodeViewModel? result = FindTreeNode(node.Children, id);
+            if (result is not null)
+            {
+                return result;
+            }
         }
 
-        return parentItem;
+        return null;
     }
 
-    private static NoteTreeNodeViewModel CreateNoteFileNode(string notePath)
+    private void UpdateParentChildCount(long? parentId, int delta)
     {
-        return new NoteTreeNodeViewModel(Path.GetFileName(notePath), notePath, isMarkdownFile: true)
+        if (parentId is null)
         {
-            NotePath = notePath,
-        };
+            return;
+        }
+
+        NoteTreeNodeViewModel? parent = FindTreeNode(parentId.Value);
+        if (parent is null)
+        {
+            return;
+        }
+
+        int childCount = parent.AreChildrenLoaded
+            ? parent.Children.Count(child => !child.IsPlaceholder)
+            : parent.ChildCount + delta;
+        parent.UpdateChildCount(childCount);
+
+        if (parent.AreChildrenLoaded || !parent.CanContainChildren)
+        {
+            return;
+        }
+
+        if (parent.ChildCount > 0 && parent.Children.Count == 0)
+        {
+            parent.Children.Add(NoteTreeNodeViewModel.CreatePlaceholder());
+        }
+        else if (parent.ChildCount == 0)
+        {
+            parent.Children.Clear();
+            parent.AreChildrenLoaded = true;
+        }
     }
 
-    private static bool TryAssignPrimaryFolderNote(NoteTreeNodeViewModel folderItem, string notePath)
+    private static int IndexOfNode(IReadOnlyList<NoteTreeNodeViewModel> nodes, long id)
     {
-        if (folderItem.IsMarkdownFile)
+        for (int index = 0; index < nodes.Count; index++)
         {
-            return false;
+            if (!nodes[index].IsPlaceholder && nodes[index].Id == id)
+            {
+                return index;
+            }
         }
 
-        string folderName = Path.GetFileName(Path.TrimEndingDirectorySeparator(folderItem.Path));
-        string noteName = Path.GetFileNameWithoutExtension(notePath);
-        if (!string.Equals(folderName, noteName, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
+        return -1;
+    }
 
-        folderItem.NotePath = notePath;
-        return true;
+    private static void RemovePlaceholders(ObservableCollection<NoteTreeNodeViewModel> nodes)
+    {
+        for (int index = nodes.Count - 1; index >= 0; index--)
+        {
+            if (nodes[index].IsPlaceholder)
+            {
+                nodes.RemoveAt(index);
+            }
+        }
+    }
+
+    private HashSet<long> CaptureExpandedItemIds()
+    {
+        HashSet<long> expandedItemIds = [];
+        CaptureExpandedItemIds(NoteRoots, expandedItemIds);
+        return expandedItemIds;
+    }
+
+    private static void CaptureExpandedItemIds(
+        IEnumerable<NoteTreeNodeViewModel> nodes,
+        ISet<long> expandedItemIds)
+    {
+        foreach (NoteTreeNodeViewModel node in nodes)
+        {
+            if (node.IsPlaceholder)
+            {
+                continue;
+            }
+
+            if (node.IsExpanded)
+            {
+                expandedItemIds.Add(node.Id);
+            }
+
+            CaptureExpandedItemIds(node.Children, expandedItemIds);
+        }
+    }
+
+    private void RestoreExpandedNodes(
+        IEnumerable<NoteTreeNodeViewModel> nodes,
+        IReadOnlySet<long> expandedItemIds)
+    {
+        foreach (NoteTreeNodeViewModel node in nodes)
+        {
+            if (node.IsPlaceholder || !expandedItemIds.Contains(node.Id))
+            {
+                continue;
+            }
+
+            LoadChildren(node);
+            node.IsExpanded = true;
+            RestoreExpandedNodes(node.Children, expandedItemIds);
+        }
     }
 
     private IReadOnlyDictionary<string, int> CreateRecentMentionRanks()
@@ -707,8 +1065,7 @@ public sealed class MainViewModel : ObservableObject
             return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return Directory
-            .EnumerateFiles(currentNotesDirectory, "*.md", SearchOption.AllDirectories)
+        return EnumerateNoteFiles(currentNotesDirectory)
             .OrderByDescending(File.GetLastWriteTime)
             .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
             .Take(8)
@@ -720,9 +1077,19 @@ public sealed class MainViewModel : ObservableObject
             .ToDictionary(item => item.Path, item => item.Rank, StringComparer.OrdinalIgnoreCase);
     }
 
+    private static IEnumerable<string> EnumerateNoteFiles(string root)
+    {
+        return Directory
+            .EnumerateFiles(root, "*.json", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
     private void ClearCurrentNoteState()
     {
         currentNotePath = null;
+        currentNoteItemId = null;
+        currentNoteTitle = string.Empty;
         lastSavedContent = string.Empty;
         OnPropertyChanged(nameof(CurrentNotePath));
     }
@@ -808,9 +1175,9 @@ public sealed class MainViewModel : ObservableObject
         return directoryName.EndsWith(CollectionDirectoryExtension, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetDirectoryName(string directoryPath)
+    public void Dispose()
     {
-        return new DirectoryInfo(directoryPath).Name;
+        noteService.Dispose();
     }
 }
 

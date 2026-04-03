@@ -1,43 +1,81 @@
 using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Text;
 using CogntApp.Models.Markdown;
+using CogntApp.Models.Tree;
 
 namespace CogntApp.Services;
 
-public interface INoteService
+public interface INoteService : IDisposable
 {
-    string CreateUniqueNotePath(string notesDirectory);
+    void CloseCurrentCollection();
 
-    string CreateExtractFile(CreateExtractFileRequest request);
+    string ReadNoteFile(string notePath);
 
-    NoteGroupResult GroupNoteWithTarget(
+    IReadOnlyList<TreeItemRow> LoadRootItems(string notesDirectory);
+
+    IReadOnlyList<TreeItemRow> LoadChildren(string notesDirectory, long parentId);
+
+    TreeItemRow? GetItem(string notesDirectory, long itemId);
+
+    TreeItemRow? FindNoteByPath(string notesDirectory, string notePath);
+
+    long CreateFolder(
         string notesDirectory,
-        string droppedNotePath,
-        string targetNotePath);
+        long? parentId,
+        string title,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null);
 
-    string RenameMarkdownFile(
+    CreatedNote CreateNote(
         string notesDirectory,
-        string notePath,
-        string newName);
+        long? parentId,
+        string title,
+        string initialContent,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null);
 
-    string RenameFolder(
+    CreatedNote CreateExtractNote(
         string notesDirectory,
-        string folderPath,
-        string newName);
+        long? parentId,
+        string sourceNotePath,
+        string title,
+        string initialContent,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null);
 
-    void DeleteMarkdownFile(
+    void MoveItem(
         string notesDirectory,
-        string notePath);
+        long itemId,
+        long? newParentId,
+        long? previousSiblingId,
+        long? nextSiblingId);
 
-    void DeleteFolder(
+    void RenameItem(
         string notesDirectory,
-        string folderPath);
+        long itemId,
+        string title);
+
+    IReadOnlyList<string> DeleteItem(
+        string notesDirectory,
+        long itemId);
+
+    IReadOnlyList<string> ImportNoteFiles(
+        string notesDirectory,
+        IEnumerable<string> sourcePaths);
 
     void SaveNote(string notePath, string content);
 
     IReadOnlyList<MentionTarget> ListMentionTargets(
         string notesDirectory,
         IReadOnlyDictionary<string, int>? recentRanks = null);
+
+    IReadOnlyList<MentionTarget> SearchMentionTargets(
+        string notesDirectory,
+        string query,
+        int limit);
 
     MentionPreview ReadMentionPreview(
         string notesDirectory,
@@ -49,183 +87,404 @@ public interface INoteService
 
 public sealed class NoteService : INoteService
 {
+    private const string MetadataDatabaseFileName = "cognt.sqlite";
+    private const string FilesDirectoryName = "Files";
+    private const string BlockSuiteNoteExtension = ".json";
+    private const string MarkdownNoteExtension = ".md";
+    private const string MarkdownImportExtension = ".markdown";
+
     private static readonly Regex HeadingRegex = new(@"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Compiled);
+    private static readonly JsonSerializerOptions BlockSuiteJsonOptions = new()
+    {
+        WriteIndented = true
+    };
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
-    public string CreateUniqueNotePath(string notesDirectory)
+    private readonly object repositoryLock = new();
+    private SqliteTreeRepository? treeRepository;
+    private string? treeRepositoryRoot;
+    private bool disposed;
+
+    public IReadOnlyList<TreeItemRow> LoadRootItems(string notesDirectory)
     {
-        if (string.IsNullOrWhiteSpace(notesDirectory))
-        {
-            throw new ArgumentException("Notes directory is required.", nameof(notesDirectory));
-        }
-
-        string notePath = Path.Combine(notesDirectory, "untitled.md");
-        int suffix = 2;
-
-        while (File.Exists(notePath))
-        {
-            notePath = Path.Combine(notesDirectory, $"untitled-{suffix}.md");
-            suffix++;
-        }
-
-        return notePath;
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        return repository.LoadRootItems();
     }
 
-    public string CreateExtractFile(CreateExtractFileRequest request)
+    public string ReadNoteFile(string notePath)
     {
-        ValidateExtractRequest(request);
+        string fullPath = Path.GetFullPath(notePath);
+        return File.ReadAllText(fullPath, Encoding.UTF8);
+    }
 
-        string fullSourcePath = Path.GetFullPath(request.SourcePath);
-        string directory = Path.GetDirectoryName(fullSourcePath)
-            ?? throw new InvalidOperationException("The source file does not have a parent directory.");
-        string sourceName = Path.GetFileNameWithoutExtension(fullSourcePath);
-        string content = EnsureTrailingNewline(request.SelectedContent.Trim());
-
-        for (int index = 1; index < 10_000; index++)
+    public void CloseCurrentCollection()
+    {
+        lock (repositoryLock)
         {
-            string candidate = Path.Combine(directory, $"{sourceName}-extract-{index:000}.md");
-            if (TryWriteNewFile(candidate, content))
+            ThrowIfDisposed();
+            CloseTreeRepository();
+        }
+    }
+
+    public IReadOnlyList<TreeItemRow> LoadChildren(string notesDirectory, long parentId)
+    {
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        return repository.LoadChildren(parentId);
+    }
+
+    public TreeItemRow? GetItem(string notesDirectory, long itemId)
+    {
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        return repository.GetItem(itemId);
+    }
+
+    public TreeItemRow? FindNoteByPath(string notesDirectory, string notePath)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullPath = ResolveExistingNotePathInRoot(root, notePath);
+        string fileRelPath = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
+        ITreeRepository repository = OpenTreeRepository(root);
+        return repository.FindNoteByFileRelPath(fileRelPath);
+    }
+
+    public long CreateFolder(
+        string notesDirectory,
+        long? parentId,
+        string title,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null)
+    {
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        return repository.CreateFolder(parentId, title, previousSiblingId, nextSiblingId);
+    }
+
+    public CreatedNote CreateNote(
+        string notesDirectory,
+        long? parentId,
+        string title,
+        string initialContent,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        ITreeRepository repository = OpenTreeRepository(root);
+        string fileRelPath = CreateUniqueMetadataNoteRelPath(root);
+
+        return CreateNoteFile(
+            root,
+            repository,
+            parentId,
+            title,
+            initialContent,
+            fileRelPath,
+            previousSiblingId,
+            nextSiblingId);
+    }
+
+    public CreatedNote CreateExtractNote(
+        string notesDirectory,
+        long? parentId,
+        string sourceNotePath,
+        string title,
+        string initialContent,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullSourcePath = ResolveExistingNotePathInRoot(root, sourceNotePath);
+        ITreeRepository repository = OpenTreeRepository(root);
+        string fileRelPath = CreateUniqueExtractNoteRelPath(root, fullSourcePath);
+        string extractTitle = CreateExtractTitleFromRelPath(fileRelPath);
+        string content = IsBlockSuiteDocumentContent(initialContent)
+            ? ApplyBlockSuiteDocumentTitle(initialContent, extractTitle)
+            : BlockSuiteDocumentContent.FromPlainText(initialContent, extractTitle);
+
+        return CreateNoteFile(
+            root,
+            repository,
+            parentId,
+            extractTitle,
+            content,
+            fileRelPath,
+            previousSiblingId,
+            nextSiblingId);
+    }
+
+    private static CreatedNote CreateNoteFile(
+        string root,
+        ITreeRepository repository,
+        long? parentId,
+        string title,
+        string initialContent,
+        string fileRelPath,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        string notePath = Path.Combine(root, ToPlatformPath(fileRelPath));
+        Directory.CreateDirectory(Path.GetDirectoryName(notePath)
+            ?? throw new InvalidOperationException("The note file does not have a parent directory."));
+
+        TryWriteNewFile(notePath, EnsureTrailingNewline(initialContent));
+
+        try
+        {
+            long itemId = repository.CreateNote(parentId, title, fileRelPath, previousSiblingId, nextSiblingId);
+            return new CreatedNote(itemId, notePath, fileRelPath);
+        }
+        catch
+        {
+            TryDeleteFile(notePath);
+            throw;
+        }
+    }
+
+    public void MoveItem(
+        string notesDirectory,
+        long itemId,
+        long? newParentId,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        TreeItemRow item = repository.GetItem(itemId)
+            ?? throw new InvalidOperationException($"Tree item {itemId} does not exist.");
+
+        if (item.ParentId == newParentId)
+        {
+            repository.ReorderItem(itemId, previousSiblingId, nextSiblingId);
+            return;
+        }
+
+        repository.MoveItem(itemId, newParentId, previousSiblingId, nextSiblingId);
+    }
+
+    public void RenameItem(string notesDirectory, long itemId, string title)
+    {
+        ITreeRepository repository = OpenTreeRepository(notesDirectory);
+        repository.RenameItem(itemId, title);
+    }
+
+    public IReadOnlyList<string> DeleteItem(string notesDirectory, long itemId)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        ITreeRepository repository = OpenTreeRepository(root);
+        IReadOnlyList<string> deletedNotePaths = CollectDeletedNotePaths(root, repository, itemId);
+
+        repository.DeleteItem(itemId);
+
+        foreach (string notePath in deletedNotePaths)
+        {
+            TryDeleteFile(notePath);
+        }
+
+        return deletedNotePaths;
+    }
+
+    private static IReadOnlyList<string> CollectDeletedNotePaths(
+        string root,
+        ITreeRepository repository,
+        long itemId)
+    {
+        TreeItemRow item = repository.GetItem(itemId)
+            ?? throw new InvalidOperationException($"Tree item {itemId} does not exist.");
+        List<string> notePaths = [];
+        HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        CollectDeletedNotePaths(root, repository, item, notePaths, seenPaths);
+        return notePaths;
+    }
+
+    private static void CollectDeletedNotePaths(
+        string root,
+        ITreeRepository repository,
+        TreeItemRow item,
+        ICollection<string> notePaths,
+        ISet<string> seenPaths)
+    {
+        if (item.Kind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath))
+        {
+            string notePath = ResolveNotePathForDeletion(root, item.FileRelPath);
+            if (seenPaths.Add(notePath))
             {
-                return candidate;
+                notePaths.Add(notePath);
             }
         }
 
-        throw new InvalidOperationException("Could not create an extract file because all generated names are taken.");
+        foreach (TreeItemRow child in repository.LoadChildren(item.Id))
+        {
+            CollectDeletedNotePaths(root, repository, child, notePaths, seenPaths);
+        }
     }
 
-    public NoteGroupResult GroupNoteWithTarget(
-        string notesDirectory,
-        string droppedNotePath,
-        string targetNotePath)
+    private static string ResolveNotePathForDeletion(string root, string fileRelPath)
     {
-        string root = GetExistingNotesRoot(notesDirectory);
-        string droppedPath = ResolveExistingMarkdownPathInRoot(root, droppedNotePath);
-        string targetPath = ResolveExistingMarkdownPathInRoot(root, targetNotePath);
-
-        if (string.Equals(droppedPath, targetPath, StringComparison.OrdinalIgnoreCase))
+        string fullPath = Path.GetFullPath(Path.Combine(root, ToPlatformPath(fileRelPath)));
+        if (!IsPathInsideRoot(fullPath, root))
         {
-            throw new InvalidOperationException("A note cannot be dropped onto itself.");
+            throw new InvalidOperationException($"The note file path is outside the collection: {fileRelPath}");
         }
 
-        string targetDirectory = Path.GetDirectoryName(targetPath)
-            ?? throw new InvalidOperationException("The target note does not have a parent directory.");
-        string targetName = Path.GetFileNameWithoutExtension(targetPath);
-        string folderPath = GetGroupFolderPath(targetDirectory, targetName);
-
-        Directory.CreateDirectory(folderPath);
-
-        string targetDestination = Path.Combine(folderPath, Path.GetFileName(targetPath));
-        string droppedDestination = Path.Combine(folderPath, Path.GetFileName(droppedPath));
-
-        EnsureMoveDestinationAvailable(targetPath, targetDestination);
-        EnsureMoveDestinationAvailable(droppedPath, droppedDestination);
-
-        string movedTargetPath = MoveMarkdownFile(targetPath, targetDestination);
-        string movedDroppedPath = MoveMarkdownFile(droppedPath, droppedDestination);
-
-        return new NoteGroupResult(
-            folderPath,
-            movedTargetPath,
-            movedDroppedPath);
+        return fullPath;
     }
 
-    public string RenameMarkdownFile(
-        string notesDirectory,
-        string notePath,
-        string newName)
+    private ITreeRepository OpenTreeRepository(string notesDirectory)
     {
         string root = GetExistingNotesRoot(notesDirectory);
-        string sourcePath = ResolveExistingMarkdownPathInRoot(root, notePath);
-        string fileName = NormalizeMarkdownFileName(newName);
-        string destinationPath = Path.Combine(
-            Path.GetDirectoryName(sourcePath)
-                ?? throw new InvalidOperationException("The Markdown file does not have a parent directory."),
-            fileName);
 
-        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase))
+        lock (repositoryLock)
         {
-            return sourcePath;
-        }
+            ThrowIfDisposed();
 
-        EnsureMoveDestinationAvailable(sourcePath, destinationPath);
-        File.Move(sourcePath, destinationPath);
-        return Path.GetFullPath(destinationPath);
+            if (treeRepository is not null
+                && string.Equals(treeRepositoryRoot, root, StringComparison.OrdinalIgnoreCase))
+            {
+                return treeRepository;
+            }
+
+            CloseTreeRepository();
+            treeRepositoryRoot = root;
+            treeRepository = new SqliteTreeRepository(Path.Combine(root, MetadataDatabaseFileName));
+
+            if (!treeRepository.HasAnyItems())
+            {
+                BootstrapTreeMetadata(root, treeRepository);
+            }
+
+            return treeRepository;
+        }
     }
 
-    public string RenameFolder(
-        string notesDirectory,
+    public void Dispose()
+    {
+        lock (repositoryLock)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            CloseTreeRepository();
+            disposed = true;
+        }
+    }
+
+    private void CloseTreeRepository()
+    {
+        treeRepository?.Dispose();
+        treeRepository = null;
+        treeRepositoryRoot = null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (disposed)
+        {
+            throw new ObjectDisposedException(nameof(NoteService));
+        }
+    }
+
+    private static void BootstrapTreeMetadata(string root, ITreeRepository repository)
+    {
+        BootstrapTreeFolder(root, root, parentId: null, repository);
+
+        string filesDirectory = Path.Combine(root, FilesDirectoryName);
+        if (Directory.Exists(filesDirectory))
+        {
+            BootstrapLooseNoteFiles(root, filesDirectory, repository);
+        }
+    }
+
+    private static void BootstrapTreeFolder(
+        string root,
         string folderPath,
-        string newName)
+        long? parentId,
+        ITreeRepository repository)
     {
-        string root = GetExistingNotesRoot(notesDirectory);
-        string sourcePath = ResolveExistingFolderPathInRoot(root, folderPath);
-        string folderName = NormalizeFileSystemName(newName, "Folder name");
-        string destinationPath = Path.Combine(
-            Path.GetDirectoryName(sourcePath)
-                ?? throw new InvalidOperationException("The folder does not have a parent directory."),
-            folderName);
+        IEnumerable<string> childPaths = Directory
+            .EnumerateDirectories(folderPath)
+            .Where(path => !IsInternalDirectory(path))
+            .Concat(EnumerateNoteFiles(folderPath, SearchOption.TopDirectoryOnly));
 
-        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase))
+        foreach (string childPath in childPaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
-            return sourcePath;
-        }
+            if (Directory.Exists(childPath))
+            {
+                long folderId = repository.CreateFolder(parentId, Path.GetFileName(childPath));
+                BootstrapTreeFolder(root, childPath, folderId, repository);
+                continue;
+            }
 
-        EnsureFolderDestinationAvailable(sourcePath, destinationPath);
-        Directory.Move(sourcePath, destinationPath);
-        return Path.GetFullPath(destinationPath);
+            string fileRelPath = NormalizeRelativePath(Path.GetRelativePath(root, childPath));
+            if (repository.FindNoteByFileRelPath(fileRelPath) is not null)
+            {
+                continue;
+            }
+
+            string title = Path.GetFileNameWithoutExtension(childPath);
+            repository.CreateNote(parentId, title, fileRelPath);
+        }
     }
 
-    public void DeleteMarkdownFile(
+    private static void BootstrapLooseNoteFiles(string root, string folderPath, ITreeRepository repository)
+    {
+        foreach (string filePath in EnumerateNoteFiles(folderPath, SearchOption.AllDirectories)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            string fileRelPath = NormalizeRelativePath(Path.GetRelativePath(root, filePath));
+            if (repository.FindNoteByFileRelPath(fileRelPath) is not null)
+            {
+                continue;
+            }
+
+            repository.CreateNote(parentId: null, Path.GetFileNameWithoutExtension(filePath), fileRelPath);
+        }
+    }
+
+    public IReadOnlyList<string> ImportNoteFiles(
         string notesDirectory,
-        string notePath)
+        IEnumerable<string> sourcePaths)
     {
         string root = GetExistingNotesRoot(notesDirectory);
-        string fullPath = ResolveExistingMarkdownPathInRoot(root, notePath);
-        File.Delete(fullPath);
-    }
+        ITreeRepository repository = OpenTreeRepository(root);
+        List<string> importedPaths = [];
 
-    public void DeleteFolder(
-        string notesDirectory,
-        string folderPath)
-    {
-        string root = GetExistingNotesRoot(notesDirectory);
-        string fullPath = ResolveExistingFolderPathInRoot(root, folderPath);
-        Directory.Delete(fullPath, recursive: true);
-    }
-
-    private static string GetGroupFolderPath(string targetDirectory, string targetName)
-    {
-        string currentDirectoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(targetDirectory));
-
-        return string.Equals(currentDirectoryName, targetName, StringComparison.OrdinalIgnoreCase)
-            ? targetDirectory
-            : Path.Combine(targetDirectory, targetName);
-    }
-
-    private static void EnsureMoveDestinationAvailable(string sourcePath, string destinationPath)
-    {
-        string fullSourcePath = Path.GetFullPath(sourcePath);
-        string fullDestinationPath = Path.GetFullPath(destinationPath);
-
-        if (!string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase)
-            && File.Exists(fullDestinationPath))
+        foreach (string sourcePath in sourcePaths)
         {
-            throw new IOException($"A Markdown file already exists at: {fullDestinationPath}");
-        }
-    }
+            string fullSourcePath = Path.GetFullPath(sourcePath);
 
-    private static string MoveMarkdownFile(string sourcePath, string destinationPath)
-    {
-        string fullSourcePath = Path.GetFullPath(sourcePath);
-        string fullDestinationPath = Path.GetFullPath(destinationPath);
+            if (!File.Exists(fullSourcePath))
+            {
+                throw new FileNotFoundException("The document to import does not exist.", fullSourcePath);
+            }
 
-        if (string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return fullSourcePath;
+            if (!IsImportableNoteExtension(fullSourcePath))
+            {
+                throw new InvalidOperationException("Only Markdown documents or Cognt JSON notes can be imported.");
+            }
+
+            string destinationPath = CreateUniqueImportedNotePath(root, fullSourcePath);
+            File.Copy(fullSourcePath, destinationPath);
+            string fileRelPath = NormalizeRelativePath(Path.GetRelativePath(root, destinationPath));
+            string title = Path.GetFileNameWithoutExtension(destinationPath);
+            repository.CreateNote(parentId: null, title, fileRelPath);
+            importedPaths.Add(Path.GetFullPath(destinationPath));
         }
 
-        File.Move(fullSourcePath, fullDestinationPath);
-        return fullDestinationPath;
+        return importedPaths;
+    }
+
+    private static bool IsInternalDirectory(string path)
+    {
+        string name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return string.Equals(name, FilesDirectoryName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> EnumerateNoteFiles(string directoryPath, SearchOption searchOption)
+    {
+        return Directory
+            .EnumerateFiles(directoryPath, $"*{BlockSuiteNoteExtension}", searchOption)
+            .Concat(Directory.EnumerateFiles(directoryPath, $"*{MarkdownNoteExtension}", searchOption))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     public void SaveNote(string notePath, string content)
@@ -235,7 +494,7 @@ public sealed class NoteService : INoteService
             return;
         }
 
-        File.WriteAllText(notePath, content);
+        File.WriteAllText(notePath, content, Encoding.UTF8);
     }
 
     public IReadOnlyList<MentionTarget> ListMentionTargets(
@@ -248,11 +507,32 @@ public sealed class NoteService : INoteService
         }
 
         string root = NormalizeRoot(notesDirectory);
+        ITreeRepository repository = OpenTreeRepository(root);
 
-        return Directory
-            .EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => CreateMentionTarget(root, path, recentRanks))
+        return repository.LoadNoteItems()
+            .Where(item => !string.IsNullOrWhiteSpace(item.FileRelPath))
+            .Select(item => CreateMentionTarget(root, item, recentRanks))
+            .OfType<MentionTarget>()
+            .ToArray();
+    }
+
+    public IReadOnlyList<MentionTarget> SearchMentionTargets(
+        string notesDirectory,
+        string query,
+        int limit)
+    {
+        if (string.IsNullOrWhiteSpace(notesDirectory) || !Directory.Exists(notesDirectory))
+        {
+            return [];
+        }
+
+        string root = NormalizeRoot(notesDirectory);
+        ITreeRepository repository = OpenTreeRepository(root);
+
+        return repository.SearchNoteItems(query, limit)
+            .Where(item => !string.IsNullOrWhiteSpace(item.FileRelPath))
+            .Select(item => CreateMentionTarget(root, item, recentRanks: null))
+            .OfType<MentionTarget>()
             .ToArray();
     }
 
@@ -263,12 +543,22 @@ public sealed class NoteService : INoteService
     {
         string root = GetExistingNotesRoot(notesDirectory);
         string path = ResolveMentionPath(root, relativePath);
-        string content = File.ReadAllText(path);
+        string normalizedRelativePath = NormalizeRelativePath(Path.GetRelativePath(root, path));
+        string content = File.ReadAllText(path, Encoding.UTF8);
+        bool isBlockSuiteNote = IsBlockSuiteNotePath(path);
+        string title = OpenTreeRepository(root).FindNoteByFileRelPath(normalizedRelativePath)?.Title
+            ?? (isBlockSuiteNote
+                ? Path.GetFileNameWithoutExtension(path)
+                : ExtractTitle(content, Path.GetFileName(path)));
 
         return new MentionPreview(
-            NormalizeRelativePath(Path.GetRelativePath(root, path)),
-            ExtractTitle(content, Path.GetFileName(path)),
-            CreateExcerpt(content, Math.Max(0, maxCharacters)));
+            normalizedRelativePath,
+            title,
+            isBlockSuiteNote
+                ? content
+                : BlockSuiteDocumentContent.FromPlainText(
+                    CreateExcerpt(content, Math.Max(0, maxCharacters)),
+                    title));
     }
 
     public string ResolveMentionPath(string notesDirectory, string relativePath)
@@ -283,91 +573,49 @@ public sealed class NoteService : INoteService
         string platformRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
         if (Path.IsPathRooted(platformRelativePath))
         {
-            throw new UnauthorizedAccessException("Mention paths must be relative to the open Markdown root.");
+            throw new UnauthorizedAccessException("Mention paths must be relative to the open collection root.");
         }
 
         string fullPath = Path.GetFullPath(Path.Combine(root, platformRelativePath));
         if (!IsPathInsideRoot(fullPath, root))
         {
-            throw new UnauthorizedAccessException("Mention path is outside the open Markdown root.");
+            throw new UnauthorizedAccessException("Mention path is outside the open collection root.");
         }
 
-        EnsureMarkdownPath(fullPath);
+        EnsureNotePath(fullPath);
 
         if (!File.Exists(fullPath))
         {
-            throw new FileNotFoundException("The mentioned Markdown file does not exist.", fullPath);
+            throw new FileNotFoundException("The mentioned note file does not exist.", fullPath);
         }
 
         return fullPath;
     }
 
-    private static string ResolveExistingMarkdownPathInRoot(string root, string path)
+    private static string ResolveExistingNotePathInRoot(string root, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            throw new ArgumentException("Markdown path is required.", nameof(path));
+            throw new ArgumentException("Note path is required.", nameof(path));
         }
 
         string fullPath = Path.GetFullPath(path);
         if (!IsPathInsideRoot(fullPath, root))
         {
-            throw new UnauthorizedAccessException("Markdown files must be inside the open Markdown root.");
+            throw new UnauthorizedAccessException("Note files must be inside the open collection root.");
         }
 
-        EnsureMarkdownPath(fullPath);
+        EnsureNotePath(fullPath);
 
         if (!File.Exists(fullPath))
         {
-            throw new FileNotFoundException("The Markdown file does not exist.", fullPath);
+            throw new FileNotFoundException("The note file does not exist.", fullPath);
         }
 
         return fullPath;
     }
 
-    private static string ResolveExistingFolderPathInRoot(string root, string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            throw new ArgumentException("Folder path is required.", nameof(path));
-        }
-
-        string fullPath = Path.GetFullPath(path);
-        if (string.Equals(
-                Path.TrimEndingDirectorySeparator(fullPath),
-                Path.TrimEndingDirectorySeparator(root),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("The open notes root cannot be renamed or deleted.");
-        }
-
-        if (!IsPathInsideRoot(fullPath, root))
-        {
-            throw new UnauthorizedAccessException("Folders must be inside the open Markdown root.");
-        }
-
-        if (!Directory.Exists(fullPath))
-        {
-            throw new DirectoryNotFoundException($"The folder does not exist: {fullPath}");
-        }
-
-        return fullPath;
-    }
-
-    private static void ValidateExtractRequest(CreateExtractFileRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.SelectedContent))
-        {
-            throw new InvalidOperationException("No selected Markdown content.");
-        }
-
-        if (!IsSafeCurrentMarkdownPath(request.SourcePath, request.CurrentNotePath, request.RootDirectory))
-        {
-            throw new InvalidOperationException("The extract source is not the current Markdown file.");
-        }
-    }
-
-    private static bool IsSafeCurrentMarkdownPath(string path, string currentPath, string root)
+    private static bool IsSafeCurrentNotePath(string path, string currentPath, string root)
     {
         if (string.IsNullOrWhiteSpace(path)
             || string.IsNullOrWhiteSpace(currentPath)
@@ -382,21 +630,37 @@ public sealed class NoteService : INoteService
 
         return string.Equals(fullPath, fullCurrentPath, StringComparison.OrdinalIgnoreCase)
             && IsPathInsideRoot(fullPath, fullRoot)
-            && string.Equals(Path.GetExtension(fullPath), ".md", StringComparison.OrdinalIgnoreCase);
+            && IsNoteFilePath(fullPath);
     }
 
-    private static MentionTarget CreateMentionTarget(
+    private static MentionTarget? CreateMentionTarget(
         string root,
-        string path,
+        TreeItemRow item,
         IReadOnlyDictionary<string, int>? recentRanks)
     {
-        string fullPath = Path.GetFullPath(path);
+        if (string.IsNullOrWhiteSpace(item.FileRelPath))
+        {
+            return null;
+        }
+
+        string relativePath = NormalizeRelativePath(item.FileRelPath);
+        string fullPath = Path.GetFullPath(Path.Combine(
+            root,
+            relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!IsPathInsideRoot(fullPath, root) || !File.Exists(fullPath))
+        {
+            return null;
+        }
+
         string fileName = Path.GetFileName(fullPath);
-        string relativePath = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
         int? recentRank = TryGetRecentRank(fullPath, recentRanks);
+        string title = string.IsNullOrWhiteSpace(item.Title)
+            ? Path.GetFileNameWithoutExtension(fullPath)
+            : item.Title;
 
         return new MentionTarget(
             relativePath,
+            title,
             fileName,
             recentRank);
     }
@@ -417,7 +681,7 @@ public sealed class NoteService : INoteService
     {
         if (string.IsNullOrWhiteSpace(notesDirectory))
         {
-            throw new InvalidOperationException("No Markdown root is open.");
+            throw new InvalidOperationException("No collection is open.");
         }
 
         string root = NormalizeRoot(notesDirectory);
@@ -431,25 +695,209 @@ public sealed class NoteService : INoteService
         return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
     }
 
-    private static void EnsureMarkdownPath(string path)
+    private static void EnsureNotePath(string path)
     {
-        if (!string.Equals(Path.GetExtension(path), ".md", StringComparison.OrdinalIgnoreCase))
+        if (!IsNoteFilePath(path))
         {
-            throw new InvalidOperationException("Mentions can only open Markdown files.");
+            throw new InvalidOperationException("Mentions can only open note files.");
         }
     }
 
-    private static string NormalizeMarkdownFileName(string name)
+    private static bool IsNoteFilePath(string path)
     {
-        string fileName = NormalizeFileSystemName(name, "Markdown file name");
+        string extension = Path.GetExtension(path);
+        return string.Equals(extension, BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase);
+    }
 
-        if (!string.Equals(Path.GetExtension(fileName), ".md", StringComparison.OrdinalIgnoreCase))
+    private static bool IsBlockSuiteNotePath(string path)
+    {
+        return string.Equals(Path.GetExtension(path), BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateUniqueMetadataNoteRelPath(string root)
+    {
+        string filesDirectory = Path.Combine(root, FilesDirectoryName);
+        Directory.CreateDirectory(filesDirectory);
+
+        string fileRelPath;
+        string notePath;
+
+        do
         {
-            fileName += ".md";
+            fileRelPath = NormalizeRelativePath(Path.Combine(
+                FilesDirectoryName,
+                $"{CreateGuidV7FileStem()}{BlockSuiteNoteExtension}"));
+            notePath = Path.Combine(root, ToPlatformPath(fileRelPath));
+        }
+        while (File.Exists(notePath));
+
+        return fileRelPath;
+    }
+
+    private static string CreateUniqueExtractNoteRelPath(string root, string sourceNotePath)
+    {
+        string filesDirectory = Path.Combine(root, FilesDirectoryName);
+        Directory.CreateDirectory(filesDirectory);
+
+        string sourceStem = CreateSourceFileStem(sourceNotePath);
+        string fileRelPath;
+        string notePath;
+
+        do
+        {
+            fileRelPath = NormalizeRelativePath(Path.Combine(
+                FilesDirectoryName,
+                $"{sourceStem}.{CreateShortUniqueIdentifier()}{BlockSuiteNoteExtension}"));
+            notePath = Path.Combine(root, ToPlatformPath(fileRelPath));
+        }
+        while (File.Exists(notePath));
+
+        return fileRelPath;
+    }
+
+    private static string CreateExtractTitleFromRelPath(string fileRelPath)
+    {
+        string stem = Path.GetFileNameWithoutExtension(fileRelPath).Trim();
+        int separatorIndex = stem.LastIndexOf('.');
+
+        return separatorIndex >= 0 && separatorIndex < stem.Length - 1
+            ? stem[(separatorIndex + 1)..]
+            : stem;
+    }
+
+    private static string ApplyBlockSuiteDocumentTitle(string content, string title)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return content;
         }
 
-        EnsureMarkdownPath(fileName);
-        return fileName;
+        try
+        {
+            JsonNode? node = JsonNode.Parse(content);
+            if (node is not JsonObject root)
+            {
+                return content;
+            }
+
+            bool changed = false;
+            JsonObject? snapshot = root["snapshot"] as JsonObject;
+            JsonObject? meta = snapshot?["meta"] as JsonObject;
+            if (meta is not null)
+            {
+                meta["title"] = title;
+                changed = true;
+            }
+
+            JsonObject? blocks = snapshot?["blocks"] as JsonObject;
+            JsonObject? props = blocks?["props"] as JsonObject;
+            if (props is not null)
+            {
+                props["title"] = CreateBlockSuiteTextValue(title);
+                changed = true;
+            }
+
+            return changed
+                ? root.ToJsonString(BlockSuiteJsonOptions) + Environment.NewLine
+                : content;
+        }
+        catch (JsonException)
+        {
+            return content;
+        }
+    }
+
+    private static bool IsBlockSuiteDocumentContent(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return false;
+        }
+
+        try
+        {
+            return JsonNode.Parse(content) is JsonObject root
+                && string.Equals(root["kind"]?.GetValue<string>(), BlockSuiteDocumentContent.Kind, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static JsonObject CreateBlockSuiteTextValue(string value)
+    {
+        JsonArray delta = [];
+        if (!string.IsNullOrEmpty(value))
+        {
+            delta.Add(new JsonObject
+            {
+                ["insert"] = value
+            });
+        }
+
+        return new JsonObject
+        {
+            ["$blocksuite:internal:text$"] = true,
+            ["delta"] = delta
+        };
+    }
+
+    private static string CreateSourceFileStem(string sourceNotePath)
+    {
+        string stem = Path.GetFileNameWithoutExtension(sourceNotePath).Trim();
+        if (Guid.TryParse(stem, out Guid guid))
+        {
+            return guid.ToString("N");
+        }
+
+        return NormalizeFileSystemName(stem, "Source note file name");
+    }
+
+    private static string CreateGuidV7FileStem()
+    {
+        return Guid.CreateVersion7().ToString("N");
+    }
+
+    private static string CreateShortUniqueIdentifier()
+    {
+        return Guid.CreateVersion7().ToString("N")[^12..];
+    }
+
+    private static string CreateUniqueImportedNotePath(string notesDirectory, string sourcePath)
+    {
+        string baseName = NormalizeFileSystemName(
+            Path.GetFileNameWithoutExtension(sourcePath),
+            "Document file name");
+        string extension = NormalizeImportedNoteExtension(sourcePath);
+        string destinationPath = Path.Combine(notesDirectory, $"{baseName}{extension}");
+        int suffix = 2;
+
+        while (File.Exists(destinationPath) || Directory.Exists(destinationPath))
+        {
+            destinationPath = Path.Combine(notesDirectory, $"{baseName}-{suffix}{extension}");
+            suffix++;
+        }
+
+        return destinationPath;
+    }
+
+    private static bool IsImportableNoteExtension(string path)
+    {
+        string extension = Path.GetExtension(path);
+
+        return string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, MarkdownImportExtension, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeImportedNoteExtension(string path)
+    {
+        string extension = Path.GetExtension(path);
+        return string.Equals(extension, BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase)
+            ? BlockSuiteNoteExtension
+            : MarkdownNoteExtension;
     }
 
     private static string NormalizeFileSystemName(string name, string label)
@@ -474,22 +922,6 @@ public sealed class NoteService : INoteService
         return fileName;
     }
 
-    private static void EnsureFolderDestinationAvailable(string sourcePath, string destinationPath)
-    {
-        string fullSourcePath = Path.GetFullPath(sourcePath);
-        string fullDestinationPath = Path.GetFullPath(destinationPath);
-
-        if (string.Equals(fullSourcePath, fullDestinationPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        if (Directory.Exists(fullDestinationPath) || File.Exists(fullDestinationPath))
-        {
-            throw new IOException($"A file or folder already exists at: {fullDestinationPath}");
-        }
-    }
-
     private static bool IsPathInsideRoot(string fullPath, string fullRoot)
     {
         string rootWithSeparator = $"{fullRoot}{Path.DirectorySeparatorChar}";
@@ -502,13 +934,30 @@ public sealed class NoteService : INoteService
         try
         {
             using FileStream stream = new(path, FileMode.CreateNew, FileAccess.Write);
-            using StreamWriter writer = new(stream);
+            using StreamWriter writer = new(stream, Encoding.UTF8);
             writer.Write(content);
             return true;
         }
         catch (IOException) when (File.Exists(path))
         {
             return false;
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 
@@ -524,7 +973,17 @@ public sealed class NoteService : INoteService
         return relativePath.Replace('\\', '/');
     }
 
+    private static string ToPlatformPath(string relativePath)
+    {
+        return relativePath.Replace('/', Path.DirectorySeparatorChar);
+    }
+
     private static string ExtractTitle(string markdown, string fileName)
+    {
+        return TryExtractHeadingTitle(markdown) ?? Path.GetFileNameWithoutExtension(fileName);
+    }
+
+    private static string? TryExtractHeadingTitle(string markdown)
     {
         foreach (string line in markdown.Split(["\r\n", "\n"], StringSplitOptions.None))
         {
@@ -541,7 +1000,7 @@ public sealed class NoteService : INoteService
             }
         }
 
-        return Path.GetFileNameWithoutExtension(fileName);
+        return null;
     }
 
     private static string CreateExcerpt(string markdown, int maxCharacters)
@@ -561,4 +1020,5 @@ public sealed class NoteService : INoteService
 
         return $"{candidate.TrimEnd()}...";
     }
+
 }

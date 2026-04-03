@@ -304,21 +304,6 @@
                                 Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDecksCommand}" />
 
-                        <TextBlock Text="RECENT"
-                                   Style="{StaticResource SectionHeaderStyle}"
-                                   Margin="8,18,0,8" />
-                        <ItemsControl ItemsSource="{Binding RecentNotes}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type viewModels:RecentNoteViewModel}">
-                                    <Button Content="{Binding DisplayName}"
-                                            Command="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding NotePath}"
-                                            Click="SidebarActionButton_Click"
-                                            Style="{StaticResource SidebarButtonStyle}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
                         <Border Height="1"
                                 Background="#E1E6F0"
                                 Margin="8,14,8,12" />
@@ -329,8 +314,11 @@
                                   Background="Transparent"
                                   FontSize="13"
                                   Foreground="#586078"
+                                  AllowDrop="True"
                                   ItemsSource="{Binding NoteRoots}"
                                   PreviewKeyDown="NotesTree_PreviewKeyDown"
+                                  PreviewMouseLeftButtonDown="NotesTree_PreviewMouseLeftButtonDown"
+                                  PreviewMouseDoubleClick="NotesTree_PreviewMouseDoubleClick"
                                   PreviewMouseRightButtonDown="NotesTree_PreviewMouseRightButtonDown"
                                   PreviewMouseMove="NotesTree_PreviewMouseMove"
                                   DragOver="NotesTree_DragOver"
@@ -338,8 +326,9 @@
                                   SelectedItemChanged="NotesTree_SelectedItemChanged">
                             <TreeView.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="Rename"
-                                              Click="RenameTreeItem_Click" />
+                                    <MenuItem Header="New Folder"
+                                              Click="NewFolderTreeItem_Click" />
+                                    <Separator />
                                     <MenuItem Header="Delete"
                                               Click="DeleteTreeItem_Click" />
                                 </ContextMenu>
@@ -347,7 +336,57 @@
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type viewModels:NoteTreeNodeViewModel}"
                                                           ItemsSource="{Binding Children}">
-                                    <TextBlock Text="{Binding Header}" />
+                                    <StackPanel Orientation="Horizontal"
+                                                MinHeight="24">
+                                        <TextBlock Text="{Binding Prefix}"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#586078" />
+                                        <Grid MinWidth="96">
+                                            <TextBlock Text="{Binding Title}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="{x:Type TextBlock}">
+                                                        <Setter Property="Visibility"
+                                                                Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRenaming}"
+                                                                         Value="True">
+                                                                <Setter Property="Visibility"
+                                                                        Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                     MinWidth="110"
+                                                     Height="24"
+                                                     Padding="4,1"
+                                                     BorderBrush="#CBD6FF"
+                                                     Background="#FFFFFF"
+                                                     Foreground="#1F2433"
+                                                     VerticalContentAlignment="Center"
+                                                     IsVisibleChanged="TreeRenameTextBox_IsVisibleChanged"
+                                                     LostKeyboardFocus="TreeRenameTextBox_LostKeyboardFocus"
+                                                     PreviewKeyDown="TreeRenameTextBox_PreviewKeyDown">
+                                                <TextBox.Style>
+                                                    <Style TargetType="{x:Type TextBox}">
+                                                        <Setter Property="Visibility"
+                                                                Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRenaming}"
+                                                                         Value="True">
+                                                                <Setter Property="Visibility"
+                                                                        Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </Grid>
+                                    </StackPanel>
                                 </HierarchicalDataTemplate>
                             </TreeView.Resources>
                             <TreeView.ItemContainerStyle>
@@ -356,7 +395,9 @@
                                     <Setter Property="IsExpanded"
                                             Value="{Binding IsExpanded, Mode=TwoWay}" />
                                     <Setter Property="AllowDrop"
-                                            Value="{Binding IsMarkdownFile}" />
+                                            Value="True" />
+                                    <EventSetter Event="Expanded"
+                                                 Handler="NotesTreeItem_Expanded" />
                                 </Style>
                             </TreeView.ItemContainerStyle>
                         </TreeView>
@@ -370,6 +411,10 @@
                             Style="{StaticResource PrimarySidebarButtonStyle}"
                             Click="SidebarActionButton_Click"
                             Command="{Binding AddNoteCommand}" />
+                    <Button Content="Import Documents"
+                            Style="{StaticResource PrimarySidebarButtonStyle}"
+                            Margin="0,8,0,0"
+                            Click="ImportDocumentsButton_Click" />
                 </StackPanel>
             </Grid>
         </Border>

@@ -18,5 +18,3 @@ public enum OverlayViewKind
     Decks,
     Review,
 }
-
-public sealed record NoteSelectionRequestedEventArgs(string NotePath);

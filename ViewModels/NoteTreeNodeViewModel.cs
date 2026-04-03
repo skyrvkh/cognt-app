@@ -8,25 +8,10 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     private bool isExpanded;
     private bool areChildrenLoaded;
     private bool isRenaming;
-    private string? legacyPath;
     private string? notePath;
     private string title;
     private string header;
     private string editingTitle;
-
-    public NoteTreeNodeViewModel(string header, string path, bool isMarkdownFile)
-        : this(
-            id: 0,
-            parentId: null,
-            isMarkdownFile ? TreeItemKind.Note : TreeItemKind.Folder,
-            header,
-            fileRelPath: null,
-            notePath: isMarkdownFile ? path : null,
-            childCount: 0)
-    {
-        legacyPath = path;
-        Header = header;
-    }
 
     public NoteTreeNodeViewModel(
         long id,
@@ -81,9 +66,7 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         set => SetProperty(ref editingTitle, value);
     }
 
-    public string Path => legacyPath ?? NotePath ?? Id.ToString();
-
-    public bool IsMarkdownFile => Kind == TreeItemKind.Note;
+    public string Path => NotePath ?? Id.ToString();
 
     public string? FileRelPath { get; }
 
