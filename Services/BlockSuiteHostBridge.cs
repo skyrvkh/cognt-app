@@ -52,10 +52,10 @@ public sealed class BlockSuiteHostBridge
         await blockSuiteHost.LoadNoteAsync(path, title, content);
     }
 
-    public async Task LoadCardAsync(string markdown)
+    public async Task LoadCardAsync(string content)
     {
         BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
-        await blockSuiteHost.LoadCardAsync(markdown);
+        await blockSuiteHost.LoadCardAsync(content);
     }
 
     public async Task BeginCardRenderAsync()
@@ -100,7 +100,7 @@ public sealed class BlockSuiteHostBridge
         string mode,
         bool ok,
         string? title = null,
-        string? markdownExcerpt = null,
+        string? documentContent = null,
         string? error = null)
     {
         BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
@@ -110,7 +110,7 @@ public sealed class BlockSuiteHostBridge
             mode,
             ok,
             title,
-            markdownExcerpt,
+            documentContent,
             error);
     }
 

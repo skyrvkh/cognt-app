@@ -78,7 +78,7 @@ public partial class EditorView : UserControl
         return LoadNoteAsync(string.Empty, string.Empty);
     }
 
-    public async Task RenderCardInHostAsync(ContentControl host, string markdown)
+    public async Task RenderCardInHostAsync(ContentControl host, string content)
     {
         ClearTransientEditorState();
         int requestId = ++loadRequestId;
@@ -107,7 +107,7 @@ public partial class EditorView : UserControl
             AttachBlockSuiteHostTo(host);
 
             await WaitWithTimeoutAsync(
-                blockSuiteBridge.LoadCardAsync(markdown),
+                blockSuiteBridge.LoadCardAsync(content),
                 EditorOperationTimeout,
                 "The shared BlockSuite host did not finish loading the review card.");
 

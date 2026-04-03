@@ -59,9 +59,9 @@
         await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content);
     }
 
-    public async Task LoadCardAsync(string markdown)
+    public async Task LoadCardAsync(string content)
     {
-        await RequireModule().InvokeVoidAsync("loadCard", instanceId, markdown);
+        await RequireModule().InvokeVoidAsync("loadCard", instanceId, content);
     }
 
     public async Task BeginCardRenderAsync()
@@ -107,7 +107,7 @@
         string mode,
         bool ok,
         string? title,
-        string? markdownExcerpt,
+        string? documentContent,
         string? error)
     {
         await RequireModule().InvokeVoidAsync(
@@ -118,7 +118,7 @@
             mode,
             ok,
             title,
-            markdownExcerpt,
+            documentContent,
             error);
     }
 
