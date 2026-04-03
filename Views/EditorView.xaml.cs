@@ -16,7 +16,7 @@ public partial class EditorView : UserControl
     private static readonly TimeSpan EditorOperationTimeout = TimeSpan.FromSeconds(8);
 
     private readonly BlockSuiteHostBridge blockSuiteBridge = new();
-    private IReadOnlyList<MarkdownMentionTarget> mentionTargets = [];
+    private IReadOnlyList<MentionTarget> mentionTargets = [];
     private string currentContent = string.Empty;
     private string currentTitle = string.Empty;
     private string? currentSourcePath;
@@ -288,7 +288,7 @@ public partial class EditorView : UserControl
             "show extract result");
     }
 
-    public void PostMentionTargets(IEnumerable<MarkdownMentionTarget> targets)
+    public void PostMentionTargets(IEnumerable<MentionTarget> targets)
     {
         mentionTargets = targets.ToList();
         RunBlockSuiteCommand(FlushMentionTargetsAsync(), "flush mention targets");
@@ -300,7 +300,7 @@ public partial class EditorView : UserControl
         string mode,
         bool ok,
         string? title = null,
-        string? markdownExcerpt = null,
+        string? documentContent = null,
         string? error = null)
     {
         RunBlockSuiteCommand(
@@ -310,7 +310,7 @@ public partial class EditorView : UserControl
                 mode,
                 ok,
                 title,
-                markdownExcerpt,
+                documentContent,
                 error),
             "post mention preview result");
     }

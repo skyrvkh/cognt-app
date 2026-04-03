@@ -88,7 +88,7 @@ public sealed class BlockSuiteHostBridge
         await blockSuiteHost.ShowExtractResultAsync(ok, createdPath, error);
     }
 
-    public async Task SetMentionTargetsAsync(IEnumerable<MarkdownMentionTarget> targets)
+    public async Task SetMentionTargetsAsync(IEnumerable<MentionTarget> targets)
     {
         BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.SetMentionTargetsAsync(targets);

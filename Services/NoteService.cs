@@ -4,13 +4,13 @@ using CogntApp.Models.Markdown;
 
 namespace CogntApp.Services;
 
-public interface IMarkdownNoteService
+public interface INoteService
 {
     string CreateUniqueNotePath(string notesDirectory);
 
     string CreateExtractFile(CreateExtractFileRequest request);
 
-    MarkdownNoteGroupResult GroupNoteWithTarget(
+    NoteGroupResult GroupNoteWithTarget(
         string notesDirectory,
         string droppedNotePath,
         string targetNotePath);
@@ -35,11 +35,11 @@ public interface IMarkdownNoteService
 
     void SaveNote(string notePath, string content);
 
-    IReadOnlyList<MarkdownMentionTarget> ListMentionTargets(
+    IReadOnlyList<MentionTarget> ListMentionTargets(
         string notesDirectory,
         IReadOnlyDictionary<string, int>? recentRanks = null);
 
-    MarkdownMentionPreview ReadMentionPreview(
+    MentionPreview ReadMentionPreview(
         string notesDirectory,
         string relativePath,
         int maxCharacters);
@@ -47,7 +47,7 @@ public interface IMarkdownNoteService
     string ResolveMentionPath(string notesDirectory, string relativePath);
 }
 
-public sealed class MarkdownNoteService : IMarkdownNoteService
+public sealed class NoteService : INoteService
 {
     private static readonly Regex HeadingRegex = new(@"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Compiled);
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
@@ -93,7 +93,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         throw new InvalidOperationException("Could not create an extract file because all generated names are taken.");
     }
 
-    public MarkdownNoteGroupResult GroupNoteWithTarget(
+    public NoteGroupResult GroupNoteWithTarget(
         string notesDirectory,
         string droppedNotePath,
         string targetNotePath)
@@ -123,7 +123,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         string movedTargetPath = MoveMarkdownFile(targetPath, targetDestination);
         string movedDroppedPath = MoveMarkdownFile(droppedPath, droppedDestination);
 
-        return new MarkdownNoteGroupResult(
+        return new NoteGroupResult(
             folderPath,
             movedTargetPath,
             movedDroppedPath);
@@ -238,7 +238,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         File.WriteAllText(notePath, content);
     }
 
-    public IReadOnlyList<MarkdownMentionTarget> ListMentionTargets(
+    public IReadOnlyList<MentionTarget> ListMentionTargets(
         string notesDirectory,
         IReadOnlyDictionary<string, int>? recentRanks = null)
     {
@@ -256,7 +256,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
             .ToArray();
     }
 
-    public MarkdownMentionPreview ReadMentionPreview(
+    public MentionPreview ReadMentionPreview(
         string notesDirectory,
         string relativePath,
         int maxCharacters)
@@ -265,7 +265,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         string path = ResolveMentionPath(root, relativePath);
         string content = File.ReadAllText(path);
 
-        return new MarkdownMentionPreview(
+        return new MentionPreview(
             NormalizeRelativePath(Path.GetRelativePath(root, path)),
             ExtractTitle(content, Path.GetFileName(path)),
             CreateExcerpt(content, Math.Max(0, maxCharacters)));
@@ -385,7 +385,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
             && string.Equals(Path.GetExtension(fullPath), ".md", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static MarkdownMentionTarget CreateMentionTarget(
+    private static MentionTarget CreateMentionTarget(
         string root,
         string path,
         IReadOnlyDictionary<string, int>? recentRanks)
@@ -395,7 +395,7 @@ public sealed class MarkdownNoteService : IMarkdownNoteService
         string relativePath = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
         int? recentRank = TryGetRecentRank(fullPath, recentRanks);
 
-        return new MarkdownMentionTarget(
+        return new MentionTarget(
             relativePath,
             fileName,
             recentRank);

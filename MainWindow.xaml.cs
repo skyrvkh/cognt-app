@@ -37,11 +37,11 @@ public partial class MainWindow : Window
     private int editorOpenRequestId;
 
     public MainWindow()
-        : this(new MarkdownNoteService())
+        : this(new NoteService())
     {
     }
 
-    internal MainWindow(IMarkdownNoteService noteService)
+    internal MainWindow(INoteService noteService)
         : this(new MainViewModel(noteService))
     {
     }
@@ -601,7 +601,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            MarkdownMentionPreview preview = viewModel.ReadMentionPreview(e.RelativePath, e.MaxCharacters);
+            MentionPreview preview = viewModel.ReadMentionPreview(e.RelativePath, e.MaxCharacters);
 
             EditorViewControl.PostMentionPreviewResult(
                 e.RequestId,
@@ -609,7 +609,7 @@ public partial class MainWindow : Window
                 e.Mode,
                 ok: true,
                 title: preview.Title,
-                markdownExcerpt: preview.MarkdownExcerpt);
+                documentContent: preview.MarkdownExcerpt);
         }
         catch (Exception ex)
         {
@@ -892,7 +892,7 @@ public partial class MainWindow : Window
 
         try
         {
-            MarkdownNoteGroupResult result = viewModel.GroupNoteWithTarget(droppedNotePath, targetNotePath);
+            NoteGroupResult result = viewModel.GroupNoteWithTarget(droppedNotePath, targetNotePath);
             await OpenNoteAsync(result.TargetNotePath, selectInTree: true);
         }
         catch (Exception ex)

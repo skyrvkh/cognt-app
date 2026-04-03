@@ -7,20 +7,18 @@ using CogntApp.Services;
 
 namespace CogntApp.ViewModels;
 
-public sealed record NoteGroupResult(string TargetNotePath);
-
 public sealed class MainViewModel : ObservableObject
 {
     private const string CollectionDirectoryExtension = ".cognt";
 
-    private readonly IMarkdownNoteService noteService;
+    private readonly INoteService noteService;
     private string notesDirectory = string.Empty;
     private string currentNotesDirectory = string.Empty;
     private string? currentNotePath;
     private string lastSavedContent = string.Empty;
     private bool isLoadingNotesDirectory;
 
-    public MainViewModel(IMarkdownNoteService noteService)
+    public MainViewModel(INoteService noteService)
     {
         this.noteService = noteService;
 
@@ -279,10 +277,10 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public MarkdownNoteGroupResult GroupNoteWithTarget(string droppedNotePath, string targetNotePath)
+    public NoteGroupResult GroupNoteWithTarget(string droppedNotePath, string targetNotePath)
     {
         SaveCurrentNoteFromEditor();
-        MarkdownNoteGroupResult result = noteService.GroupNoteWithTarget(
+        NoteGroupResult result = noteService.GroupNoteWithTarget(
             currentNotesDirectory,
             droppedNotePath,
             targetNotePath);
@@ -310,7 +308,7 @@ public sealed class MainViewModel : ObservableObject
         return createdPath;
     }
 
-    public MarkdownMentionPreview ReadMentionPreview(string relativePath, int maxCharacters)
+    public MentionPreview ReadMentionPreview(string relativePath, int maxCharacters)
     {
         return noteService.ReadMentionPreview(currentNotesDirectory, relativePath, maxCharacters);
     }
@@ -334,7 +332,7 @@ public sealed class MainViewModel : ObservableObject
         SaveNoteIfChanged(markdown);
     }
 
-    public IReadOnlyList<MarkdownMentionTarget> ListMentionTargets()
+    public IReadOnlyList<MentionTarget> ListMentionTargets()
     {
         if (string.IsNullOrWhiteSpace(currentNotesDirectory) || !Directory.Exists(currentNotesDirectory))
         {

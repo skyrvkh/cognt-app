@@ -89,7 +89,7 @@
         await RequireModule().InvokeVoidAsync("showExtractResult", instanceId, ok, createdPath, error);
     }
 
-    public async Task SetMentionTargetsAsync(IEnumerable<MarkdownMentionTarget> targets)
+    public async Task SetMentionTargetsAsync(IEnumerable<MentionTarget> targets)
     {
         var payload = targets.Select(target => new
         {

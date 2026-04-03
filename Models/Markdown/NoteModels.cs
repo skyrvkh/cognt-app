@@ -6,17 +6,17 @@ public sealed record CreateExtractFileRequest(
     string SourcePath,
     string SelectedContent);
 
-public sealed record MarkdownMentionTarget(
+public sealed record MentionTarget(
     string RelativePath,
     string FileName,
     int? RecentRank);
 
-public sealed record MarkdownMentionPreview(
+public sealed record MentionPreview(
     string RelativePath,
     string Title,
     string MarkdownExcerpt);
 
-public sealed record MarkdownNoteGroupResult(
+public sealed record NoteGroupResult(
     string FolderPath,
     string TargetNotePath,
     string DroppedNotePath);
