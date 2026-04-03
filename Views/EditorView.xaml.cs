@@ -14,6 +14,9 @@ namespace CogntApp.Views;
 public partial class EditorView : UserControl
 {
     private static readonly TimeSpan EditorOperationTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan HostStartupTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MinimumDocumentLoadTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MaximumDocumentLoadTimeout = TimeSpan.FromMinutes(4);
 
     private readonly BlockSuiteHostBridge blockSuiteBridge = new();
     private IReadOnlyList<MentionTarget> mentionTargets = [];
@@ -27,8 +30,10 @@ public partial class EditorView : UserControl
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
+    public event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
+    public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
 
     public bool IsShowingTransientEditor => isShowingTransientEditor;
 
@@ -41,18 +46,23 @@ public partial class EditorView : UserControl
 
     public async Task WarmUpAsync()
     {
+        BlockSuiteHostView.UpdateLayout();
+        await Dispatcher.Yield(DispatcherPriority.Loaded);
+
         await WaitWithTimeoutAsync(
             blockSuiteBridge.WaitUntilReadyAsync(),
-            EditorOperationTimeout,
+            HostStartupTimeout,
             "The BlockSuite host did not finish starting.");
     }
 
-    public async Task LoadNoteAsync(string title, string content, string? path = null)
+    public async Task LoadNoteAsync(
+        string title,
+        string content,
+        string? path = null)
     {
         ClearTransientEditorState();
         int requestId = ++loadRequestId;
-        NoteTitle.Text = title;
-        currentTitle = title;
+        UpdateCurrentNoteTitle(title);
         currentContent = content;
         currentSourcePath = path;
 
@@ -66,8 +76,9 @@ public partial class EditorView : UserControl
 
         await WaitWithTimeoutAsync(
             blockSuiteBridge.LoadNoteAsync(path, title, content),
-            EditorOperationTimeout,
+            GetDocumentLoadTimeout(content),
             "The editor did not finish loading the note.");
+
         isShowingCardSide = false;
         SetBlockSuiteHostVisible(true);
         await FlushMentionTargetsAsync();
@@ -76,6 +87,12 @@ public partial class EditorView : UserControl
     public Task ClearNoteAsync()
     {
         return LoadNoteAsync(string.Empty, string.Empty);
+    }
+
+    public void UpdateCurrentNoteTitle(string title)
+    {
+        currentTitle = title;
+        NoteTitle.Text = title;
     }
 
     public async Task RenderCardInHostAsync(ContentControl host, string content)
@@ -108,7 +125,7 @@ public partial class EditorView : UserControl
 
             await WaitWithTimeoutAsync(
                 blockSuiteBridge.LoadCardAsync(content),
-                EditorOperationTimeout,
+                GetDocumentLoadTimeout(content),
                 "The shared BlockSuite host did not finish loading the review card.");
 
             if (requestId == loadRequestId)
@@ -153,8 +170,8 @@ public partial class EditorView : UserControl
                 "The shared BlockSuite editor did not leave read-only mode.");
 
             await WaitWithTimeoutAsync(
-                blockSuiteBridge.LoadNoteAsync("card-workbench.md", title, content),
-                EditorOperationTimeout,
+                blockSuiteBridge.LoadNoteAsync("card-workbench.json", title, content),
+                GetDocumentLoadTimeout(content),
                 "The shared BlockSuite editor did not finish loading the card text.");
 
             if (requestId != loadRequestId)
@@ -216,7 +233,7 @@ public partial class EditorView : UserControl
         {
             await WaitWithTimeoutAsync(
                 blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent),
-                EditorOperationTimeout,
+                GetDocumentLoadTimeout(currentContent),
                 "The editor did not restore the current note after card editing.");
             await FlushMentionTargetsAsync();
         }
@@ -348,8 +365,10 @@ public partial class EditorView : UserControl
         blockSuiteBridge.ContentChanged += BlockSuiteBridge_ContentChanged;
         blockSuiteBridge.CreateExtractRequested += BlockSuiteBridge_CreateExtractRequested;
         blockSuiteBridge.SaveClozeRequested += BlockSuiteBridge_SaveClozeRequested;
+        blockSuiteBridge.MentionSearchRequested += BlockSuiteBridge_MentionSearchRequested;
         blockSuiteBridge.MentionPreviewRequested += BlockSuiteBridge_MentionPreviewRequested;
         blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
+        blockSuiteBridge.CreateLinkedNoteRequested += BlockSuiteBridge_CreateLinkedNoteRequested;
         blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
     }
 
@@ -397,7 +416,7 @@ public partial class EditorView : UserControl
     {
         if (!IsCurrentSourcePath(e.SourcePath))
         {
-            PostSaveResult(e.SourcePath, ok: false, error: "The cloze source is not the current Markdown file.");
+            PostSaveResult(e.SourcePath, ok: false, error: "The cloze source is not the current note file.");
             return;
         }
 
@@ -413,6 +432,32 @@ public partial class EditorView : UserControl
         }
     }
 
+    private void BlockSuiteBridge_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
+    {
+        if (!IsCurrentSourcePath(e.SourcePath))
+        {
+            e.Complete([]);
+            return;
+        }
+
+        EventHandler<MentionSearchRequestedEventArgs>? handler = MentionSearchRequested;
+        if (handler is null)
+        {
+            e.Complete([]);
+            return;
+        }
+
+        try
+        {
+            handler.Invoke(this, e);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"BlockSuite mention search failed: {ex}");
+            e.Complete([]);
+        }
+    }
+
     private void BlockSuiteBridge_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
     {
         if (!IsCurrentSourcePath(e.SourcePath))
@@ -422,7 +467,7 @@ public partial class EditorView : UserControl
                 e.RelativePath,
                 e.Mode,
                 ok: false,
-                error: "The mention preview source is not the current Markdown file.");
+                error: "The mention preview source is not the current note file.");
             return;
         }
 
@@ -452,7 +497,7 @@ public partial class EditorView : UserControl
     {
         if (!IsCurrentSourcePath(e.SourcePath))
         {
-            PostMentionOpenResult(e.RelativePath, ok: false, error: "The mention source is not the current Markdown file.");
+            PostMentionOpenResult(e.RelativePath, ok: false, error: "The mention source is not the current note file.");
             return;
         }
 
@@ -471,6 +516,31 @@ public partial class EditorView : UserControl
         catch (Exception ex)
         {
             PostMentionOpenResult(e.RelativePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void BlockSuiteBridge_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
+    {
+        if (!IsCurrentSourcePath(e.SourcePath))
+        {
+            e.Complete(CreateLinkedNoteResult.Fail("The linked note source is not the current note file."));
+            return;
+        }
+
+        EventHandler<CreateLinkedNoteRequestedEventArgs>? handler = CreateLinkedNoteRequested;
+        if (handler is null)
+        {
+            e.Complete(CreateLinkedNoteResult.Fail("No linked note handler is registered."));
+            return;
+        }
+
+        try
+        {
+            handler.Invoke(this, e);
+        }
+        catch (Exception ex)
+        {
+            e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
         }
     }
 
@@ -567,10 +637,35 @@ public partial class EditorView : UserControl
 
         if (completedTask != task)
         {
+            RunBlockSuiteCommand(task, "timed-out operation");
             throw new TimeoutException(timeoutMessage);
         }
 
         await task;
+    }
+
+    private static async Task<T> WaitWithTimeoutAsync<T>(Task<T> task, TimeSpan timeout, string timeoutMessage)
+    {
+        Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
+
+        if (completedTask != task)
+        {
+            RunBlockSuiteCommand(task, "timed-out operation");
+            throw new TimeoutException(timeoutMessage);
+        }
+
+        return await task;
+    }
+
+    private static TimeSpan GetDocumentLoadTimeout(string? content)
+    {
+        int contentLength = content?.Length ?? 0;
+        int totalSeconds = 30 + (int)Math.Ceiling(contentLength / 10_000d);
+
+        return TimeSpan.FromSeconds(Math.Clamp(
+            totalSeconds,
+            (int)MinimumDocumentLoadTimeout.TotalSeconds,
+            (int)MaximumDocumentLoadTimeout.TotalSeconds));
     }
 
     private static void RunBlockSuiteCommand(Task task, string operation)

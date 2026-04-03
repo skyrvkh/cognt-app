@@ -1,6 +1,7 @@
 @namespace CogntApp.Components
 @implements IAsyncDisposable
 @using System.Text.Json
+@using CogntApp.Models.Editor
 @using CogntApp.Models.Markdown
 @using CogntApp.Services
 @inject IJSRuntime JsRuntime
@@ -94,11 +95,27 @@
         var payload = targets.Select(target => new
         {
             relativePath = target.RelativePath,
+            title = target.Title,
             fileName = target.FileName,
             recentRank = target.RecentRank,
         });
 
         await RequireModule().InvokeVoidAsync("setMentionTargets", instanceId, payload);
+    }
+
+    [JSInvokable]
+    public IReadOnlyList<object> HandleSearchMentionTargets(string sourcePath, string query, int limit)
+    {
+        return Bridge.RaiseMentionSearch(sourcePath, query, limit)
+            .Select(target => new
+            {
+                relativePath = target.RelativePath,
+                title = target.Title,
+                fileName = target.FileName,
+                recentRank = target.RecentRank,
+            })
+            .Cast<object>()
+            .ToArray();
     }
 
     public async Task HandleMentionPreviewResultAsync(
@@ -164,6 +181,12 @@
     public void HandleOpenMention(string sourcePath, string relativePath, string content)
     {
         Bridge.RaiseOpenMention(sourcePath, relativePath, content);
+    }
+
+    [JSInvokable]
+    public CreateLinkedNoteResult HandleCreateLinkedNote(string sourcePath, string viewMode)
+    {
+        return Bridge.RaiseCreateLinkedNote(sourcePath, viewMode);
     }
 
     [JSInvokable]

@@ -15,8 +15,10 @@ public sealed class BlockSuiteHostBridge
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
     public event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;
+    public event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
+    public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
     public event EventHandler<string>? DiagnosticReceived;
 
     internal void Register(BlockSuiteHost blockSuiteHost)
@@ -151,9 +153,23 @@ public sealed class BlockSuiteHostBridge
             new MentionPreviewRequestedEventArgs(requestId, sourcePath, relativePath, mode, maxCharacters));
     }
 
+    internal IReadOnlyList<MentionTarget> RaiseMentionSearch(string sourcePath, string query, int limit)
+    {
+        MentionSearchRequestedEventArgs args = new(sourcePath, query, limit);
+        MentionSearchRequested?.Invoke(this, args);
+        return args.Targets;
+    }
+
     internal void RaiseOpenMention(string sourcePath, string relativePath, string content)
     {
         OpenMentionRequested?.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, content));
+    }
+
+    internal CreateLinkedNoteResult RaiseCreateLinkedNote(string sourcePath, string viewMode)
+    {
+        CreateLinkedNoteRequestedEventArgs args = new(sourcePath, viewMode);
+        CreateLinkedNoteRequested?.Invoke(this, args);
+        return args.Result;
     }
 
     internal void RaiseHostMessage(JsonElement message)
