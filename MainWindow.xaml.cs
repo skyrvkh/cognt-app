@@ -696,19 +696,15 @@ public partial class MainWindow : Window
         }
 
         string itemKind = viewModel.GetNodeKind(node);
-        RenameItemDialog dialog = new(itemKind, viewModel.GetEditableName(node))
-        {
-            Owner = this,
-        };
-
-        if (dialog.ShowDialog() != true)
+        string? itemName = ShowRenamePrompt(itemKind, viewModel.GetEditableName(node));
+        if (itemName is null)
         {
             return;
         }
 
         try
         {
-            viewModel.RenameNode(node, dialog.ItemName);
+            viewModel.RenameNode(node, itemName);
         }
         catch (Exception ex)
         {
@@ -718,6 +714,99 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    private string? ShowRenamePrompt(string itemKind, string currentName)
+    {
+        TextBlock promptTextBlock = new()
+        {
+            Text = $"New {itemKind} name",
+            Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1F2937")!,
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+
+        TextBox nameTextBox = new()
+        {
+            Text = currentName,
+            Height = 30,
+            Padding = new Thickness(8, 3, 8, 3),
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+
+        Button cancelButton = new()
+        {
+            Content = "Cancel",
+            Width = 76,
+            Height = 28,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsCancel = true,
+        };
+
+        Button renameButton = new()
+        {
+            Content = "Rename",
+            Width = 76,
+            Height = 28,
+            IsDefault = true,
+        };
+
+        StackPanel actionsPanel = new()
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 14, 0, 0),
+        };
+        actionsPanel.Children.Add(cancelButton);
+        actionsPanel.Children.Add(renameButton);
+
+        Grid dialogContent = new()
+        {
+            Margin = new Thickness(16),
+        };
+        dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        dialogContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(promptTextBlock, 0);
+        Grid.SetRow(nameTextBox, 1);
+        Grid.SetRow(actionsPanel, 2);
+        dialogContent.Children.Add(promptTextBlock);
+        dialogContent.Children.Add(nameTextBox);
+        dialogContent.Children.Add(actionsPanel);
+
+        Window dialog = new()
+        {
+            Title = $"Rename {itemKind}",
+            Height = 150,
+            Width = 360,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = System.Windows.Media.Brushes.White,
+            Owner = this,
+            Content = dialogContent,
+        };
+
+        dialog.Loaded += (_, _) =>
+        {
+            nameTextBox.Focus();
+            nameTextBox.SelectAll();
+        };
+        renameButton.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(nameTextBox.Text))
+            {
+                MessageBox.Show(
+                    "Name is required.",
+                    "Rename",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            dialog.DialogResult = true;
+        };
+
+        return dialog.ShowDialog() == true ? nameTextBox.Text : null;
     }
 
     private void DeleteTreeNode(NoteTreeNodeViewModel? node)
