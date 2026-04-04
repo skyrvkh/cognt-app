@@ -1,5 +1,4 @@
 using System.Text.Json;
-using CogntApp.Components;
 using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 
@@ -10,7 +9,7 @@ public sealed class BlockSuiteHostBridge
     private const string DiagnosticMessageType = "diagnostic";
 
     private readonly TaskCompletionSource readyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private BlockSuiteHost? host;
+    private IBlockSuiteHostClient? host;
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
@@ -21,7 +20,7 @@ public sealed class BlockSuiteHostBridge
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
     public event EventHandler<string>? DiagnosticReceived;
 
-    internal void Register(BlockSuiteHost blockSuiteHost)
+    internal void Register(IBlockSuiteHostClient blockSuiteHost)
     {
         host = blockSuiteHost;
         readyCompletion.TrySetResult();
@@ -35,7 +34,7 @@ public sealed class BlockSuiteHostBridge
         DiagnosticReceived?.Invoke(this, exception.ToString());
     }
 
-    internal void Unregister(BlockSuiteHost blockSuiteHost)
+    internal void Unregister(IBlockSuiteHostClient blockSuiteHost)
     {
         if (ReferenceEquals(host, blockSuiteHost))
         {
@@ -50,49 +49,49 @@ public sealed class BlockSuiteHostBridge
 
     public async Task LoadNoteAsync(string? path, string title, string content)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.LoadNoteAsync(path, title, content);
     }
 
     public async Task LoadCardAsync(string content)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.LoadCardAsync(content);
     }
 
     public async Task BeginCardRenderAsync()
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.BeginCardRenderAsync();
     }
 
     public async Task ActivateEditorAsync()
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ActivateEditorAsync();
     }
 
     public async Task FocusEditorAsync()
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.FocusEditorAsync();
     }
 
     public async Task ShowSaveResultAsync(bool ok, string? error = null)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ShowSaveResultAsync(ok, error);
     }
 
     public async Task ShowExtractResultAsync(bool ok, string? createdPath = null, string? error = null)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ShowExtractResultAsync(ok, createdPath, error);
     }
 
     public async Task SetMentionTargetsAsync(IEnumerable<MentionTarget> targets)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.SetMentionTargetsAsync(targets);
     }
 
@@ -105,7 +104,7 @@ public sealed class BlockSuiteHostBridge
         string? documentContent = null,
         string? error = null)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.HandleMentionPreviewResultAsync(
             requestId,
             relativePath,
@@ -118,7 +117,7 @@ public sealed class BlockSuiteHostBridge
 
     public async Task HandleMentionOpenResultAsync(bool ok, string? error = null)
     {
-        BlockSuiteHost blockSuiteHost = await WaitForHostAsync();
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.HandleMentionOpenResultAsync(ok, error);
     }
 
@@ -184,15 +183,9 @@ public sealed class BlockSuiteHostBridge
         DiagnosticReceived?.Invoke(this, messageElement.GetString() ?? string.Empty);
     }
 
-    private async Task<BlockSuiteHost> WaitForHostAsync()
+    private async Task<IBlockSuiteHostClient> WaitForHostAsync()
     {
         await WaitUntilReadyAsync();
         return host ?? throw new InvalidOperationException("The BlockSuite host is not ready.");
     }
 }
-
-public sealed record SaveClozeRequestedEventArgs(
-    string SourcePath,
-    string SelectedPlainText,
-    string ClozeText,
-    string Content);
