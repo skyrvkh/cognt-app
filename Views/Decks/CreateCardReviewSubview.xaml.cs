@@ -1,17 +1,18 @@
 using System.Windows;
 using System.Windows.Controls;
 using CogntApp.Models.Decks;
+using CogntApp.Services;
 
 namespace CogntApp.Views.Decks;
 
 public partial class CreateCardReviewSubview : UserControl
 {
-    private const string InitialCardMarkdown =
+    private const string InitialCardText =
         "The {{c1::mitochondria}} is the organelle responsible for producing most of the cell's {{c2::ATP}}.";
 
     private double lastLayoutWidth = double.NaN;
     private bool hasRequestedTextEditor;
-    private string currentCardMarkdown = InitialCardMarkdown;
+    private string currentCardContent = BlockSuiteDocumentContent.FromPlainText(InitialCardText, "Card Text");
 
     public event EventHandler<CreateCardEditorHostRequestedEventArgs>? CardEditorHostRequested;
 
@@ -53,8 +54,8 @@ public partial class CreateCardReviewSubview : UserControl
             this,
             new CreateCardEditorHostRequestedEventArgs(
                 CardTextEditorHost,
-                currentCardMarkdown,
-                UpdateCardMarkdown));
+                currentCardContent,
+                UpdateCardContent));
     }
 
     private void ApplyResponsiveLayout()
@@ -90,8 +91,8 @@ public partial class CreateCardReviewSubview : UserControl
         TagsField.Margin = new Thickness(0);
     }
 
-    private void UpdateCardMarkdown(string content)
+    private void UpdateCardContent(string content)
     {
-        currentCardMarkdown = content;
+        currentCardContent = content;
     }
 }

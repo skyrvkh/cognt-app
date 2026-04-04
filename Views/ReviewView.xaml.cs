@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using CogntApp.Services;
 
 namespace CogntApp.Views;
 
@@ -10,20 +11,20 @@ public partial class ReviewView : UserControl
     private static readonly ReviewSampleCard[] SampleCards =
     [
         new(
-            "What organelle produces most ATP in a eukaryotic cell?",
-            "**Mitochondria** produce most ATP through cellular respiration."),
+            BlockSuiteDocumentContent.FromPlainText("What organelle produces most ATP in a eukaryotic cell?", "Front"),
+            BlockSuiteDocumentContent.FromPlainText("Mitochondria produce most ATP through cellular respiration.", "Back")),
         new(
-            "What molecule carries genetic instructions in cells?",
-            "**DNA** carries genetic instructions used for growth, function, and reproduction."),
+            BlockSuiteDocumentContent.FromPlainText("What molecule carries genetic instructions in cells?", "Front"),
+            BlockSuiteDocumentContent.FromPlainText("DNA carries genetic instructions used for growth, function, and reproduction.", "Back")),
         new(
-            "What does a pH below 7 indicate?",
-            "A pH below 7 indicates an **acidic** solution."),
+            BlockSuiteDocumentContent.FromPlainText("What does a pH below 7 indicate?", "Front"),
+            BlockSuiteDocumentContent.FromPlainText("A pH below 7 indicates an acidic solution.", "Back")),
         new(
-            "Which trade route connected East Asia with Europe?",
-            "The **Silk Road** connected East Asia with Europe through overland trade networks."),
+            BlockSuiteDocumentContent.FromPlainText("Which trade route connected East Asia with Europe?", "Front"),
+            BlockSuiteDocumentContent.FromPlainText("The Silk Road connected East Asia with Europe through overland trade networks.", "Back")),
         new(
-            "What does immutability mean?",
-            "An immutable value cannot be changed after it is created.")
+            BlockSuiteDocumentContent.FromPlainText("What does immutability mean?", "Front"),
+            BlockSuiteDocumentContent.FromPlainText("An immutable value cannot be changed after it is created.", "Back"))
     ];
 
     private int currentCardIndex;
