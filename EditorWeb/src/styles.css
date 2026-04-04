@@ -30,6 +30,7 @@ page-editor {
 }
 
 #editor-host {
+  position: relative;
   overflow: hidden;
 }
 
@@ -61,14 +62,6 @@ rich-text,
   text-decoration: none;
 }
 
-::highlight(cognt-mention) {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
-  text-decoration: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 2px;
-}
-
 #mention-preview {
   position: fixed;
   z-index: 10001;
@@ -94,6 +87,12 @@ rich-text,
   width: min(760px, calc(100vw - 48px));
   max-height: min(78vh, 760px);
   padding: 16px 18px;
+}
+
+#mention-preview[data-anchor="linked-page"] {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 32px));
+  padding: 10px 12px;
 }
 
 .mention-preview-header {
@@ -128,6 +127,11 @@ rich-text,
 
 #mention-preview[data-mode="full"] .mention-preview-body {
   max-height: min(640px, calc(78vh - 96px));
+}
+
+#mention-preview[data-anchor="linked-page"] .mention-preview-body {
+  max-height: min(310px, calc(100vh - 92px));
+  overflow-wrap: anywhere;
 }
 
 .mention-preview-body--static {

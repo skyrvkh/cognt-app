@@ -1,21 +1,30 @@
 import type { PageEditor } from '@blocksuite/presets';
+import { createDefaultDoc } from '@blocksuite/blocks';
+import { REFERENCE_NODE } from '@blocksuite/affine-components/rich-text';
 import { html } from 'lit';
 import {
   buildMentionPreviewHtml,
+  escapeHtml,
   filterMentionTargets,
-  findMentionAtOffset,
   type MentionPreviewResult,
   type MentionTarget,
   type MentionViewMode,
 } from './mentions';
 
 const previewDelayMs = 220;
+const linkedPagePreviewDelayMs = 560;
 const previewDismissDelayMs = 200;
+const mentionSearchDebounceMs = 500;
 const previewMaxCharacters = 0;
-const highlightName = 'cognt-mention';
 const maxNativeMentionItems = 8;
-const markdownMentionGroupName = 'Markdown Files';
-const markdownMentionIcon = html`<span
+const nativeMentionSearchLimit = 32;
+const noteMentionGroupName = 'Notes';
+const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
+const nativeReferencePreviewId = 'cognt-reference-preview';
+const nativeReferencePreviewStyleId = 'cognt-reference-preview-style';
+const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';
+const nativeMentionSearchPreviewStyleId = 'cognt-linked-doc-search-preview-style';
+const noteMentionIcon = html`<span
   style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-weight:700;color:var(--affine-text-secondary-color);"
   >#</span
 >`;
@@ -33,7 +42,14 @@ export type OpenMentionMessage = {
   type: 'openMention';
   sourcePath: string;
   relativePath: string;
-  markdown: string;
+  content: string;
+};
+
+export type SearchMentionTargetsMessage = {
+  type: 'searchMentionTargets';
+  sourcePath: string;
+  query: string;
+  limit: number;
 };
 
 export type NativeInlineRange = {
@@ -43,7 +59,7 @@ export type NativeInlineRange = {
 
 export type NativeInlineEditor = {
   getInlineRange(): NativeInlineRange | null;
-  insertText(range: NativeInlineRange, text: string): void;
+  insertText(range: NativeInlineRange, text: string, attributes?: unknown): void;
   setInlineRange(range: NativeInlineRange | null): void;
 };
 
@@ -66,10 +82,11 @@ type MentionControllerOptions = {
   editor: PageEditor;
   previewElement: HTMLElement;
   getCurrentPath(): string;
-  exportMarkdown(): Promise<string>;
+  exportContent(): Promise<string>;
   flushHost(): Promise<void>;
   scheduleContentChanged(): void;
   showStatus(message: string): void;
+  onSearchTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
   onRequestPreview(message: RequestMentionPreviewMessage): void;
   onOpenMention(message: OpenMentionMessage): void;
 };
@@ -79,20 +96,25 @@ type Point = {
   y: number;
 };
 
+type FloatingAnchor = Point | HTMLElement;
+
 export class MentionController {
   private readonly eventAbort = new AbortController();
   private readonly editor: PageEditor;
   private readonly previewElement: HTMLElement;
   private readonly options: MentionControllerOptions;
   private targets: MentionTarget[] = [];
-  private highlightFrame: number | undefined;
   private hoverTimer: number | undefined;
   private previewHideTimer: number | undefined;
   private hoverPath = '';
   private pendingPreviewRequestId = '';
   private activeViewMode: MentionViewMode | null = null;
-  private viewAnchor: Point | null = null;
+  private viewAnchor: FloatingAnchor | null = null;
+  private nativePreviewAnchor: HTMLElement | null = null;
+  private nativeMentionMenuPreviewAnchor: HTMLElement | null = null;
+  private nativeMentionMenuPreviewPath = '';
   private requestCounter = 0;
+  private searchCounter = 0;
 
   public constructor(options: MentionControllerOptions) {
     this.options = options;
@@ -108,6 +130,27 @@ export class MentionController {
       () => this.schedulePreviewHide(),
       { signal: this.eventAbort.signal }
     );
+    document.addEventListener(
+      'mousemove',
+      event => {
+        if (this.activeViewMode !== 'preview') {
+          return;
+        }
+
+        const target = event.target as Node | null;
+        if (target && (this.editor.contains(target) || this.containsFloatingUi(target))) {
+          return;
+        }
+
+        this.schedulePreviewHide();
+      },
+      { signal: this.eventAbort.signal }
+    );
+    document.addEventListener(
+      'mousemove',
+      event => this.handleNativeMentionMenuMove(event),
+      { signal: this.eventAbort.signal }
+    );
   }
 
   public setTargets(targets: MentionTarget[]) {
@@ -117,15 +160,24 @@ export class MentionController {
   public getNativeMentionMenus(
     query: string,
     abort: () => void,
-    inlineEditor: NativeInlineEditor
-  ): NativeLinkedMenuGroup[] {
-    const targets = filterMentionTargets(this.targets, query);
+    inlineEditor: NativeInlineEditor,
+    abortSignal?: AbortSignal
+  ): Promise<NativeLinkedMenuGroup[]> {
+    return this.getNativeMentionMenusAsync(query, abort, inlineEditor, abortSignal);
+  }
 
-    if (targets.length === 0) {
-      return [];
-    }
+  private async getNativeMentionMenusAsync(
+    query: string,
+    abort: () => void,
+    inlineEditor: NativeInlineEditor,
+    abortSignal?: AbortSignal
+  ) {
+    const targets = await this.searchMentionTargets(query, abortSignal);
+    this.scheduleFirstNativeMentionMenuPreview(targets, abortSignal);
 
-    return [this.createNativeMentionGroup(targets, abort, inlineEditor)];
+    return targets.length === 0
+      ? []
+      : [this.createNativeMentionGroup(targets, abort, inlineEditor)];
   }
 
   public handlePreviewResult(result: MentionPreviewResult) {
@@ -136,6 +188,24 @@ export class MentionController {
     this.cancelScheduledPreviewHide();
     const mode = result.mode ?? this.activeViewMode ?? 'preview';
     this.activeViewMode = mode;
+
+    if (this.nativePreviewAnchor && mode === 'preview') {
+      this.renderNativeReferencePreview(
+        this.nativePreviewAnchor,
+        result.relativePath,
+        buildMentionPreviewHtml(result)
+      );
+      return;
+    }
+
+    if (this.nativeMentionMenuPreviewAnchor && mode === 'preview') {
+      this.renderNativeMentionSearchPreview(
+        this.nativeMentionMenuPreviewAnchor,
+        buildMentionPreviewHtml(result)
+      );
+      return;
+    }
+
     this.previewElement.dataset.mode = mode;
     this.previewElement.innerHTML = buildMentionPreviewHtml(result);
     this.previewElement.dataset.visible = 'true';
@@ -147,105 +217,68 @@ export class MentionController {
 
   public handleOpenResult(ok: boolean, error?: string) {
     if (!ok) {
-      this.options.showStatus(`Open failed: ${error ?? 'Could not open Markdown file.'}`);
+      this.options.showStatus(`Open failed: ${error ?? 'Could not open note.'}`);
     }
   }
 
-  public scheduleHighlightUpdate() {
-    if (this.highlightFrame !== undefined) {
-      return;
-    }
+  public scheduleHighlightUpdate() {}
 
-    this.highlightFrame = window.requestAnimationFrame(() => {
-      this.highlightFrame = undefined;
-      this.updateHighlights();
-    });
-  }
+  public refreshHighlights() {}
 
-  public refreshHighlights() {
-    this.cancelScheduledHighlightUpdate();
-    this.updateHighlights();
-  }
+  public cancelScheduledHighlightUpdate() {}
 
-  public cancelScheduledHighlightUpdate() {
-    if (this.highlightFrame === undefined) {
-      return;
-    }
-
-    window.cancelAnimationFrame(this.highlightFrame);
-    this.highlightFrame = undefined;
-  }
-
-  public handleHover(event: MouseEvent) {
+  public handleLinkedPageHover(relativePath: string, anchor: FloatingAnchor) {
     if (!this.options.getCurrentPath() || this.activeViewMode === 'full') {
-      return;
-    }
-
-    const mention = this.getHitFromPoint(event.clientX, event.clientY);
-    if (!mention) {
-      this.clearHoverTimer();
-      this.hoverPath = '';
-
-      if (this.activeViewMode === 'preview') {
-        this.schedulePreviewHide();
-      }
       return;
     }
 
     this.cancelScheduledPreviewHide();
 
+    const sameNativeAnchor = isElementAnchor(anchor) && this.nativePreviewAnchor === anchor;
     if (
-      mention.relativePath === this.hoverPath &&
-      (this.hoverTimer !== undefined || this.activeViewMode === 'preview')
+      relativePath === this.hoverPath &&
+      (this.hoverTimer !== undefined || (this.activeViewMode === 'preview' && sameNativeAnchor))
     ) {
       return;
     }
 
-    this.hoverPath = mention.relativePath;
+    this.hoverPath = relativePath;
     this.clearHoverTimer();
 
-    const anchor = { x: event.clientX + 12, y: event.clientY + 12 };
     this.hoverTimer = window.setTimeout(() => {
       this.hoverTimer = undefined;
-      if (this.hoverPath === mention.relativePath && this.activeViewMode !== 'full') {
-        this.requestPreview(mention.relativePath, anchor, 'preview');
+      if (this.hoverPath === relativePath && this.activeViewMode !== 'full') {
+        this.requestPreview(relativePath, anchor, 'preview');
       }
-    }, previewDelayMs);
+    }, linkedPagePreviewDelayMs);
   }
 
-  public async handleClick(event: MouseEvent) {
-    const currentPath = this.options.getCurrentPath();
-    if (!currentPath) {
-      return;
+  public handleHoverMiss() {
+    this.clearHoverTimer();
+    this.hoverPath = '';
+
+    if (this.activeViewMode === 'preview') {
+      this.schedulePreviewHide();
     }
-
-    const mention = this.getHitFromPoint(event.clientX, event.clientY);
-    if (!mention) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    this.hidePreview();
-
-    this.options.onOpenMention({
-      type: 'openMention',
-      sourcePath: currentPath,
-      relativePath: mention.relativePath,
-      markdown: await this.options.exportMarkdown(),
-    });
-    this.options.showStatus(`Opening ${mention.relativePath}...`);
   }
+
+  public async handleClick(_event: MouseEvent) {}
 
   public hidePreview() {
     this.pendingPreviewRequestId = '';
     this.activeViewMode = null;
     this.viewAnchor = null;
+    this.nativePreviewAnchor = null;
+    this.nativeMentionMenuPreviewAnchor = null;
+    this.nativeMentionMenuPreviewPath = '';
     this.hoverPath = '';
     this.clearHoverTimer();
     this.cancelScheduledPreviewHide();
+    removeNativeReferencePreview();
+    removeNativeMentionSearchPreview();
     this.previewElement.dataset.visible = 'false';
     this.previewElement.dataset.mode = '';
+    this.previewElement.dataset.anchor = '';
     this.previewElement.innerHTML = '';
   }
 
@@ -274,7 +307,9 @@ export class MentionController {
   }
 
   public containsFloatingUi(target: Node) {
-    return this.previewElement.contains(target);
+    return this.previewElement.contains(target)
+      || isReferencePopupTarget(target)
+      || isLinkedDocPopoverTarget(target);
   }
 
   public isShowingPreview() {
@@ -284,76 +319,40 @@ export class MentionController {
   public dispose() {
     this.hidePreview();
     this.cancelScheduledHighlightUpdate();
-    this.clearMentionHighlights();
     this.eventAbort.abort();
-  }
-
-  private updateHighlights() {
-    const cssWithHighlights = CSS as typeof CSS & {
-      highlights?: {
-        set(name: string, highlight: unknown): void;
-        delete(name: string): void;
-      };
-    };
-    const highlightConstructor = (globalThis as typeof globalThis & {
-      Highlight?: new (...ranges: Range[]) => unknown;
-    }).Highlight;
-
-    if (!cssWithHighlights.highlights || !highlightConstructor) {
-      return;
-    }
-
-    const ranges: Range[] = [];
-    const expression = /\[\[[^\]\[\n]+\]\]/g;
-
-    for (const current of collectMentionTextNodes(this.editor)) {
-      const text = current.textContent ?? '';
-      let match: RegExpExecArray | null;
-
-      while ((match = expression.exec(text)) !== null) {
-        const range = document.createRange();
-        range.setStart(current, match.index);
-        range.setEnd(current, match.index + match[0].length);
-        ranges.push(range);
-      }
-    }
-
-    if (ranges.length === 0) {
-      cssWithHighlights.highlights.delete(highlightName);
-      return;
-    }
-
-    cssWithHighlights.highlights.set(highlightName, new highlightConstructor(...ranges));
-  }
-
-  private clearMentionHighlights() {
-    const cssWithHighlights = CSS as typeof CSS & {
-      highlights?: {
-        delete(name: string): void;
-      };
-    };
-
-    cssWithHighlights.highlights?.delete(highlightName);
   }
 
   private insertNativeMention(inlineEditor: NativeInlineEditor, target: MentionTarget) {
     const range = inlineEditor.getInlineRange();
     if (!range) {
-      this.options.showStatus('Could not insert the Markdown file link at the current caret.');
+      this.options.showStatus('Could not insert the note link at the current caret.');
       return;
     }
 
-    const replacementText = `[[${target.relativePath}]]`;
+    const title = getMentionDisplayTitle(target);
+    const linkedDoc = createDefaultDoc(this.editor.doc.collection, { title });
+    const reference = {
+      type: 'LinkedPage',
+      pageId: linkedDoc.id,
+      params: {
+        [cogntLinkedNotePathProp]: target.relativePath,
+      },
+      title,
+      description: target.relativePath,
+      [cogntLinkedNotePathProp]: target.relativePath,
+    };
 
     try {
-      inlineEditor.insertText(range, replacementText);
+      inlineEditor.insertText(range, REFERENCE_NODE, {
+        reference,
+      } as never);
       inlineEditor.setInlineRange({
-        index: range.index + replacementText.length,
+        index: range.index + REFERENCE_NODE.length,
         length: 0,
       });
     } catch (error) {
       console.warn('Native mention insertion failed.', error);
-      this.options.showStatus('Could not insert the Markdown file link at the current caret.');
+      this.options.showStatus('Could not insert the note link at the current caret.');
       return;
     }
 
@@ -369,7 +368,7 @@ export class MentionController {
     inlineEditor: NativeInlineEditor
   ): NativeLinkedMenuGroup {
     const group: NativeLinkedMenuGroup = {
-      name: markdownMentionGroupName,
+      name: noteMentionGroupName,
       items: targets.map(target => this.createNativeMentionItem(target, abort, inlineEditor)),
       maxDisplay: maxNativeMentionItems,
     };
@@ -387,10 +386,10 @@ export class MentionController {
     inlineEditor: NativeInlineEditor
   ): NativeLinkedMenuItem {
     return {
-      key: `markdown:${target.relativePath}`,
-      name: target.fileName,
-      suffix: target.relativePath === target.fileName ? undefined : target.relativePath,
-      icon: markdownMentionIcon,
+      key: `note:${target.relativePath}`,
+      name: getMentionDisplayTitle(target),
+      suffix: getMentionMenuSuffix(target),
+      icon: noteMentionIcon,
       action: () => {
         abort();
         this.insertNativeMention(inlineEditor, target);
@@ -398,7 +397,113 @@ export class MentionController {
     };
   }
 
-  private requestPreview(relativePath: string, anchor: Point, mode: MentionViewMode) {
+  private async searchMentionTargets(query: string, abortSignal?: AbortSignal) {
+    const currentPath = this.options.getCurrentPath();
+    if (!currentPath) {
+      return [];
+    }
+
+    const signal = abortSignal ?? new AbortController().signal;
+    const searchId = ++this.searchCounter;
+
+    try {
+      await delayWithAbort(mentionSearchDebounceMs, signal);
+
+      if (signal.aborted || searchId !== this.searchCounter) {
+        return [];
+      }
+
+      const targets = await this.options.onSearchTargets({
+        type: 'searchMentionTargets',
+        sourcePath: currentPath,
+        query,
+        limit: nativeMentionSearchLimit,
+      });
+
+      if (signal.aborted || searchId !== this.searchCounter) {
+        return [];
+      }
+
+      this.mergeTargets(targets);
+      return targets;
+    } catch (error) {
+      if (signal.aborted) {
+        return [];
+      }
+
+      console.warn('Mention search failed.', error);
+      return filterMentionTargets(this.targets, query, nativeMentionSearchLimit);
+    }
+  }
+
+  private scheduleFirstNativeMentionMenuPreview(
+    targets: MentionTarget[],
+    abortSignal?: AbortSignal
+  ) {
+    const firstTarget = targets[0];
+    if (!firstTarget || abortSignal?.aborted) {
+      removeNativeMentionSearchPreview();
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (abortSignal?.aborted) {
+        return;
+      }
+
+      const anchor = findNativeMentionMenuItem(firstTarget.relativePath);
+      if (anchor) {
+        this.requestNativeMentionMenuPreview(firstTarget.relativePath, anchor);
+      }
+    }, 0);
+  }
+
+  private handleNativeMentionMenuMove(event: MouseEvent) {
+    const target = getNativeMentionMenuItemFromEvent(event);
+    if (!target) {
+      return;
+    }
+
+    const relativePath = getNativeMentionMenuItemPath(target);
+    if (!relativePath) {
+      return;
+    }
+
+    this.requestNativeMentionMenuPreview(relativePath, target);
+  }
+
+  private requestNativeMentionMenuPreview(relativePath: string, anchor: HTMLElement) {
+    if (
+      this.nativeMentionMenuPreviewAnchor === anchor
+      && this.nativeMentionMenuPreviewPath === relativePath
+      && this.activeViewMode === 'preview'
+    ) {
+      return;
+    }
+
+    this.nativeMentionMenuPreviewAnchor = anchor;
+    this.nativeMentionMenuPreviewPath = relativePath;
+    this.nativePreviewAnchor = null;
+    this.requestPreview(relativePath, anchor, 'preview');
+  }
+
+  private mergeTargets(targets: MentionTarget[]) {
+    if (targets.length === 0) {
+      return;
+    }
+
+    const merged = new Map(this.targets.map(target => [
+      normalizeMentionPathKey(target.relativePath),
+      target,
+    ]));
+    for (const target of targets) {
+      merged.set(normalizeMentionPathKey(target.relativePath), target);
+    }
+
+    this.targets = [...merged.values()];
+  }
+
+  private requestPreview(relativePath: string, anchor: FloatingAnchor, mode: MentionViewMode) {
     const currentPath = this.options.getCurrentPath();
     if (!currentPath) {
       return;
@@ -409,12 +514,44 @@ export class MentionController {
     this.pendingPreviewRequestId = requestId;
     this.activeViewMode = mode;
     this.viewAnchor = anchor;
-    this.previewElement.dataset.mode = mode;
-    this.previewElement.innerHTML = `<div class="mention-preview-body mention-preview-body--static"><p>${
-      mode === 'full' ? 'Opening document...' : 'Loading preview...'
-    }</p></div>`;
-    this.previewElement.dataset.visible = 'true';
-    this.positionFloatingElement(this.previewElement, anchor);
+
+    if (mode === 'preview' && isElementAnchor(anchor) && isNativeMentionMenuItem(anchor)) {
+      this.nativePreviewAnchor = null;
+      this.nativeMentionMenuPreviewAnchor = anchor;
+      this.previewElement.dataset.visible = 'false';
+      this.previewElement.dataset.mode = '';
+      this.previewElement.dataset.anchor = '';
+      this.previewElement.innerHTML = '';
+      this.renderNativeMentionSearchPreview(
+        anchor,
+        `<div class="mention-preview-body mention-preview-body--static"><p>Loading preview...</p></div>`
+      );
+    } else if (mode === 'preview' && isElementAnchor(anchor)) {
+      this.nativePreviewAnchor = anchor;
+      this.nativeMentionMenuPreviewAnchor = null;
+      this.nativeMentionMenuPreviewPath = '';
+      this.previewElement.dataset.visible = 'false';
+      this.previewElement.dataset.mode = '';
+      this.previewElement.dataset.anchor = '';
+      this.previewElement.innerHTML = '';
+      this.renderNativeReferencePreview(
+        anchor,
+        relativePath,
+        `<div class="mention-preview-body mention-preview-body--static"><p>Loading preview...</p></div>`
+      );
+    } else {
+      this.nativePreviewAnchor = null;
+      this.nativeMentionMenuPreviewAnchor = null;
+      this.nativeMentionMenuPreviewPath = '';
+      this.previewElement.dataset.mode = mode;
+      this.previewElement.dataset.anchor = isElementAnchor(anchor) ? 'linked-page' : '';
+      this.previewElement.innerHTML = `<div class="mention-preview-body mention-preview-body--static"><p>${
+        mode === 'full' ? 'Opening document...' : 'Loading preview...'
+      }</p></div>`;
+      this.previewElement.dataset.visible = 'true';
+      this.positionFloatingElement(this.previewElement, anchor);
+      window.requestAnimationFrame(() => this.positionFloatingElement(this.previewElement, anchor));
+    }
 
     this.options.onRequestPreview({
       type: 'requestMentionPreview',
@@ -426,39 +563,133 @@ export class MentionController {
     });
   }
 
-  private getHitFromPoint(x: number, y: number) {
-    const position = getTextPositionFromPoint(x, y);
-    if (position && isNodeInside(this.editor, position.node)) {
-      const text = position.node.textContent ?? '';
-      const mention = findMentionAtOffset(text, position.offset);
-      if (mention) {
-        return mention;
-      }
-    }
-
-    const expression = /\[\[([^\]\[\n]+)\]\]/g;
-    for (const node of collectMentionTextNodes(this.editor)) {
-      const text = node.textContent ?? '';
-      let match: RegExpExecArray | null;
-
-      while ((match = expression.exec(text)) !== null) {
-        const range = document.createRange();
-        range.setStart(node, match.index);
-        range.setEnd(node, match.index + match[0].length);
-
-        for (const rect of Array.from(range.getClientRects())) {
-          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-            return {
-              relativePath: match[1],
-              start: match.index,
-              end: match.index + match[0].length,
-            };
+  private renderNativeMentionSearchPreview(anchor: HTMLElement, htmlContent: string, attempt = 0) {
+    const container = getLinkedDocPopoverContainer(anchor);
+    if (!container) {
+      if (attempt < 8) {
+        window.requestAnimationFrame(() => {
+          if (
+            this.nativeMentionMenuPreviewAnchor === anchor
+            && this.activeViewMode === 'preview'
+          ) {
+            this.renderNativeMentionSearchPreview(anchor, htmlContent, attempt + 1);
           }
-        }
+        });
       }
+      return;
     }
 
-    return null;
+    const root = container.getRootNode();
+    if (root instanceof ShadowRoot) {
+      injectNativeMentionSearchPreviewStyle(root);
+    }
+
+    let preview = container.querySelector<HTMLElement>(`#${nativeMentionSearchPreviewId}`);
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.id = nativeMentionSearchPreviewId;
+      preview.className = nativeMentionSearchPreviewId;
+      container.append(preview);
+    }
+
+    preview.innerHTML = htmlContent;
+  }
+
+  private renderNativeReferencePreview(
+    anchor: HTMLElement,
+    relativePath: string,
+    htmlContent: string,
+    attempt = 0
+  ) {
+    const container = getReferencePopoverContainer(anchor.getBoundingClientRect());
+    if (!container) {
+      if (attempt < 16) {
+        window.requestAnimationFrame(() => {
+          if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
+            this.renderNativeReferencePreview(anchor, relativePath, htmlContent, attempt + 1);
+          }
+        });
+      } else if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
+        this.renderFloatingReferencePreview(anchor, htmlContent);
+      }
+      return;
+    }
+
+    this.previewElement.dataset.visible = 'false';
+    this.previewElement.dataset.mode = '';
+    this.previewElement.dataset.anchor = '';
+    this.previewElement.innerHTML = '';
+
+    const root = container.getRootNode();
+    if (root instanceof ShadowRoot) {
+      injectNativeReferencePreviewStyle(root);
+    }
+
+    let preview = container.querySelector<HTMLElement>(`#${nativeReferencePreviewId}`);
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.id = nativeReferencePreviewId;
+      preview.className = nativeReferencePreviewId;
+      container.append(preview);
+    }
+
+    preview.innerHTML = buildNativeReferenceExtensionHtml(relativePath, htmlContent);
+    this.bindNativeReferenceExtension(preview, relativePath);
+  }
+
+  private renderFloatingReferencePreview(anchor: HTMLElement, htmlContent: string) {
+    this.previewElement.dataset.mode = 'preview';
+    this.previewElement.dataset.anchor = 'linked-page';
+    this.previewElement.innerHTML = htmlContent;
+    this.previewElement.dataset.visible = 'true';
+    this.positionFloatingElement(this.previewElement, anchor);
+    window.requestAnimationFrame(() => {
+      if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
+        this.positionFloatingElement(this.previewElement, anchor);
+      }
+    });
+  }
+
+  private bindNativeReferenceExtension(preview: HTMLElement, relativePath: string) {
+    preview.querySelector<HTMLElement>('[data-cognt-reference-action="open"]')
+      ?.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.openMention(relativePath);
+      });
+
+    preview.querySelector<HTMLElement>('[data-cognt-reference-action="copy-path"]')
+      ?.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.copyMentionPath(relativePath);
+      });
+  }
+
+  private async openMention(relativePath: string) {
+    const currentPath = this.options.getCurrentPath();
+    if (!currentPath) {
+      return;
+    }
+
+    this.hidePreview();
+    this.options.onOpenMention({
+      type: 'openMention',
+      sourcePath: currentPath,
+      relativePath,
+      content: await this.options.exportContent(),
+    });
+    this.options.showStatus(`Opening ${relativePath}...`);
+  }
+
+  private async copyMentionPath(relativePath: string) {
+    try {
+      await navigator.clipboard.writeText(relativePath);
+      this.options.showStatus('Copied linked note path.');
+    } catch (error) {
+      console.warn('Could not copy linked note path.', error);
+      this.options.showStatus('Could not copy linked note path.');
+    }
   }
 
   private makeRequestId() {
@@ -466,16 +697,30 @@ export class MentionController {
     return `${Date.now().toString(36)}-${this.requestCounter.toString(36)}`;
   }
 
-  private positionFloatingElement(element: HTMLElement, point: Point) {
+  private positionFloatingElement(element: HTMLElement, anchor: FloatingAnchor) {
     const margin = 12;
+    const preferred = getFloatingAnchorPoint(anchor);
+    const preferredWidth = isElementAnchor(anchor)
+      ? getReferencePopoverRect(anchor.getBoundingClientRect())?.width
+      : undefined;
+
+    if (preferredWidth && preferredWidth > 0) {
+      element.style.minWidth = `${Math.min(
+        Math.max(preferredWidth, 360),
+        window.innerWidth - margin * 2
+      )}px`;
+    } else {
+      element.style.minWidth = '';
+    }
+
     const width = element.offsetWidth || 320;
     const height = element.offsetHeight || 220;
     const left = Math.min(
-      Math.max(margin, point.x),
+      Math.max(margin, preferred.x),
       Math.max(margin, window.innerWidth - width - margin)
     );
     const top = Math.min(
-      Math.max(margin, point.y),
+      Math.max(margin, preferred.y),
       Math.max(margin, window.innerHeight - height - margin)
     );
 
@@ -493,76 +738,421 @@ export class MentionController {
   }
 }
 
-function collectMentionTextNodes(root: Node) {
-  const nodes: Text[] = [];
-
-  const visit = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if ((node.textContent ?? '').includes('[[')) {
-        nodes.push(node as Text);
-      }
-      return;
-    }
-
-    if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
-      return;
-    }
-
-    const element = node as Element;
-    if (element.shadowRoot) {
-      visit(element.shadowRoot);
-    }
-
-    for (const child of Array.from(node.childNodes)) {
-      visit(child);
-    }
-  };
-
-  visit(root);
-  return nodes;
-}
-
-function getTextPositionFromPoint(x: number, y: number) {
-  const documentWithCaretRange = document as Document & {
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-  };
-
-  const range = documentWithCaretRange.caretRangeFromPoint?.(x, y);
-  if (range?.startContainer.nodeType === Node.TEXT_NODE) {
-    return {
-      node: range.startContainer as Text,
-      offset: range.startOffset,
-    };
+function delayWithAbort(delayMs: number, signal: AbortSignal) {
+  if (signal.aborted) {
+    return Promise.reject(new Error('Mention search was cancelled.'));
   }
 
-  const position = documentWithCaretRange.caretPositionFromPoint?.(x, y);
-  if (position?.offsetNode.nodeType === Node.TEXT_NODE) {
-    return {
-      node: position.offsetNode as Text,
-      offset: position.offset,
+  return new Promise<void>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, delayMs);
+
+    const abort = () => {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener('abort', abort);
+      reject(new Error('Mention search was cancelled.'));
     };
+
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+function normalizeMentionPathKey(relativePath: string) {
+  return relativePath.replace(/\\/g, '/').trim().toLowerCase();
+}
+
+function isNativeMentionMenuItem(element: HTMLElement) {
+  return Boolean(getNativeMentionMenuItemPath(element));
+}
+
+function getNativeMentionMenuItemPath(element: HTMLElement) {
+  const key = element.dataset.id;
+  return key?.startsWith('note:') ? key.slice('note:'.length) : null;
+}
+
+function getNativeMentionMenuItemFromEvent(event: MouseEvent) {
+  for (const item of event.composedPath()) {
+    if (item instanceof HTMLElement && isNativeMentionMenuItem(item)) {
+      return item;
+    }
   }
 
   return null;
 }
 
-function isNodeInside(root: Node, node: Node) {
-  let current: Node | null = node;
+function findNativeMentionMenuItem(relativePath: string) {
+  const key = `note:${relativePath}`;
 
-  while (current) {
-    if (current === root) {
-      return true;
+  for (const element of Array.from(document.querySelectorAll<HTMLElement>('affine-linked-doc-popover'))) {
+    const item = element.shadowRoot?.querySelector<HTMLElement>(
+      `icon-button[data-id="${escapeCssIdentifier(key)}"]`
+    );
+    if (item) {
+      return item;
     }
+  }
 
-    const currentRoot = current.getRootNode();
-    if (currentRoot instanceof ShadowRoot) {
-      current = currentRoot.host;
+  return null;
+}
+
+function getLinkedDocPopoverContainer(anchor: HTMLElement) {
+  const root = anchor.getRootNode();
+  if (root instanceof ShadowRoot) {
+    const container = root.querySelector<HTMLElement>('.linked-doc-popover');
+    if (container) {
+      return container;
+    }
+  }
+
+  for (const element of Array.from(document.querySelectorAll<HTMLElement>('affine-linked-doc-popover'))) {
+    const container = element.shadowRoot?.querySelector<HTMLElement>('.linked-doc-popover');
+    if (container) {
+      return container;
+    }
+  }
+
+  return null;
+}
+
+function escapeCssIdentifier(value: string) {
+  return typeof CSS !== 'undefined' && CSS.escape
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, match => `\\${match}`);
+}
+
+function isElementAnchor(anchor: FloatingAnchor): anchor is HTMLElement {
+  return anchor instanceof HTMLElement;
+}
+
+function getFloatingAnchorPoint(anchor: FloatingAnchor): Point {
+  if (!isElementAnchor(anchor)) {
+    return anchor;
+  }
+
+  const referenceRect = anchor.getBoundingClientRect();
+  const popoverRect = getReferencePopoverRect(referenceRect);
+  if (popoverRect) {
+    return {
+      x: popoverRect.left,
+      y: popoverRect.bottom + 4,
+    };
+  }
+
+  return {
+    x: referenceRect.left,
+    y: referenceRect.bottom + 72,
+  };
+}
+
+function getReferencePopoverRect(referenceRect: DOMRect) {
+  return getReferencePopoverContainer(referenceRect)?.getBoundingClientRect() ?? null;
+}
+
+function getReferencePopoverContainer(referenceRect: DOMRect) {
+  let bestContainer: HTMLElement | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const container of getReferencePopoverContainers()) {
+    const rect = container.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
       continue;
     }
 
-    current = current.parentNode;
+    const score = Math.abs(rect.left - referenceRect.left)
+      + Math.abs(rect.top - referenceRect.bottom);
+    if (score < bestScore) {
+      bestScore = score;
+      bestContainer = container;
+    }
   }
 
-  return false;
+  return bestContainer;
 }
+
+function getReferencePopoverContainers() {
+  const containers = new Set<HTMLElement>();
+
+  for (const popup of Array.from(document.querySelectorAll<HTMLElement>('reference-popup'))) {
+    const container = popup.shadowRoot?.querySelector<HTMLElement>(
+      '.affine-reference-popover-container'
+    );
+    if (container) {
+      containers.add(container);
+    }
+  }
+
+  for (const element of Array.from(document.body.children)) {
+    if (!(element instanceof HTMLElement) || !element.shadowRoot) {
+      continue;
+    }
+
+    const container = element.shadowRoot.querySelector<HTMLElement>(
+      '.affine-reference-popover-container'
+    );
+    if (container) {
+      containers.add(container);
+    }
+  }
+
+  return [...containers];
+}
+
+function buildNativeReferenceExtensionHtml(relativePath: string, previewHtml: string) {
+  return `
+    <div class="cognt-reference-actions" data-cognt-reference-path="${escapeHtml(relativePath)}">
+      <div class="cognt-reference-meta">
+        <span class="cognt-reference-kicker">Cognt note</span>
+        <span class="cognt-reference-path">${escapeHtml(relativePath)}</span>
+      </div>
+      <button type="button" class="cognt-reference-action" data-cognt-reference-action="open">
+        Open
+      </button>
+      <button type="button" class="cognt-reference-action" data-cognt-reference-action="copy-path">
+        Copy path
+      </button>
+    </div>
+    <div class="cognt-reference-preview-content">
+      ${previewHtml}
+    </div>
+  `;
+}
+
+function injectNativeReferencePreviewStyle(root: ShadowRoot) {
+  if (root.getElementById(nativeReferencePreviewStyleId)) {
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.id = nativeReferencePreviewStyleId;
+  style.textContent = `
+    .affine-reference-popover-container {
+      min-width: 420px;
+      max-width: min(720px, calc(100vw - 24px));
+    }
+
+    .affine-reference-popover-container editor-toolbar.affine-reference-popover.view {
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    #${nativeReferencePreviewId} {
+      box-sizing: border-box;
+      width: 100%;
+      max-height: 340px;
+      margin-top: 8px;
+      overflow: hidden;
+      border: 1px solid var(--affine-border-color, rgba(30, 41, 59, 0.12));
+      border-radius: 8px;
+      background: var(--affine-background-primary-color, #fff);
+      box-shadow: var(--affine-shadow-2, 0 10px 30px rgba(15, 23, 42, 0.12));
+      color: var(--affine-text-primary-color, #1f2937);
+      font-family: var(--affine-font-family);
+      font-size: var(--affine-font-sm, 14px);
+      line-height: 1.45;
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-actions {
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--affine-border-color, rgba(30, 41, 59, 0.12));
+      background: var(--affine-background-secondary-color, #f8fafc);
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-meta {
+      display: grid;
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: 1px;
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-kicker {
+      color: var(--affine-text-secondary-color, #6b7280);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-path {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--affine-text-primary-color, #1f2937);
+      font-size: 12px;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-action {
+      flex: 0 0 auto;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--affine-border-color, rgba(30, 41, 59, 0.14));
+      border-radius: 6px;
+      background: var(--affine-background-primary-color, #fff);
+      color: var(--affine-text-primary-color, #1f2937);
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      line-height: 26px;
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-action:hover {
+      background: var(--affine-hover-color, rgba(30, 41, 59, 0.06));
+    }
+
+    #${nativeReferencePreviewId} .cognt-reference-preview-content {
+      min-height: 0;
+    }
+
+    #${nativeReferencePreviewId} .mention-preview-body {
+      box-sizing: border-box;
+      max-height: 256px;
+      overflow: auto;
+      padding: 12px 14px;
+      outline: none;
+    }
+
+    #${nativeReferencePreviewId} .mention-preview-body--static {
+      color: var(--affine-text-secondary-color, #6b7280);
+    }
+
+    #${nativeReferencePreviewId} .mention-preview-body p {
+      margin: 0 0 8px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    #${nativeReferencePreviewId} .mention-preview-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    #${nativeReferencePreviewId} .mention-preview-empty,
+    #${nativeReferencePreviewId} .mention-preview-error {
+      color: var(--affine-text-secondary-color, #6b7280);
+    }
+  `;
+  root.append(style);
+}
+
+function injectNativeMentionSearchPreviewStyle(root: ShadowRoot) {
+  if (root.getElementById(nativeMentionSearchPreviewStyleId)) {
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.id = nativeMentionSearchPreviewStyleId;
+  style.textContent = `
+    .linked-doc-popover {
+      width: 420px;
+      max-width: min(720px, calc(100vw - 24px));
+    }
+
+    .linked-doc-popover .group icon-button {
+      width: 100%;
+    }
+
+    #${nativeMentionSearchPreviewId} {
+      box-sizing: border-box;
+      width: 100%;
+      max-height: 240px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-top: 1px solid var(--affine-border-color, rgba(30, 41, 59, 0.12));
+      color: var(--affine-text-primary-color, #1f2937);
+      font-family: var(--affine-font-family);
+      font-size: var(--affine-font-sm, 14px);
+      line-height: 1.45;
+    }
+
+    #${nativeMentionSearchPreviewId} .mention-preview-body {
+      box-sizing: border-box;
+      max-height: 238px;
+      overflow: auto;
+      padding: 12px 14px 4px;
+      outline: none;
+    }
+
+    #${nativeMentionSearchPreviewId} .mention-preview-body--static {
+      color: var(--affine-text-secondary-color, #6b7280);
+    }
+
+    #${nativeMentionSearchPreviewId} .mention-preview-body p {
+      margin: 0 0 8px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    #${nativeMentionSearchPreviewId} .mention-preview-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    #${nativeMentionSearchPreviewId} .mention-preview-empty,
+    #${nativeMentionSearchPreviewId} .mention-preview-error {
+      color: var(--affine-text-secondary-color, #6b7280);
+    }
+  `;
+  root.append(style);
+}
+
+function removeNativeReferencePreview() {
+  for (const container of getReferencePopoverContainers()) {
+    container.querySelector(`#${nativeReferencePreviewId}`)?.remove();
+  }
+}
+
+function removeNativeMentionSearchPreview() {
+  for (const element of Array.from(document.querySelectorAll<HTMLElement>('affine-linked-doc-popover'))) {
+    element.shadowRoot?.getElementById(nativeMentionSearchPreviewId)?.remove();
+  }
+}
+
+function isReferencePopupTarget(target: Node) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.shadowRoot?.querySelector('.affine-reference-popover-container')
+      ?? target.closest('reference-popup')
+  );
+}
+
+function isLinkedDocPopoverTarget(target: Node) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.shadowRoot?.querySelector('.linked-doc-popover')
+      ?? target.closest('affine-linked-doc-popover')
+  );
+}
+
+function getMentionDisplayTitle(target: MentionTarget) {
+  const title = target.title.trim()
+    || target.fileName.replace(/\.(json|md|markdown)$/i, '').trim();
+  return title.length > 0 ? title : target.relativePath;
+}
+
+function getMentionMenuSuffix(target: MentionTarget) {
+  const parts = target.relativePath.split(/[\\/]/).filter(Boolean);
+  if (parts.length <= 1) {
+    return undefined;
+  }
+
+  const first = parts[0]?.toLowerCase();
+  if (first === 'files') {
+    return undefined;
+  }
+
+  parts.pop();
+  return parts.length > 0 ? parts.join('/') : undefined;
+}
+

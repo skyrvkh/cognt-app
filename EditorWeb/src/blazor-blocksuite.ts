@@ -1,7 +1,10 @@
 import '@toeverything/theme/fonts.css';
 import '@toeverything/theme/style.css';
 import './styles.css';
-import { MarkdownBlockSuiteEditor } from './blocksuite-editor';
+import {
+  MarkdownBlockSuiteEditor,
+  type CreateLinkedNoteResult,
+} from './blocksuite-editor';
 import { installHostDiagnostics, waitForAnimationFrames } from './host';
 
 installHostDiagnostics();
@@ -40,7 +43,7 @@ export function mountBlockSuite(
       void dotNet.invokeMethodAsync(
         'HandleCreateExtract',
         message.sourcePath,
-        message.selectedMarkdown,
+        message.selectedContent,
         message.selectedPlainText
       );
     },
@@ -50,9 +53,18 @@ export function mountBlockSuite(
         message.sourcePath,
         message.selectedPlainText,
         message.clozeText,
-        message.markdown
+        message.content
       );
     },
+    onSearchMentionTargets: async message =>
+      normalizeMentionTargets(
+        await dotNet.invokeMethodAsync(
+          'HandleSearchMentionTargets',
+          message.sourcePath,
+          message.query,
+          message.limit
+        )
+      ),
     onRequestMentionPreview: message => {
       void dotNet.invokeMethodAsync(
         'HandleRequestMentionPreview',
@@ -68,9 +80,17 @@ export function mountBlockSuite(
         'HandleOpenMention',
         message.sourcePath,
         message.relativePath,
-        message.markdown
+        message.content
       );
     },
+    onCreateLinkedNote: async message =>
+      normalizeCreateLinkedNoteResult(
+        await dotNet.invokeMethodAsync(
+          'HandleCreateLinkedNote',
+          message.sourcePath,
+          message.viewMode
+        )
+      ),
   });
 
   instances.set(instanceId, { editor });
@@ -88,9 +108,9 @@ export async function loadNote(
   await waitForAnimationFrames(2);
 }
 
-export async function loadCard(instanceId: number, markdown: string) {
+export async function loadCard(instanceId: number, content: string) {
   const instance = getInstance(instanceId);
-  await instance.editor.loadCard(markdown);
+  await instance.editor.loadCard(content);
   await waitForAnimationFrames(2);
 }
 
@@ -123,16 +143,12 @@ export function showExtractResult(
   error?: string
 ) {
   const instance = getInstance(instanceId);
-  instance.editor.showStatus(
-    ok
-      ? `Created ${createdPath?.split(/[\\/]/).pop() ?? 'extract file'}.`
-      : `Extract failed: ${error ?? 'Unknown error'}`
-  );
+  void instance.editor.handleExtractResult(ok, createdPath, error);
 }
 
 export function setMentionTargets(
   instanceId: number,
-  targets: Array<{ relativePath: string; fileName: string; recentRank: number }>
+  targets: Array<{ relativePath: string; title: string; fileName: string; recentRank: number }>
 ) {
   const instance = getInstance(instanceId);
   instance.editor.setMentionTargets(targets);
@@ -145,7 +161,7 @@ export function handleMentionPreviewResult(
   mode: string,
   ok: boolean,
   title?: string,
-  markdownExcerpt?: string,
+  documentContent?: string,
   error?: string
 ) {
   const instance = getInstance(instanceId);
@@ -155,7 +171,7 @@ export function handleMentionPreviewResult(
     mode: mode === 'full' ? 'full' : 'preview',
     ok,
     title,
-    markdownExcerpt,
+    documentContent,
     error,
   });
 }
@@ -182,4 +198,58 @@ function getInstance(instanceId: number) {
   }
 
   return instance;
+}
+
+function normalizeCreateLinkedNoteResult(value: unknown): CreateLinkedNoteResult {
+  const result = value as {
+    ok?: boolean;
+    Ok?: boolean;
+    relativePath?: string;
+    RelativePath?: string;
+    title?: string;
+    Title?: string;
+    documentContent?: string;
+    DocumentContent?: string;
+    error?: string;
+    Error?: string;
+  } | null;
+
+  return {
+    ok: Boolean(result?.ok ?? result?.Ok),
+    relativePath: result?.relativePath ?? result?.RelativePath,
+    title: result?.title ?? result?.Title,
+    documentContent: result?.documentContent ?? result?.DocumentContent,
+    error: result?.error ?? result?.Error,
+  };
+}
+
+function normalizeMentionTargets(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap(item => {
+    const target = item as {
+      relativePath?: string;
+      RelativePath?: string;
+      title?: string;
+      Title?: string;
+      fileName?: string;
+      FileName?: string;
+      recentRank?: number | null;
+      RecentRank?: number | null;
+    } | null;
+
+    const relativePath = target?.relativePath ?? target?.RelativePath;
+    if (!relativePath) {
+      return [];
+    }
+
+    return [{
+      relativePath,
+      title: target?.title ?? target?.Title ?? '',
+      fileName: target?.fileName ?? target?.FileName ?? '',
+      recentRank: target?.recentRank ?? target?.RecentRank ?? null,
+    }];
+  });
 }
