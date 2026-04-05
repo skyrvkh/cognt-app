@@ -34,6 +34,13 @@ import {
   importBlockSuiteJsonIntoExistingDoc,
 } from './documents/io';
 import {
+  cloneTextSelection,
+  createBlockSuiteDocumentJsonFromSelection,
+  getCurrentSelection,
+  getTextSelectionSnapshotRange,
+  type TextSelectionSnapshot,
+} from './documents/selection-export';
+import {
   findEditableElement,
   findElementsDeep,
   getInteractivityDiagnostic,
@@ -101,19 +108,6 @@ type LinkedPageReference = {
   params?: Record<string, unknown>;
   title?: string;
   type?: string;
-};
-
-type TextSelectionPointSnapshot = {
-  blockId: string;
-  index: number;
-  length: number;
-};
-
-type TextSelectionSnapshot = {
-  from: TextSelectionPointSnapshot;
-  to: TextSelectionPointSnapshot | null;
-  start?: TextSelectionPointSnapshot;
-  end?: TextSelectionPointSnapshot;
 };
 
 type PendingExtract = {
@@ -1954,53 +1948,6 @@ function getDeltaReference(delta: {
   return null;
 }
 
-function getCurrentSelection() {
-  const selectedText = window.getSelection()?.toString() ?? '';
-  const plainText = normalizeSelectionText(selectedText);
-
-  if (plainText.length === 0) {
-    return null;
-  }
-
-  return {
-    plainText,
-  };
-}
-
-function createBlockSuiteDocumentJsonFromSelection(
-  doc: Doc,
-  editor: PageEditor,
-  plainText: string
-) {
-  const textSelection = editor.std?.selection.find('text') as TextSelection | null | undefined;
-  if (!textSelection || textSelection.isCollapsed()) {
-    return null;
-  }
-
-  const models = getSelectedTextBlockModels(editor, doc, textSelection);
-  if (models.length === 0) {
-    return null;
-  }
-
-  const job = new Job({ collection: doc.collection });
-  const start = getTextSelectionStart(textSelection);
-  const end = getTextSelectionEnd(textSelection);
-  const snapshots = models
-    .map(model => job.blockToSnapshot(model as DraftModel))
-    .filter(isBlockSnapshot)
-    .map(cloneBlockSnapshot)
-    .map(snapshot => trimSnapshotForTextSelection(snapshot, start, end));
-
-  if (snapshots.length === 0 || !snapshots.some(hasSnapshotBodyContent)) {
-    return null;
-  }
-
-  return createBlockSuiteDocumentJsonFromBlockSnapshots(
-    snapshots,
-    createTitleFromPlainText(plainText, 'Extract')
-  );
-}
-
 function replaceExtractSelectionWithLinkedPage(
   doc: Doc,
   selection: TextSelectionSnapshot,
@@ -2038,47 +1985,6 @@ function replaceExtractSelectionWithLinkedPage(
   });
 
   return linkedDoc;
-}
-
-function cloneTextSelection(selection: TextSelection): TextSelectionSnapshot {
-  return {
-    from: cloneTextSelectionPoint(selection.from),
-    to: selection.to ? cloneTextSelectionPoint(selection.to) : null,
-    start: selection.start ? cloneTextSelectionPoint(selection.start) : undefined,
-    end: selection.end ? cloneTextSelectionPoint(selection.end) : undefined,
-  };
-}
-
-function cloneTextSelectionPoint(point: TextSelectionPointSnapshot): TextSelectionPointSnapshot {
-  return {
-    blockId: point.blockId,
-    index: point.index,
-    length: point.length,
-  };
-}
-
-function getTextSelectionSnapshotRange(selection: TextSelectionSnapshot) {
-  const start = selection.start ?? selection.from;
-  const end = selection.end ?? selection.to ?? selection.from;
-
-  if (start.blockId !== end.blockId) {
-    return null;
-  }
-
-  const index = Math.min(start.index, end.index);
-  const selectionEnd = Math.max(
-    start.index + Math.max(0, start.length),
-    end.index + Math.max(0, end.length)
-  );
-  const length = selectionEnd - index;
-
-  return length > 0
-    ? {
-        blockId: start.blockId,
-        index,
-        length,
-      }
-    : null;
 }
 
 function getSelectedTextBlockModels(
