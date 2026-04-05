@@ -4,7 +4,6 @@ import {
   defaultBlockMarkdownAdapterMatchers,
   MarkdownAdapter,
   MarkdownTransformer,
-  PageEditorBlockSpecs,
   type AffineSlashMenuActionItem,
   type AffineSlashMenuGroupDivider,
   type AffineSlashMenuItem,
@@ -13,13 +12,11 @@ import {
   type AffineSlashSubMenu,
 } from '@blocksuite/blocks';
 import {
-  focusTextModel,
   getInlineEditorByModel,
   REFERENCE_NODE,
   RefNodeSlotsProvider,
 } from '@blocksuite/affine-components/rich-text';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
-import { BlockStdScope, ConfigExtension, type EditorHost } from '@blocksuite/block-std';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { createEmptyDoc, type PageEditor } from '@blocksuite/presets';
 import {
@@ -31,11 +28,33 @@ import {
   type DraftModel,
 } from '@blocksuite/store';
 import { replaceSelectionWithCloze, updateClozeHighlights, type TextSelection } from './cloze';
+import {
+  findEditableElement,
+  findElementsDeep,
+  getInteractivityDiagnostic,
+  waitForNextAnimationFrame,
+} from './editor/dom';
+import {
+  flushEditorHost,
+  focusFirstTextBlock,
+  forceEditableRichText,
+  setDocReadonly,
+} from './editor/host-operations';
+import {
+  isEditorShortcut,
+  preventReadOnlyKeyboardInput,
+} from './editor/keyboard';
+import {
+  createEditorSpecs,
+  patchBlockStdRender,
+} from './editor/specs';
+import {
+  formatElapsed,
+  logEditorTiming,
+} from './editor/timing';
 import { reportDiagnostic } from './host';
 import {
   MentionController,
-  type NativeInlineEditor,
-  type NativeLinkedMenuGroup,
   type OpenMentionMessage,
   type RequestMentionPreviewMessage,
   type SearchMentionTargetsMessage,
@@ -368,7 +387,7 @@ export class MarkdownBlockSuiteEditor {
 
     const startedAt = performance.now();
     this.enableEditorMode();
-    this.setCurrentDocReadonly(false);
+    setDocReadonly(this.currentDoc, false);
 
     await waitForNextAnimationFrame();
 
@@ -376,7 +395,7 @@ export class MarkdownBlockSuiteEditor {
       return false;
     }
 
-    await this.forceEditableRichText();
+    await forceEditableRichText(this.editor);
     logEditorTiming(`${operation} editable unlock`, startedAt);
     reportDiagnostic(
       'info',
@@ -392,7 +411,7 @@ export class MarkdownBlockSuiteEditor {
       }
 
       const focusStartedAt = performance.now();
-      this.focusFirstTextBlock();
+      focusFirstTextBlock(this.editor, this.currentDoc);
       logEditorTiming('focus first text block', focusStartedAt);
 
       const clozeStartedAt = performance.now();
@@ -429,8 +448,8 @@ export class MarkdownBlockSuiteEditor {
     this.enableEditorMode();
     await this.flushHost();
     await waitForNextAnimationFrame();
-    await this.forceEditableRichText();
-    this.focusFirstTextBlock();
+    await forceEditableRichText(this.editor);
+    focusFirstTextBlock(this.editor, this.currentDoc);
     reportDiagnostic(
       'info',
       `Editor mode active (${getInteractivityDiagnostic(this.currentDoc, document)}).`
@@ -479,11 +498,7 @@ export class MarkdownBlockSuiteEditor {
     this.readOnlyMode = false;
     document.body.dataset.mode = 'editor';
     this.editor.classList.remove('review-renderer', 'card-render-pending');
-    this.setCurrentDocReadonly(false);
-  }
-
-  private setCurrentDocReadonly(readonly: boolean) {
-    this.currentDoc?.awarenessStore.setReadonly(this.currentDoc.blockCollection, readonly);
+    setDocReadonly(this.currentDoc, false);
   }
 
   private isEditorInputLocked() {
@@ -498,42 +513,6 @@ export class MarkdownBlockSuiteEditor {
 
     this.lockedInputStatusShownAt = now;
     this.showStatus('This view is read-only.');
-  }
-
-  private focusFirstTextBlock() {
-    if (!this.currentDoc || this.currentDoc.readonly) {
-      return;
-    }
-
-    const textBlock = this.currentDoc
-      .getBlocks()
-      .find(block => block.role === 'content' && block.text);
-
-    if (textBlock) {
-      focusTextModel(this.editor.std, textBlock.id, textBlock.text?.length ?? 0);
-    }
-  }
-
-  private async forceEditableRichText() {
-    for (const richText of findElementsDeep(this.editor, 'rich-text')) {
-      const editable = richText as HTMLElement & {
-        readonly?: boolean;
-        inlineEditor?: { setReadonly?: (readonly: boolean) => void };
-        requestUpdate?: (name?: string, oldValue?: unknown) => void;
-        updateComplete?: Promise<unknown>;
-      };
-
-      editable.readonly = false;
-      editable.inlineEditor?.setReadonly?.(false);
-      editable.requestUpdate?.('readonly', true);
-      await editable.updateComplete;
-
-      const inlineEditor = findEditableElement(editable.shadowRoot) ??
-        editable.shadowRoot?.querySelector<HTMLElement>('.inline-editor');
-
-      inlineEditor?.classList.remove('readonly');
-      inlineEditor?.setAttribute('contenteditable', 'true');
-    }
   }
 
   public showStatus(message: string) {
@@ -1097,24 +1076,7 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private async flushHost() {
-    await this.editor.updateComplete;
-
-    const host = this.editor.host as (EditorHost & {
-      requestUpdate?: () => void;
-      updateComplete?: Promise<unknown>;
-    }) | null;
-
-    if (!host || !this.editor.std || !this.editor.doc) {
-      return;
-    }
-
-    host.std = this.editor.std;
-    host.doc = this.editor.doc;
-    host.requestUpdate?.();
-    await host.updateComplete;
-    patchRenderedEmbedLinkedDocBlocks(this.editor);
-    window.requestAnimationFrame(() => patchRenderedEmbedLinkedDocBlocks(this.editor));
-    window.setTimeout(() => patchRenderedEmbedLinkedDocBlocks(this.editor), 80);
+    await flushEditorHost(this.editor);
   }
 
   private async exportCurrentContent() {
@@ -1337,7 +1299,6 @@ export class MarkdownBlockSuiteEditor {
   }
 }
 
-type ShortcutKey = 'x' | 'z';
 type SlashMenuStaticItem =
   | AffineSlashMenuActionItem
   | AffineSlashMenuGroupDivider
@@ -1994,123 +1955,6 @@ function getDeltaReference(delta: {
   return null;
 }
 
-function createEditorSpecs(
-  getMenus: (
-    query: string,
-    abort: () => void,
-    inlineEditor: NativeInlineEditor,
-    abortSignal: AbortSignal
-  ) => Promise<NativeLinkedMenuGroup[]> | NativeLinkedMenuGroup[]
-) {
-  return [
-    ...PageEditorBlockSpecs,
-    ConfigExtension('affine:page', {
-      linkedWidget: {
-        triggerKeys: ['@'],
-        convertTriggerKey: false,
-        getMenus: (
-          query: string,
-          abort: () => void,
-          _editorHost: EditorHost,
-          inlineEditor: NativeInlineEditor,
-          abortSignal: AbortSignal
-        ) => getMenus(query, abort, inlineEditor, abortSignal),
-      },
-    }),
-  ];
-}
-
-function isEditorShortcut(
-  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>,
-  key: ShortcutKey
-) {
-  return (
-    (event.ctrlKey || event.metaKey) &&
-    !event.shiftKey &&
-    !event.altKey &&
-    event.key.toLowerCase() === key
-  );
-}
-
-function preventReadOnlyKeyboardInput(event: KeyboardEvent) {
-  if (event.ctrlKey || event.metaKey || event.altKey) {
-    return;
-  }
-
-  if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
-    event.preventDefault();
-  }
-}
-
-function findEditableElement(root: ParentNode | ShadowRoot | null): HTMLElement | null {
-  if (!root) {
-    return null;
-  }
-
-  const editable = findElementDeep(root, '[contenteditable="true"], [contenteditable=""], textarea, input');
-  if (editable) {
-    return editable;
-  }
-
-  return findElementDeep(root, '.inline-editor, rich-text');
-}
-
-function getInteractivityDiagnostic(doc: Doc | null, root: ParentNode | ShadowRoot) {
-  const editable = findEditableElement(root);
-  const readOnlyRichTexts = findElementsDeep(root, 'rich-text')
-    .filter(element => (element as HTMLElement & { readonly?: boolean }).readonly);
-  const falseContentEditableCount = findElementsDeep(root, '[contenteditable="false"]').length;
-
-  return [
-    `docReadonly=${String(doc?.readonly ?? false)}`,
-    `editable=${String(!!editable)}`,
-    `editableTag=${editable?.tagName.toLowerCase() ?? 'none'}`,
-    `editableContentEditable=${editable?.getAttribute('contenteditable') ?? 'none'}`,
-    `readOnlyRichTexts=${readOnlyRichTexts.length}`,
-    `falseContentEditable=${falseContentEditableCount}`,
-  ].join(', ');
-}
-
-function findElementDeep(root: ParentNode | ShadowRoot, selector: string): HTMLElement | null {
-  const direct = root.querySelector<HTMLElement>(selector);
-
-  if (direct) {
-    return direct;
-  }
-
-  for (const element of root.querySelectorAll<HTMLElement>('*')) {
-    const found = element.shadowRoot ? findElementDeep(element.shadowRoot, selector) : null;
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
-}
-
-function findElementsDeep(root: ParentNode | ShadowRoot, selector: string): HTMLElement[] {
-  const elements = Array.from(root.querySelectorAll<HTMLElement>(selector));
-
-  if (root instanceof HTMLElement && root.shadowRoot) {
-    elements.push(...findElementsDeep(root.shadowRoot, selector));
-  }
-
-  for (const element of root.querySelectorAll<HTMLElement>('*')) {
-    if (element.shadowRoot) {
-      elements.push(...findElementsDeep(element.shadowRoot, selector));
-    }
-  }
-
-  return elements;
-}
-
-function waitForNextAnimationFrame() {
-  return new Promise<void>(resolve => {
-    window.requestAnimationFrame(() => resolve());
-  });
-}
-
-
 function getCurrentSelection() {
   const selectedText = window.getSelection()?.toString() ?? '';
   const plainText = normalizeSelectionText(selectedText);
@@ -2562,34 +2406,6 @@ function normalizeSelectionText(text: string) {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-function patchBlockStdRender() {
-  const prototype = BlockStdScope.prototype as unknown as {
-    __cogntRenderPatched?: boolean;
-    render: () => EditorHost;
-  };
-
-  if (prototype.__cogntRenderPatched) {
-    return;
-  }
-
-  prototype.render = function renderWithCreateElement(this: BlockStdScope) {
-    const scope = this as unknown as {
-      doc: Doc;
-      _getHost: () => EditorHost;
-      _lifeCycleWatchers: Array<{ rendered: { call(watcher: unknown): void } }>;
-    };
-    const element = document.createElement('editor-host') as EditorHost;
-    element.std = this;
-    element.doc = scope.doc;
-    scope._getHost = () => element;
-    scope._lifeCycleWatchers.forEach(watcher => {
-      watcher.rendered.call(watcher);
-    });
-    return element;
-  };
-  prototype.__cogntRenderPatched = true;
-}
-
 function createEmptyMarkdownDoc() {
   return createEmptyDoc().init();
 }
@@ -2789,15 +2605,6 @@ function findFirstBlockSnapshot(block: BlockSnapshot, flavour: string): BlockSna
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function formatElapsed(startedAt: number) {
-  return `${Math.round(performance.now() - startedAt)}ms`;
-}
-
-function logEditorTiming(operation: string, startedAt: number, detail?: string) {
-  const suffix = detail ? ` [${detail}]` : '';
-  reportDiagnostic('info', `BlockSuite editor ${operation}: ${formatElapsed(startedAt)}${suffix}`);
 }
 
 function hydrateCogntEmbedLinkedNotes(
