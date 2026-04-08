@@ -1,5 +1,4 @@
 import {
-  createDefaultDoc,
   type AffineSlashMenuContext,
 } from '@blocksuite/blocks';
 import {
@@ -10,7 +9,6 @@ import { effects as blockEffects } from '@blocksuite/blocks/effects';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { type PageEditor } from '@blocksuite/presets';
 import {
-  type BlockModel,
   type BlockSnapshot,
   type Doc,
   type DocSnapshot,
@@ -86,6 +84,8 @@ import {
   isOpenThisDocToolbarIntent,
   normalizeCreatedExtractPath,
   normalizeLinkedNotePathKey,
+  registerSerializedCogntEmbedLinkedNotes,
+  registerSerializedCogntInlineLinkedNotes,
   replaceExtractSelectionWithLinkedPage,
   type LinkedPageReference,
 } from './links/linked-notes';
@@ -101,22 +101,7 @@ const saveDebounceMs = 500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
 const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
-const defaultCogntEmbedStyle = 'horizontal';
-const cogntEmbedStyleAliases = new Map([
-  ['horizontal', 'horizontal'],
-  ['horizontalthin', 'horizontalThin'],
-  ['list', 'list'],
-  ['vertical', 'vertical'],
-  ['cube', 'cube'],
-]);
 const editorsByDoc = new WeakMap<Doc, MarkdownBlockSuiteEditor>();
-
-type CogntLinkedDoc = {
-  doc: Doc;
-  relativePath: string;
-};
-
-type LinkedNoteTitleResolver = (relativePath: string) => string | null | undefined;
 
 defineCogntPropertiesBlockElement();
 configureCogntSlashMenu({
@@ -1210,372 +1195,8 @@ export class MarkdownBlockSuiteEditor {
 
 }
 
-function getLinkedNoteTitleFromModel(model: unknown) {
-  if (typeof model !== 'object' || model === null) {
-    return null;
-  }
-
-  const record = model as Record<string, unknown>;
-  const props = typeof record.props === 'object' && record.props !== null
-    ? record.props as Record<string, unknown>
-    : {};
-
-  return getCogntLinkedNoteTitle(record) ?? getCogntLinkedNoteTitle(props);
-}
-
-function extractCogntEmbedTarget(markdown: string | undefined) {
-  const match = markdown?.trim().match(/^!\[\[([^\]\n]+)\]\]$/);
-  return parseCogntLinkTarget(match?.[1]);
-}
-
-function parseCogntLinkTarget(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const [relativePath, ...parts] = value.split('|');
-  const normalizedPath = relativePath.trim();
-  if (!normalizedPath) {
-    return null;
-  }
-
-  const titleParts: string[] = [];
-  let style: string | null = null;
-
-  for (const part of parts) {
-    const optionMatch = part.trim().match(/^style\s*=\s*(.+)$/i);
-    if (optionMatch) {
-      style = normalizeCogntEmbedStyle(optionMatch[1]) ?? style;
-      continue;
-    }
-
-    titleParts.push(part);
-  }
-
-  return {
-    relativePath: normalizedPath,
-    title: normalizeLinkedNoteTitle(titleParts.join('|')),
-    style,
-  };
-}
-
-function normalizeLinkedNoteTitle(title: string | null | undefined) {
-  return title?.replace(/[|\]\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() || null;
-}
-
-function normalizeCogntEmbedStyle(style: unknown) {
-  if (typeof style !== 'string') {
-    return null;
-  }
-
-  return cogntEmbedStyleAliases.get(style.trim().toLowerCase()) ?? null;
-}
-
-function* walkBlockModels(model: unknown): Generator<unknown> {
-  if (!model) {
-    return;
-  }
-
-  yield model;
-
-  const children = (model as { children?: unknown }).children;
-  if (!Array.isArray(children)) {
-    return;
-  }
-
-  for (const child of children) {
-    yield* walkBlockModels(child);
-  }
-}
-
-function getBlockText(model: unknown) {
-  const text = (model as { text?: unknown } | null)?.text;
-  if (
-    typeof text === 'object'
-    && text !== null
-    && typeof (text as { toDelta?: unknown }).toDelta === 'function'
-    && typeof (text as { format?: unknown }).format === 'function'
-  ) {
-    return text as {
-      toDelta(): Array<{
-        insert?: unknown;
-        attributes?: Record<string, unknown>;
-      }>;
-      format(index: number, length: number, format: Record<string, unknown>): void;
-      replace(
-        index: number,
-        length: number,
-        content: string,
-        attributes?: Record<string, unknown>
-      ): void;
-    };
-  }
-
-  return null;
-}
-
-function getDeltaReference(delta: {
-  attributes?: Record<string, unknown>;
-}) {
-  const reference = delta.attributes?.reference;
-  if (typeof reference === 'object' && reference !== null) {
-    return reference as {
-      pageId?: string;
-      title?: string;
-      description?: string;
-      relativePath?: string;
-      cogntLinkedNotePath?: string;
-      params?: Record<string, unknown>;
-      type?: string;
-    };
-  }
-
-  return null;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hydrateCogntEmbedLinkedNotes(
-  doc: Doc,
-  onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
-  resolveTitle?: LinkedNoteTitleResolver
-) {
-  const note = doc.root?.children.find(child => child.flavour === 'affine:note') ?? null;
-
-  if (!note) {
-    return;
-  }
-
-  for (const child of [...note.children]) {
-    if (child.flavour !== 'affine:paragraph') {
-      continue;
-    }
-
-    const target = extractCogntEmbedTarget(child.text?.toString());
-    if (!target) {
-      continue;
-    }
-
-    const title = getLinkedNoteTitle(
-      target.relativePath,
-      target.title ?? resolveTitle?.(target.relativePath)
-    );
-    const linkedDoc = createDefaultDoc(doc.collection, { title });
-    onLinkedDoc?.({ doc: linkedDoc, relativePath: target.relativePath });
-    const parent = doc.getParent(child);
-    if (!parent) {
-      continue;
-    }
-
-    const index = parent.children.indexOf(child);
-    doc.addBlock(
-      'affine:embed-linked-doc' as never,
-      {
-        pageId: linkedDoc.id,
-        params: createCogntLinkedNoteParams(target.relativePath),
-        style: target.style ?? defaultCogntEmbedStyle,
-        caption: null,
-        title,
-        description: target.relativePath,
-        [cogntLinkedNotePathProp]: target.relativePath,
-      } as never,
-      parent,
-      index
-    );
-    doc.deleteBlock(child, { deleteChildren: true });
-  }
-}
-
-function registerSerializedCogntEmbedLinkedNotes(
-  doc: Doc,
-  onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
-  resolveTitle?: LinkedNoteTitleResolver
-) {
-  let changed = false;
-
-  for (const model of doc.getBlocks()) {
-    if (!isCogntLinkedDocModel(model)) {
-      continue;
-    }
-
-    const relativePath = getCogntLinkedNotePathFromModel(model);
-    if (!relativePath) {
-      continue;
-    }
-
-    const title = getLinkedNoteTitle(
-      relativePath,
-      resolveTitle?.(relativePath) ?? getLinkedNoteTitleFromModel(model)
-    );
-    const modelRecord = model as unknown as Record<string, unknown> & { pageId?: string };
-    const existingPageId = getTrimmedString(modelRecord.pageId);
-    const linkedDoc = ensureLinkedDocReferenceDoc(doc, existingPageId, title);
-    const mergedParams = mergeCogntLinkedNoteParams(
-      getRecordProperty(modelRecord, 'params'),
-      relativePath
-    );
-    const needsUpdate =
-      modelRecord.pageId !== linkedDoc.id
-      || getLinkedNoteTitleFromModel(model) !== title
-      || getCogntLinkedNotePathFromModel(model) !== relativePath
-      || getTrimmedString(modelRecord.description) !== relativePath
-      || !hasCogntLinkedNotePath(modelRecord.params, relativePath);
-
-    if (needsUpdate) {
-      doc.updateBlock(model as BlockModel, {
-        pageId: linkedDoc.id,
-        params: mergedParams,
-        title,
-        description: relativePath,
-        [cogntLinkedNotePathProp]: relativePath,
-      });
-      changed = true;
-    }
-    onLinkedDoc?.({ doc: linkedDoc, relativePath });
-  }
-
-  return changed;
-}
-
-function registerSerializedCogntInlineLinkedNotes(
-  doc: Doc,
-  resolveTitle?: LinkedNoteTitleResolver
-) {
-  let changed = false;
-
-  for (const model of walkBlockModels(doc.root)) {
-    const text = getBlockText(model);
-    if (!text) {
-      continue;
-    }
-
-    let index = 0;
-    for (const delta of text.toDelta()) {
-      const inserted = typeof delta.insert === 'string' ? delta.insert : '';
-      const length = inserted.length;
-      const reference = getDeltaReference(delta);
-      const relativePath = reference ? getLinkedPageReferencePath(reference) : null;
-
-      if (reference?.type === 'LinkedPage' && reference.pageId && relativePath) {
-        const linkedPage = ensureLinkedPageReferenceDoc(doc, reference, relativePath, resolveTitle);
-        const needsUpdate =
-          reference.pageId !== linkedPage.pageId
-          || getTrimmedString(reference.title) !== linkedPage.title
-          || getLinkedPageReferencePath(reference) !== relativePath
-          || getTrimmedString(reference.description) !== relativePath
-          || !hasCogntLinkedNotePath(reference.params, relativePath);
-
-        if (needsUpdate) {
-          text.format(index, Math.max(length, REFERENCE_NODE.length), {
-            reference: {
-              ...reference,
-              type: 'LinkedPage',
-              pageId: linkedPage.pageId,
-              params: mergeCogntLinkedNoteParams(reference.params, relativePath),
-              title: linkedPage.title,
-              description: relativePath,
-              [cogntLinkedNotePathProp]: relativePath,
-            },
-          });
-          changed = true;
-        }
-      }
-
-      index += length;
-    }
-  }
-
-  return changed;
-}
-
-function upgradeRuntimeRawCogntInlineMentions(doc: Doc, resolveTitle?: LinkedNoteTitleResolver) {
-  for (const model of walkBlockModels(doc.root)) {
-    const text = getBlockText(model);
-    if (!text) {
-      continue;
-    }
-
-    const replacements: Array<{
-      index: number;
-      length: number;
-      relativePath: string;
-    }> = [];
-    let index = 0;
-
-    for (const delta of text.toDelta()) {
-      const inserted = typeof delta.insert === 'string' ? delta.insert : '';
-      const length = inserted.length;
-
-      if (inserted.includes('[[')) {
-        const expression = /\[\[([^\]\[\n]+)\]\]/g;
-        let match: RegExpExecArray | null;
-
-        while ((match = expression.exec(inserted)) !== null) {
-          const target = parseNoteMentionTarget(match[1]);
-          if (!target || !isCogntNoteRelativePath(target.relativePath)) {
-            continue;
-          }
-
-          replacements.push({
-            index: index + match.index,
-            length: match[0].length,
-            relativePath: target.relativePath,
-          });
-        }
-      }
-
-      index += length;
-    }
-
-    for (const replacement of replacements.reverse()) {
-      text.replace(
-        replacement.index,
-        replacement.length,
-        REFERENCE_NODE,
-        {
-          reference: createLinkedPageReference(
-            createBlockId(),
-            replacement.relativePath,
-            getLinkedNoteTitle(replacement.relativePath, resolveTitle?.(replacement.relativePath))
-          ),
-        }
-      );
-    }
-  }
-}
-
-function ensureLinkedPageReferenceDoc(
-  doc: Doc,
-  reference: Record<string, unknown>,
-  relativePath: string,
-  resolveTitle?: LinkedNoteTitleResolver
-) {
-  const title = getLinkedNoteTitle(
-    relativePath,
-    resolveTitle?.(relativePath) ?? getTrimmedString(reference.title)
-  );
-  const pageId = getTrimmedString(reference.pageId) ?? createBlockId();
-
-  if (!doc.collection.getDoc(pageId)) {
-    createDefaultDoc(doc.collection, { id: pageId, title });
-  } else {
-    doc.collection.setDocMeta(pageId, { title });
-  }
-
-  return { pageId, title };
-}
-
-function ensureLinkedDocReferenceDoc(doc: Doc, pageId: string | null, title: string) {
-  const existingDoc = pageId ? doc.collection.getDoc(pageId) : null;
-  const linkedDoc = existingDoc ?? createDefaultDoc(
-    doc.collection,
-    pageId ? { id: pageId, title } : { title }
-  );
-
-  doc.collection.setDocMeta(linkedDoc.id, { title });
-  return linkedDoc;
 }
 
 function upgradeSerializedRawCogntInlineMentionSnapshots(snapshot: DocSnapshot) {
@@ -1750,14 +1371,5 @@ function hasCogntLinkedNotePath(params: unknown, relativePath: string) {
 function getRecordProperty(record: Record<string, unknown>, key: string) {
   const value = record[key];
   return isRecord(value) ? value : null;
-}
-
-function getCogntLinkedNoteTitle(props: Record<string, unknown>) {
-  const value = props.title;
-  return typeof value === 'string' ? normalizeLinkedNoteTitle(value) : null;
-}
-
-function getCogntLinkedNoteStyle(props: Record<string, unknown>) {
-  return normalizeCogntEmbedStyle(props.style);
 }
 
