@@ -3,7 +3,6 @@ import {
   type AffineSlashMenuContext,
 } from '@blocksuite/blocks';
 import {
-  getInlineEditorByModel,
   REFERENCE_NODE,
   RefNodeSlotsProvider,
 } from '@blocksuite/affine-components/rich-text';
@@ -23,6 +22,7 @@ import {
   type PendingExtract,
   runClozeCommand,
   runCreateExtractCommand,
+  runCreateLinkedNoteCommand,
   runInsertPropertiesBlockCommand,
   type SaveClozeCommandMessage,
 } from './commands';
@@ -72,6 +72,11 @@ import {
   logEditorTiming,
 } from './editor/timing';
 import { reportDiagnostic } from './host';
+import {
+  attachCogntPathToInlineReference,
+  getLinkedNotePathFromResult,
+  getLinkedNoteTitleFromResult,
+} from './links/linked-notes';
 import {
   MentionController,
   type OpenMentionMessage,
@@ -1159,70 +1164,31 @@ export class MarkdownBlockSuiteEditor {
     viewMode: LinkedNoteViewMode,
     context: AffineSlashMenuContext
   ) {
-    if (this.isEditorInputLocked()) {
-      this.showStatus('Wait for the full note to finish loading before creating linked notes.');
-      return;
-    }
-
-    if (!this.currentDoc || !this.currentPath) {
-      this.showStatus('Open a note before creating a linked note.');
-      return;
-    }
-
-    try {
-      const result = await this.onCreateLinkedNote({
-        type: 'createLinkedNote',
-        sourcePath: this.currentPath,
-        viewMode,
-      });
-
-      if (!result.ok) {
-        throw new Error(result.error ?? 'The linked note could not be created.');
-      }
-
-      const linkedNotePath = getLinkedNotePathFromResult(result);
-      if (!linkedNotePath) {
-        throw new Error('The linked note path was not returned.');
-      }
-
-      if (viewMode === 'embed') {
-        const linkedDoc = insertCogntLinkedNoteEmbed(
-          context,
-          linkedNotePath,
-          getLinkedNoteTitleFromResult(result)
-        );
-        this.trackLinkedDoc(linkedDoc, linkedNotePath);
-
-        if (typeof result.documentContent === 'string') {
-          await importBlockSuiteJsonIntoExistingDoc(
-            linkedDoc,
-            result.documentContent,
-            nestedLinkedDoc => this.registerLinkedDoc(nestedLinkedDoc, this.loadGeneration)
-          );
-          this.markLinkedDocPreviewed(linkedDoc);
-        } else {
-          this.requestLinkedDocPreview(linkedDoc, linkedNotePath, this.loadGeneration);
-        }
-      } else {
-        const linkedDoc = insertCogntLinkedNoteInline(
-          context,
-          linkedNotePath,
-          getLinkedNoteTitleFromResult(result)
-        );
-        this.trackLinkedDoc(linkedDoc, linkedNotePath);
-      }
-
-      await this.flushHost();
-      this.mentions.refreshHighlights();
-      this.cancelPendingContentChanged();
-      this.userEditGeneration++;
-      this.onContentChanged(await this.exportCurrentContent());
-      this.showStatus(`Created ${result.relativePath ?? 'linked note'}.`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      reportDiagnostic('error', `Could not create linked note: ${message}`);
-      this.showStatus(`Create note failed: ${message}`);
-    }
+    await runCreateLinkedNoteCommand(
+      {
+        isInputLocked: () => this.isEditorInputLocked(),
+        getCurrentDoc: () => this.currentDoc,
+        getCurrentPath: () => this.currentPath,
+        getLoadGeneration: () => this.loadGeneration,
+        createLinkedNote: message => this.onCreateLinkedNote(message),
+        trackLinkedDoc: (doc, relativePath) => this.trackLinkedDoc(doc, relativePath),
+        registerNestedLinkedDoc: (linkedDoc, generation) =>
+          this.registerLinkedDoc(linkedDoc, generation),
+        markLinkedDocPreviewed: doc => this.markLinkedDocPreviewed(doc),
+        requestLinkedDocPreview: (doc, relativePath, generation) =>
+          this.requestLinkedDocPreview(doc, relativePath, generation),
+        flushHost: () => this.flushHost(),
+        refreshMentionHighlights: () => this.mentions.refreshHighlights(),
+        cancelPendingContentChanged: () => this.cancelPendingContentChanged(),
+        recordUserEdit: () => {
+          this.userEditGeneration++;
+        },
+        notifyContentChanged: async () => this.onContentChanged(await this.exportCurrentContent()),
+        showStatus: message => this.showStatus(message),
+      },
+      viewMode,
+      context
+    );
   }
 
   public async insertPropertiesBlockFromSlashMenu(context: AffineSlashMenuContext) {
@@ -1449,19 +1415,6 @@ function linkedDocNestedWrapCss() {
   `;
 }
 
-function getLinkedNotePathFromResult(result: CreateLinkedNoteResult) {
-  if (result.relativePath?.trim()) {
-    return result.relativePath.trim();
-  }
-
-  return null;
-}
-
-function getLinkedNoteTitleFromResult(result: CreateLinkedNoteResult) {
-  const title = normalizeLinkedNoteTitle(result.title);
-  return title;
-}
-
 function normalizeCreatedExtractPath(path: string | null | undefined) {
   const value = path?.trim().replace(/\\/g, '/');
   if (!value) {
@@ -1549,125 +1502,6 @@ function normalizeCogntEmbedStyle(style: unknown) {
   }
 
   return cogntEmbedStyleAliases.get(style.trim().toLowerCase()) ?? null;
-}
-
-function insertCogntLinkedNoteEmbed(
-  context: AffineSlashMenuContext,
-  relativePath: string,
-  requestedTitle?: string | null
-): Doc {
-  const { rootComponent, model } = context;
-  const parent = rootComponent.doc.getParent(model);
-
-  if (!parent) {
-    throw new Error('Could not find the insertion block.');
-  }
-
-  const index = parent.children.indexOf(model);
-  const title = getLinkedNoteTitle(relativePath, requestedTitle);
-  const linkedDoc = createDefaultDoc(rootComponent.doc.collection, { title });
-  const blockId = rootComponent.doc.addBlock(
-    'affine:embed-linked-doc' as never,
-    {
-      pageId: linkedDoc.id,
-      params: createCogntLinkedNoteParams(relativePath),
-      style: defaultCogntEmbedStyle,
-      caption: null,
-      title,
-      description: relativePath,
-      [cogntLinkedNotePathProp]: relativePath,
-    } as never,
-    parent,
-    index + 1
-  );
-
-  if (model.text?.length === 0 && model.children.length === 0) {
-    rootComponent.doc.deleteBlock(model);
-  }
-
-  rootComponent.host.selection.setGroup('note', [
-    rootComponent.host.selection.create('block', { blockId }),
-  ]);
-
-  return linkedDoc;
-}
-
-function insertCogntLinkedNoteInline(
-  context: AffineSlashMenuContext,
-  relativePath: string,
-  requestedTitle?: string | null
-): Doc {
-  const { rootComponent, model } = context;
-  const inlineEditor = getInlineEditorByModel(rootComponent.host, model);
-
-  if (!inlineEditor) {
-    throw new Error('Could not find the inline editor for the insertion block.');
-  }
-
-  const inlineRange = inlineEditor.getInlineRange();
-  if (!inlineRange) {
-    throw new Error('Could not find the inline insertion point.');
-  }
-
-  const title = getLinkedNoteTitle(relativePath, requestedTitle);
-  const linkedDoc = createDefaultDoc(rootComponent.doc.collection, { title });
-  const reference = {
-    type: 'LinkedPage',
-    pageId: linkedDoc.id,
-    params: createCogntLinkedNoteParams(relativePath),
-    title,
-    description: relativePath,
-    [cogntLinkedNotePathProp]: relativePath,
-  };
-  inlineEditor.insertText(inlineRange, REFERENCE_NODE, {
-    reference,
-  } as never);
-  inlineEditor.setInlineRange({
-    index: inlineRange.index + REFERENCE_NODE.length,
-    length: 0,
-  });
-
-  return linkedDoc;
-}
-
-function attachCogntPathToInlineReference(
-  doc: Doc,
-  pageId: string,
-  relativePath: string,
-  title?: string | null
-) {
-  for (const model of walkBlockModels(doc.root)) {
-    const text = getBlockText(model);
-    if (!text) {
-      continue;
-    }
-
-    let index = 0;
-    for (const delta of text.toDelta()) {
-      const inserted = typeof delta.insert === 'string' ? delta.insert : '';
-      const length = inserted.length;
-      const reference = getDeltaReference(delta);
-
-      if (reference?.pageId === pageId) {
-        text.format(index, Math.max(length, REFERENCE_NODE.length), {
-          reference: {
-            ...reference,
-            type: 'LinkedPage',
-            pageId,
-            params: mergeCogntLinkedNoteParams(reference.params, relativePath),
-            title: title ?? reference.title,
-            description: relativePath,
-            [cogntLinkedNotePathProp]: relativePath,
-          },
-        });
-        return true;
-      }
-
-      index += length;
-    }
-  }
-
-  return false;
 }
 
 function* walkBlockModels(model: unknown): Generator<unknown> {
