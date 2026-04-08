@@ -49,7 +49,6 @@ import {
 } from './editor/slash-menu';
 import {
   findEditableElement,
-  findElementsDeep,
   getInteractivityDiagnostic,
   waitForNextAnimationFrame,
 } from './editor/dom';
@@ -74,8 +73,18 @@ import {
 import { reportDiagnostic } from './host';
 import {
   attachCogntPathToInlineReference,
+  getCogntLinkedDocOpenIntent,
+  getCogntLinkedDocToolbarModel,
+  getCogntLinkedNotePathFromModel,
+  getInlineLinkedPageReference,
+  getInlineLinkedPageReferenceElementFromEvent,
+  getInlineLinkedPageReferenceFromEvent,
+  getLinkedDocReferenceFromModel,
   getLinkedNotePathFromResult,
   getLinkedNoteTitleFromResult,
+  isCogntLinkedDocModel,
+  isOpenThisDocToolbarIntent,
+  type LinkedPageReference,
 } from './links/linked-notes';
 import {
   MentionController,
@@ -89,8 +98,6 @@ const saveDebounceMs = 500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
 const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
-const embedLinkedDocTagName = 'affine-embed-linked-doc-block';
-const cogntLinkedDocWrapStyleId = 'cognt-linked-doc-wrap-style';
 const defaultCogntEmbedStyle = 'horizontal';
 const cogntEmbedStyleAliases = new Map([
   ['horizontal', 'horizontal'],
@@ -107,16 +114,6 @@ type CogntLinkedDoc = {
 };
 
 type LinkedNoteTitleResolver = (relativePath: string) => string | null | undefined;
-
-type LinkedPageReference = {
-  pageId?: string;
-  relativePath?: string;
-  description?: string;
-  cogntLinkedNotePath?: string;
-  params?: Record<string, unknown>;
-  title?: string;
-  type?: string;
-};
 
 defineCogntPropertiesBlockElement();
 configureCogntSlashMenu({
@@ -1210,139 +1207,6 @@ export class MarkdownBlockSuiteEditor {
 
 }
 
-function getInlineLinkedPageReferenceFromEvent(event: MouseEvent): LinkedPageReference | null {
-  const element = getInlineLinkedPageReferenceElementFromEvent(event);
-  return element ? getInlineLinkedPageReference(element) : null;
-}
-
-function getInlineLinkedPageReferenceElementFromEvent(
-  event: MouseEvent
-): (HTMLElement & {
-  referenceInfo?: unknown;
-  delta?: { attributes?: { reference?: unknown } };
-}) | null {
-  return event.composedPath().find(isInlineLinkedPageReferenceElement) ?? null;
-}
-
-function getInlineLinkedPageReference(
-  element: HTMLElement & {
-    referenceInfo?: unknown;
-    delta?: { attributes?: { reference?: unknown } };
-  }
-): LinkedPageReference | null {
-  const reference = element?.referenceInfo ?? element?.delta?.attributes?.reference;
-
-  return isLinkedPageReference(reference) ? reference : null;
-}
-
-function isInlineLinkedPageReferenceElement(
-  value: EventTarget
-): value is HTMLElement & {
-  referenceInfo?: unknown;
-  delta?: { attributes?: { reference?: unknown } };
-} {
-  return value instanceof HTMLElement && value.localName === 'affine-reference';
-}
-
-function isLinkedPageReference(value: unknown): value is LinkedPageReference {
-  return typeof value === 'object'
-    && value !== null
-    && (value as { pageId?: unknown }).pageId !== undefined
-    && typeof (value as { pageId?: unknown }).pageId === 'string';
-}
-
-function getCogntLinkedDocOpenIntent(event: MouseEvent) {
-  const path = event.composedPath();
-  const block = path.find(isEmbedLinkedDocBlockElement) as
-    | (HTMLElement & { model?: unknown })
-    | undefined;
-
-  if (!block || !path.some(isLinkedDocCardOpenTarget)) {
-    return null;
-  }
-
-  return isCogntLinkedDocModel(block.model)
-    && getCogntLinkedNotePathFromModel(block.model)
-    ? block.model
-    : null;
-}
-
-function isOpenThisDocToolbarIntent(event: MouseEvent) {
-  return event.composedPath().some(isOpenThisDocActionElement);
-}
-
-function getCogntLinkedDocToolbarModel(event: MouseEvent) {
-  for (const target of event.composedPath()) {
-    if (typeof target !== 'object' || target === null) {
-      continue;
-    }
-
-    const candidate = target as { focusModel?: unknown; model?: unknown };
-    const model = candidate.focusModel ?? candidate.model;
-    if (isCogntLinkedDocModel(model) && getCogntLinkedNotePathFromModel(model)) {
-      return model;
-    }
-  }
-
-  return null;
-}
-
-function isEmbedLinkedDocBlockElement(value: EventTarget) {
-  return value instanceof HTMLElement && value.localName === embedLinkedDocTagName;
-}
-
-function isLinkedDocCardOpenTarget(value: EventTarget) {
-  return value instanceof HTMLElement
-    && (value.classList.contains('affine-embed-linked-doc-content-title-icon')
-      || value.classList.contains('affine-embed-linked-doc-content-title-text'));
-}
-
-function isOpenThisDocActionElement(value: EventTarget) {
-  if (!(value instanceof HTMLElement)) {
-    return false;
-  }
-
-  const ariaLabel = value.getAttribute('aria-label')?.trim().toLowerCase();
-  const actionType = value.getAttribute('type')?.trim().toLowerCase();
-
-  return ariaLabel === 'open this doc'
-    || actionType === 'open-this-doc'
-    || actionType === 'open';
-}
-
-function getLinkedDocReferenceFromModel(model: unknown) {
-  if (!isCogntLinkedDocModel(model)) {
-    return null;
-  }
-
-  const linkedDocModel = model as Record<string, unknown> & { pageId: string };
-
-  return {
-    pageId: linkedDocModel.pageId,
-    relativePath: getCogntLinkedNotePathFromModel(linkedDocModel) ?? undefined,
-  };
-}
-
-function isCogntLinkedDocModel(model: unknown) {
-  return typeof model === 'object'
-    && model !== null
-    && (model as { flavour?: unknown }).flavour === 'affine:embed-linked-doc'
-    && typeof (model as { pageId?: unknown }).pageId === 'string';
-}
-
-function getCogntLinkedNotePathFromModel(model: unknown) {
-  if (typeof model !== 'object' || model === null) {
-    return null;
-  }
-
-  const record = model as Record<string, unknown>;
-  const props = typeof record.props === 'object' && record.props !== null
-    ? record.props as Record<string, unknown>
-    : {};
-
-  return getCogntLinkedNotePath(record) ?? getCogntLinkedNotePath(props);
-}
-
 function getLinkedNoteTitleFromModel(model: unknown) {
   if (typeof model !== 'object' || model === null) {
     return null;
@@ -1354,65 +1218,6 @@ function getLinkedNoteTitleFromModel(model: unknown) {
     : {};
 
   return getCogntLinkedNoteTitle(record) ?? getCogntLinkedNoteTitle(props);
-}
-
-function patchRenderedEmbedLinkedDocBlocks(root: ParentNode | ShadowRoot) {
-  for (const block of findElementsDeep(root, embedLinkedDocTagName)) {
-    injectShadowStyle(block, linkedDocCardWrapCss());
-
-    for (const child of findElementsDeep(
-      block,
-      'affine-paragraph, affine-list, rich-text, .inline-editor'
-    )) {
-      injectShadowStyle(child, linkedDocNestedWrapCss());
-    }
-  }
-}
-
-function injectShadowStyle(element: HTMLElement, cssText: string) {
-  const root = element.shadowRoot;
-  if (!root || root.getElementById(cogntLinkedDocWrapStyleId)) {
-    return;
-  }
-
-  const style = document.createElement('style');
-  style.id = cogntLinkedDocWrapStyleId;
-  style.textContent = cssText;
-  root.prepend(style);
-}
-
-function linkedDocCardWrapCss() {
-  return `
-    .affine-embed-linked-doc-content,
-    .affine-embed-linked-doc-content-note,
-    .affine-embed-doc-content-note-blocks,
-    .affine-embed-doc-content-note-blocks * {
-      min-width: 0 !important;
-      max-width: 100% !important;
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
-      white-space: normal !important;
-    }
-
-    .affine-embed-linked-doc-content-note.render {
-      overflow: hidden !important;
-    }
-  `;
-}
-
-function linkedDocNestedWrapCss() {
-  return `
-    :host,
-    *,
-    .inline-editor,
-    rich-text {
-      min-width: 0 !important;
-      max-width: 100% !important;
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
-      white-space: normal !important;
-    }
-  `;
 }
 
 function normalizeCreatedExtractPath(path: string | null | undefined) {
