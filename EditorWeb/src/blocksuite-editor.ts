@@ -1,12 +1,6 @@
 import {
-  AffineSlashMenuWidget,
   createDefaultDoc,
-  type AffineSlashMenuActionItem,
-  type AffineSlashMenuGroupDivider,
-  type AffineSlashMenuItem,
-  type AffineSlashMenuItemGenerator,
   type AffineSlashMenuContext,
-  type AffineSlashSubMenu,
 } from '@blocksuite/blocks';
 import {
   getInlineEditorByModel,
@@ -22,12 +16,14 @@ import {
   type Doc,
   type DocSnapshot,
 } from '@blocksuite/store';
+import { defineCogntPropertiesBlockElement } from './blocks/properties';
 import { updateClozeHighlights, type TextSelection } from './cloze';
 import {
   type CreateExtractCommandMessage,
   type PendingExtract,
   runClozeCommand,
   runCreateExtractCommand,
+  runInsertPropertiesBlockCommand,
   type SaveClozeCommandMessage,
 } from './commands';
 import {
@@ -47,6 +43,10 @@ import {
   getTextSelectionSnapshotRange,
   type TextSelectionSnapshot,
 } from './documents/selection-export';
+import {
+  configureCogntSlashMenu,
+  type LinkedNoteViewMode,
+} from './editor/slash-menu';
 import {
   findEditableElement,
   findElementsDeep,
@@ -83,8 +83,6 @@ import { parseNoteMentionTarget, type MentionPreviewResult, type MentionTarget }
 const saveDebounceMs = 500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
-const hiddenSlashMenuSections = new Set(['Style', 'Date', 'Actions']);
-const hiddenSlashMenuItems = new Set(['Figma', 'GitHub', 'Github', 'Loom', 'Linked Doc', 'Embed Link']);
 const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
 const embedLinkedDocTagName = 'affine-embed-linked-doc-block';
 const cogntLinkedDocWrapStyleId = 'cognt-linked-doc-wrap-style';
@@ -115,7 +113,10 @@ type LinkedPageReference = {
   type?: string;
 };
 
-configureSlashMenu();
+defineCogntPropertiesBlockElement();
+configureCogntSlashMenu({
+  getEditor: doc => editorsByDoc.get(doc),
+});
 blockEffects();
 presetEffects();
 patchBlockStdRender();
@@ -125,7 +126,7 @@ export type {
   SaveClozeCommandMessage as SaveClozeMessage,
 } from './commands';
 
-export type LinkedNoteViewMode = 'inline' | 'embed' | 'native';
+export type { LinkedNoteViewMode } from './editor/slash-menu';
 
 export type CreateLinkedNoteMessage = {
   type: 'createLinkedNote';
@@ -1224,174 +1225,23 @@ export class MarkdownBlockSuiteEditor {
     }
   }
 
-}
-
-type SlashMenuStaticItem =
-  | AffineSlashMenuActionItem
-  | AffineSlashMenuGroupDivider
-  | AffineSlashSubMenu;
-
-function configureSlashMenu() {
-  const config = AffineSlashMenuWidget.DEFAULT_CONFIG;
-
-  AffineSlashMenuWidget.DEFAULT_CONFIG = {
-    ...config,
-    items: [
-      { groupName: 'Cognt' },
+  public async insertPropertiesBlockFromSlashMenu(context: AffineSlashMenuContext) {
+    await runInsertPropertiesBlockCommand(
       {
-        name: 'Create Note',
-        description: 'Create a note link.',
-        alias: ['note', 'linked note', 'new note'],
-        subMenu: [
-          { groupName: 'Create Note' },
-          {
-            name: 'Inline Link',
-            description: 'Insert a link to a new note.',
-            alias: ['inline note', 'link note'],
-            action: context => {
-              void runCreateLinkedNoteAction('inline', context);
-            },
-          },
-          {
-            name: 'Embed Link',
-            description: 'Insert an embedded reference to a new note.',
-            alias: ['embed note', 'note embed', 'embed view'],
-            action: context => {
-              void runCreateLinkedNoteAction('embed', context);
-            },
-          },
-        ],
+        isInputLocked: () => this.isEditorInputLocked(),
+        getCurrentDoc: () => this.currentDoc,
+        flushHost: () => this.flushHost(),
+        cancelPendingContentChanged: () => this.cancelPendingContentChanged(),
+        recordUserEdit: () => {
+          this.userEditGeneration++;
+        },
+        notifyContentChanged: async () => this.onContentChanged(await this.exportCurrentContent()),
+        showStatus: message => this.showStatus(message),
       },
-      ...filterSlashMenuItems(config.items),
-    ],
-  };
-}
-
-async function runCreateLinkedNoteAction(
-  viewMode: LinkedNoteViewMode,
-  context: AffineSlashMenuContext
-) {
-  const editor = editorsByDoc.get(context.rootComponent.doc);
-
-  if (!editor) {
-    reportDiagnostic('error', 'Could not create linked note: no editor is registered for this document.');
-    return;
+      context
+    );
   }
 
-  await editor.createLinkedNoteFromSlashMenu(viewMode, context);
-}
-
-function filterSlashMenuItems(items: AffineSlashMenuItem[]) {
-  const filtered: AffineSlashMenuItem[] = [];
-  let isSkippingSection = false;
-
-  for (const item of items) {
-    if (isSlashMenuGenerator(item)) {
-      if (!isSkippingSection) {
-        filtered.push(context => filterSlashMenuStaticItems(item(context)));
-      }
-
-      continue;
-    }
-
-    if (isSlashMenuGroupDivider(item)) {
-      isSkippingSection = hiddenSlashMenuSections.has(item.groupName);
-
-      if (!isSkippingSection) {
-        filtered.push(item);
-      }
-
-      continue;
-    }
-
-    if (isSkippingSection) {
-      continue;
-    }
-
-    const nextItem = filterSlashMenuStaticItem(item);
-    if (nextItem) {
-      filtered.push(nextItem);
-    }
-  }
-
-  return filtered;
-}
-
-function filterSlashMenuStaticItems(items: SlashMenuStaticItem[]) {
-  const filtered: SlashMenuStaticItem[] = [];
-  let isSkippingSection = false;
-
-  for (const item of items) {
-    if (isSlashMenuGroupDivider(item)) {
-      isSkippingSection = hiddenSlashMenuSections.has(item.groupName);
-
-      if (!isSkippingSection) {
-        filtered.push(item);
-      }
-
-      continue;
-    }
-
-    if (isSkippingSection) {
-      continue;
-    }
-
-    const nextItem = filterSlashMenuStaticItem(item);
-    if (nextItem) {
-      filtered.push(nextItem);
-    }
-  }
-
-  return filtered;
-}
-
-function filterSlashMenuStaticItem(item: SlashMenuStaticItem): SlashMenuStaticItem | null {
-  if (isNamedSlashMenuItem(item) && hiddenSlashMenuItems.has(item.name)) {
-    return null;
-  }
-
-  if (isNamedSlashMenuItem(item) && item.name === 'New Doc' && !isSlashSubMenu(item)) {
-    return {
-      ...item,
-      description: 'Start a new note.',
-      action: context => {
-        void runCreateLinkedNoteAction('inline', context);
-      },
-    } as AffineSlashMenuActionItem;
-  }
-
-  if (isSlashSubMenu(item)) {
-    const subMenu = filterSlashMenuStaticItems(item.subMenu);
-
-    if (subMenu.length === 0) {
-      return null;
-    }
-
-    return {
-      ...item,
-      subMenu,
-    };
-  }
-
-  return item;
-}
-
-function isSlashMenuGenerator(item: AffineSlashMenuItem): item is AffineSlashMenuItemGenerator {
-  return typeof item === 'function';
-}
-
-function isSlashMenuGroupDivider(item: SlashMenuStaticItem): item is AffineSlashMenuGroupDivider {
-  return 'groupName' in item;
-}
-
-function isSlashSubMenu(item: SlashMenuStaticItem): item is AffineSlashSubMenu {
-  return 'subMenu' in item;
-}
-
-function isNamedSlashMenuItem(
-  item: SlashMenuStaticItem
-): item is AffineSlashMenuActionItem | AffineSlashSubMenu {
-  return 'name' in item;
 }
 
 function getInlineLinkedPageReferenceFromEvent(event: MouseEvent): LinkedPageReference | null {
