@@ -1,0 +1,21 @@
+{
+  "name": "cognt-editor-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@blocksuite/blocks": "0.19.5",
+    "@blocksuite/icons": "2.1.75",
+    "@blocksuite/presets": "0.19.5",
+    "@blocksuite/store": "0.19.5",
+    "@toeverything/theme": "1.1.23"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vite": "7.2.4"
+  }
+}
