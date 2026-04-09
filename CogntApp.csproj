@@ -21,6 +21,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="src\Cognt.Wpf\ViewModels\CountDisplayFormatter.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\NumericTextFormatter.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\ObservableObject.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\RelayCommand.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EditorWebSource Include="EditorWeb\package.json" />
     <EditorWebSource Include="EditorWeb\tsconfig.json" />
     <EditorWebSource Include="EditorWeb\vite.config.js" />
