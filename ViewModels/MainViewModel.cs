@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
+using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Models.Tree;
@@ -747,18 +748,20 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private NoteTreeNodeViewModel CreateTreeNode(TreeItemRow item)
     {
-        string? notePath = item.Kind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath)
-            ? Path.Combine(currentNotesDirectory, item.FileRelPath.Replace('/', Path.DirectorySeparatorChar))
+        KnowledgeTreeItemRow knowledgeItem = ToKnowledgeTreeItemRow(item);
+        TreeItemKind itemKind = ToTreeItemKind(knowledgeItem.Kind);
+        string? notePath = itemKind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(knowledgeItem.FileRelPath)
+            ? Path.Combine(currentNotesDirectory, knowledgeItem.FileRelPath.Replace('/', Path.DirectorySeparatorChar))
             : null;
 
         NoteTreeNodeViewModel node = new(
-            item.Id,
-            item.ParentId,
-            item.Kind,
-            item.Title,
-            item.FileRelPath,
+            knowledgeItem.Id,
+            knowledgeItem.ParentId,
+            itemKind,
+            knowledgeItem.Title,
+            knowledgeItem.FileRelPath,
             notePath,
-            item.ChildCount)
+            knowledgeItem.ChildCount)
         {
             IsExpanded = false,
         };
@@ -769,6 +772,42 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
 
         return node;
+    }
+
+    private static KnowledgeTreeItemRow ToKnowledgeTreeItemRow(TreeItemRow item)
+    {
+        return new KnowledgeTreeItemRow(
+            item.Id,
+            item.Uid,
+            item.ParentId,
+            item.Kind switch
+            {
+                TreeItemKind.Root => KnowledgeTreeItemKind.Root,
+                TreeItemKind.Trash => KnowledgeTreeItemKind.Trash,
+                TreeItemKind.Note => KnowledgeTreeItemKind.Note,
+                _ => KnowledgeTreeItemKind.Folder,
+            },
+            item.Title,
+            item.Position,
+            item.FileRelPath,
+            item.ChildCount,
+            item.IsDeleted,
+            item.CreatedAt,
+            item.UpdatedAt,
+            item.FileSize,
+            item.FileMtimeUtc,
+            item.ContentHash);
+    }
+
+    private static TreeItemKind ToTreeItemKind(KnowledgeTreeItemKind kind)
+    {
+        return kind switch
+        {
+            KnowledgeTreeItemKind.Root => TreeItemKind.Root,
+            KnowledgeTreeItemKind.Trash => TreeItemKind.Trash,
+            KnowledgeTreeItemKind.Note or KnowledgeTreeItemKind.PdfDocument => TreeItemKind.Note,
+            _ => TreeItemKind.Folder,
+        };
     }
 
     private void AddLoadedTreeNode(TreeItemRow? item)

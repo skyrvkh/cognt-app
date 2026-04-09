@@ -39,6 +39,10 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Domain\Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
+  </ItemGroup>
+
   <Target Name="BuildEditorWeb"
           BeforeTargets="AssignTargetPaths"
           DependsOnTargets="RestoreEditorWeb"
