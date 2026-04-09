@@ -7,8 +7,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <RootNamespace>CogntApp</RootNamespace>
+    <ApplicationIcon>src\Cognt.Wpf\Assets\icon.ico</ApplicationIcon>
     <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="src\**\*.cs" />
+    <Page Remove="src\**\*.xaml" />
+    <ApplicationDefinition Remove="src\**\*.xaml" />
+    <Resource Remove="src\**\*" />
+    <Content Remove="src\**\*" />
+    <None Remove="src\**\*" />
+  </ItemGroup>
 
   <ItemGroup>
     <EditorWebSource Include="EditorWeb\package.json" />
