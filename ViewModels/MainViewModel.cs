@@ -6,6 +6,7 @@ using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Models.Tree;
 using CogntApp.Services;
+using KnowledgeOpenedNoteReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeOpenedNoteReadModel;
 
 namespace CogntApp.ViewModels;
 
@@ -159,11 +160,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ? null
             : noteService.FindNoteByPath(currentNotesDirectory, fullPath);
 
-        return new PreparedNote(
-            fullPath,
+        KnowledgeOpenedNoteReadModel openedNote = new(
+            string.IsNullOrWhiteSpace(currentNotesDirectory)
+                ? fullPath
+                : Path.GetRelativePath(currentNotesDirectory, fullPath),
             noteItem?.Title ?? Path.GetFileNameWithoutExtension(fullPath),
             content,
             noteItem?.Id);
+
+        return new PreparedNote(
+            fullPath,
+            openedNote.Title,
+            openedNote.Content,
+            openedNote.ItemId);
     }
 
     public void CompleteOpenNote(PreparedNote note)
