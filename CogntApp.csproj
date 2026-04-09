@@ -41,6 +41,7 @@
 
   <ItemGroup>
     <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Domain\Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
+    <ProjectReference Include="src\Modules\ProgressTrackingAndAnalytics\Cognt.Modules.ProgressTrackingAndAnalytics.Application\Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
     <ProjectReference Include="src\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Domain\Cognt.Modules.SpacedRepetitionSystem.Domain.csproj" />
   </ItemGroup>
 

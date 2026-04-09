@@ -1,4 +1,6 @@
 using CogntApp.Models.Decks;
+using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Abstractions;
+using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Models;
 using LiveChartsCore;
 using LiveChartsCore.Defaults;
 using LiveChartsCore.SkiaSharpView;
@@ -35,12 +37,7 @@ public sealed class StatisticsSubviewViewModel
     public IReadOnlyList<DailyStatisticsRow> DailyStatisticsRows { get; }
 
     public IReadOnlyList<RecallDistributionRow> RecallDistributionRows { get; } =
-    [
-        new("Again", 105, 8, "#DC2626"),
-        new("Hard", 205, 16, "#D97706"),
-        new("Good", 436, 34, "#2563EB"),
-        new("Easy", 538, 42, "#16A34A")
-    ];
+        CreateRecallDistributionRows(CreateAnalyticsSnapshot());
 
     public IReadOnlyList<WeeklyOutcomeRow> WeeklyOutcomeRows { get; } =
     [
@@ -347,5 +344,47 @@ public sealed class StatisticsSubviewViewModel
     private static SolidColorPaint ChartPaint(string color)
     {
         return new SolidColorPaint(SKColor.Parse(color));
+    }
+
+    private static CollectionProgressAnalyticsSnapshot CreateAnalyticsSnapshot()
+    {
+        return new CollectionProgressAnalyticsSnapshot(
+            [],
+            new ProgressAnalyticsDashboardSnapshot(0, 0, 0, 0, 0, 0, []),
+            new ProgressAnalyticsDetailSnapshot(
+                0,
+                0,
+                [],
+                [
+                    new ProgressAnalyticsRecallCount(ProgressAnalyticsRecallRating.Again, 105),
+                    new ProgressAnalyticsRecallCount(ProgressAnalyticsRecallRating.Hard, 205),
+                    new ProgressAnalyticsRecallCount(ProgressAnalyticsRecallRating.Good, 436),
+                    new ProgressAnalyticsRecallCount(ProgressAnalyticsRecallRating.Easy, 538),
+                ],
+                []));
+    }
+
+    private static IReadOnlyList<RecallDistributionRow> CreateRecallDistributionRows(CollectionProgressAnalyticsSnapshot snapshot)
+    {
+        int total = Math.Max(1, snapshot.Details.RecallDistribution.Sum(row => row.Count));
+
+        return snapshot.Details.RecallDistribution
+            .Select(row => new RecallDistributionRow(
+                row.Rating.ToString(),
+                row.Count,
+                (int)Math.Round(row.Count * 100.0 / total),
+                RecallColor(row.Rating)))
+            .ToArray();
+    }
+
+    private static string RecallColor(ProgressAnalyticsRecallRating rating)
+    {
+        return rating switch
+        {
+            ProgressAnalyticsRecallRating.Again => "#DC2626",
+            ProgressAnalyticsRecallRating.Hard => "#D97706",
+            ProgressAnalyticsRecallRating.Good => "#2563EB",
+            _ => "#16A34A",
+        };
     }
 }
