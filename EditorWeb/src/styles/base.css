@@ -1,0 +1,63 @@
+:root {
+  color-scheme: light;
+  font-family: var(--affine-font-family);
+  background: var(--affine-background-primary-color);
+  color: var(--affine-text-primary-color);
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+#app {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--affine-background-primary-color);
+}
+
+#editor-host,
+.cognt-blocksuite-host,
+page-editor {
+  width: 100%;
+  height: 100%;
+  display: block;
+  min-height: 0;
+}
+
+#editor-host {
+  position: relative;
+  overflow: hidden;
+}
+
+page-editor {
+  box-sizing: border-box;
+  overflow: auto;
+  background: var(--affine-background-primary-color);
+  --affine-editor-width: none;
+  --affine-editor-side-padding: clamp(24px, 5vw, 96px);
+}
+
+.affine-page-root-block-container,
+.doc-title-container,
+rich-text,
+.inline-editor {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+::selection {
+  color: var(--affine-text-primary-color);
+  background: var(--affine-blue-100);
+}
+
+::highlight(cognt-cloze) {
+  color: transparent;
+  background: #dbe4ee;
+  text-shadow: none;
+  text-decoration: none;
+}

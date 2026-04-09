@@ -1,0 +1,24 @@
+#editor-status {
+  position: fixed;
+  z-index: 1002;
+  right: 14px;
+  bottom: 14px;
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 8px 10px;
+  border: 1px solid var(--affine-border-color);
+  border-radius: 6px;
+  background: var(--affine-background-overlay-panel-color);
+  color: var(--affine-text-secondary-color);
+  box-shadow: var(--affine-shadow-2);
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
+}
+
+#editor-status[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
