@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
+using Cognt.Composition;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 
@@ -12,6 +13,7 @@ namespace CogntApp;
 public partial class App : Application
 {
     private bool isShowingExceptionDialog;
+    private IDisposable? moduleComposition;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -22,6 +24,7 @@ public partial class App : Application
         try
         {
             MainWindow = new MainWindow();
+            moduleComposition = CogntModuleComposition.BuildModuleScope();
             MainWindow.Show();
         }
         catch (Exception ex)
@@ -32,6 +35,12 @@ public partial class App : Application
                 ex);
             Shutdown(1);
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        moduleComposition?.Dispose();
+        base.OnExit(e);
     }
 
     private void RegisterExceptionHandlers()
