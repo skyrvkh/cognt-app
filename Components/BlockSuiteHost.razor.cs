@@ -1,9 +1,9 @@
 using System.Text.Json;
-using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 using CogntApp.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
 
 namespace CogntApp.Components;
 

@@ -6,12 +6,18 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using CogntApp.Models.Decks;
-using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
+using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
+using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
+using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
+using KnowledgeMentionTargetReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeMentionTargetReadModel;
+using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
+using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
+using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
 
 namespace CogntApp;
 
@@ -709,7 +715,7 @@ public partial class MainWindow : Window
 
     private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
     {
-        e.Complete(viewModel.SearchMentionTargets(e.Query, e.Limit));
+        e.Complete(viewModel.SearchMentionTargets(e.Query, e.Limit).Select(ToKnowledgeMentionTarget));
     }
 
     private void EditorView_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
@@ -757,12 +763,17 @@ public partial class MainWindow : Window
         try
         {
             LinkedNote note = viewModel.CreateLinkedNote(e.SourcePath, e.ViewMode);
-            e.Complete(CreateLinkedNoteResult.Success(note));
+            e.Complete(CreateLinkedNoteResult.Success(note.RelativePath, note.Title, note.DocumentContent));
         }
         catch (Exception ex)
         {
             e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
         }
+    }
+
+    private static KnowledgeMentionTargetReadModel ToKnowledgeMentionTarget(MentionTarget target)
+    {
+        return new KnowledgeMentionTargetReadModel(target.RelativePath, target.Title);
     }
 
     private void EditorView_ContentChanged(object? sender, string content)

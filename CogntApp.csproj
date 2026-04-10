@@ -25,6 +25,11 @@
     <Compile Include="src\Cognt.Wpf\ViewModels\NumericTextFormatter.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\ObservableObject.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\RelayCommand.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateExtractRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateLinkedNoteRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\MentionPreviewRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\MentionSearchRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\OpenMentionRequestedEventArgs.cs" />
   </ItemGroup>
 
   <ItemGroup>

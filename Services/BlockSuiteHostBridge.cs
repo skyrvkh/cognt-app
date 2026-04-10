@@ -1,6 +1,14 @@
+using System.IO;
 using System.Text.Json;
-using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
+using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
+using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
+using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
+using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
+using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
 
 namespace CogntApp.Services;
 
@@ -156,7 +164,7 @@ public sealed class BlockSuiteHostBridge
     {
         MentionSearchRequestedEventArgs args = new(sourcePath, query, limit);
         MentionSearchRequested?.Invoke(this, args);
-        return args.Targets;
+        return args.Targets.Select(ToMentionTarget).ToArray();
     }
 
     internal void RaiseOpenMention(string sourcePath, string relativePath, string content)
@@ -187,5 +195,14 @@ public sealed class BlockSuiteHostBridge
     {
         await WaitUntilReadyAsync();
         return host ?? throw new InvalidOperationException("The BlockSuite host is not ready.");
+    }
+
+    private static MentionTarget ToMentionTarget(KnowledgeMentionTargetReadModel target)
+    {
+        return new MentionTarget(
+            target.RelativePath,
+            target.Title,
+            Path.GetFileName(target.RelativePath),
+            0);
     }
 }
