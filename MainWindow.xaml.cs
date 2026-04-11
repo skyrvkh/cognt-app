@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using CogntApp.Models.Decks;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
+using CogntApp.Shell.Dialogs;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
@@ -598,11 +599,8 @@ public partial class MainWindow : Window
 
     private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
     {
-        MessageBox.Show(
-            e.Message,
-            e.Title,
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        IShellDialogService dialogService = new WindowShellDialogService(this);
+        dialogService.ShowWarning(e.Title, e.Message);
     }
 
     private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
