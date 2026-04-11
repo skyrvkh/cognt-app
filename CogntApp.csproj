@@ -36,6 +36,7 @@
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.NamePrompt.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
   </ItemGroup>
 
   <ItemGroup>
