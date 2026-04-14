@@ -5,6 +5,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Models.Tree;
+using CogntApp.Shell.Collections;
 using CogntApp.Services;
 using KnowledgeOpenedNoteReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeOpenedNoteReadModel;
 
@@ -12,8 +13,7 @@ namespace CogntApp.ViewModels;
 
 public sealed class MainViewModel : ObservableObject, IDisposable
 {
-    private const string CollectionDirectoryExtension = ".cognt";
-
+    private readonly IKnowledgeCollectionPathResolver collectionPathResolver = new FileSystemKnowledgeCollectionPathResolver();
     private readonly INoteService noteService;
     private string notesDirectory = string.Empty;
     private string currentNotesDirectory = string.Empty;
@@ -85,10 +85,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public void Initialize()
     {
-        string defaultCollectionPath = ResolveDefaultNotesDirectory();
+        string defaultCollectionPath = collectionPathResolver.ResolveDefaultCollectionPath();
         NotesDirectory = defaultCollectionPath;
 
-        if (Directory.Exists(defaultCollectionPath) && IsCognCollectionPath(defaultCollectionPath))
+        if (Directory.Exists(defaultCollectionPath) && collectionPathResolver.IsCollectionPath(defaultCollectionPath))
         {
             LoadNotesDirectory(defaultCollectionPath, clearEditor: false);
         }
@@ -110,11 +110,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (!IsCognCollectionPath(fullPath))
+        if (!collectionPathResolver.IsCollectionPath(fullPath))
         {
             RaiseMessage(
                 "Invalid Collection",
-                $"Only collection folders ending with \"{CollectionDirectoryExtension}\" can be opened.");
+                $"Only collection folders ending with \"{collectionPathResolver.CollectionDirectoryExtension}\" can be opened.");
             return;
         }
 
@@ -1167,60 +1167,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             or FileNotFoundException
             or PathTooLongException
             or NotSupportedException;
-    }
-
-    private static string ResolveDefaultNotesDirectory()
-    {
-        foreach (string root in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
-        {
-            DirectoryInfo? directory = new(root);
-
-            while (directory is not null)
-            {
-                string samplesCollectionPath = Path.Combine(directory.FullName, $"Samples{CollectionDirectoryExtension}");
-                if (Directory.Exists(samplesCollectionPath))
-                {
-                    return samplesCollectionPath;
-                }
-
-                string? firstCollectionPath = FindFirstCollectionPath(directory.FullName);
-
-                if (!string.IsNullOrWhiteSpace(firstCollectionPath))
-                {
-                    return firstCollectionPath;
-                }
-
-                directory = directory.Parent;
-            }
-        }
-
-        return Path.Combine(Environment.CurrentDirectory, $"Samples{CollectionDirectoryExtension}");
-    }
-
-    private static string? FindFirstCollectionPath(string directoryPath)
-    {
-        try
-        {
-            return Directory
-                .EnumerateDirectories(directoryPath, $"*{CollectionDirectoryExtension}", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    private static bool IsCognCollectionPath(string path)
-    {
-        string directoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
-
-        return directoryName.EndsWith(CollectionDirectoryExtension, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()
