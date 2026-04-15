@@ -8,6 +8,7 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
   title: string
 ) {
   const pageId = createBlockId();
+  const surfaceId = createBlockId();
   const noteId = createBlockId();
 
   return `${JSON.stringify(
@@ -33,14 +34,21 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
           children: [
             {
               type: 'block',
+              id: surfaceId,
+              flavour: 'affine:surface',
+              version: 5,
+              props: {},
+              children: [],
+            },
+            {
+              type: 'block',
               id: noteId,
               flavour: 'affine:note',
               version: 1,
               props: {
-                xywh: '[0,0,498,92]',
-                background: '--affine-note-background-white',
+                xywh: '[0,0,800,95]',
+                background: '--affine-note-background-blue',
                 index: 'a0',
-                lockedBySelf: false,
                 hidden: false,
                 displayMode: 'both',
                 edgeless: {
@@ -111,22 +119,13 @@ export function isBlockSuiteJsonPath(path: string | null | undefined) {
 
 export function getSnapshotTextValue(snapshot: BlockSnapshot) {
   const text = snapshot.props.text;
-  return isPlainRecord(text) ? text : null;
+  return isRecord(text) ? text : null;
 }
 
 export function getSnapshotTextDelta(textValue: Record<string, unknown>) {
   return Array.isArray(textValue.delta) ? textValue.delta : [];
 }
 
-export function isBlockSnapshot(value: unknown): value is BlockSnapshot {
-  return isPlainRecord(value)
-    && value.type === 'block'
-    && typeof value.id === 'string'
-    && typeof value.flavour === 'string'
-    && isPlainRecord(value.props)
-    && Array.isArray(value.children);
-}
-
-export function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
