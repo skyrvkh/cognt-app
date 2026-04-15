@@ -8,6 +8,7 @@ using CogntApp.Models.Tree;
 using CogntApp.Shell.Collections;
 using CogntApp.Services;
 using KnowledgeOpenedNoteReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeOpenedNoteReadModel;
+using KnowledgeItemKind = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeItemKind;
 
 namespace CogntApp.ViewModels;
 
@@ -246,7 +247,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public string GetNodeKind(NoteTreeNodeViewModel node)
     {
-        return node.Kind == TreeItemKind.Note ? "note" : "folder";
+        return node.Kind is KnowledgeItemKind.Note or KnowledgeItemKind.PdfDocument ? "note" : "folder";
     }
 
     public void RenameNode(NoteTreeNodeViewModel node, string newName)
@@ -758,8 +759,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private NoteTreeNodeViewModel CreateTreeNode(TreeItemRow item)
     {
         KnowledgeTreeItemRow knowledgeItem = ToKnowledgeTreeItemRow(item);
-        TreeItemKind itemKind = ToTreeItemKind(knowledgeItem.Kind);
-        string? notePath = itemKind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(knowledgeItem.FileRelPath)
+        KnowledgeItemKind itemKind = ToKnowledgeItemKind(knowledgeItem.Kind);
+        string? notePath = itemKind is KnowledgeItemKind.Note or KnowledgeItemKind.PdfDocument
+            && !string.IsNullOrWhiteSpace(knowledgeItem.FileRelPath)
             ? Path.Combine(currentNotesDirectory, knowledgeItem.FileRelPath.Replace('/', Path.DirectorySeparatorChar))
             : null;
 
@@ -808,14 +810,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             item.ContentHash);
     }
 
-    private static TreeItemKind ToTreeItemKind(KnowledgeTreeItemKind kind)
+    private static KnowledgeItemKind ToKnowledgeItemKind(KnowledgeTreeItemKind kind)
     {
         return kind switch
         {
-            KnowledgeTreeItemKind.Root => TreeItemKind.Root,
-            KnowledgeTreeItemKind.Trash => TreeItemKind.Trash,
-            KnowledgeTreeItemKind.Note or KnowledgeTreeItemKind.PdfDocument => TreeItemKind.Note,
-            _ => TreeItemKind.Folder,
+            KnowledgeTreeItemKind.Root => KnowledgeItemKind.Root,
+            KnowledgeTreeItemKind.Trash => KnowledgeItemKind.Trash,
+            KnowledgeTreeItemKind.Note => KnowledgeItemKind.Note,
+            KnowledgeTreeItemKind.PdfDocument => KnowledgeItemKind.PdfDocument,
+            _ => KnowledgeItemKind.Folder,
         };
     }
 

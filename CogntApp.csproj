@@ -22,8 +22,12 @@
 
   <ItemGroup>
     <Compile Include="src\Cognt.Wpf\ViewModels\CountDisplayFormatter.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\NoteTreeNodeViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\NumericTextFormatter.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\ObservableObject.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\RecentNoteViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\CollectionOptionViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\EditorBreadcrumbItemViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\RelayCommand.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateExtractRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateLinkedNoteRequestedEventArgs.cs" />

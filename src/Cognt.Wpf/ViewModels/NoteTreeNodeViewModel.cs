@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using CogntApp.Models.Tree;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 
 namespace CogntApp.ViewModels;
 
@@ -10,37 +10,37 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     private bool isRenaming;
     private string? notePath;
     private string title;
-    private string header;
     private string editingTitle;
 
     public NoteTreeNodeViewModel(
         long id,
         long? parentId,
-        TreeItemKind kind,
+        KnowledgeItemKind kind,
         string title,
         string? fileRelPath,
         string? notePath,
         int childCount,
         bool isPlaceholder = false)
     {
+        ArgumentNullException.ThrowIfNull(title);
+
         Id = id;
         ParentId = parentId;
         Kind = kind;
         this.title = title;
-        editingTitle = title;
+        editingTitle = this.title;
         FileRelPath = fileRelPath;
-        ChildCount = childCount;
+        ChildCount = Math.Max(0, childCount);
         IsPlaceholder = isPlaceholder;
-        header = CreateHeader(kind, title, isPlaceholder);
         this.notePath = notePath;
-        areChildrenLoaded = isPlaceholder || childCount == 0;
+        areChildrenLoaded = isPlaceholder || ChildCount == 0;
     }
 
     public long Id { get; }
 
     public long? ParentId { get; private set; }
 
-    public TreeItemKind Kind { get; }
+    public KnowledgeItemKind Kind { get; }
 
     public string Title
     {
@@ -48,25 +48,20 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         private set => SetProperty(ref title, value);
     }
 
-    public string Header
-    {
-        get => header;
-        private set => SetProperty(ref header, value);
-    }
-
     public string Prefix => IsPlaceholder
         ? string.Empty
-        : Kind == TreeItemKind.Note
-            ? "[N]"
-            : "[F]";
+        : Kind switch
+        {
+            KnowledgeItemKind.Note => "[N]",
+            KnowledgeItemKind.PdfDocument => "[PDF]",
+            _ => "[F]"
+        };
 
     public string EditingTitle
     {
         get => editingTitle;
         set => SetProperty(ref editingTitle, value);
     }
-
-    public string Path => NotePath ?? Id.ToString();
 
     public string? FileRelPath { get; }
 
@@ -75,7 +70,10 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     public bool IsPlaceholder { get; }
 
     public bool CanContainChildren => !IsPlaceholder
-        && Kind is TreeItemKind.Folder or TreeItemKind.Note or TreeItemKind.Root or TreeItemKind.Trash;
+        && Kind is KnowledgeItemKind.Folder
+            or KnowledgeItemKind.Note
+            or KnowledgeItemKind.Root
+            or KnowledgeItemKind.Trash;
 
     public ObservableCollection<NoteTreeNodeViewModel> Children { get; } = [];
 
@@ -112,8 +110,9 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
 
     public void UpdateTitle(string newTitle)
     {
+        ArgumentNullException.ThrowIfNull(newTitle);
+
         Title = newTitle;
-        Header = CreateHeader(Kind, newTitle, IsPlaceholder);
 
         if (!IsRenaming)
         {
@@ -156,20 +155,11 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         return new NoteTreeNodeViewModel(
             id: 0,
             parentId: null,
-            TreeItemKind.Note,
+            KnowledgeItemKind.Note,
             string.Empty,
             fileRelPath: null,
             notePath: null,
             childCount: 0,
             isPlaceholder: true);
-    }
-
-    private static string CreateHeader(TreeItemKind kind, string title, bool isPlaceholder)
-    {
-        return isPlaceholder
-            ? string.Empty
-            : kind == TreeItemKind.Note
-                ? $"[N] {title}"
-                : $"[F] {title}";
     }
 }
