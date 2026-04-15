@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CogntApp.Models.Markdown;
 using CogntApp.Services;
+using Cognt.Wpf.EditorHost.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
@@ -224,3 +225,4 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         return module ?? throw new InvalidOperationException("The BlockSuite JavaScript module is not ready.");
     }
 }
+

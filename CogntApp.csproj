@@ -32,6 +32,7 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\OpenMentionRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\NavigationModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\UserMessageRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\IShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />

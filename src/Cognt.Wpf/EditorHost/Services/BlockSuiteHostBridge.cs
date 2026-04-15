@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using CogntApp.Models.Markdown;
+using CogntApp.Services;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
 using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
@@ -10,7 +11,7 @@ using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.Menti
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
 using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
 
-namespace CogntApp.Services;
+namespace Cognt.Wpf.EditorHost.Services;
 
 public sealed class BlockSuiteHostBridge
 {
@@ -206,3 +207,4 @@ public sealed class BlockSuiteHostBridge
             0);
     }
 }
+

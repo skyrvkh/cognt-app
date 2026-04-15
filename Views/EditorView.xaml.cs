@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using CogntApp.Components;
 using CogntApp.Models.Markdown;
 using CogntApp.Services;
+using Cognt.Wpf.EditorHost.Services;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
 using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
 using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
@@ -691,3 +692,4 @@ public partial class EditorView : UserControl
         }
     }
 }
+
