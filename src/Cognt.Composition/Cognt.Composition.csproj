@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Application\Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
     <ProjectReference Include="..\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Domain\Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
+    <ProjectReference Include="..\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\ProgressTrackingAndAnalytics\Cognt.Modules.ProgressTrackingAndAnalytics.Application\Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
     <ProjectReference Include="..\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Domain\Cognt.Modules.SpacedRepetitionSystem.Domain.csproj" />
   </ItemGroup>

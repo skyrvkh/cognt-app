@@ -11,8 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Notes\NoteService.DocumentMentions.cs" />
-    <Compile Include="Notes\NoteService.DocumentMentions.cs" />
     <ProjectReference Include="..\Cognt.Modules.PersonalKnowledgeManagement.Application\Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
     <ProjectReference Include="..\Cognt.Modules.PersonalKnowledgeManagement.Domain\Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
   </ItemGroup>
