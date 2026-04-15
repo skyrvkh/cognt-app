@@ -9,7 +9,6 @@ import type {
   NativeLinkedMenuGroup,
 } from '../mention-controller-types';
 import { CogntPropertiesBlockSpec } from '../blocks/properties';
-import { CogntReferencesBlockSpec } from '../blocks/references';
 
 export function createEditorSpecs(
   getMenus: (
@@ -22,8 +21,7 @@ export function createEditorSpecs(
   return [
     ...PageEditorBlockSpecs,
     ...CogntPropertiesBlockSpec,
-    ...CogntReferencesBlockSpec,
-    ConfigExtension('affine:page' as never, {
+    ConfigExtension('affine:page', {
       linkedWidget: {
         triggerKeys: ['@'],
         convertTriggerKey: false,

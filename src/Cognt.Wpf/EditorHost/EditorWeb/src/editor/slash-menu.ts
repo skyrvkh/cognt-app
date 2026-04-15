@@ -12,11 +12,10 @@ import {
   createDefaultPropertiesRows,
   insertCogntPropertiesBlock,
 } from '../blocks/properties';
-import type { CogntSlashMenuRootComponent } from '../blocksuite-compat';
 import { reportDiagnostic } from '../host';
 
 const hiddenSlashMenuSections = new Set(['Style', 'Date', 'Actions']);
-const hiddenSlashMenuItems = new Set(['Figma', 'GitHub', 'Github', 'Loom', 'Linked Doc', 'Embed Link', 'Image']);
+const hiddenSlashMenuItems = new Set(['Figma', 'GitHub', 'Github', 'Loom', 'Linked Doc', 'Embed Link']);
 
 export type LinkedNoteViewMode = 'inline' | 'embed' | 'native';
 
@@ -27,8 +26,6 @@ export type CogntSlashMenuEditor = {
   ): Promise<void>;
 
   insertPropertiesBlockFromSlashMenu(context: AffineSlashMenuContext): Promise<void>;
-
-  insertImageFromSlashMenu(context: AffineSlashMenuContext): Promise<void>;
 };
 
 type ConfigureCogntSlashMenuOptions = {
@@ -47,8 +44,7 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
     viewMode: LinkedNoteViewMode,
     context: AffineSlashMenuContext
   ) => {
-    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
-    const editor = options.getEditor(rootComponent.doc);
+    const editor = options.getEditor(context.rootComponent.doc);
 
     if (!editor) {
       reportDiagnostic('error', 'Could not create linked note: no editor is registered for this document.');
@@ -59,12 +55,11 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
   };
 
   const runInsertPropertiesBlockAction = async (context: AffineSlashMenuContext) => {
-    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
-    const editor = options.getEditor(rootComponent.doc);
+    const editor = options.getEditor(context.rootComponent.doc);
 
     if (!editor) {
       try {
-        insertCogntPropertiesBlock(context, createDefaultPropertiesRows(rootComponent.doc));
+        insertCogntPropertiesBlock(context, createDefaultPropertiesRows(context.rootComponent.doc));
         reportDiagnostic(
           'warn',
           'Added properties block without editor save hook; waiting for the document change listener to persist it.'
@@ -77,18 +72,6 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
     }
 
     await editor.insertPropertiesBlockFromSlashMenu(context);
-  };
-
-  const runInsertImageAction = async (context: AffineSlashMenuContext) => {
-    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
-    const editor = options.getEditor(rootComponent.doc);
-
-    if (!editor) {
-      reportDiagnostic('error', 'Could not add image: no editor is registered for this document.');
-      return;
-    }
-
-    await editor.insertImageFromSlashMenu(context);
   };
 
   const filterSlashMenuStaticItem = (item: SlashMenuStaticItem): SlashMenuStaticItem | null => {
@@ -149,14 +132,6 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
             },
           },
         ],
-      },
-      {
-        name: 'Image',
-        description: 'Insert an image block.',
-        alias: ['picture', 'photo', 'attachment'],
-        action: context => {
-          void runInsertImageAction(context);
-        },
       },
       {
         name: 'Properties',

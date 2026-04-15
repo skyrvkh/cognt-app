@@ -1,5 +1,4 @@
 import type { AffineSlashMenuContext } from '@blocksuite/blocks';
-import type { CogntSlashMenuRootComponent } from '../blocksuite-compat';
 import {
   cogntPropertiesFlavour,
   type CogntPropertyRow,
@@ -10,8 +9,7 @@ export function insertCogntPropertiesBlock(
   context: AffineSlashMenuContext,
   properties: CogntPropertyRow[]
 ) {
-  const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
-  const { model } = context;
+  const { rootComponent, model } = context;
   const parent = rootComponent.doc.getParent(model);
 
   if (!parent) {

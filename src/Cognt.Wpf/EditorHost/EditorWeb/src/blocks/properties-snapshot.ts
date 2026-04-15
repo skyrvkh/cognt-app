@@ -1,5 +1,4 @@
 import type { BlockSnapshot, DocSnapshot } from '@blocksuite/store';
-import { isBlockSnapshot } from '../documents/block-suite-document';
 import { cogntPropertiesFlavour } from './properties-schema';
 import { normalizeCogntProperties } from './properties-normalize';
 
@@ -32,4 +31,17 @@ function upgradeSerializedCogntPropertiesBlockSnapshot(snapshot: BlockSnapshot) 
       upgradeSerializedCogntPropertiesBlockSnapshot(child);
     }
   });
+}
+
+function isBlockSnapshot(value: unknown): value is BlockSnapshot {
+  return isRecord(value)
+    && value.type === 'block'
+    && typeof value.id === 'string'
+    && typeof value.flavour === 'string'
+    && isRecord(value.props)
+    && Array.isArray(value.children);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

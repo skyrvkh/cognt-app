@@ -1,4 +1,4 @@
-import { css } from '@lit/reactive-element/css-tag.js';
+import { css } from 'lit';
 
 export const cogntPropertiesBlockStyles = css`
     .cognt-properties {

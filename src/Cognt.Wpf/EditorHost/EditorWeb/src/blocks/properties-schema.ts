@@ -3,12 +3,11 @@ import {
   BlockViewExtension,
   FlavourExtension,
 } from '@blocksuite/block-std';
-import { literal } from 'lit-html/static.js';
-import { createContentBlockSchema, type CogntContentBlockModel } from './block-schema-helpers';
 import {
-  CogntReferencesBlockSchema,
-  cogntReferencesFlavour,
-} from './references-schema';
+  BlockModel,
+  defineBlockSchema,
+} from '@blocksuite/store';
+import { literal } from 'lit/static-html.js';
 
 export const cogntPropertiesFlavour = 'cognt:properties';
 
@@ -25,18 +24,24 @@ export type CogntPropertiesBlockProps = {
   properties: CogntPropertyRow[];
 };
 
-export type CogntPropertiesBlockModel = CogntContentBlockModel<
-  CogntPropertiesBlockProps,
-  typeof cogntPropertiesFlavour
->;
+export type CogntPropertiesBlockModel = BlockModel<CogntPropertiesBlockProps>
+  & CogntPropertiesBlockProps
+  & { flavour: typeof cogntPropertiesFlavour };
 
-const CogntPropertiesBlockSchema = createContentBlockSchema(
-  cogntPropertiesFlavour,
-  () => ({
+const CogntPropertiesBlockSchema = defineBlockSchema({
+  flavour: cogntPropertiesFlavour,
+  metadata: {
+    version: 1,
+    role: 'content',
+    parent: ['affine:note'],
+    children: [],
+  },
+  props: () => ({
     title: 'Properties',
     properties: [] as CogntPropertyRow[],
   }),
-);
+  toModel: () => new BlockModel<CogntPropertiesBlockProps>() as CogntPropertiesBlockModel,
+});
 
 export const CogntPropertiesBlockSpec = [
   FlavourExtension(cogntPropertiesFlavour),
@@ -57,12 +62,10 @@ export function createCogntSchemas() {
           children: [
             ...(schema.model.children ?? []),
             cogntPropertiesFlavour,
-            cogntReferencesFlavour,
           ],
         },
       };
     }),
     CogntPropertiesBlockSchema,
-    CogntReferencesBlockSchema,
   ];
 }
