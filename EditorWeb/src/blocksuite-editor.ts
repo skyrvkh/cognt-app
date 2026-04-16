@@ -73,10 +73,6 @@ import {
   importBlockSuiteJsonIntoExistingDoc,
 } from './documents/io';
 import {
-  getTextSelectionSnapshotRange,
-  type TextSelectionSnapshot,
-} from './documents/selection-export';
-import {
   configureCogntSlashMenu,
   type LinkedNoteViewMode,
 } from './editor/slash-menu';
@@ -85,14 +81,21 @@ import {
   getCogntLinkedDocOpenIntent,
   getCogntLinkedDocToolbarModel,
   getCogntLinkedNotePathFromModel,
+  getExtractTitleFromRelPath,
   getInlineLinkedPageReference,
   getInlineLinkedPageReferenceElementFromEvent,
   getInlineLinkedPageReferenceFromEvent,
   getLinkedDocReferenceFromModel,
   getLinkedNotePathFromResult,
+  getLinkedNoteTitle,
   getLinkedNoteTitleFromResult,
+  getLinkedPageReferencePath,
+  getLinkedPageReferenceTitle,
   isCogntLinkedDocModel,
   isOpenThisDocToolbarIntent,
+  normalizeCreatedExtractPath,
+  normalizeLinkedNotePathKey,
+  replaceExtractSelectionWithLinkedPage,
   type LinkedPageReference,
 } from './links/linked-notes';
 
@@ -1222,30 +1225,6 @@ function getLinkedNoteTitleFromModel(model: unknown) {
   return getCogntLinkedNoteTitle(record) ?? getCogntLinkedNoteTitle(props);
 }
 
-function normalizeCreatedExtractPath(path: string | null | undefined) {
-  const value = path?.trim().replace(/\\/g, '/');
-  if (!value) {
-    return null;
-  }
-
-  const filesIndex = value.toLowerCase().lastIndexOf('/files/');
-  if (filesIndex >= 0) {
-    return value.slice(filesIndex + 1);
-  }
-
-  return value;
-}
-
-function getExtractTitleFromRelPath(relativePath: string) {
-  const fileName = relativePath.split(/[\\/]/).filter(Boolean).pop() ?? relativePath;
-  const stem = fileName.replace(/\.(json|md|markdown)$/i, '').trim();
-  const separatorIndex = stem.lastIndexOf('.');
-
-  return separatorIndex >= 0 && separatorIndex < stem.length - 1
-    ? stem.slice(separatorIndex + 1)
-    : stem;
-}
-
 function extractCogntEmbedTarget(markdown: string | undefined) {
   const match = markdown?.trim().match(/^!\[\[([^\]\n]+)\]\]$/);
   return parseCogntLinkTarget(match?.[1]);
@@ -1280,23 +1259,6 @@ function parseCogntLinkTarget(value: string | undefined) {
     title: normalizeLinkedNoteTitle(titleParts.join('|')),
     style,
   };
-}
-
-function getLinkedNoteTitle(relativePath: string, title?: string | null) {
-  const normalizedTitle = normalizeLinkedNoteTitle(title);
-  if (normalizedTitle
-    && normalizedTitle !== relativePath
-    && !isCogntNoteRelativePath(normalizedTitle)) {
-    return normalizedTitle;
-  }
-
-  const fileName = relativePath.split(/[\\/]/).filter(Boolean).pop() ?? relativePath;
-  const fallbackTitle = fileName.replace(/\.(json|md|markdown)$/i, '').trim();
-  return fallbackTitle || 'Untitled';
-}
-
-function normalizeLinkedNotePathKey(relativePath: string) {
-  return relativePath.replace(/\\/g, '/').trim().toLowerCase();
 }
 
 function normalizeLinkedNoteTitle(title: string | null | undefined) {
@@ -1371,46 +1333,6 @@ function getDeltaReference(delta: {
   }
 
   return null;
-}
-
-
-function replaceExtractSelectionWithLinkedPage(
-  doc: Doc,
-  selection: TextSelectionSnapshot,
-  relativePath: string,
-  title: string
-) {
-  const range = getTextSelectionSnapshotRange(selection);
-  if (!range) {
-    throw new Error('source replacement supports text selected inside one block');
-  }
-
-  const model = doc.getBlockById(range.blockId) as
-    | {
-        text?: {
-          replace(
-            index: number,
-            length: number,
-            content: string,
-            attributes?: Record<string, unknown>
-          ): void;
-        };
-      }
-    | null;
-  if (!model?.text) {
-    throw new Error('selected block no longer has editable text');
-  }
-
-  const linkedDoc = createDefaultDoc(doc.collection, { title });
-  const reference = createLinkedPageReference(linkedDoc.id, relativePath, title);
-
-  doc.transact(() => {
-    model.text!.replace(range.index, range.length, REFERENCE_NODE, {
-      reference,
-    });
-  });
-
-  return linkedDoc;
 }
 
 function isBlockSnapshot(value: unknown): value is BlockSnapshot {
@@ -1807,17 +1729,6 @@ function getCogntLinkedNotePath(props: Record<string, unknown>) {
     ?? getCogntLinkedNoteLegacyPath(props.description);
 
   return legacyPath;
-}
-
-function getLinkedPageReferencePath(reference: LinkedPageReference | Record<string, unknown>) {
-  const record = reference as Record<string, unknown>;
-  return getCogntLinkedNotePath(record)
-    ?? getTrimmedString(record.relativePath)
-    ?? getTrimmedString(record.description);
-}
-
-function getLinkedPageReferenceTitle(reference: LinkedPageReference | Record<string, unknown>) {
-  return getTrimmedString((reference as Record<string, unknown>).title);
 }
 
 function getTrimmedString(value: unknown) {
