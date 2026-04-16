@@ -24,7 +24,14 @@ import {
   type DocSnapshot,
   type DraftModel,
 } from '@blocksuite/store';
-import { replaceSelectionWithCloze, updateClozeHighlights, type TextSelection } from './cloze';
+import { updateClozeHighlights, type TextSelection } from './cloze';
+import {
+  type CreateExtractCommandMessage,
+  type PendingExtract,
+  runClozeCommand,
+  runCreateExtractCommand,
+  type SaveClozeCommandMessage,
+} from './commands';
 import { reportDiagnostic } from './host';
 import {
   MentionController,
@@ -59,8 +66,6 @@ import {
 } from './editor/timing';
 import {
   createBlockId,
-  createBlockSuiteDocumentJsonFromPlainText,
-  createTitleFromPlainText,
   getSnapshotTextDelta,
   getSnapshotTextValue,
   isBlockSuiteJsonPath,
@@ -73,9 +78,6 @@ import {
   importBlockSuiteJsonIntoExistingDoc,
 } from './documents/io';
 import {
-  cloneTextSelection,
-  createBlockSuiteDocumentJsonFromSelection,
-  getCurrentSelection,
   getTextSelectionSnapshotRange,
   type TextSelectionSnapshot,
 } from './documents/selection-export';
@@ -115,31 +117,15 @@ type LinkedPageReference = {
   type?: string;
 };
 
-type PendingExtract = {
-  generation: number;
-  sourcePath: string;
-  selection: TextSelectionSnapshot;
-};
-
 configureSlashMenu();
 blockEffects();
 presetEffects();
 patchBlockStdRender();
 
-export type CreateExtractMessage = {
-  type: 'createExtract';
-  sourcePath: string;
-  selectedContent: string;
-  selectedPlainText: string;
-};
-
-export type SaveClozeMessage = {
-  type: 'saveCloze';
-  sourcePath: string;
-  selectedPlainText: string;
-  clozeText: string;
-  content: string;
-};
+export type {
+  CreateExtractCommandMessage as CreateExtractMessage,
+  SaveClozeCommandMessage as SaveClozeMessage,
+} from './commands';
 
 export type LinkedNoteViewMode = 'inline' | 'embed' | 'native';
 
@@ -162,8 +148,8 @@ export type MarkdownEditorOptions = {
   statusElement: HTMLElement;
   mentionPreviewElement: HTMLElement;
   onContentChanged(content: string): void;
-  onCreateExtract(message: CreateExtractMessage): void;
-  onSaveCloze(message: SaveClozeMessage): void;
+  onCreateExtract(message: CreateExtractCommandMessage): void;
+  onSaveCloze(message: SaveClozeCommandMessage): void;
   onSearchMentionTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
   onRequestMentionPreview(message: RequestMentionPreviewMessage): void;
   onOpenMention(message: OpenMentionMessage): void;
@@ -183,8 +169,8 @@ export class MarkdownBlockSuiteEditor {
   private readonly statusElement: HTMLElement;
   private readonly mentions: MentionController;
   private readonly onContentChanged: (content: string) => void;
-  private readonly onCreateExtract: (message: CreateExtractMessage) => void;
-  private readonly onSaveCloze: (message: SaveClozeMessage) => void;
+  private readonly onCreateExtract: (message: CreateExtractCommandMessage) => void;
+  private readonly onSaveCloze: (message: SaveClozeCommandMessage) => void;
   private readonly onRequestMentionPreview: (message: RequestMentionPreviewMessage) => void;
   private readonly onOpenMention: (message: OpenMentionMessage) => void;
   private readonly onCreateLinkedNote: (
@@ -1129,90 +1115,41 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private async handleCreateExtractShortcut(event: KeyboardEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (this.isEditorInputLocked()) {
-      this.showStatus('Wait for the full note to finish loading before extracting text.');
-      return;
-    }
-
-    const selection = getCurrentSelection();
-    if (!selection) {
-      this.showStatus('Ctrl+X needs selected text.');
-      return;
-    }
-
-    const textSelection = this.getTextSelection();
-    const selectionSnapshot = textSelection && !textSelection.isCollapsed()
-      ? cloneTextSelection(textSelection)
-      : null;
-    if (!selectionSnapshot) {
-      this.showStatus('Ctrl+X needs a BlockSuite text selection.');
-      return;
-    }
-
-    const selectedContent = this.currentDoc
-      ? createBlockSuiteDocumentJsonFromSelection(this.currentDoc, this.editor, selection.plainText)
-      : null;
-    this.pendingExtract = {
-      generation: this.loadGeneration,
-      sourcePath: this.currentPath,
-      selection: selectionSnapshot,
-    };
-
-    this.onCreateExtract({
-      type: 'createExtract',
-      sourcePath: this.currentPath,
-      selectedContent: selectedContent ?? createBlockSuiteDocumentJsonFromPlainText(
-        selection.plainText,
-        createTitleFromPlainText(selection.plainText, 'Extract')
-      ),
-      selectedPlainText: selection.plainText,
-    });
-    this.showStatus('Creating extract...');
+    this.pendingExtract = runCreateExtractCommand(
+      {
+        isInputLocked: () => this.isEditorInputLocked(),
+        getCurrentDoc: () => this.currentDoc,
+        getCurrentPath: () => this.currentPath,
+        getLoadGeneration: () => this.loadGeneration,
+        getEditor: () => this.editor,
+        getTextSelection: () => this.getTextSelection(),
+        createExtract: message => this.onCreateExtract(message),
+        showStatus: message => this.showStatus(message),
+      },
+      event
+    );
   }
 
   private async handleClozeShortcut(event: KeyboardEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (this.isEditorInputLocked()) {
-      this.showStatus('Wait for the full note to finish loading before creating cloze text.');
-      return;
-    }
-
-    const selection = getCurrentSelection();
-    if (!selection) {
-      this.showStatus('Ctrl+Z is disabled unless text is selected.');
-      return;
-    }
-
-    let clozeText: string;
-    try {
-      clozeText = replaceSelectionWithCloze(this.createClozeContext(), selection.plainText);
-    } catch (error) {
-      this.showStatus(
-        error instanceof Error ? error.message : 'Could not hide the selected text in place.'
-      );
-      return;
-    }
-
-    this.editor.host?.selection.clear(['text']);
-    window.getSelection()?.removeAllRanges();
-    await this.flushHost();
-    await new Promise(resolve => window.requestAnimationFrame(resolve));
-    this.refreshClozeHighlights();
-    this.cancelPendingContentChanged();
-    const content = await this.exportCurrentContent();
-    this.onSaveCloze({
-      type: 'saveCloze',
-      sourcePath: this.currentPath,
-      selectedPlainText: selection.plainText,
-      clozeText,
-      content,
-    });
-    this.showStatus('Selection hidden in place with cloze.');
+    await runClozeCommand(
+      {
+        isInputLocked: () => this.isEditorInputLocked(),
+        getCurrentDoc: () => this.currentDoc,
+        getCurrentPath: () => this.currentPath,
+        getTextSelection: () => this.getTextSelection(),
+        clearTextSelection: () => {
+          this.editor.host?.selection.clear(['text']);
+          window.getSelection()?.removeAllRanges();
+        },
+        flushHost: () => this.flushHost(),
+        refreshClozeHighlights: () => this.refreshClozeHighlights(),
+        cancelPendingContentChanged: () => this.cancelPendingContentChanged(),
+        exportContent: () => this.exportCurrentContent(),
+        saveCloze: message => this.onSaveCloze(message),
+        showStatus: message => this.showStatus(message),
+      },
+      event
+    );
   }
 
   private getTextSelection() {
@@ -1289,12 +1226,6 @@ export class MarkdownBlockSuiteEditor {
     }
   }
 
-  private createClozeContext() {
-    return {
-      doc: this.currentDoc,
-      textSelection: this.getTextSelection(),
-    };
-  }
 }
 
 type SlashMenuStaticItem =
