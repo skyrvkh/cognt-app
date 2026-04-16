@@ -58,6 +58,9 @@ import {
   logEditorTiming,
 } from './editor/timing';
 import {
+  createBlockId,
+  createBlockSuiteDocumentJsonFromPlainText,
+  createTitleFromPlainText,
   getSnapshotTextDelta,
   getSnapshotTextValue,
   isBlockSuiteJsonPath,
@@ -86,8 +89,6 @@ const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
 const embedLinkedDocTagName = 'affine-embed-linked-doc-block';
 const cogntLinkedDocWrapStyleId = 'cognt-linked-doc-wrap-style';
 const defaultCogntEmbedStyle = 'horizontal';
-const cogntBlockSuiteDocumentKind = 'cognt-blocksuite-doc';
-const cogntBlockSuiteDocumentVersion = 1;
 const cogntEmbedStyleAliases = new Map([
   ['horizontal', 'horizontal'],
   ['horizontalthin', 'horizontalThin'],
@@ -1990,177 +1991,6 @@ function replaceExtractSelectionWithLinkedPage(
   });
 
   return linkedDoc;
-}
-
-function createBlockSuiteDocumentJsonFromBlockSnapshots(
-  children: BlockSnapshot[],
-  title: string
-) {
-  const pageId = createBlockId();
-  const surfaceId = createBlockId();
-  const noteId = createBlockId();
-
-  return `${JSON.stringify(
-    {
-      kind: cogntBlockSuiteDocumentKind,
-      version: cogntBlockSuiteDocumentVersion,
-      snapshot: {
-        type: 'page',
-        meta: {
-          id: pageId,
-          title,
-          createDate: Date.now(),
-          tags: [],
-        },
-        blocks: {
-          type: 'block',
-          id: pageId,
-          flavour: 'affine:page',
-          version: 2,
-          props: {
-            title: createBlockSuiteTextValue(title),
-          },
-          children: [
-            {
-              type: 'block',
-              id: surfaceId,
-              flavour: 'affine:surface',
-              version: 5,
-              props: {},
-              children: [],
-            },
-            {
-              type: 'block',
-              id: noteId,
-              flavour: 'affine:note',
-              version: 1,
-              props: {
-                xywh: '[0,0,800,95]',
-                background: '--affine-note-background-blue',
-                index: 'a0',
-                hidden: false,
-                displayMode: 'both',
-                edgeless: {
-                  style: {
-                    borderRadius: 8,
-                    borderSize: 4,
-                    borderStyle: 'none',
-                    shadowType: '--affine-note-shadow-box',
-                  },
-                },
-              },
-              children,
-            },
-          ],
-        },
-      },
-    },
-    null,
-    2
-  )}\n`;
-}
-
-function createBlockSuiteDocumentJsonFromPlainText(text: string, title: string) {
-  const pageId = createBlockId();
-  const surfaceId = createBlockId();
-  const noteId = createBlockId();
-  const paragraphId = createBlockId();
-
-  return `${JSON.stringify(
-    {
-      kind: cogntBlockSuiteDocumentKind,
-      version: cogntBlockSuiteDocumentVersion,
-      snapshot: {
-        type: 'page',
-        meta: {
-          id: pageId,
-          title,
-          createDate: Date.now(),
-          tags: [],
-        },
-        blocks: {
-          type: 'block',
-          id: pageId,
-          flavour: 'affine:page',
-          version: 2,
-          props: {
-            title: createBlockSuiteTextValue(title),
-          },
-          children: [
-            {
-              type: 'block',
-              id: surfaceId,
-              flavour: 'affine:surface',
-              version: 5,
-              props: {},
-              children: [],
-            },
-            {
-              type: 'block',
-              id: noteId,
-              flavour: 'affine:note',
-              version: 1,
-              props: {
-                xywh: '[0,0,800,95]',
-                background: '--affine-note-background-blue',
-                index: 'a0',
-                hidden: false,
-                displayMode: 'both',
-                edgeless: {
-                  style: {
-                    borderRadius: 8,
-                    borderSize: 4,
-                    borderStyle: 'none',
-                    shadowType: '--affine-note-shadow-box',
-                  },
-                },
-              },
-              children: [
-                {
-                  type: 'block',
-                  id: paragraphId,
-                  flavour: 'affine:paragraph',
-                  version: 1,
-                  props: {
-                    type: 'text',
-                    text: createBlockSuiteTextValue(text),
-                    collapsed: false,
-                  },
-                  children: [],
-                },
-              ],
-            },
-          ],
-        },
-      },
-    },
-    null,
-    2
-  )}\n`;
-}
-
-function createBlockSuiteTextValue(value: string) {
-  return {
-    '$blocksuite:internal:text$': true,
-    delta: value.length > 0 ? [{ insert: value }] : [],
-  };
-}
-
-function createBlockId() {
-  return `cognt-${Math.random().toString(36).slice(2, 14)}`;
-}
-
-function createTitleFromPlainText(text: string, fallback: string) {
-  const title = text.replace(/\s+/g, ' ').trim();
-  if (title.length === 0) {
-    return fallback;
-  }
-
-  return title.length <= 60 ? title : title.slice(0, 60).trimEnd();
-}
-
-function normalizeSelectionText(text: string) {
-  return text.replace(/\s+/g, ' ').trim();
 }
 
 function isBlockSnapshot(value: unknown): value is BlockSnapshot {
