@@ -7,8 +7,10 @@ import {
 } from './mentions';
 import { NativeMentionMenuController } from './mention-controller-native-menu';
 import { MentionPreviewSession } from './mention-preview-session';
+import { type FloatingAnchor, type Point } from './mention-controller-anchors';
+import { MentionHoverController } from './mention-hover-controller';
+import { bindMentionControllerEvents } from './mention-controller-events';
 
-const linkedPagePreviewDelayMs = 560;
 const nativeReferencePreviewId = 'cognt-reference-preview';
 const nativeReferencePreviewStyleId = 'cognt-reference-preview-style';
 const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';
@@ -73,13 +75,6 @@ type MentionControllerOptions = {
   onOpenMention(message: OpenMentionMessage): void;
 };
 
-type Point = {
-  x: number;
-  y: number;
-};
-
-type FloatingAnchor = Point | HTMLElement;
-
 export class MentionController {
   private readonly eventAbort = new AbortController();
   private readonly editor: PageEditor;
@@ -87,9 +82,8 @@ export class MentionController {
   private readonly options: MentionControllerOptions;
   private readonly nativeMentionMenu: NativeMentionMenuController;
   private readonly preview: MentionPreviewSession;
+  private readonly hover: MentionHoverController;
   private targets: MentionTarget[] = [];
-  private hoverTimer: number | undefined;
-  private hoverPath = '';
 
   public constructor(options: MentionControllerOptions) {
     this.options = options;
@@ -102,6 +96,15 @@ export class MentionController {
       showStatus: message => this.options.showStatus(message),
       onRequestPreview: message => this.options.onRequestPreview(message),
       onOpenMention: message => this.options.onOpenMention(message),
+    });
+    this.hover = new MentionHoverController({
+      getCurrentPath: () => this.options.getCurrentPath(),
+      getActiveViewMode: () => this.preview.getActiveViewMode(),
+      getNativePreviewAnchor: () => this.preview.getNativePreviewAnchor(),
+      cancelScheduledPreviewHide: () => this.cancelScheduledPreviewHide(),
+      schedulePreviewHide: () => this.schedulePreviewHide(),
+      requestPreview: (relativePath, anchor, mode) =>
+        this.preview.requestPreview(relativePath, anchor, mode),
     });
     this.nativeMentionMenu = new NativeMentionMenuController({
       editor: this.editor,
@@ -118,37 +121,16 @@ export class MentionController {
         this.preview.requestNativeMentionMenuPreview(relativePath, anchor),
       refreshHighlights: () => this.refreshHighlights(),
     });
-    this.previewElement.addEventListener(
-      'mouseenter',
-      () => this.cancelScheduledPreviewHide(),
-      { signal: this.eventAbort.signal }
-    );
-    this.previewElement.addEventListener(
-      'mouseleave',
-      () => this.schedulePreviewHide(),
-      { signal: this.eventAbort.signal }
-    );
-    document.addEventListener(
-      'mousemove',
-      event => {
-        if (this.preview.getActiveViewMode() !== 'preview') {
-          return;
-        }
-
-        const target = event.target as Node | null;
-        if (target && (this.editor.contains(target) || this.containsFloatingUi(target))) {
-          return;
-        }
-
-        this.schedulePreviewHide();
-      },
-      { signal: this.eventAbort.signal }
-    );
-    document.addEventListener(
-      'mousemove',
-      event => this.nativeMentionMenu.handleMouseMove(event),
-      { signal: this.eventAbort.signal }
-    );
+    bindMentionControllerEvents({
+      editor: this.editor,
+      previewElement: this.previewElement,
+      signal: this.eventAbort.signal,
+      isShowingPreview: () => this.isShowingPreview(),
+      containsFloatingUi: target => this.containsFloatingUi(target),
+      schedulePreviewHide: () => this.schedulePreviewHide(),
+      cancelScheduledPreviewHide: () => this.cancelScheduledPreviewHide(),
+      handleNativeMentionMenuMove: event => this.nativeMentionMenu.handleMouseMove(event),
+    });
   }
 
   public setTargets(targets: MentionTarget[]) {
@@ -179,61 +161,23 @@ export class MentionController {
   public cancelScheduledHighlightUpdate() {}
 
   public handleLinkedPageHover(relativePath: string, anchor: FloatingAnchor) {
-    if (!this.options.getCurrentPath() || this.preview.getActiveViewMode() === 'full') {
-      return;
-    }
-
-    this.cancelScheduledPreviewHide();
-
-    const sameNativeAnchor = isElementAnchor(anchor)
-      && this.preview.getNativePreviewAnchor() === anchor;
-    if (
-      relativePath === this.hoverPath &&
-      (
-        this.hoverTimer !== undefined
-        || (this.preview.getActiveViewMode() === 'preview' && sameNativeAnchor)
-      )
-    ) {
-      return;
-    }
-
-    this.hoverPath = relativePath;
-    this.clearHoverTimer();
-
-    this.hoverTimer = window.setTimeout(() => {
-      this.hoverTimer = undefined;
-      if (
-        this.hoverPath === relativePath
-        && this.preview.getActiveViewMode() !== 'full'
-      ) {
-        this.preview.requestPreview(relativePath, anchor, 'preview');
-      }
-    }, linkedPagePreviewDelayMs);
+    this.hover.handleLinkedPageHover(relativePath, anchor);
   }
 
   public handleHoverMiss() {
-    this.clearHoverTimer();
-    this.hoverPath = '';
-
-    if (this.preview.getActiveViewMode() === 'preview') {
-      this.schedulePreviewHide();
-    }
+    this.hover.handleHoverMiss();
   }
 
   public async handleClick(_event: MouseEvent) {}
 
   public hidePreview() {
-    this.hoverPath = '';
-    this.clearHoverTimer();
+    this.hover.reset();
     this.preview.hidePreview();
   }
 
   public schedulePreviewHide() {
-    this.clearHoverTimer();
-    this.preview.schedulePreviewHide(() => {
-      this.hoverPath = '';
-      this.clearHoverTimer();
-    });
+    this.hover.clear();
+    this.preview.schedulePreviewHide(() => this.hover.reset());
   }
 
   public cancelScheduledPreviewHide() {
@@ -256,14 +200,6 @@ export class MentionController {
     this.eventAbort.abort();
   }
 
-  private clearHoverTimer() {
-    if (!this.hoverTimer) {
-      return;
-    }
-
-    window.clearTimeout(this.hoverTimer);
-    this.hoverTimer = undefined;
-  }
 }
 
 function isNativeMentionMenuItem(element: HTMLElement) {
