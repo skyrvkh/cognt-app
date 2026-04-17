@@ -1,34 +1,21 @@
 import type { PageEditor } from '@blocksuite/presets';
-import { createDefaultDoc } from '@blocksuite/blocks';
-import { REFERENCE_NODE } from '@blocksuite/affine-components/rich-text';
-import { html } from 'lit';
 import {
   buildMentionPreviewHtml,
   escapeHtml,
-  filterMentionTargets,
   type MentionPreviewResult,
   type MentionTarget,
   type MentionViewMode,
 } from './mentions';
+import { NativeMentionMenuController } from './mention-controller-native-menu';
 
 const previewDelayMs = 220;
 const linkedPagePreviewDelayMs = 560;
 const previewDismissDelayMs = 200;
-const mentionSearchDebounceMs = 500;
 const previewMaxCharacters = 0;
-const maxNativeMentionItems = 8;
-const nativeMentionSearchLimit = 32;
-const noteMentionGroupName = 'Notes';
-const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
 const nativeReferencePreviewId = 'cognt-reference-preview';
 const nativeReferencePreviewStyleId = 'cognt-reference-preview-style';
 const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';
 const nativeMentionSearchPreviewStyleId = 'cognt-linked-doc-search-preview-style';
-const noteMentionIcon = html`<span
-  style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-weight:700;color:var(--affine-text-secondary-color);"
-  >#</span
->`;
-
 export type RequestMentionPreviewMessage = {
   type: 'requestMentionPreview';
   requestId: string;
@@ -63,17 +50,15 @@ export type NativeInlineEditor = {
   setInlineRange(range: NativeInlineRange | null): void;
 };
 
-type NativeLinkedMenuItem = {
-  key: string;
-  name: string;
-  icon: unknown;
-  suffix?: string;
-  action: () => void | Promise<void>;
-};
-
 export type NativeLinkedMenuGroup = {
   name: string;
-  items: NativeLinkedMenuItem[];
+  items: Array<{
+    key: string;
+    name: string;
+    icon: unknown;
+    suffix?: string;
+    action: () => void | Promise<void>;
+  }>;
   maxDisplay?: number;
   overflowText?: string;
 };
@@ -103,6 +88,7 @@ export class MentionController {
   private readonly editor: PageEditor;
   private readonly previewElement: HTMLElement;
   private readonly options: MentionControllerOptions;
+  private readonly nativeMentionMenu: NativeMentionMenuController;
   private targets: MentionTarget[] = [];
   private hoverTimer: number | undefined;
   private previewHideTimer: number | undefined;
@@ -114,12 +100,26 @@ export class MentionController {
   private nativeMentionMenuPreviewAnchor: HTMLElement | null = null;
   private nativeMentionMenuPreviewPath = '';
   private requestCounter = 0;
-  private searchCounter = 0;
 
   public constructor(options: MentionControllerOptions) {
     this.options = options;
     this.editor = options.editor;
     this.previewElement = options.previewElement;
+    this.nativeMentionMenu = new NativeMentionMenuController({
+      editor: this.editor,
+      getCurrentPath: () => this.options.getCurrentPath(),
+      getTargets: () => this.targets,
+      setTargets: targets => {
+        this.targets = targets;
+      },
+      flushHost: () => this.options.flushHost(),
+      scheduleContentChanged: () => this.options.scheduleContentChanged(),
+      showStatus: message => this.options.showStatus(message),
+      onSearchTargets: message => this.options.onSearchTargets(message),
+      requestPreview: (relativePath, anchor) =>
+        this.requestNativeMentionMenuPreview(relativePath, anchor),
+      refreshHighlights: () => this.refreshHighlights(),
+    });
     this.previewElement.addEventListener(
       'mouseenter',
       () => this.cancelScheduledPreviewHide(),
@@ -148,7 +148,7 @@ export class MentionController {
     );
     document.addEventListener(
       'mousemove',
-      event => this.handleNativeMentionMenuMove(event),
+      event => this.nativeMentionMenu.handleMouseMove(event),
       { signal: this.eventAbort.signal }
     );
   }
@@ -163,21 +163,7 @@ export class MentionController {
     inlineEditor: NativeInlineEditor,
     abortSignal?: AbortSignal
   ): Promise<NativeLinkedMenuGroup[]> {
-    return this.getNativeMentionMenusAsync(query, abort, inlineEditor, abortSignal);
-  }
-
-  private async getNativeMentionMenusAsync(
-    query: string,
-    abort: () => void,
-    inlineEditor: NativeInlineEditor,
-    abortSignal?: AbortSignal
-  ) {
-    const targets = await this.searchMentionTargets(query, abortSignal);
-    this.scheduleFirstNativeMentionMenuPreview(targets, abortSignal);
-
-    return targets.length === 0
-      ? []
-      : [this.createNativeMentionGroup(targets, abort, inlineEditor)];
+    return this.nativeMentionMenu.getMenus(query, abort, inlineEditor, abortSignal);
   }
 
   public handlePreviewResult(result: MentionPreviewResult) {
@@ -322,156 +308,6 @@ export class MentionController {
     this.eventAbort.abort();
   }
 
-  private insertNativeMention(inlineEditor: NativeInlineEditor, target: MentionTarget) {
-    const range = inlineEditor.getInlineRange();
-    if (!range) {
-      this.options.showStatus('Could not insert the note link at the current caret.');
-      return;
-    }
-
-    const title = getMentionDisplayTitle(target);
-    const linkedDoc = createDefaultDoc(this.editor.doc.collection, { title });
-    const reference = {
-      type: 'LinkedPage',
-      pageId: linkedDoc.id,
-      params: {
-        [cogntLinkedNotePathProp]: target.relativePath,
-      },
-      title,
-      description: target.relativePath,
-      [cogntLinkedNotePathProp]: target.relativePath,
-    };
-
-    try {
-      inlineEditor.insertText(range, REFERENCE_NODE, {
-        reference,
-      } as never);
-      inlineEditor.setInlineRange({
-        index: range.index + REFERENCE_NODE.length,
-        length: 0,
-      });
-    } catch (error) {
-      console.warn('Native mention insertion failed.', error);
-      this.options.showStatus('Could not insert the note link at the current caret.');
-      return;
-    }
-
-    void this.options.flushHost().then(() => {
-      this.refreshHighlights();
-      this.options.scheduleContentChanged();
-    });
-  }
-
-  private createNativeMentionGroup(
-    targets: MentionTarget[],
-    abort: () => void,
-    inlineEditor: NativeInlineEditor
-  ): NativeLinkedMenuGroup {
-    const group: NativeLinkedMenuGroup = {
-      name: noteMentionGroupName,
-      items: targets.map(target => this.createNativeMentionItem(target, abort, inlineEditor)),
-      maxDisplay: maxNativeMentionItems,
-    };
-
-    if (targets.length > maxNativeMentionItems) {
-      group.overflowText = `${targets.length - maxNativeMentionItems} more notes`;
-    }
-
-    return group;
-  }
-
-  private createNativeMentionItem(
-    target: MentionTarget,
-    abort: () => void,
-    inlineEditor: NativeInlineEditor
-  ): NativeLinkedMenuItem {
-    return {
-      key: `note:${target.relativePath}`,
-      name: getMentionDisplayTitle(target),
-      suffix: getMentionMenuSuffix(target),
-      icon: noteMentionIcon,
-      action: () => {
-        abort();
-        this.insertNativeMention(inlineEditor, target);
-      },
-    };
-  }
-
-  private async searchMentionTargets(query: string, abortSignal?: AbortSignal) {
-    const currentPath = this.options.getCurrentPath();
-    if (!currentPath) {
-      return [];
-    }
-
-    const signal = abortSignal ?? new AbortController().signal;
-    const searchId = ++this.searchCounter;
-
-    try {
-      await delayWithAbort(mentionSearchDebounceMs, signal);
-
-      if (signal.aborted || searchId !== this.searchCounter) {
-        return [];
-      }
-
-      const targets = await this.options.onSearchTargets({
-        type: 'searchMentionTargets',
-        sourcePath: currentPath,
-        query,
-        limit: nativeMentionSearchLimit,
-      });
-
-      if (signal.aborted || searchId !== this.searchCounter) {
-        return [];
-      }
-
-      this.mergeTargets(targets);
-      return targets;
-    } catch (error) {
-      if (signal.aborted) {
-        return [];
-      }
-
-      console.warn('Mention search failed.', error);
-      return filterMentionTargets(this.targets, query, nativeMentionSearchLimit);
-    }
-  }
-
-  private scheduleFirstNativeMentionMenuPreview(
-    targets: MentionTarget[],
-    abortSignal?: AbortSignal
-  ) {
-    const firstTarget = targets[0];
-    if (!firstTarget || abortSignal?.aborted) {
-      removeNativeMentionSearchPreview();
-      return;
-    }
-
-    window.setTimeout(() => {
-      if (abortSignal?.aborted) {
-        return;
-      }
-
-      const anchor = findNativeMentionMenuItem(firstTarget.relativePath);
-      if (anchor) {
-        this.requestNativeMentionMenuPreview(firstTarget.relativePath, anchor);
-      }
-    }, 0);
-  }
-
-  private handleNativeMentionMenuMove(event: MouseEvent) {
-    const target = getNativeMentionMenuItemFromEvent(event);
-    if (!target) {
-      return;
-    }
-
-    const relativePath = getNativeMentionMenuItemPath(target);
-    if (!relativePath) {
-      return;
-    }
-
-    this.requestNativeMentionMenuPreview(relativePath, target);
-  }
-
   private requestNativeMentionMenuPreview(relativePath: string, anchor: HTMLElement) {
     if (
       this.nativeMentionMenuPreviewAnchor === anchor
@@ -485,22 +321,6 @@ export class MentionController {
     this.nativeMentionMenuPreviewPath = relativePath;
     this.nativePreviewAnchor = null;
     this.requestPreview(relativePath, anchor, 'preview');
-  }
-
-  private mergeTargets(targets: MentionTarget[]) {
-    if (targets.length === 0) {
-      return;
-    }
-
-    const merged = new Map(this.targets.map(target => [
-      normalizeMentionPathKey(target.relativePath),
-      target,
-    ]));
-    for (const target of targets) {
-      merged.set(normalizeMentionPathKey(target.relativePath), target);
-    }
-
-    this.targets = [...merged.values()];
   }
 
   private requestPreview(relativePath: string, anchor: FloatingAnchor, mode: MentionViewMode) {
@@ -738,31 +558,6 @@ export class MentionController {
   }
 }
 
-function delayWithAbort(delayMs: number, signal: AbortSignal) {
-  if (signal.aborted) {
-    return Promise.reject(new Error('Mention search was cancelled.'));
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      signal.removeEventListener('abort', abort);
-      resolve();
-    }, delayMs);
-
-    const abort = () => {
-      window.clearTimeout(timeoutId);
-      signal.removeEventListener('abort', abort);
-      reject(new Error('Mention search was cancelled.'));
-    };
-
-    signal.addEventListener('abort', abort, { once: true });
-  });
-}
-
-function normalizeMentionPathKey(relativePath: string) {
-  return relativePath.replace(/\\/g, '/').trim().toLowerCase();
-}
-
 function isNativeMentionMenuItem(element: HTMLElement) {
   return Boolean(getNativeMentionMenuItemPath(element));
 }
@@ -770,31 +565,6 @@ function isNativeMentionMenuItem(element: HTMLElement) {
 function getNativeMentionMenuItemPath(element: HTMLElement) {
   const key = element.dataset.id;
   return key?.startsWith('note:') ? key.slice('note:'.length) : null;
-}
-
-function getNativeMentionMenuItemFromEvent(event: MouseEvent) {
-  for (const item of event.composedPath()) {
-    if (item instanceof HTMLElement && isNativeMentionMenuItem(item)) {
-      return item;
-    }
-  }
-
-  return null;
-}
-
-function findNativeMentionMenuItem(relativePath: string) {
-  const key = `note:${relativePath}`;
-
-  for (const element of Array.from(document.querySelectorAll<HTMLElement>('affine-linked-doc-popover'))) {
-    const item = element.shadowRoot?.querySelector<HTMLElement>(
-      `icon-button[data-id="${escapeCssIdentifier(key)}"]`
-    );
-    if (item) {
-      return item;
-    }
-  }
-
-  return null;
 }
 
 function getLinkedDocPopoverContainer(anchor: HTMLElement) {
@@ -1133,26 +903,5 @@ function isLinkedDocPopoverTarget(target: Node) {
     target.shadowRoot?.querySelector('.linked-doc-popover')
       ?? target.closest('affine-linked-doc-popover')
   );
-}
-
-function getMentionDisplayTitle(target: MentionTarget) {
-  const title = target.title.trim()
-    || target.fileName.replace(/\.(json|md|markdown)$/i, '').trim();
-  return title.length > 0 ? title : target.relativePath;
-}
-
-function getMentionMenuSuffix(target: MentionTarget) {
-  const parts = target.relativePath.split(/[\\/]/).filter(Boolean);
-  if (parts.length <= 1) {
-    return undefined;
-  }
-
-  const first = parts[0]?.toLowerCase();
-  if (first === 'files') {
-    return undefined;
-  }
-
-  parts.pop();
-  return parts.length > 0 ? parts.join('/') : undefined;
 }
 
