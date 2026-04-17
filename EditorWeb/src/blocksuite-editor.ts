@@ -1,20 +1,13 @@
 import { type AffineSlashMenuContext } from '@blocksuite/blocks';
-import {
-  REFERENCE_NODE,
-  RefNodeSlotsProvider,
-} from '@blocksuite/affine-components/rich-text';
+import { RefNodeSlotsProvider } from '@blocksuite/affine-components/rich-text';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { type PageEditor } from '@blocksuite/presets';
+import { type Doc } from '@blocksuite/store';
 import {
-  Job,
-  type BlockSnapshot,
-  type Doc,
-  type DocSnapshot,
-  type DraftModel,
-} from '@blocksuite/store';
+  defineCogntPropertiesBlockElement,
+} from './blocks/properties';
 import { updateClozeHighlights, type TextSelection } from './cloze';
-import { defineCogntPropertiesBlockElement } from './blocks/properties';
 import {
   type CreateExtractCommandMessage,
   type PendingExtract,
@@ -24,14 +17,20 @@ import {
   runInsertPropertiesBlockCommand,
   type SaveClozeCommandMessage,
 } from './commands';
-import { reportDiagnostic } from './host';
 import {
-  MentionController,
-  type OpenMentionMessage,
-  type RequestMentionPreviewMessage,
-  type SearchMentionTargetsMessage,
-} from './mention-controller';
-import { parseNoteMentionTarget, type MentionPreviewResult, type MentionTarget } from './mentions';
+  isBlockSuiteJsonPath,
+} from './documents/block-suite-document';
+import {
+  createDocFromBlockSuiteJson,
+  createDocFromMarkdown,
+  createEmptyMarkdownDoc,
+  exportDocContent,
+  importBlockSuiteJsonIntoExistingDoc,
+} from './documents/io';
+import {
+  configureCogntSlashMenu,
+  type LinkedNoteViewMode,
+} from './editor/slash-menu';
 import {
   findEditableElement,
   getInteractivityDiagnostic,
@@ -48,30 +47,20 @@ import {
   preventReadOnlyKeyboardInput,
 } from './editor/keyboard';
 import {
-  createEditorSpecs,
-  patchBlockStdRender,
-} from './editor/specs';
-import {
   formatElapsed,
   logEditorTiming,
 } from './editor/timing';
+import { reportDiagnostic } from './host';
 import {
-  createBlockId,
-  getSnapshotTextDelta,
-  getSnapshotTextValue,
-  isBlockSuiteJsonPath,
-} from './documents/block-suite-document';
+  MentionController,
+  type OpenMentionMessage,
+  type RequestMentionPreviewMessage,
+  type SearchMentionTargetsMessage,
+} from './mention-controller';
 import {
-  createDocFromBlockSuiteJson,
-  createDocFromMarkdown,
-  createEmptyMarkdownDoc,
-  exportDocContent,
-  importBlockSuiteJsonIntoExistingDoc,
-} from './documents/io';
-import {
-  configureCogntSlashMenu,
-  type LinkedNoteViewMode,
-} from './editor/slash-menu';
+  createEditorSpecs,
+  patchBlockStdRender,
+} from './editor/specs';
 import {
   attachCogntPathToInlineReference,
   getCogntLinkedDocOpenIntent,
@@ -96,11 +85,11 @@ import {
   replaceExtractSelectionWithLinkedPage,
   type LinkedPageReference,
 } from './links/linked-notes';
+import { type MentionPreviewResult, type MentionTarget } from './mentions';
 
 const saveDebounceMs = 500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
-const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
 const editorsByDoc = new WeakMap<Doc, MarkdownBlockSuiteEditor>();
 
 defineCogntPropertiesBlockElement();
@@ -1192,193 +1181,4 @@ export class MarkdownBlockSuiteEditor {
       context
     );
   }
-
 }
-
-function isBlockSnapshot(value: unknown): value is BlockSnapshot {
-  return isRecord(value)
-    && value.type === 'block'
-    && typeof value.id === 'string'
-    && typeof value.flavour === 'string'
-    && isRecord(value.props)
-    && Array.isArray(value.children);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function upgradeSerializedRawCogntInlineMentionSnapshots(snapshot: DocSnapshot) {
-  upgradeBlockSnapshotRawCogntInlineMentions(snapshot.blocks);
-}
-
-function upgradeBlockSnapshotRawCogntInlineMentions(snapshot: BlockSnapshot) {
-  const textValue = getSnapshotTextValue(snapshot);
-  const delta = textValue ? getSnapshotTextDelta(textValue) : [];
-  const upgradedDelta = upgradeRawCogntInlineMentionDelta(delta);
-
-  if (upgradedDelta !== delta && textValue) {
-    snapshot.props = {
-      ...snapshot.props,
-      text: {
-        ...textValue,
-        delta: upgradedDelta,
-      },
-    };
-  }
-
-  snapshot.children.forEach(upgradeBlockSnapshotRawCogntInlineMentions);
-}
-
-function upgradeRawCogntInlineMentionDelta(delta: unknown[]) {
-  let changed = false;
-  const upgraded: unknown[] = [];
-
-  for (const entry of delta) {
-    if (!isRecord(entry) || typeof entry.insert !== 'string' || !entry.insert.includes('[[')) {
-      upgraded.push(entry);
-      continue;
-    }
-
-    const segments = splitRawCogntInlineMentionEntry(entry as Record<string, unknown>);
-    if (segments === null) {
-      upgraded.push(entry);
-      continue;
-    }
-
-    changed = true;
-    upgraded.push(...segments);
-  }
-
-  return changed ? upgraded : delta;
-}
-
-function splitRawCogntInlineMentionEntry(entry: Record<string, unknown>) {
-  const insert = entry.insert;
-  if (typeof insert !== 'string') {
-    return null;
-  }
-
-  const expression = /\[\[([^\]\[\n]+)\]\]/g;
-  const segments: unknown[] = [];
-  let changed = false;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = expression.exec(insert)) !== null) {
-    const target = parseNoteMentionTarget(match[1]);
-    if (!target || !isCogntNoteRelativePath(target.relativePath)) {
-      continue;
-    }
-
-    if (match.index > lastIndex) {
-      segments.push(createTextDeltaSegment(entry, insert.slice(lastIndex, match.index)));
-    }
-
-    segments.push({
-      insert: REFERENCE_NODE,
-      attributes: {
-        reference: createLinkedPageReference(
-          createBlockId(),
-          target.relativePath,
-          getLinkedNoteTitle(target.relativePath)
-        ),
-      },
-    });
-
-    changed = true;
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (!changed) {
-    return null;
-  }
-
-  if (lastIndex < insert.length) {
-    segments.push(createTextDeltaSegment(entry, insert.slice(lastIndex)));
-  }
-
-  return segments;
-}
-
-function createTextDeltaSegment(source: Record<string, unknown>, insert: string) {
-  const segment: Record<string, unknown> = { insert };
-  if (isRecord(source.attributes)) {
-    segment.attributes = source.attributes;
-  }
-
-  return segment;
-}
-
-function createLinkedPageReference(pageId: string, relativePath: string, title: string) {
-  return {
-    type: 'LinkedPage',
-    pageId,
-    params: createCogntLinkedNoteParams(relativePath),
-    title,
-    description: relativePath,
-    [cogntLinkedNotePathProp]: relativePath,
-  };
-}
-
-function isCogntNoteRelativePath(relativePath: string) {
-  return /\.(json|md|markdown)$/i.test(relativePath);
-}
-
-function getCogntLinkedNotePath(props: Record<string, unknown>) {
-  const value = props[cogntLinkedNotePathProp];
-  const directPath = typeof value === 'string' && value.trim().length > 0
-    ? value.trim()
-    : null;
-  if (directPath) {
-    return directPath;
-  }
-
-  const params = getRecordProperty(props, 'params');
-  const paramPath = params
-    ? getTrimmedString(params[cogntLinkedNotePathProp])
-      ?? getTrimmedString(params.relativePath)
-    : null;
-  if (paramPath) {
-    return paramPath;
-  }
-
-  const legacyPath =
-    getCogntLinkedNoteLegacyPath(props.relativePath)
-    ?? getCogntLinkedNoteLegacyPath(props.description);
-
-  return legacyPath;
-}
-
-function getTrimmedString(value: unknown) {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-function getCogntLinkedNoteLegacyPath(value: unknown) {
-  const path = getTrimmedString(value);
-  return path && isCogntNoteRelativePath(path) ? path : null;
-}
-
-function createCogntLinkedNoteParams(relativePath: string) {
-  return {
-    [cogntLinkedNotePathProp]: relativePath,
-  };
-}
-
-function mergeCogntLinkedNoteParams(params: unknown, relativePath: string) {
-  return {
-    ...(isRecord(params) ? params : {}),
-    [cogntLinkedNotePathProp]: relativePath,
-  };
-}
-
-function hasCogntLinkedNotePath(params: unknown, relativePath: string) {
-  return isRecord(params)
-    && getTrimmedString(params[cogntLinkedNotePathProp]) === relativePath;
-}
-
-function getRecordProperty(record: Record<string, unknown>, key: string) {
-  const value = record[key];
-  return isRecord(value) ? value : null;
-}
-
