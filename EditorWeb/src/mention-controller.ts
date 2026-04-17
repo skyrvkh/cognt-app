@@ -3,11 +3,18 @@ import {
   escapeHtml,
   type MentionPreviewResult,
   type MentionTarget,
-  type MentionViewMode,
 } from './mentions';
+import type {
+  MentionControllerOptions,
+  NativeInlineEditor,
+  NativeLinkedMenuGroup,
+} from './mention-controller-types';
 import { NativeMentionMenuController } from './mention-controller-native-menu';
 import { MentionPreviewSession } from './mention-preview-session';
-import { type FloatingAnchor, type Point } from './mention-controller-anchors';
+import {
+  getReferencePopoverContainers,
+  type FloatingAnchor,
+} from './mention-controller-anchors';
 import { MentionHoverController } from './mention-hover-controller';
 import { bindMentionControllerEvents } from './mention-controller-events';
 
@@ -15,65 +22,15 @@ const nativeReferencePreviewId = 'cognt-reference-preview';
 const nativeReferencePreviewStyleId = 'cognt-reference-preview-style';
 const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';
 const nativeMentionSearchPreviewStyleId = 'cognt-linked-doc-search-preview-style';
-export type RequestMentionPreviewMessage = {
-  type: 'requestMentionPreview';
-  requestId: string;
-  sourcePath: string;
-  relativePath: string;
-  mode: MentionViewMode;
-  maxCharacters: number;
-};
-
-export type OpenMentionMessage = {
-  type: 'openMention';
-  sourcePath: string;
-  relativePath: string;
-  content: string;
-};
-
-export type SearchMentionTargetsMessage = {
-  type: 'searchMentionTargets';
-  sourcePath: string;
-  query: string;
-  limit: number;
-};
-
-export type NativeInlineRange = {
-  index: number;
-  length: number;
-};
-
-export type NativeInlineEditor = {
-  getInlineRange(): NativeInlineRange | null;
-  insertText(range: NativeInlineRange, text: string, attributes?: unknown): void;
-  setInlineRange(range: NativeInlineRange | null): void;
-};
-
-export type NativeLinkedMenuGroup = {
-  name: string;
-  items: Array<{
-    key: string;
-    name: string;
-    icon: unknown;
-    suffix?: string;
-    action: () => void | Promise<void>;
-  }>;
-  maxDisplay?: number;
-  overflowText?: string;
-};
-
-type MentionControllerOptions = {
-  editor: PageEditor;
-  previewElement: HTMLElement;
-  getCurrentPath(): string;
-  exportContent(): Promise<string>;
-  flushHost(): Promise<void>;
-  scheduleContentChanged(): void;
-  showStatus(message: string): void;
-  onSearchTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
-  onRequestPreview(message: RequestMentionPreviewMessage): void;
-  onOpenMention(message: OpenMentionMessage): void;
-};
+export type {
+  MentionControllerOptions,
+  NativeInlineEditor,
+  NativeInlineRange,
+  NativeLinkedMenuGroup,
+  OpenMentionMessage,
+  RequestMentionPreviewMessage,
+  SearchMentionTargetsMessage,
+} from './mention-controller-types';
 
 export class MentionController {
   private readonly eventAbort = new AbortController();
@@ -200,117 +157,6 @@ export class MentionController {
     this.eventAbort.abort();
   }
 
-}
-
-function isNativeMentionMenuItem(element: HTMLElement) {
-  return Boolean(getNativeMentionMenuItemPath(element));
-}
-
-function getNativeMentionMenuItemPath(element: HTMLElement) {
-  const key = element.dataset.id;
-  return key?.startsWith('note:') ? key.slice('note:'.length) : null;
-}
-
-function getLinkedDocPopoverContainer(anchor: HTMLElement) {
-  const root = anchor.getRootNode();
-  if (root instanceof ShadowRoot) {
-    const container = root.querySelector<HTMLElement>('.linked-doc-popover');
-    if (container) {
-      return container;
-    }
-  }
-
-  for (const element of Array.from(document.querySelectorAll<HTMLElement>('affine-linked-doc-popover'))) {
-    const container = element.shadowRoot?.querySelector<HTMLElement>('.linked-doc-popover');
-    if (container) {
-      return container;
-    }
-  }
-
-  return null;
-}
-
-function escapeCssIdentifier(value: string) {
-  return typeof CSS !== 'undefined' && CSS.escape
-    ? CSS.escape(value)
-    : value.replace(/["\\]/g, match => `\\${match}`);
-}
-
-function isElementAnchor(anchor: FloatingAnchor): anchor is HTMLElement {
-  return anchor instanceof HTMLElement;
-}
-
-function getFloatingAnchorPoint(anchor: FloatingAnchor): Point {
-  if (!isElementAnchor(anchor)) {
-    return anchor;
-  }
-
-  const referenceRect = anchor.getBoundingClientRect();
-  const popoverRect = getReferencePopoverRect(referenceRect);
-  if (popoverRect) {
-    return {
-      x: popoverRect.left,
-      y: popoverRect.bottom + 4,
-    };
-  }
-
-  return {
-    x: referenceRect.left,
-    y: referenceRect.bottom + 72,
-  };
-}
-
-function getReferencePopoverRect(referenceRect: DOMRect) {
-  return getReferencePopoverContainer(referenceRect)?.getBoundingClientRect() ?? null;
-}
-
-function getReferencePopoverContainer(referenceRect: DOMRect) {
-  let bestContainer: HTMLElement | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (const container of getReferencePopoverContainers()) {
-    const rect = container.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
-      continue;
-    }
-
-    const score = Math.abs(rect.left - referenceRect.left)
-      + Math.abs(rect.top - referenceRect.bottom);
-    if (score < bestScore) {
-      bestScore = score;
-      bestContainer = container;
-    }
-  }
-
-  return bestContainer;
-}
-
-function getReferencePopoverContainers() {
-  const containers = new Set<HTMLElement>();
-
-  for (const popup of Array.from(document.querySelectorAll<HTMLElement>('reference-popup'))) {
-    const container = popup.shadowRoot?.querySelector<HTMLElement>(
-      '.affine-reference-popover-container'
-    );
-    if (container) {
-      containers.add(container);
-    }
-  }
-
-  for (const element of Array.from(document.body.children)) {
-    if (!(element instanceof HTMLElement) || !element.shadowRoot) {
-      continue;
-    }
-
-    const container = element.shadowRoot.querySelector<HTMLElement>(
-      '.affine-reference-popover-container'
-    );
-    if (container) {
-      containers.add(container);
-    }
-  }
-
-  return [...containers];
 }
 
 function buildNativeReferenceExtensionHtml(relativePath: string, previewHtml: string) {
