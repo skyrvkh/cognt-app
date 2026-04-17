@@ -1,17 +1,14 @@
 import type { PageEditor } from '@blocksuite/presets';
 import {
-  buildMentionPreviewHtml,
   escapeHtml,
   type MentionPreviewResult,
   type MentionTarget,
   type MentionViewMode,
 } from './mentions';
 import { NativeMentionMenuController } from './mention-controller-native-menu';
+import { MentionPreviewSession } from './mention-preview-session';
 
-const previewDelayMs = 220;
 const linkedPagePreviewDelayMs = 560;
-const previewDismissDelayMs = 200;
-const previewMaxCharacters = 0;
 const nativeReferencePreviewId = 'cognt-reference-preview';
 const nativeReferencePreviewStyleId = 'cognt-reference-preview-style';
 const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';
@@ -89,22 +86,23 @@ export class MentionController {
   private readonly previewElement: HTMLElement;
   private readonly options: MentionControllerOptions;
   private readonly nativeMentionMenu: NativeMentionMenuController;
+  private readonly preview: MentionPreviewSession;
   private targets: MentionTarget[] = [];
   private hoverTimer: number | undefined;
-  private previewHideTimer: number | undefined;
   private hoverPath = '';
-  private pendingPreviewRequestId = '';
-  private activeViewMode: MentionViewMode | null = null;
-  private viewAnchor: FloatingAnchor | null = null;
-  private nativePreviewAnchor: HTMLElement | null = null;
-  private nativeMentionMenuPreviewAnchor: HTMLElement | null = null;
-  private nativeMentionMenuPreviewPath = '';
-  private requestCounter = 0;
 
   public constructor(options: MentionControllerOptions) {
     this.options = options;
     this.editor = options.editor;
     this.previewElement = options.previewElement;
+    this.preview = new MentionPreviewSession({
+      previewElement: this.previewElement,
+      getCurrentPath: () => this.options.getCurrentPath(),
+      exportContent: () => this.options.exportContent(),
+      showStatus: message => this.options.showStatus(message),
+      onRequestPreview: message => this.options.onRequestPreview(message),
+      onOpenMention: message => this.options.onOpenMention(message),
+    });
     this.nativeMentionMenu = new NativeMentionMenuController({
       editor: this.editor,
       getCurrentPath: () => this.options.getCurrentPath(),
@@ -117,7 +115,7 @@ export class MentionController {
       showStatus: message => this.options.showStatus(message),
       onSearchTargets: message => this.options.onSearchTargets(message),
       requestPreview: (relativePath, anchor) =>
-        this.requestNativeMentionMenuPreview(relativePath, anchor),
+        this.preview.requestNativeMentionMenuPreview(relativePath, anchor),
       refreshHighlights: () => this.refreshHighlights(),
     });
     this.previewElement.addEventListener(
@@ -133,7 +131,7 @@ export class MentionController {
     document.addEventListener(
       'mousemove',
       event => {
-        if (this.activeViewMode !== 'preview') {
+        if (this.preview.getActiveViewMode() !== 'preview') {
           return;
         }
 
@@ -167,44 +165,11 @@ export class MentionController {
   }
 
   public handlePreviewResult(result: MentionPreviewResult) {
-    if (result.requestId !== this.pendingPreviewRequestId) {
-      return;
-    }
-
-    this.cancelScheduledPreviewHide();
-    const mode = result.mode ?? this.activeViewMode ?? 'preview';
-    this.activeViewMode = mode;
-
-    if (this.nativePreviewAnchor && mode === 'preview') {
-      this.renderNativeReferencePreview(
-        this.nativePreviewAnchor,
-        result.relativePath,
-        buildMentionPreviewHtml(result)
-      );
-      return;
-    }
-
-    if (this.nativeMentionMenuPreviewAnchor && mode === 'preview') {
-      this.renderNativeMentionSearchPreview(
-        this.nativeMentionMenuPreviewAnchor,
-        buildMentionPreviewHtml(result)
-      );
-      return;
-    }
-
-    this.previewElement.dataset.mode = mode;
-    this.previewElement.innerHTML = buildMentionPreviewHtml(result);
-    this.previewElement.dataset.visible = 'true';
-
-    if (this.viewAnchor) {
-      this.positionFloatingElement(this.previewElement, this.viewAnchor);
-    }
+    this.preview.handlePreviewResult(result);
   }
 
   public handleOpenResult(ok: boolean, error?: string) {
-    if (!ok) {
-      this.options.showStatus(`Open failed: ${error ?? 'Could not open note.'}`);
-    }
+    this.preview.handleOpenResult(ok, error);
   }
 
   public scheduleHighlightUpdate() {}
@@ -214,16 +179,20 @@ export class MentionController {
   public cancelScheduledHighlightUpdate() {}
 
   public handleLinkedPageHover(relativePath: string, anchor: FloatingAnchor) {
-    if (!this.options.getCurrentPath() || this.activeViewMode === 'full') {
+    if (!this.options.getCurrentPath() || this.preview.getActiveViewMode() === 'full') {
       return;
     }
 
     this.cancelScheduledPreviewHide();
 
-    const sameNativeAnchor = isElementAnchor(anchor) && this.nativePreviewAnchor === anchor;
+    const sameNativeAnchor = isElementAnchor(anchor)
+      && this.preview.getNativePreviewAnchor() === anchor;
     if (
       relativePath === this.hoverPath &&
-      (this.hoverTimer !== undefined || (this.activeViewMode === 'preview' && sameNativeAnchor))
+      (
+        this.hoverTimer !== undefined
+        || (this.preview.getActiveViewMode() === 'preview' && sameNativeAnchor)
+      )
     ) {
       return;
     }
@@ -233,8 +202,11 @@ export class MentionController {
 
     this.hoverTimer = window.setTimeout(() => {
       this.hoverTimer = undefined;
-      if (this.hoverPath === relativePath && this.activeViewMode !== 'full') {
-        this.requestPreview(relativePath, anchor, 'preview');
+      if (
+        this.hoverPath === relativePath
+        && this.preview.getActiveViewMode() !== 'full'
+      ) {
+        this.preview.requestPreview(relativePath, anchor, 'preview');
       }
     }, linkedPagePreviewDelayMs);
   }
@@ -243,7 +215,7 @@ export class MentionController {
     this.clearHoverTimer();
     this.hoverPath = '';
 
-    if (this.activeViewMode === 'preview') {
+    if (this.preview.getActiveViewMode() === 'preview') {
       this.schedulePreviewHide();
     }
   }
@@ -251,45 +223,21 @@ export class MentionController {
   public async handleClick(_event: MouseEvent) {}
 
   public hidePreview() {
-    this.pendingPreviewRequestId = '';
-    this.activeViewMode = null;
-    this.viewAnchor = null;
-    this.nativePreviewAnchor = null;
-    this.nativeMentionMenuPreviewAnchor = null;
-    this.nativeMentionMenuPreviewPath = '';
     this.hoverPath = '';
     this.clearHoverTimer();
-    this.cancelScheduledPreviewHide();
-    removeNativeReferencePreview();
-    removeNativeMentionSearchPreview();
-    this.previewElement.dataset.visible = 'false';
-    this.previewElement.dataset.mode = '';
-    this.previewElement.dataset.anchor = '';
-    this.previewElement.innerHTML = '';
+    this.preview.hidePreview();
   }
 
   public schedulePreviewHide() {
-    if (this.activeViewMode !== 'preview' || this.previewHideTimer !== undefined) {
-      return;
-    }
-
     this.clearHoverTimer();
-    this.previewHideTimer = window.setTimeout(() => {
-      this.previewHideTimer = undefined;
-
-      if (this.activeViewMode === 'preview') {
-        this.hidePreview();
-      }
-    }, previewDismissDelayMs);
+    this.preview.schedulePreviewHide(() => {
+      this.hoverPath = '';
+      this.clearHoverTimer();
+    });
   }
 
   public cancelScheduledPreviewHide() {
-    if (this.previewHideTimer === undefined) {
-      return;
-    }
-
-    window.clearTimeout(this.previewHideTimer);
-    this.previewHideTimer = undefined;
+    this.preview.cancelScheduledPreviewHide();
   }
 
   public containsFloatingUi(target: Node) {
@@ -299,253 +247,13 @@ export class MentionController {
   }
 
   public isShowingPreview() {
-    return this.activeViewMode === 'preview';
+    return this.preview.isShowingPreview();
   }
 
   public dispose() {
     this.hidePreview();
     this.cancelScheduledHighlightUpdate();
     this.eventAbort.abort();
-  }
-
-  private requestNativeMentionMenuPreview(relativePath: string, anchor: HTMLElement) {
-    if (
-      this.nativeMentionMenuPreviewAnchor === anchor
-      && this.nativeMentionMenuPreviewPath === relativePath
-      && this.activeViewMode === 'preview'
-    ) {
-      return;
-    }
-
-    this.nativeMentionMenuPreviewAnchor = anchor;
-    this.nativeMentionMenuPreviewPath = relativePath;
-    this.nativePreviewAnchor = null;
-    this.requestPreview(relativePath, anchor, 'preview');
-  }
-
-  private requestPreview(relativePath: string, anchor: FloatingAnchor, mode: MentionViewMode) {
-    const currentPath = this.options.getCurrentPath();
-    if (!currentPath) {
-      return;
-    }
-
-    this.cancelScheduledPreviewHide();
-    const requestId = this.makeRequestId();
-    this.pendingPreviewRequestId = requestId;
-    this.activeViewMode = mode;
-    this.viewAnchor = anchor;
-
-    if (mode === 'preview' && isElementAnchor(anchor) && isNativeMentionMenuItem(anchor)) {
-      this.nativePreviewAnchor = null;
-      this.nativeMentionMenuPreviewAnchor = anchor;
-      this.previewElement.dataset.visible = 'false';
-      this.previewElement.dataset.mode = '';
-      this.previewElement.dataset.anchor = '';
-      this.previewElement.innerHTML = '';
-      this.renderNativeMentionSearchPreview(
-        anchor,
-        `<div class="mention-preview-body mention-preview-body--static"><p>Loading preview...</p></div>`
-      );
-    } else if (mode === 'preview' && isElementAnchor(anchor)) {
-      this.nativePreviewAnchor = anchor;
-      this.nativeMentionMenuPreviewAnchor = null;
-      this.nativeMentionMenuPreviewPath = '';
-      this.previewElement.dataset.visible = 'false';
-      this.previewElement.dataset.mode = '';
-      this.previewElement.dataset.anchor = '';
-      this.previewElement.innerHTML = '';
-      this.renderNativeReferencePreview(
-        anchor,
-        relativePath,
-        `<div class="mention-preview-body mention-preview-body--static"><p>Loading preview...</p></div>`
-      );
-    } else {
-      this.nativePreviewAnchor = null;
-      this.nativeMentionMenuPreviewAnchor = null;
-      this.nativeMentionMenuPreviewPath = '';
-      this.previewElement.dataset.mode = mode;
-      this.previewElement.dataset.anchor = isElementAnchor(anchor) ? 'linked-page' : '';
-      this.previewElement.innerHTML = `<div class="mention-preview-body mention-preview-body--static"><p>${
-        mode === 'full' ? 'Opening document...' : 'Loading preview...'
-      }</p></div>`;
-      this.previewElement.dataset.visible = 'true';
-      this.positionFloatingElement(this.previewElement, anchor);
-      window.requestAnimationFrame(() => this.positionFloatingElement(this.previewElement, anchor));
-    }
-
-    this.options.onRequestPreview({
-      type: 'requestMentionPreview',
-      requestId,
-      sourcePath: currentPath,
-      relativePath,
-      mode,
-      maxCharacters: previewMaxCharacters,
-    });
-  }
-
-  private renderNativeMentionSearchPreview(anchor: HTMLElement, htmlContent: string, attempt = 0) {
-    const container = getLinkedDocPopoverContainer(anchor);
-    if (!container) {
-      if (attempt < 8) {
-        window.requestAnimationFrame(() => {
-          if (
-            this.nativeMentionMenuPreviewAnchor === anchor
-            && this.activeViewMode === 'preview'
-          ) {
-            this.renderNativeMentionSearchPreview(anchor, htmlContent, attempt + 1);
-          }
-        });
-      }
-      return;
-    }
-
-    const root = container.getRootNode();
-    if (root instanceof ShadowRoot) {
-      injectNativeMentionSearchPreviewStyle(root);
-    }
-
-    let preview = container.querySelector<HTMLElement>(`#${nativeMentionSearchPreviewId}`);
-    if (!preview) {
-      preview = document.createElement('div');
-      preview.id = nativeMentionSearchPreviewId;
-      preview.className = nativeMentionSearchPreviewId;
-      container.append(preview);
-    }
-
-    preview.innerHTML = htmlContent;
-  }
-
-  private renderNativeReferencePreview(
-    anchor: HTMLElement,
-    relativePath: string,
-    htmlContent: string,
-    attempt = 0
-  ) {
-    const container = getReferencePopoverContainer(anchor.getBoundingClientRect());
-    if (!container) {
-      if (attempt < 16) {
-        window.requestAnimationFrame(() => {
-          if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
-            this.renderNativeReferencePreview(anchor, relativePath, htmlContent, attempt + 1);
-          }
-        });
-      } else if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
-        this.renderFloatingReferencePreview(anchor, htmlContent);
-      }
-      return;
-    }
-
-    this.previewElement.dataset.visible = 'false';
-    this.previewElement.dataset.mode = '';
-    this.previewElement.dataset.anchor = '';
-    this.previewElement.innerHTML = '';
-
-    const root = container.getRootNode();
-    if (root instanceof ShadowRoot) {
-      injectNativeReferencePreviewStyle(root);
-    }
-
-    let preview = container.querySelector<HTMLElement>(`#${nativeReferencePreviewId}`);
-    if (!preview) {
-      preview = document.createElement('div');
-      preview.id = nativeReferencePreviewId;
-      preview.className = nativeReferencePreviewId;
-      container.append(preview);
-    }
-
-    preview.innerHTML = buildNativeReferenceExtensionHtml(relativePath, htmlContent);
-    this.bindNativeReferenceExtension(preview, relativePath);
-  }
-
-  private renderFloatingReferencePreview(anchor: HTMLElement, htmlContent: string) {
-    this.previewElement.dataset.mode = 'preview';
-    this.previewElement.dataset.anchor = 'linked-page';
-    this.previewElement.innerHTML = htmlContent;
-    this.previewElement.dataset.visible = 'true';
-    this.positionFloatingElement(this.previewElement, anchor);
-    window.requestAnimationFrame(() => {
-      if (this.nativePreviewAnchor === anchor && this.activeViewMode === 'preview') {
-        this.positionFloatingElement(this.previewElement, anchor);
-      }
-    });
-  }
-
-  private bindNativeReferenceExtension(preview: HTMLElement, relativePath: string) {
-    preview.querySelector<HTMLElement>('[data-cognt-reference-action="open"]')
-      ?.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.openMention(relativePath);
-      });
-
-    preview.querySelector<HTMLElement>('[data-cognt-reference-action="copy-path"]')
-      ?.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.copyMentionPath(relativePath);
-      });
-  }
-
-  private async openMention(relativePath: string) {
-    const currentPath = this.options.getCurrentPath();
-    if (!currentPath) {
-      return;
-    }
-
-    this.hidePreview();
-    this.options.onOpenMention({
-      type: 'openMention',
-      sourcePath: currentPath,
-      relativePath,
-      content: await this.options.exportContent(),
-    });
-    this.options.showStatus(`Opening ${relativePath}...`);
-  }
-
-  private async copyMentionPath(relativePath: string) {
-    try {
-      await navigator.clipboard.writeText(relativePath);
-      this.options.showStatus('Copied linked note path.');
-    } catch (error) {
-      console.warn('Could not copy linked note path.', error);
-      this.options.showStatus('Could not copy linked note path.');
-    }
-  }
-
-  private makeRequestId() {
-    this.requestCounter++;
-    return `${Date.now().toString(36)}-${this.requestCounter.toString(36)}`;
-  }
-
-  private positionFloatingElement(element: HTMLElement, anchor: FloatingAnchor) {
-    const margin = 12;
-    const preferred = getFloatingAnchorPoint(anchor);
-    const preferredWidth = isElementAnchor(anchor)
-      ? getReferencePopoverRect(anchor.getBoundingClientRect())?.width
-      : undefined;
-
-    if (preferredWidth && preferredWidth > 0) {
-      element.style.minWidth = `${Math.min(
-        Math.max(preferredWidth, 360),
-        window.innerWidth - margin * 2
-      )}px`;
-    } else {
-      element.style.minWidth = '';
-    }
-
-    const width = element.offsetWidth || 320;
-    const height = element.offsetHeight || 220;
-    const left = Math.min(
-      Math.max(margin, preferred.x),
-      Math.max(margin, window.innerWidth - width - margin)
-    );
-    const top = Math.min(
-      Math.max(margin, preferred.y),
-      Math.max(margin, window.innerHeight - height - margin)
-    );
-
-    element.style.left = `${left}px`;
-    element.style.top = `${top}px`;
   }
 
   private clearHoverTimer() {
