@@ -6,3 +6,5 @@ obj/
 .npm-cache/
 EditorWeb/node_modules/
 EditorWeb/dist/
+src/Cognt.Wpf/EditorHost/EditorWeb/node_modules/
+src/Cognt.Wpf/EditorHost/EditorWeb/dist/

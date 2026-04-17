@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>CogntApp</RootNamespace>
     <ApplicationIcon>src\Cognt.Wpf\Assets\icon.ico</ApplicationIcon>
-    <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
+    <EditorWebDirectory>$(MSBuildProjectDirectory)\src\Cognt.Wpf\EditorHost\EditorWeb</EditorWebDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,10 +47,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EditorWebSource Include="EditorWeb\package.json" />
-    <EditorWebSource Include="EditorWeb\tsconfig.json" />
-    <EditorWebSource Include="EditorWeb\vite.config.js" />
-    <EditorWebSource Include="EditorWeb\src\**\*" />
+    <EditorWebSource Include="$(EditorWebDirectory)\package.json" />
+    <EditorWebSource Include="$(EditorWebDirectory)\tsconfig.json" />
+    <EditorWebSource Include="$(EditorWebDirectory)\vite.config.js" />
+    <EditorWebSource Include="$(EditorWebDirectory)\src\**\*" />
   </ItemGroup>
 
   <ItemGroup>

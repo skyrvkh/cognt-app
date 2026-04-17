@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "tsc && vite build --configLoader native"
   },
   "dependencies": {
     "@blocksuite/blocks": "0.19.5",
