@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <Compile Include="src\Cognt.Wpf\ViewModels\CountDisplayFormatter.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.Catalog.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.Filters.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.TreeCatalog.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\IAllNotesCatalogSource.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\NoteTreeNodeViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\NumericTextFormatter.cs" />
