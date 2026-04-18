@@ -1,0 +1,242 @@
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Windows.Input;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using CogntApp.Models.Navigation;
+
+namespace CogntApp.ViewModels;
+
+public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
+{
+    private const string AllTagsValue = "__all_tags";
+    private const string AllTypesValue = "__all_types";
+    private readonly IAllNotesCatalogSource catalogSource;
+    private readonly RelayCommand openNoteCommand;
+    private string currentCollectionId = string.Empty;
+    private string searchQuery = string.Empty;
+    private bool isLoading;
+    private bool hasError;
+    private string errorMessage = string.Empty;
+    private string emptyStateTitle = "No notes yet.";
+    private string emptyStateMessage = "Create or import a note to get started.";
+    private bool hasLoadedCatalog;
+    private AllNotesFilterOptionViewModel? selectedTagOption;
+    private AllNotesFilterOptionViewModel? selectedTypeOption;
+    private AllNotesSortOptionViewModel? selectedSortOption;
+    private CancellationTokenSource? applyFiltersCancellation;
+    private IReadOnlyList<KnowledgeNoteListItemReadModel> allNotes = [];
+    private IReadOnlyList<AllNotesTreeItemViewModel> allTreeRoots = [];
+    private bool isTreeViewMode;
+
+    public AllNotesViewModel(IAllNotesCatalogSource catalogSource)
+    {
+        ArgumentNullException.ThrowIfNull(catalogSource);
+
+        this.catalogSource = catalogSource;
+        openNoteCommand = new RelayCommand(OpenNoteFromCommand, CanOpenNoteFromCommand);
+        ClearFiltersCommand = new RelayCommand(ClearFilters);
+        CreateNoteCommand = new RelayCommand(() => CreateNoteRequested?.Invoke(this, EventArgs.Empty));
+        ImportDocumentsCommand = new RelayCommand(() => ImportDocumentsRequested?.Invoke(this, EventArgs.Empty));
+
+        TagOptions.Add(new AllNotesFilterOptionViewModel("All tags", AllTagsValue));
+        TypeOptions.Add(new AllNotesFilterOptionViewModel("All types", AllTypesValue));
+
+        foreach (AllNotesSortOptionViewModel option in CreateSortOptions())
+        {
+            SortOptions.Add(option);
+        }
+
+        selectedTagOption = TagOptions[0];
+        selectedTypeOption = TypeOptions[0];
+        selectedSortOption = SortOptions[0];
+    }
+
+    internal event EventHandler<OpenAllNotesRequestedEventArgs>? OpenNoteRequested;
+
+    internal event EventHandler? CreateNoteRequested;
+
+    internal event EventHandler? ImportDocumentsRequested;
+
+    public void Dispose()
+    {
+        applyFiltersCancellation?.Cancel();
+        applyFiltersCancellation?.Dispose();
+        applyFiltersCancellation = null;
+    }
+
+    public ObservableCollection<AllNotesListItemViewModel> VisibleNotes { get; } = [];
+
+    public ObservableCollection<AllNotesTreeItemViewModel> VisibleTreeNodes { get; } = [];
+
+    public ObservableCollection<AllNotesFilterOptionViewModel> TagOptions { get; } = [];
+
+    public ObservableCollection<AllNotesFilterOptionViewModel> TypeOptions { get; } = [];
+
+    public ObservableCollection<AllNotesSortOptionViewModel> SortOptions { get; } = [];
+
+    public ICommand OpenNoteCommand => openNoteCommand;
+
+    public ICommand ClearFiltersCommand { get; }
+
+    public ICommand CreateNoteCommand { get; }
+
+    public ICommand ImportDocumentsCommand { get; }
+
+    public string SearchQuery
+    {
+        get => searchQuery;
+        set
+        {
+            if (SetProperty(ref searchQuery, value))
+            {
+                QueueApplyFilters();
+            }
+        }
+    }
+
+    public bool IsLoading
+    {
+        get => isLoading;
+        private set
+        {
+            if (SetProperty(ref isLoading, value))
+            {
+                OnPropertyChanged(nameof(ShouldShowEmptyState));
+            }
+        }
+    }
+
+    public bool HasError
+    {
+        get => hasError;
+        private set
+        {
+            if (SetProperty(ref hasError, value))
+            {
+                OnPropertyChanged(nameof(ShouldShowEmptyState));
+            }
+        }
+    }
+
+    public string ErrorMessage
+    {
+        get => errorMessage;
+        private set => SetProperty(ref errorMessage, value);
+    }
+
+    public string EmptyStateTitle
+    {
+        get => emptyStateTitle;
+        private set => SetProperty(ref emptyStateTitle, value);
+    }
+
+    public string EmptyStateMessage
+    {
+        get => emptyStateMessage;
+        private set => SetProperty(ref emptyStateMessage, value);
+    }
+
+    public bool HasVisibleNotes => VisibleNotes.Count > 0;
+
+    public bool ShouldShowEmptyState => !IsLoading && !HasError && !HasVisibleNotes;
+
+    public bool IsTreeViewMode
+    {
+        get => isTreeViewMode;
+        set
+        {
+            if (SetProperty(ref isTreeViewMode, value))
+            {
+                OnPropertyChanged(nameof(IsListViewMode));
+            }
+        }
+    }
+
+    public bool IsListViewMode => !IsTreeViewMode;
+
+    public string NoteCountLabel => $"{allNotes.Count} note{(allNotes.Count == 1 ? string.Empty : "s")}";
+
+    public string ResultsSummary => HasVisibleNotes
+        ? $"Showing {VisibleNotes.Count} of {allNotes.Count} notes"
+        : $"0 of {allNotes.Count} notes";
+
+    public string CollectionLabel => string.IsNullOrWhiteSpace(currentCollectionId)
+        ? "No collection selected"
+        : Path.GetFileName(currentCollectionId.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+    public string PageSubtitle => $"{CollectionLabel} - {NoteCountLabel}";
+
+    public AllNotesFilterOptionViewModel? SelectedTagOption
+    {
+        get => selectedTagOption;
+        set
+        {
+            if (SetProperty(ref selectedTagOption, value))
+            {
+                QueueApplyFilters();
+            }
+        }
+    }
+
+    public AllNotesFilterOptionViewModel? SelectedTypeOption
+    {
+        get => selectedTypeOption;
+        set
+        {
+            if (SetProperty(ref selectedTypeOption, value))
+            {
+                QueueApplyFilters();
+            }
+        }
+    }
+
+    public AllNotesSortOptionViewModel? SelectedSortOption
+    {
+        get => selectedSortOption;
+        set
+        {
+            if (SetProperty(ref selectedSortOption, value))
+            {
+                QueueApplyFilters();
+            }
+        }
+    }
+
+    private void ClearFilters()
+    {
+        SearchQuery = string.Empty;
+        SelectedTagOption = TagOptions.FirstOrDefault();
+        SelectedTypeOption = TypeOptions.FirstOrDefault();
+        SelectedSortOption = SortOptions.FirstOrDefault();
+    }
+
+    private bool CanOpenNoteFromCommand(object? parameter)
+    {
+        if (string.IsNullOrWhiteSpace(currentCollectionId))
+        {
+            return false;
+        }
+
+        return parameter switch
+        {
+            AllNotesListItemViewModel note => !string.IsNullOrWhiteSpace(note.RelativePath),
+            AllNotesTreeItemViewModel => true,
+            _ => false
+        };
+    }
+
+    private void OpenNoteFromCommand(object? parameter)
+    {
+        string? relativePath = parameter switch
+        {
+            AllNotesListItemViewModel note => note.RelativePath,
+            AllNotesTreeItemViewModel treeItem when treeItem.CanOpen => treeItem.RelativePath,
+            _ => null
+        };
+
+        if (!string.IsNullOrWhiteSpace(relativePath))
+        {
+            OpenNoteRequested?.Invoke(this, new OpenAllNotesRequestedEventArgs(relativePath));
+        }
+    }
+}
