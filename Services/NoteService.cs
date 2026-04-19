@@ -101,7 +101,7 @@ public sealed class NoteService : INoteService
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
     private readonly object repositoryLock = new();
-    private SqliteTreeRepository? treeRepository;
+    private ITreeRepository? treeRepository;
     private string? treeRepositoryRoot;
     private bool disposed;
 
@@ -301,7 +301,7 @@ public sealed class NoteService : INoteService
         ICollection<string> notePaths,
         ISet<string> seenPaths)
     {
-        if (item.Kind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath))
+        if (item.Kind is TreeItemKind.Note or TreeItemKind.PdfDocument && !string.IsNullOrWhiteSpace(item.FileRelPath))
         {
             string notePath = ResolveNotePathForDeletion(root, item.FileRelPath);
             if (seenPaths.Add(notePath))
@@ -343,7 +343,7 @@ public sealed class NoteService : INoteService
 
             CloseTreeRepository();
             treeRepositoryRoot = root;
-            treeRepository = new SqliteTreeRepository(Path.Combine(root, MetadataDatabaseFileName));
+            treeRepository = new PkmTreeRepository(Path.Combine(root, MetadataDatabaseFileName));
 
             if (!treeRepository.HasAnyItems())
             {

@@ -44,7 +44,7 @@ public sealed class AllNotesCatalogSource : IAllNotesCatalogSource
 
         foreach (TreeItemRow item in EnumerateItems(collectionId, parentId: null))
         {
-            if (item.Kind != TreeItemKind.Note || string.IsNullOrWhiteSpace(item.FileRelPath))
+            if (!IsFileBackedItem(item) || string.IsNullOrWhiteSpace(item.FileRelPath))
             {
                 continue;
             }
@@ -71,7 +71,7 @@ public sealed class AllNotesCatalogSource : IAllNotesCatalogSource
     public IReadOnlyList<KnowledgeNoteListItemReadModel> LoadNoteCatalog(string collectionId)
     {
         return EnumerateItems(collectionId, parentId: null)
-            .Where(item => item.Kind == TreeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath))
+            .Where(item => IsFileBackedItem(item) && !string.IsNullOrWhiteSpace(item.FileRelPath))
             .Select(ToCatalogItem)
             .ToArray();
     }
@@ -86,7 +86,7 @@ public sealed class AllNotesCatalogSource : IAllNotesCatalogSource
         {
             yield return item;
 
-            if (item.ChildCount <= 0 || item.Kind is not (TreeItemKind.Folder or TreeItemKind.Note or TreeItemKind.Root or TreeItemKind.Trash))
+            if (item.ChildCount <= 0 || item.Kind is not (TreeItemKind.Folder or TreeItemKind.Note or TreeItemKind.PdfDocument or TreeItemKind.Root or TreeItemKind.Trash))
             {
                 continue;
             }
@@ -128,8 +128,14 @@ public sealed class AllNotesCatalogSource : IAllNotesCatalogSource
             TreeItemKind.Folder => KnowledgeItemKind.Folder,
             TreeItemKind.Root => KnowledgeItemKind.Root,
             TreeItemKind.Trash => KnowledgeItemKind.Trash,
+            TreeItemKind.PdfDocument => KnowledgeItemKind.PdfDocument,
             _ => KnowledgeItemKind.Note
         };
+    }
+
+    private static bool IsFileBackedItem(TreeItemRow item)
+    {
+        return item.Kind is TreeItemKind.Note or TreeItemKind.PdfDocument;
     }
 
     private static KnowledgeNoteListItemType GetNoteType(string relativePath)

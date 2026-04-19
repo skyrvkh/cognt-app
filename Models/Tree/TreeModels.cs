@@ -6,6 +6,7 @@ public enum TreeItemKind
     Note = 2,
     Root = 3,
     Trash = 4,
+    PdfDocument = 5,
 }
 
 public sealed record TreeItemRow(
