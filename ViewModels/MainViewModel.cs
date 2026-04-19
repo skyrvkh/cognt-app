@@ -32,6 +32,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             () => RunUserAction("Load Collection Failed", () => LoadNotesDirectory(NotesDirectory)));
         ShowDashboardCommand = new RelayCommand(
             () => RunUserAction("Navigation Failed", ShowDashboard));
+        ShowAllNotesCommand = new RelayCommand(
+            () => RunUserAction("Navigation Failed", ShowAllNotes));
         ShowDecksCommand = new RelayCommand(
             () => RunUserAction("Navigation Failed", ShowDecks));
         AddNoteCommand = new RelayCommand(
@@ -61,6 +63,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ICommand LoadDirectoryCommand { get; }
 
     public ICommand ShowDashboardCommand { get; }
+
+    public ICommand ShowAllNotesCommand { get; }
 
     public ICommand ShowDecksCommand { get; }
 
@@ -529,6 +533,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         SaveCurrentNoteFromEditor();
         ClearCurrentNoteState();
         OverlayRequested?.Invoke(this, new OverlayRequestedEventArgs(OverlayViewKind.Dashboard));
+    }
+
+    private void ShowAllNotes()
+    {
+        SaveCurrentNoteFromEditor();
+        ClearCurrentNoteState();
+        OverlayRequested?.Invoke(this, new OverlayRequestedEventArgs(OverlayViewKind.AllNotes));
     }
 
     private void ShowDecks()
