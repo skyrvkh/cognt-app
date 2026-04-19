@@ -4,6 +4,17 @@ import {
   type LinkedNoteResult,
   type LinkedPageReference,
 } from './linked-note-types';
+import { parseNoteMentionTarget } from '../mentions';
+import {
+  getNotePathFileName,
+  normalizeNotePathKey,
+} from './note-path-utils';
+
+export type RawCogntInlineMentionMatch = {
+  index: number;
+  length: number;
+  relativePath: string;
+};
 
 export function getLinkedNotePathFromResult(result: LinkedNoteResult) {
   if (result.relativePath?.trim()) {
@@ -32,7 +43,7 @@ export function normalizeCreatedExtractPath(path: string | null | undefined) {
 }
 
 export function getExtractTitleFromRelPath(relativePath: string) {
-  const fileName = relativePath.split(/[\\/]/).filter(Boolean).pop() ?? relativePath;
+  const fileName = getNotePathFileName(relativePath);
   const stem = fileName.replace(/\.(json|md|markdown)$/i, '').trim();
   const separatorIndex = stem.lastIndexOf('.');
 
@@ -49,13 +60,13 @@ export function getLinkedNoteTitle(relativePath: string, title?: string | null) 
     return normalizedTitle;
   }
 
-  const fileName = relativePath.split(/[\\/]/).filter(Boolean).pop() ?? relativePath;
+  const fileName = getNotePathFileName(relativePath);
   const fallbackTitle = fileName.replace(/\.(json|md|markdown)$/i, '').trim();
   return fallbackTitle || 'Untitled';
 }
 
 export function normalizeLinkedNotePathKey(relativePath: string) {
-  return relativePath.replace(/\\/g, '/').trim().toLowerCase();
+  return normalizeNotePathKey(relativePath);
 }
 
 export function getLinkedPageReferencePath(reference: LinkedPageReference | Record<string, unknown>) {
@@ -103,6 +114,27 @@ export function parseCogntLinkTarget(value: string | undefined) {
     title: normalizeLinkedNoteTitle(titleParts.join('|')),
     style,
   };
+}
+
+export function findRawCogntInlineMentionMatches(text: string): RawCogntInlineMentionMatch[] {
+  const matches: RawCogntInlineMentionMatch[] = [];
+  const expression = /\[\[([^\]\[\n]+)\]\]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = expression.exec(text)) !== null) {
+    const target = parseNoteMentionTarget(match[1]);
+    if (!target || !isCogntNoteRelativePath(target.relativePath)) {
+      continue;
+    }
+
+    matches.push({
+      index: match.index,
+      length: match[0].length,
+      relativePath: target.relativePath,
+    });
+  }
+
+  return matches;
 }
 
 export function normalizeLinkedNoteTitle(title: string | null | undefined) {
