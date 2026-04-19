@@ -38,6 +38,8 @@ public partial class MainWindow : Window
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
     private readonly MainViewModel viewModel;
+    private readonly AllNotesViewModel allNotesViewModel;
+    private readonly AllNotesView allNotesView = new();
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
@@ -71,9 +73,11 @@ public partial class MainWindow : Window
     internal MainWindow(MainViewModel viewModel)
     {
         this.viewModel = viewModel;
+        allNotesViewModel = new AllNotesViewModel(new AllNotesCatalogSource(new NoteService()));
 
         InitializeComponent();
         DataContext = viewModel;
+        allNotesView.DataContext = allNotesViewModel;
 
         viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
@@ -89,6 +93,9 @@ public partial class MainWindow : Window
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
         EditorViewControl.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
+        allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
+        allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
+        allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
         decksView.PracticeRequested += DecksView_PracticeRequested;
         decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
         decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
@@ -96,6 +103,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        allNotesViewModel.Dispose();
         viewModel.Dispose();
         base.OnClosed(e);
     }
@@ -436,6 +444,13 @@ public partial class MainWindow : Window
                     ShowOverlay(decksView);
                     return;
 
+                case OverlayViewKind.AllNotes:
+                    await CloseReviewIfActiveAsync();
+                    await CloseCreateCardEditorIfActiveAsync();
+                    await allNotesViewModel.LoadAsync(viewModel.CurrentNotesDirectory);
+                    ShowOverlay(allNotesView);
+                    return;
+
                 case OverlayViewKind.Review:
                     try
                     {
@@ -601,6 +616,32 @@ public partial class MainWindow : Window
     {
         IShellDialogService dialogService = new WindowShellDialogService(this);
         dialogService.ShowWarning(e.Title, e.Message);
+    }
+
+    private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(viewModel.CurrentNotesDirectory))
+        {
+            return;
+        }
+
+        string notePath = Path.GetFullPath(Path.Combine(
+            viewModel.CurrentNotesDirectory,
+            e.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+        await OpenNoteAsync(notePath, selectInTree: true);
+    }
+
+    private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
+    {
+        if (viewModel.AddNoteCommand.CanExecute(null))
+        {
+            viewModel.AddNoteCommand.Execute(null);
+        }
+    }
+
+    private void AllNotesViewModel_ImportDocumentsRequested(object? sender, EventArgs e)
+    {
+        ImportDocumentsButton_Click(sender ?? this, new RoutedEventArgs());
     }
 
     private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
