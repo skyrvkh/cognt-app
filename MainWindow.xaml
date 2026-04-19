@@ -298,7 +298,7 @@
                         <Button Content="All Documents"
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="SidebarActionButton_Click"
-                                Command="{Binding LoadDirectoryCommand}" />
+                                Command="{Binding ShowAllNotesCommand}" />
                         <Button Content="Flashcards"
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="SidebarActionButton_Click"
