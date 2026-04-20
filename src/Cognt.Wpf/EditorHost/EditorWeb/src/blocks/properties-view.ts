@@ -1,7 +1,14 @@
 import { BlockComponent } from '@blocksuite/block-std';
 import { PlusIcon, RemoveIcon, TitleIcon } from '@blocksuite/icons/lit';
-import { html, nothing } from 'lit';
+import { html, nothing } from 'lit-html';
 import { createBlockId } from '../documents/block-suite-document';
+import {
+  configureNonEditableBlockView,
+  defineBlockElementOnce,
+  selectCurrentBlock,
+  stopBlockControlEvent,
+  stopBlockEventPropagation,
+} from './block-view-helpers';
 import {
   cogntPropertiesTagName,
   type CogntPropertiesBlockModel,
@@ -15,7 +22,7 @@ class CogntPropertiesBlockComponent extends BlockComponent<CogntPropertiesBlockM
 
   connectedCallback() {
     super.connectedCallback();
-    this.contentEditable = 'false';
+    configureNonEditableBlockView(this);
   }
 
   private get rows() {
@@ -45,7 +52,7 @@ class CogntPropertiesBlockComponent extends BlockComponent<CogntPropertiesBlockM
   }
 
   private addRow(event: Event) {
-    stopEvent(event);
+    stopBlockControlEvent(event);
     this.updateRows([
       ...this.rows,
       { id: createBlockId(), name: 'property', value: '' },
@@ -53,7 +60,7 @@ class CogntPropertiesBlockComponent extends BlockComponent<CogntPropertiesBlockM
   }
 
   private removeRow(event: Event, index: number) {
-    stopEvent(event);
+    stopBlockControlEvent(event);
     const rows = this.rows;
 
     if (rows.length <= 1) {
@@ -65,14 +72,11 @@ class CogntPropertiesBlockComponent extends BlockComponent<CogntPropertiesBlockM
   }
 
   private stopControlEvent(event: Event) {
-    event.stopPropagation();
+    stopBlockEventPropagation(event);
   }
 
   private selectBlock(event: Event) {
-    event.stopPropagation();
-    this.host.selection.setGroup('note', [
-      this.host.selection.create('block', { blockId: this.blockId }),
-    ]);
+    selectCurrentBlock(this, event);
   }
 
   renderBlock() {
@@ -154,12 +158,5 @@ class CogntPropertiesBlockComponent extends BlockComponent<CogntPropertiesBlockM
 }
 
 export function defineCogntPropertiesBlockElement() {
-  if (!customElements.get(cogntPropertiesTagName)) {
-    customElements.define(cogntPropertiesTagName, CogntPropertiesBlockComponent);
-  }
-}
-
-function stopEvent(event: Event) {
-  event.preventDefault();
-  event.stopPropagation();
+  defineBlockElementOnce(cogntPropertiesTagName, CogntPropertiesBlockComponent);
 }
