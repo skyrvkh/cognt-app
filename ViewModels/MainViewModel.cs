@@ -651,7 +651,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void AddOrUpdateRecentNote(TreeItemRow? item, string? notePath)
     {
         if (item is null
-            || item.Kind != TreeItemKind.Note
+            || item.Kind is not (TreeItemKind.Note or TreeItemKind.PdfDocument)
             || string.IsNullOrWhiteSpace(notePath))
         {
             return;
@@ -807,6 +807,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 TreeItemKind.Root => KnowledgeTreeItemKind.Root,
                 TreeItemKind.Trash => KnowledgeTreeItemKind.Trash,
                 TreeItemKind.Note => KnowledgeTreeItemKind.Note,
+                TreeItemKind.PdfDocument => KnowledgeTreeItemKind.PdfDocument,
                 _ => KnowledgeTreeItemKind.Folder,
             },
             item.Title,
