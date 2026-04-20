@@ -4,6 +4,10 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 internal sealed partial class SqliteFlashcardRepository : IDisposable
 {
+    private const string FlashcardRecordProjection = """
+        id, front_rel_path, fsrs_card_state_json, due_at, state
+        """;
+
     private readonly object connectionLock = new();
     private readonly string databasePath;
     private SqliteConnection? connection;
