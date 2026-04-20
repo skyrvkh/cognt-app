@@ -28,7 +28,11 @@ export type TextSelectionSnapshot = {
   end?: TextSelectionPointSnapshot;
 };
 
-export function getCurrentSelection() {
+export type CurrentSelection = {
+  plainText: string;
+};
+
+export function getCurrentSelection(): CurrentSelection | null {
   const selectedText = window.getSelection()?.toString() ?? '';
   const plainText = normalizeSelectionText(selectedText);
 
