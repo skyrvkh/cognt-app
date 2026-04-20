@@ -37,4 +37,6 @@ internal interface ITreeRepository : IDisposable
     void ReorderItem(long itemId, long? previousSiblingId, long? nextSiblingId);
 
     void DeleteItem(long itemId);
+
+    void RewriteFileRelPathPrefix(string oldPrefix, string newPrefix);
 }
