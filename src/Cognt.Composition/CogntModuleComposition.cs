@@ -1,6 +1,7 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Abstractions;
+using Cognt.Modules.ProgressTrackingAndAnalytics.Infrastructure;
 using Cognt.Modules.SpacedRepetitionSystem.Domain;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,7 @@ public static class CogntModuleComposition
                 new CogntModuleSlice("PersonalKnowledgeManagement.Domain", typeof(KnowledgeTreeItemRow)),
                 new CogntModuleSlice("PersonalKnowledgeManagement.Application", typeof(KnowledgeOpenedNoteReadModel)),
                 new CogntModuleSlice("ProgressTrackingAndAnalytics.Application", typeof(CollectionProgressAnalyticsSnapshot)),
+                new CogntModuleSlice("ProgressTrackingAndAnalytics.Infrastructure", typeof(ProgressAnalyticsModule)),
                 new CogntModuleSlice("SpacedRepetitionSystem.Domain", typeof(FlashcardSchedule)),
             });
 
