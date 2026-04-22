@@ -15,8 +15,7 @@ body,
 }
 
 #app {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  display: block;
   background: var(--affine-background-primary-color);
 }
 
@@ -31,12 +30,19 @@ page-editor {
 
 #editor-host {
   position: relative;
-  overflow: hidden;
+  min-height: 70%;
+  overflow: visible;
+}
+
+.cognt-blocksuite-host {
+  overflow: auto;
 }
 
 page-editor {
   box-sizing: border-box;
-  overflow: auto;
+  min-height: calc(100vh - 260px);
+  height: auto;
+  overflow: visible;
   background: var(--affine-background-primary-color);
   --affine-editor-width: none;
   --affine-editor-side-padding: clamp(24px, 5vw, 96px);
