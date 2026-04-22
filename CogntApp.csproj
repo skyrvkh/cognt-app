@@ -34,19 +34,14 @@
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\CollectionOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\EditorBreadcrumbItemViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\RelayCommand.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateExtractRequestedEventArgs.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\CreateLinkedNoteRequestedEventArgs.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\MentionPreviewRequestedEventArgs.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\MentionSearchRequestedEventArgs.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Models\Editor\OpenMentionRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\NavigationModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\UserMessageRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\IShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.NamePrompt.cs" />
-    <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\FileSystemKnowledgeCollectionPathResolver.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\IKnowledgeCollectionPathResolver.cs" />
   </ItemGroup>
@@ -72,6 +67,7 @@
 
   <ItemGroup>
     <ProjectReference Include="src\Cognt.Composition\Cognt.Composition.csproj" />
+    <ProjectReference Include="src\Cognt.Wpf\EditorHost\Cognt.Wpf.EditorHost.csproj" />
     <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Application\Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
     <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Domain\Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
     <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.csproj" />
