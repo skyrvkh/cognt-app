@@ -22,28 +22,38 @@ type ClozeContext = {
   textSelection: TextSelection | null | undefined;
 };
 
-export function toClozeText(text: string) {
-  return `{{${normalizeSelectionText(text)}}}`;
+export function toClozeText(text: string, index = 1) {
+  return `{{c${Math.max(1, index)}::${normalizeSelectionText(text)}}}`;
 }
 
-export function replaceSelectionWithCloze(context: ClozeContext, selectedPlainText: string) {
-  const clozeText = toClozeText(selectedPlainText);
+export function replaceSelectionWithCloze(
+  context: ClozeContext,
+  selectedPlainText: string,
+  clozeIndex = 1
+) {
+  const clozeText = toClozeText(selectedPlainText, clozeIndex);
 
   if (replaceTextSelectionWithCloze(context, clozeText)) {
     return clozeText;
   }
 
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-    throw new Error('No editable selection is available for cloze.');
+  throw new Error('Cloze requires a single BlockSuite text selection.');
+}
+
+export function getNextClozeIndex(root: Node) {
+  let maxIndex = 0;
+  const expression = /\{\{c(\d+)::?[^{}\n]*\}\}/g;
+
+  for (const current of collectClozeTextNodes(root)) {
+    const text = current.textContent ?? '';
+    let match: RegExpExecArray | null;
+
+    while ((match = expression.exec(text)) !== null) {
+      maxIndex = Math.max(maxIndex, Number.parseInt(match[1], 10));
+    }
   }
 
-  const replaced = document.execCommand('insertText', false, clozeText);
-  if (!replaced) {
-    throw new Error('BlockSuite did not accept the cloze replacement.');
-  }
-
-  return clozeText;
+  return maxIndex + 1;
 }
 
 export function updateClozeHighlights(root: Node) {
@@ -62,7 +72,7 @@ export function updateClozeHighlights(root: Node) {
   }
 
   const ranges: Range[] = [];
-  const expression = /\{\{[^{}\n]+\}\}/g;
+  const expression = /\{\{(?:c\d+::?)?[^{}\n]+\}\}/g;
 
   for (const current of collectClozeTextNodes(root)) {
     const text = current.textContent ?? '';
