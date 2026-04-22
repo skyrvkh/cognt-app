@@ -30,6 +30,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         LoadDirectoryCommand = new RelayCommand(
             () => RunUserAction("Load Collection Failed", () => LoadNotesDirectory(NotesDirectory)));
+        LoadCollectionCommand = LoadDirectoryCommand;
         ShowDashboardCommand = new RelayCommand(
             () => RunUserAction("Navigation Failed", ShowDashboard));
         ShowAllNotesCommand = new RelayCommand(
@@ -62,6 +63,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public ICommand LoadDirectoryCommand { get; }
 
+    public ICommand LoadCollectionCommand { get; }
+
     public ICommand ShowDashboardCommand { get; }
 
     public ICommand ShowAllNotesCommand { get; }
@@ -75,18 +78,52 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string NotesDirectory
     {
         get => notesDirectory;
-        set => SetProperty(ref notesDirectory, value);
+        set
+        {
+            if (SetProperty(ref notesDirectory, value))
+            {
+                OnPropertyChanged(nameof(CollectionPath));
+                OnPropertyChanged(nameof(CurrentCollectionPath));
+            }
+        }
+    }
+
+    public string CollectionPath
+    {
+        get => notesDirectory;
+        set
+        {
+            if (SetProperty(ref notesDirectory, value))
+            {
+                OnPropertyChanged(nameof(NotesDirectory));
+                OnPropertyChanged(nameof(CurrentCollectionPath));
+            }
+        }
     }
 
     public string CurrentNotesDirectory => currentNotesDirectory;
+
+    public string OpenCollectionPath => currentNotesDirectory;
+
+    public string CurrentCollectionPath => string.IsNullOrWhiteSpace(currentNotesDirectory)
+        ? CollectionPath
+        : currentNotesDirectory;
 
     public string? CurrentNotePath => currentNotePath;
 
     public bool IsLoadingNotesDirectory
     {
         get => isLoadingNotesDirectory;
-        private set => SetProperty(ref isLoadingNotesDirectory, value);
+        private set
+        {
+            if (SetProperty(ref isLoadingNotesDirectory, value))
+            {
+                OnPropertyChanged(nameof(IsLoadingCollection));
+            }
+        }
     }
+
+    public bool IsLoadingCollection => isLoadingNotesDirectory;
 
     public void Initialize()
     {
@@ -141,6 +178,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
         currentNotesDirectory = fullPath;
         NotesDirectory = currentNotesDirectory;
+        OnPropertyChanged(nameof(OpenCollectionPath));
+        OnPropertyChanged(nameof(CurrentCollectionPath));
         ClearCurrentNoteState();
         RefreshNotesTree(preserveExpansion: true);
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
@@ -178,6 +217,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             openedNote.Title,
             openedNote.Content,
             openedNote.ItemId);
+    }
+
+    public void LoadCollection(string directoryPath, bool clearEditor = true)
+    {
+        LoadNotesDirectory(directoryPath, clearEditor);
     }
 
     public void CompleteOpenNote(PreparedNote note)

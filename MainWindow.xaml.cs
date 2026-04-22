@@ -110,7 +110,7 @@ public partial class MainWindow : Window
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (viewModel.IsLoadingNotesDirectory || suppressTreeSelectionHandling)
+        if (viewModel.IsLoadingCollection || suppressTreeSelectionHandling)
         {
             return;
         }
@@ -447,7 +447,7 @@ public partial class MainWindow : Window
                 case OverlayViewKind.AllNotes:
                     await CloseReviewIfActiveAsync();
                     await CloseCreateCardEditorIfActiveAsync();
-                    await allNotesViewModel.LoadAsync(viewModel.CurrentNotesDirectory);
+                    await allNotesViewModel.LoadAsync(viewModel.OpenCollectionPath);
                     ShowOverlay(allNotesView);
                     return;
 
@@ -620,13 +620,13 @@ public partial class MainWindow : Window
 
     private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(viewModel.CurrentNotesDirectory))
+        if (string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath))
         {
             return;
         }
 
         string notePath = Path.GetFullPath(Path.Combine(
-            viewModel.CurrentNotesDirectory,
+            viewModel.OpenCollectionPath,
             e.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
         await OpenNoteAsync(notePath, selectInTree: true);
     }
@@ -1326,7 +1326,7 @@ public partial class MainWindow : Window
         if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem targetItem)
         {
             target = new TreeDropTarget(ParentId: null, PreviousSiblingId: null, NextSiblingId: null);
-            return !string.IsNullOrWhiteSpace(viewModel.CurrentNotesDirectory);
+            return !string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath);
         }
 
         if (targetItem.DataContext is not NoteTreeNodeViewModel targetNode
