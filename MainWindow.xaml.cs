@@ -9,6 +9,7 @@ using CogntApp.Models.Decks;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
+using CogntApp.Shell.Editor;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
@@ -577,45 +578,22 @@ public partial class MainWindow : Window
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        try
-        {
-            await ShowEmptyEditorViewAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The editor could not be cleared: {ex.Message}",
-                "Editor Not Ready",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        await CreateEditorRequestController().HandleClearEditorRequestedAsync();
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        try
-        {
-            await OpenNoteAsync(e.NotePath, e.SelectInTree);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The note could not be opened: {ex.Message}",
-                "Open Note Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        await CreateEditorRequestController().HandleOpenNoteRequestedAsync(e);
     }
 
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
     {
-        QueueMentionTargetsRefresh();
+        CreateEditorRequestController().HandleMentionTargetsChanged();
     }
 
     private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
     {
-        IShellDialogService dialogService = new WindowShellDialogService(this);
-        dialogService.ShowWarning(e.Title, e.Message);
+        CreateEditorRequestController().HandleUserMessageRequested(e);
     }
 
     private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
@@ -646,7 +624,17 @@ public partial class MainWindow : Window
 
     private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
     {
-        EditorViewControl.UpdateCurrentNoteTitle(title);
+        CreateEditorRequestController().HandleCurrentNoteTitleChanged(title);
+    }
+
+    private EditorRequestController CreateEditorRequestController()
+    {
+        return new EditorRequestController(
+            ShowEmptyEditorViewAsync,
+            OpenNoteAsync,
+            QueueMentionTargetsRefresh,
+            EditorViewControl.UpdateCurrentNoteTitle,
+            new WindowShellDialogService(this));
     }
 
     private async Task<bool> OpenNoteAsync(string notePath, bool selectInTree)
