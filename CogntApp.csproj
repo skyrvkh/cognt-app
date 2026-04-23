@@ -37,8 +37,10 @@
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\NavigationModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\UserMessageRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.Events.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.razor.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.BridgeCallbacks.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\IShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />
