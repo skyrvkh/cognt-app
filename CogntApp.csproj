@@ -41,6 +41,7 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.razor.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.BridgeCallbacks.cs" />
+    <Compile Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\IShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />
@@ -59,6 +60,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Content Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.razor" />
     <Content Update="wwwroot\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

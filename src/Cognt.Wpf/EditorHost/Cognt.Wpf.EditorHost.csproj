@@ -12,7 +12,10 @@
   <ItemGroup>
     <Compile Remove="Components\**\*.cs" />
     <Compile Remove="Services\**\*.cs" />
+    <Compile Remove="Views\**\*.cs" />
     <Content Remove="Components\**\*.razor" />
+    <Page Remove="Views\**\*.xaml" />
+    <ApplicationDefinition Remove="Views\**\*.xaml" />
     <None Remove="Components\**\*.razor" />
     <RazorComponent Remove="Components\**\*.razor" />
   </ItemGroup>
