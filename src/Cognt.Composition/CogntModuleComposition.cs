@@ -2,6 +2,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Abstractions;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Infrastructure;
+using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Domain;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +33,29 @@ public static class CogntModuleComposition
     {
         ServiceCollection services = [];
         services.AddCogntModules();
+        RunCardContextSnapshotCheck();
         return services.BuildServiceProvider();
+    }
+
+    private static void RunCardContextSnapshotCheck()
+    {
+        CardContextSnapshot snapshot = CardContextSnapshotFactory.CreateSnapshot(
+            "startup-check.json",
+            string.Empty,
+            new CardContext(
+                "startup-check",
+                null,
+                [],
+                [],
+                [],
+                [],
+                null,
+                CardContextStatus.Draft,
+                null));
+
+        if (snapshot.Status != CardContextStatus.Draft)
+        {
+            throw new InvalidOperationException("Card context snapshot startup check failed.");
+        }
     }
 }
