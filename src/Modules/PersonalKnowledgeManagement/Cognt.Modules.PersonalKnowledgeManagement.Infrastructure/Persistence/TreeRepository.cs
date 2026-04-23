@@ -5,6 +5,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
 internal sealed partial class SqliteTreeRepository : ITreeRepository
 {
+    private const string LocalCollectionId = "default";
     private const long PositionGap = 1000;
 
     private readonly object connectionLock = new();

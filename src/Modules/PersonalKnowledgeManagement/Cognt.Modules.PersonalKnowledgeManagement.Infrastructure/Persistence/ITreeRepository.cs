@@ -39,4 +39,26 @@ internal interface ITreeRepository : IDisposable
     void DeleteItem(long itemId);
 
     void RewriteFileRelPathPrefix(string oldPrefix, string newPrefix);
+
+    bool HasDocumentMentions();
+
+    IReadOnlyList<DocumentMentionRow> LoadDocumentMentionsBySource(string sourceDocumentId);
+
+    IReadOnlyList<DocumentMentionRow> LoadDocumentMentionsByTarget(string targetDocumentId);
+
+    void ReplaceDocumentMentions(
+        string sourceDocumentId,
+        IReadOnlyList<DocumentMentionRow> mentions);
+
+    IReadOnlyList<AttachmentRow> LoadAttachments();
+
+    IReadOnlyList<NoteAttachmentRow> LoadNoteAttachments();
+
+    AttachmentRow? GetAttachment(string attachmentId);
+
+    AttachmentRow? FindAttachmentBySha256(string sha256);
+
+    void UpsertAttachment(AttachmentRow attachment);
+
+    void UpsertNoteAttachment(NoteAttachmentRow attachment);
 }
