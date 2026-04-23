@@ -10,7 +10,7 @@ public static partial class CardContextSnapshotFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceRelPath);
         ArgumentNullException.ThrowIfNull(context);
 
-        CardPresentationPolicy defaultPresentationPolicy = ResolvePresentationPolicy(context);
+        CardPresentationPolicy defaultPresentationPolicy = CardPresentationPolicies.Resolve(context);
         string contextContent = ExtractSelectedContextContent(noteContent, context);
         string snapshotHash = ComputeSnapshotHash(contextContent, context);
 
@@ -61,25 +61,6 @@ public static partial class CardContextSnapshotFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(slotId);
 
         return ComputeSlotSnapshotHash(snapshot, slotId);
-    }
-
-    private static CardPresentationPolicy ResolvePresentationPolicy(CardContext context)
-    {
-        return context.DefaultPresentationPolicy
-            ?? new CardPresentationPolicy(
-                CardPresentationPreset.TextHideAllCueCurrent,
-                TextClozeFrontMode.HideAllCueCurrent,
-                ImageOcclusionFrontMode.None,
-                CardBackRevealMode.RevealAllTargets,
-                CueCurrentTarget: true,
-                RevealSiblingAnswersOnBack: true);
-    }
-
-    private static CardPresentationPolicy ResolvePresentationPolicy(
-        CardContextSnapshot snapshot,
-        CardSlot slot)
-    {
-        return slot.PresentationOverride ?? snapshot.DefaultPresentationPolicy;
     }
 
     private static CardContextStatus ResolveStatusFromSnapshotHash(CardContext context, string snapshotHash)

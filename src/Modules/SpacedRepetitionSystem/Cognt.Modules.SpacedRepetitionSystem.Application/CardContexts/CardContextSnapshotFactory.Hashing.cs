@@ -12,7 +12,7 @@ public static partial class CardContextSnapshotFactory
             context.Id,
             context.Title ?? string.Empty,
             context.Order.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            FormatPolicy(ResolvePresentationPolicy(context)),
+            CardPresentationPolicies.ToStableKey(CardPresentationPolicies.Resolve(context)),
             contextContent ?? string.Empty,
             string.Join("|", context.ContextBlockIds.Order(StringComparer.Ordinal)),
             string.Join(
@@ -56,7 +56,7 @@ public static partial class CardContextSnapshotFactory
             snapshot.SourceRelPath,
             snapshot.Id,
             slot.Id,
-            FormatPolicy(ResolvePresentationPolicy(snapshot, slot)),
+            CardPresentationPolicies.ToStableKey(CardPresentationPolicies.Resolve(snapshot, slot)),
             snapshot.ContextContent ?? string.Empty,
             string.Join(
                 "|",
@@ -97,13 +97,6 @@ public static partial class CardContextSnapshotFactory
     {
         return policy is null
             ? string.Empty
-            : string.Join(
-                ":",
-                policy.Preset,
-                policy.TextFrontMode,
-                policy.ImageFrontMode,
-                policy.BackRevealMode,
-                policy.CueCurrentTarget,
-                policy.RevealSiblingAnswersOnBack);
+            : CardPresentationPolicies.ToStableKey(policy);
     }
 }
