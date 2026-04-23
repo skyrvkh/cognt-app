@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
 
-namespace CogntApp.Components;
+namespace Cognt.Wpf.EditorHost.Components;
 
 public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 {

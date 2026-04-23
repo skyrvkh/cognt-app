@@ -10,7 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Components\**\*.cs" />
     <Compile Remove="Services\**\*.cs" />
+    <Content Remove="Components\**\*.razor" />
+    <None Remove="Components\**\*.razor" />
+    <RazorComponent Remove="Components\**\*.razor" />
   </ItemGroup>
 
   <ItemGroup>
