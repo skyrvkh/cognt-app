@@ -31,8 +31,6 @@
     <Compile Include="src\Cognt.Wpf\ViewModels\NumericTextFormatter.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\ObservableObject.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\RecentNoteViewModel.cs" />
-    <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\CollectionOptionViewModel.cs" />
-    <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\EditorBreadcrumbItemViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\RelayCommand.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\NavigationModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\UserMessageRequestedEventArgs.cs" />
@@ -48,6 +46,10 @@
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.NamePrompt.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Editor\EditorRequestController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Editor\EditorShellOperationGuard.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Navigation\NavigationShellOperationGuard.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeCommandController.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.DragDrop.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\FileSystemKnowledgeCollectionPathResolver.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\IKnowledgeCollectionPathResolver.cs" />
   </ItemGroup>

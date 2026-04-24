@@ -10,6 +10,7 @@ using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Editor;
+using CogntApp.Shell.Navigation;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
@@ -40,6 +41,9 @@ public partial class MainWindow : Window
     private readonly DecksView decksView = new();
     private readonly MainViewModel viewModel;
     private readonly AllNotesViewModel allNotesViewModel;
+    private readonly IShellDialogService shellDialogs;
+    private readonly NoteTreeCommandController noteTreeCommands;
+    private readonly NoteTreeInteractionController noteTreeInteractions;
     private readonly AllNotesView allNotesView = new();
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
@@ -47,7 +51,6 @@ public partial class MainWindow : Window
     private ReviewView? reviewView;
     private int editorOpenRequestId;
     private int mentionTargetsRefreshRequestId;
-    private Point? noteTreeDragStartPoint;
     private NoteTreeNodeViewModel? noteTreeContextNode;
     private bool suppressTreeSelectionHandling;
     private bool isStartupInitialized;
@@ -79,6 +82,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         allNotesView.DataContext = allNotesViewModel;
+        shellDialogs = new WindowShellDialogService(this);
+        noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
+        noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
 
         viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
@@ -111,27 +117,9 @@ public partial class MainWindow : Window
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (viewModel.IsLoadingCollection || suppressTreeSelectionHandling)
-        {
-            return;
-        }
+        noteTreeInteractions.HandleSelectedItemChanged(e.NewValue);
 
-        NoteTreeNodeViewModel? selectedNode = e.NewValue as NoteTreeNodeViewModel;
-        try
-        {
-            viewModel.SelectTreeNode(selectedNode);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The selected note could not be opened: {ex.Message}",
-                "Open Note Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(selectedNode?.NotePath))
+        if (!string.IsNullOrWhiteSpace((e.NewValue as NoteTreeNodeViewModel)?.NotePath))
         {
             CloseSidebarSheet();
         }
@@ -139,26 +127,7 @@ public partial class MainWindow : Window
 
     private void NotesTreeItem_Expanded(object sender, RoutedEventArgs e)
     {
-        if (e.OriginalSource is not TreeViewItem item
-            || item.DataContext is not NoteTreeNodeViewModel node)
-        {
-            return;
-        }
-
-        try
-        {
-            viewModel.LoadChildren(node);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The child items could not be loaded: {ex.Message}",
-                "Load Children Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-
-        e.Handled = true;
+        noteTreeInteractions.HandleExpanded(e);
     }
 
     private void NotesTree_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -864,55 +833,12 @@ public partial class MainWindow : Window
 
     private void CreateFolderInTree(NoteTreeNodeViewModel? node)
     {
-        if (!viewModel.CanCreateFolderInNode(node))
-        {
-            MessageBox.Show(
-                "A folder cannot be created here.",
-                "New Folder",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        try
-        {
-            if (node is { CanContainChildren: true })
-            {
-                node.IsExpanded = true;
-                viewModel.LoadChildren(node);
-            }
-
-            string createdId = viewModel.CreateFolder(node, "New Folder");
-            BeginInlineRenameById(createdId);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The folder could not be created:{Environment.NewLine}{ex.Message}",
-                "New Folder Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        noteTreeCommands.CreateFolder(node, BeginInlineRenameById);
     }
 
     private void BeginInlineRename(NoteTreeNodeViewModel? node)
     {
-        if (node is null)
-        {
-            return;
-        }
-
-        if (!viewModel.CanRenameNode(node))
-        {
-            MessageBox.Show(
-                "This item cannot be renamed.",
-                "Rename",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        node.BeginRename();
+        noteTreeCommands.BeginInlineRename(node);
     }
 
     private void BeginInlineRenameById(string itemId)
@@ -941,45 +867,7 @@ public partial class MainWindow : Window
 
     private void CommitInlineRename(NoteTreeNodeViewModel? node)
     {
-        if (node is null || !node.IsRenaming)
-        {
-            return;
-        }
-
-        string itemKind = viewModel.GetNodeKind(node);
-        string newName = node.EditingTitle.Trim();
-
-        if (string.IsNullOrWhiteSpace(newName))
-        {
-            MessageBox.Show(
-                "Name is required.",
-                "Rename",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            BeginInlineRename(node);
-            return;
-        }
-
-        if (string.Equals(newName, viewModel.GetEditableName(node), StringComparison.Ordinal))
-        {
-            node.CancelRename();
-            return;
-        }
-
-        try
-        {
-            viewModel.RenameNode(node, newName);
-            node.EndRename();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The {itemKind} could not be renamed:{Environment.NewLine}{ex.Message}",
-                "Rename Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            BeginInlineRename(node);
-        }
+        noteTreeCommands.CommitInlineRename(node, BeginInlineRename);
     }
 
     private void TreeRenameTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -1123,134 +1011,27 @@ public partial class MainWindow : Window
 
     private void DeleteTreeNode(NoteTreeNodeViewModel? node)
     {
-        if (node is null)
-        {
-            return;
-        }
-
-        if (!viewModel.CanDeleteNode(node))
-        {
-            MessageBox.Show(
-                "This item cannot be deleted.",
-                "Delete",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        string itemKind = viewModel.GetNodeKind(node);
-        string itemName = viewModel.GetEditableName(node);
-        string message = itemKind == "note" && node.ChildCount == 0
-            ? $"Delete note \"{itemName}\"?"
-            : itemKind == "note"
-                ? $"Delete note \"{itemName}\" and everything inside it?"
-                : $"Delete folder \"{itemName}\" and everything inside it?";
-
-        MessageBoxResult result = MessageBox.Show(
-            message,
-            "Confirm Delete",
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            viewModel.DeleteNode(node);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The {itemKind} could not be deleted:{Environment.NewLine}{ex.Message}",
-                "Delete Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        noteTreeCommands.DeleteNode(node);
     }
 
     private void NotesTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount >= 2
-            && FindTreeViewItem(e.OriginalSource) is TreeViewItem item
-            && item.DataContext is NoteTreeNodeViewModel node)
-        {
-            e.Handled = true;
-            RunWithSuppressedTreeSelection(() =>
-            {
-                item.IsSelected = true;
-                item.Focus();
-            });
-            BeginInlineRename(node);
-            noteTreeDragStartPoint = null;
-            return;
-        }
-
-        noteTreeDragStartPoint = e.GetPosition(NotesTree);
+        noteTreeInteractions.PreviewMouseLeftButtonDown(e, BeginInlineRename);
     }
 
     private void NotesTree_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || noteTreeDragStartPoint is not Point startPoint)
-        {
-            noteTreeDragStartPoint = null;
-            return;
-        }
-
-        Point currentPoint = e.GetPosition(NotesTree);
-        if (Math.Abs(currentPoint.X - startPoint.X) < SystemParameters.MinimumHorizontalDragDistance
-            && Math.Abs(currentPoint.Y - startPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
-        {
-            return;
-        }
-
-        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
-            || item.DataContext is not NoteTreeNodeViewModel node
-            || !viewModel.CanMoveNode(node))
-        {
-            return;
-        }
-
-        noteTreeDragStartPoint = null;
-        DragDrop.DoDragDrop(item, new DataObject(NoteTreeDragDataFormat, node.Id), DragDropEffects.Move);
+        noteTreeInteractions.PreviewMouseMove(e);
     }
 
     private void NotesTree_DragOver(object sender, DragEventArgs e)
     {
-        e.Effects = TryGetTreeDropTarget(e, out _, out _)
-            ? DragDropEffects.Move
-            : DragDropEffects.None;
-        e.Handled = true;
+        noteTreeInteractions.DragOver(e);
     }
 
     private void NotesTree_Drop(object sender, DragEventArgs e)
     {
-        if (!TryGetTreeDropTarget(e, out long itemId, out TreeDropTarget target))
-        {
-            e.Effects = DragDropEffects.None;
-            e.Handled = true;
-            return;
-        }
-
-        e.Effects = DragDropEffects.Move;
-        e.Handled = true;
-
-        try
-        {
-            RunWithSuppressedTreeSelection(
-                () => viewModel.MoveTreeNode(itemId, target.ParentId, target.PreviousSiblingId, target.NextSiblingId),
-                deferRestore: true);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The item could not be moved:{Environment.NewLine}{ex.Message}",
-                "Drag and Drop Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        noteTreeInteractions.Drop(e);
     }
 
     private void RunWithSuppressedTreeSelection(Action action, bool deferRestore = false)
