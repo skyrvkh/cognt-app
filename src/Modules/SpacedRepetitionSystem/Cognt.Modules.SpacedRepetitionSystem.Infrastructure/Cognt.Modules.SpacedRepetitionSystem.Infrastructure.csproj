@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Cognt.Modules.SpacedRepetitionSystem.Application\Cognt.Modules.SpacedRepetitionSystem.Application.csproj" />
     <ProjectReference Include="..\Cognt.Modules.SpacedRepetitionSystem.Domain\Cognt.Modules.SpacedRepetitionSystem.Domain.csproj" />
   </ItemGroup>
 </Project>
