@@ -8,6 +8,13 @@ import {
   findElementsDeep,
 } from './dom';
 
+export type MutationPersistenceHost = {
+  flushHost(): Promise<void>;
+  cancelPendingContentChanged(): void;
+  recordUserEdit(): void;
+  notifyContentChanged(): Promise<void>;
+};
+
 export function setDocReadonly(doc: Doc | null, readonly: boolean) {
   doc?.awarenessStore.setReadonly(doc.blockCollection, readonly);
 }
@@ -67,4 +74,11 @@ export async function flushEditorHost(editor: PageEditor) {
   patchRenderedEmbedLinkedDocBlocks(editor);
   window.requestAnimationFrame(() => patchRenderedEmbedLinkedDocBlocks(editor));
   window.setTimeout(() => patchRenderedEmbedLinkedDocBlocks(editor), 80);
+}
+
+export async function persistMutation(host: MutationPersistenceHost) {
+  await host.flushHost();
+  host.cancelPendingContentChanged();
+  host.recordUserEdit();
+  await host.notifyContentChanged();
 }

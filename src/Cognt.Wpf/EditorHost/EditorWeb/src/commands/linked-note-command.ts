@@ -1,6 +1,7 @@
 import type { AffineSlashMenuContext } from '@blocksuite/blocks';
 import type { Doc } from '@blocksuite/store';
 import { importBlockSuiteJsonIntoExistingDoc } from '../documents/io';
+import { persistMutation, type MutationPersistenceHost } from '../editor/host-operations';
 import { reportDiagnostic } from '../host';
 import {
   getLinkedNotePathFromResult,
@@ -25,7 +26,7 @@ type CreateLinkedNoteCommandResult = {
   error?: string;
 };
 
-export type LinkedNoteCommandHost = {
+export type LinkedNoteCommandHost = MutationPersistenceHost & {
   isInputLocked(): boolean;
   getCurrentDoc(): Doc | null;
   getCurrentPath(): string;
@@ -35,11 +36,7 @@ export type LinkedNoteCommandHost = {
   registerNestedLinkedDoc(linkedDoc: CogntLinkedDoc, generation: number): void;
   markLinkedDocPreviewed(doc: Doc): void;
   requestLinkedDocPreview(doc: Doc, relativePath: string, generation: number): void;
-  flushHost(): Promise<void>;
   refreshMentionHighlights(): void;
-  cancelPendingContentChanged(): void;
-  recordUserEdit(): void;
-  notifyContentChanged(): Promise<void>;
   showStatus(message: string): void;
 };
 
@@ -103,11 +100,8 @@ export async function runCreateLinkedNoteCommand(
       host.trackLinkedDoc(linkedDoc, linkedNotePath);
     }
 
-    await host.flushHost();
+    await persistMutation(host);
     host.refreshMentionHighlights();
-    host.cancelPendingContentChanged();
-    host.recordUserEdit();
-    await host.notifyContentChanged();
     host.showStatus(`Created ${result.relativePath ?? 'linked note'}.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
