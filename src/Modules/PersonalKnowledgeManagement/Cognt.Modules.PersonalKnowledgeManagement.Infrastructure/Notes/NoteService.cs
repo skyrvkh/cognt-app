@@ -12,11 +12,40 @@ internal sealed partial class NoteService : IDisposable
     private const string FilesDirectoryName = "collection";
     private const string LegacyFilesDirectoryName = "Files";
     private const string AttachmentsDirectoryName = "attachments";
+    private const string ImagesDirectoryName = "images";
     private const string FlashcardsDirectoryName = "flashcards";
     private const string LegacyFlashcardsDirectoryName = "Flashcards";
     private const string BlockSuiteNoteExtension = ".json";
     private const string MarkdownNoteExtension = ".md";
     private const string MarkdownImportExtension = ".markdown";
+    private const string PdfExtension = ".pdf";
+    private const string DocExtension = ".doc";
+    private const string DocxExtension = ".docx";
+    private const string RtfExtension = ".rtf";
+    private const string TextExtension = ".txt";
+    private const string PngExtension = ".png";
+    private const string JpgExtension = ".jpg";
+    private const string JpegExtension = ".jpeg";
+    private const string WebpExtension = ".webp";
+    private const string GifExtension = ".gif";
+    private static readonly HashSet<string> DocumentAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        PdfExtension,
+        DocExtension,
+        DocxExtension,
+        RtfExtension,
+        TextExtension,
+        MarkdownNoteExtension,
+        MarkdownImportExtension
+    };
+    private static readonly HashSet<string> ImageAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        PngExtension,
+        JpgExtension,
+        JpegExtension,
+        WebpExtension,
+        GifExtension
+    };
 
     private readonly object repositoryLock = new();
     private ITreeRepository? treeRepository;
