@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using CogntApp.Services;
 
 namespace CogntApp.Views;
@@ -8,24 +9,9 @@ public partial class ReviewView : UserControl
 {
     private const double HeaderHeight = 72;
 
-    private static readonly ReviewSampleCard[] SampleCards =
-    [
-        new(
-            BlockSuiteDocumentContent.FromPlainText("What organelle produces most ATP in a eukaryotic cell?", "Front"),
-            BlockSuiteDocumentContent.FromPlainText("Mitochondria produce most ATP through cellular respiration.", "Back")),
-        new(
-            BlockSuiteDocumentContent.FromPlainText("What molecule carries genetic instructions in cells?", "Front"),
-            BlockSuiteDocumentContent.FromPlainText("DNA carries genetic instructions used for growth, function, and reproduction.", "Back")),
-        new(
-            BlockSuiteDocumentContent.FromPlainText("What does a pH below 7 indicate?", "Front"),
-            BlockSuiteDocumentContent.FromPlainText("A pH below 7 indicates an acidic solution.", "Back")),
-        new(
-            BlockSuiteDocumentContent.FromPlainText("Which trade route connected East Asia with Europe?", "Front"),
-            BlockSuiteDocumentContent.FromPlainText("The Silk Road connected East Asia with Europe through overland trade networks.", "Back")),
-        new(
-            BlockSuiteDocumentContent.FromPlainText("What does immutability mean?", "Front"),
-            BlockSuiteDocumentContent.FromPlainText("An immutable value cannot be changed after it is created.", "Back"))
-    ];
+    private static readonly ReviewSampleCard[] SampleCards = FlashcardPracticeSampleContent.Create()
+        .Select(card => new ReviewSampleCard(card.FrontContent, card.BackContent))
+        .ToArray();
 
     private int currentCardIndex;
     private bool isAnswerVisible;

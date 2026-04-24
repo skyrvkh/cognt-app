@@ -81,6 +81,7 @@
     <ProjectReference Include="src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.csproj" />
     <ProjectReference Include="src\Modules\ProgressTrackingAndAnalytics\Cognt.Modules.ProgressTrackingAndAnalytics.Application\Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
     <ProjectReference Include="src\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Domain\Cognt.Modules.SpacedRepetitionSystem.Domain.csproj" />
+    <ProjectReference Include="src\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Infrastructure\Cognt.Modules.SpacedRepetitionSystem.Infrastructure.csproj" />
   </ItemGroup>
 
   <Target Name="BuildEditorWeb"
