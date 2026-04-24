@@ -34,6 +34,16 @@ internal static partial class FlashcardCollectionStorage
         return new SqliteFlashcardRepository(GetDatabasePath(normalizedCollectionPath));
     }
 
+    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionId(string collectionId)
+    {
+        return OpenPrunedRepositoryForCollectionPath(GetExistingCollectionPath(collectionId));
+    }
+
+    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionPath(string collectionPath)
+    {
+        return OpenRepositoryForCollectionPath(collectionPath);
+    }
+
     internal static string CreateFlashcardRelPath()
     {
         string cardUid = Guid.CreateVersion7().ToString("N");
