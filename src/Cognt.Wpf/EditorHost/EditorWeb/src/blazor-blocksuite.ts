@@ -5,6 +5,7 @@ import {
   MarkdownBlockSuiteEditor,
   type CreateLinkedNoteResult,
 } from './blocksuite-editor';
+import type { DocumentLinksPayload } from './document-links';
 import { installHostDiagnostics, waitForAnimationFrames } from './host';
 
 installHostDiagnostics();
@@ -179,6 +180,11 @@ export function handleMentionPreviewResult(
 export function handleMentionOpenResult(instanceId: number, ok: boolean, error?: string) {
   const instance = getInstance(instanceId);
   instance.editor.handleMentionOpenResult(ok, error);
+}
+
+export function setDocumentLinks(instanceId: number, payload: DocumentLinksPayload) {
+  const instance = getInstance(instanceId);
+  instance.editor.setDocumentLinks(payload);
 }
 
 export function disposeBlockSuite(instanceId: number) {

@@ -7,6 +7,9 @@ import { type Doc } from '@blocksuite/store';
 import {
   defineCogntPropertiesBlockElement,
 } from './blocks/properties';
+import {
+  defineCogntReferencesBlockElement,
+} from './blocks/references';
 import { updateClozeHighlights, type TextSelection } from './cloze';
 import {
   type CreateExtractCommandMessage,
@@ -58,6 +61,10 @@ import {
   type SearchMentionTargetsMessage,
 } from './mention-controller';
 import {
+  DocumentLinksController,
+  type DocumentLinksPayload,
+} from './document-links';
+import {
   createEditorSpecs,
   patchBlockStdRender,
 } from './editor/specs';
@@ -93,6 +100,7 @@ const linkedDocPreviewMaxCharacters = 4000;
 const editorsByDoc = new WeakMap<Doc, MarkdownBlockSuiteEditor>();
 
 defineCogntPropertiesBlockElement();
+defineCogntReferencesBlockElement();
 configureCogntSlashMenu({
   getEditor: doc => editorsByDoc.get(doc),
 });
@@ -146,6 +154,7 @@ export class MarkdownBlockSuiteEditor {
   private readonly editor: PageEditor;
   private readonly statusElement: HTMLElement;
   private readonly mentions: MentionController;
+  private readonly documentLinks: DocumentLinksController;
   private readonly onContentChanged: (content: string) => void;
   private readonly onCreateExtract: (message: CreateExtractCommandMessage) => void;
   private readonly onSaveCloze: (message: SaveClozeCommandMessage) => void;
@@ -210,6 +219,10 @@ export class MarkdownBlockSuiteEditor {
       },
       onRequestPreview: options.onRequestMentionPreview,
       onOpenMention: options.onOpenMention,
+    });
+    this.documentLinks = new DocumentLinksController({
+      getDoc: () => this.currentDoc,
+      openDocument: relativePath => this.openDocumentLink(relativePath),
     });
     this.editor.specs = createEditorSpecs((query, abort, inlineEditor, abortSignal) =>
       this.mentions.getNativeMentionMenus(query, abort, inlineEditor, abortSignal)
@@ -281,6 +294,10 @@ export class MarkdownBlockSuiteEditor {
     this.enableEditorMode();
     this.editor.hasViewport = true;
     this.bindDocChangeEvents(nextDoc);
+    this.documentLinks.setLinks({
+      incoming: [],
+      outgoing: [],
+    });
     logEditorTiming('editor.doc assignment', assignStartedAt, options.title);
 
     const flushStartedAt = performance.now();
@@ -323,6 +340,10 @@ export class MarkdownBlockSuiteEditor {
     this.enableEditorMode();
     this.editor.hasViewport = true;
     this.bindDocChangeEvents(nextDoc);
+    this.documentLinks.setLinks({
+      incoming: [],
+      outgoing: [],
+    });
     logEditorTiming('editor.doc assignment', assignStartedAt, options.title);
 
     const flushStartedAt = performance.now();
@@ -558,6 +579,10 @@ export class MarkdownBlockSuiteEditor {
     }
   }
 
+  public setDocumentLinks(payload: DocumentLinksPayload) {
+    this.documentLinks.setLinks(payload);
+  }
+
   private refreshCurrentLinkedDocTitlesFromTargets() {
     if (!this.currentDoc) {
       return false;
@@ -773,6 +798,21 @@ export class MarkdownBlockSuiteEditor {
     }
 
     await this.openLinkedDocReference(reference);
+  }
+
+  private async openDocumentLink(relativePath: string) {
+    if (!this.currentPath || !relativePath) {
+      return;
+    }
+
+    this.mentions.hidePreview();
+    this.onOpenMention({
+      type: 'openMention',
+      sourcePath: this.currentPath,
+      relativePath,
+      content: await this.exportCurrentContent(),
+    });
+    this.showStatus(`Opening ${relativePath}...`);
   }
 
   private requestLinkedDocPreview(doc: Doc, relativePath: string, generation: number) {

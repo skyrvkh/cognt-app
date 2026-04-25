@@ -1,4 +1,5 @@
 @import './styles/base.css';
+@import './styles/document-links.css';
 @import './styles/mention-preview.css';
 @import './styles/status.css';
 @import './styles/review.css';
