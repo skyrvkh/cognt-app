@@ -5,6 +5,11 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 internal sealed partial class SqliteFlashcardRepository
 {
+    internal FlashcardRecord GetCard(long cardId)
+    {
+        return UseConnection(connection => GetCard(cardId, connection));
+    }
+
     internal IReadOnlyList<FlashcardRecord> LoadCardsByIds(IReadOnlyList<long> cardIds)
     {
         long[] distinctIds = cardIds
