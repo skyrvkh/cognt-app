@@ -126,6 +126,15 @@ export function getSnapshotTextDelta(textValue: Record<string, unknown>) {
   return Array.isArray(textValue.delta) ? textValue.delta : [];
 }
 
+export function isBlockSnapshot(value: unknown): value is BlockSnapshot {
+  return isRecord(value)
+    && value.type === 'block'
+    && typeof value.id === 'string'
+    && typeof value.flavour === 'string'
+    && isRecord(value.props)
+    && Array.isArray(value.children);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
