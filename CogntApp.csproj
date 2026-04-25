@@ -50,6 +50,7 @@
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeCommandController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.DragDrop.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Overlay\OverlayHostController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\FileSystemKnowledgeCollectionPathResolver.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\IKnowledgeCollectionPathResolver.cs" />
   </ItemGroup>

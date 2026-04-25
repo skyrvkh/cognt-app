@@ -11,6 +11,7 @@ using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Editor;
 using CogntApp.Shell.Navigation;
+using CogntApp.Shell.Overlay;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
@@ -44,6 +45,7 @@ public partial class MainWindow : Window
     private readonly IShellDialogService shellDialogs;
     private readonly NoteTreeCommandController noteTreeCommands;
     private readonly NoteTreeInteractionController noteTreeInteractions;
+    private readonly OverlayHostController overlayHostController;
     private readonly AllNotesView allNotesView = new();
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
@@ -85,6 +87,7 @@ public partial class MainWindow : Window
         shellDialogs = new WindowShellDialogService(this);
         noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
         noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
+        overlayHostController = new OverlayHostController(OverlayHost, EditorViewControl);
 
         viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
@@ -1326,10 +1329,7 @@ public partial class MainWindow : Window
         ReviewView view = reviewView;
         reviewView = null;
 
-        if (ReferenceEquals(OverlayHost.Content, view))
-        {
-            OverlayHost.Content = null;
-        }
+        overlayHostController.ClearIfContent(view);
 
         try
         {
@@ -1354,22 +1354,11 @@ public partial class MainWindow : Window
 
     private void ShowOverlay(UIElement overlay)
     {
-        EditorViewControl.DetachBlockSuiteHost();
-        EditorViewControl.Visibility = Visibility.Visible;
-        EditorViewControl.IsEnabled = true;
-        EditorViewControl.IsHitTestVisible = true;
-        OverlayHost.Content = overlay;
-        OverlayHost.Visibility = Visibility.Visible;
-        OverlayHost.IsHitTestVisible = true;
+        overlayHostController.Show(overlay);
     }
 
     private void HideOverlay()
     {
-        OverlayHost.Content = null;
-        OverlayHost.Visibility = Visibility.Collapsed;
-        OverlayHost.IsHitTestVisible = false;
-        EditorViewControl.Visibility = Visibility.Visible;
-        EditorViewControl.IsEnabled = true;
-        EditorViewControl.IsHitTestVisible = true;
+        overlayHostController.Hide();
     }
 }
