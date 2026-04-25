@@ -51,6 +51,12 @@
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.DragDrop.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Overlay\OverlayHostController.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportModels.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportQueueItem.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportViewModel.Importing.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportViewModel.Queue.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportWindow.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\FileSystemKnowledgeCollectionPathResolver.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Collections\IKnowledgeCollectionPathResolver.cs" />
   </ItemGroup>
@@ -64,6 +70,7 @@
 
   <ItemGroup>
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
+    <Page Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportWindow.xaml" />
     <Content Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.razor" />
     <Content Update="wwwroot\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

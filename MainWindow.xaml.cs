@@ -9,6 +9,7 @@ using CogntApp.Models.Decks;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
+using CogntApp.Shell.DocumentImport;
 using CogntApp.Shell.Editor;
 using CogntApp.Shell.Navigation;
 using CogntApp.Shell.Overlay;
@@ -245,32 +246,12 @@ public partial class MainWindow : Window
 
     private void ImportDocumentsButton_Click(object sender, RoutedEventArgs e)
     {
-        Microsoft.Win32.OpenFileDialog dialog = new()
+        DocumentImportWindow window = new(new DocumentImportViewModel(viewModel))
         {
-            Title = "Import Documents",
-            Filter = "Note documents (*.json;*.md;*.markdown)|*.json;*.md;*.markdown",
-            Multiselect = true,
-            CheckFileExists = true,
+            Owner = this
         };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        try
-        {
-            viewModel.ImportDocuments(dialog.FileNames);
-            CloseSidebarSheet();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The documents could not be imported:{Environment.NewLine}{ex.Message}",
-                "Import Documents Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        CloseSidebarSheet();
+        window.ShowDialog();
     }
 
     private void CloseSidebarSheet()
