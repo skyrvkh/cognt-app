@@ -481,7 +481,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         return noteService.ResolveMentionPath(currentNotesDirectory, relativePath);
     }
 
-
     public Task<AttachedEditorFile> AttachFileToCurrentNoteAsync(
         string sourcePath,
         string fileName,
