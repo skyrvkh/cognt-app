@@ -50,6 +50,9 @@ public partial class MainWindow : Window
     private readonly NoteTreeInteractionController noteTreeInteractions;
     private readonly OverlayHostController overlayHostController;
     private readonly AllNotesView allNotesView = new();
+
+    private readonly BrowserPaneView browserPaneView = new();
+    private readonly PdfReaderView pdfReaderView = new();
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
@@ -255,6 +258,28 @@ public partial class MainWindow : Window
         };
         CloseSidebarSheet();
         window.ShowDialog();
+    }
+
+
+    private async void BrowserButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            editorOpenRequestId++;
+            CloseSidebarSheet();
+            await CloseReviewIfActiveAsync();
+            await CloseCreateCardEditorIfActiveAsync();
+            ShowOverlay(browserPaneView);
+            browserPaneView.FocusAddressBox();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The browser could not be opened: {ex.Message}",
+                "Browser Not Ready",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void CloseSidebarSheet()

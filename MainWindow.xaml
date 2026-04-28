@@ -303,6 +303,9 @@
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDecksCommand}" />
+                        <Button Content="Browser"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                Click="BrowserButton_Click" />
 
                         <Border Height="1"
                                 Background="#E1E6F0"
