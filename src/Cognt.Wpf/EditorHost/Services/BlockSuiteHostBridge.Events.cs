@@ -2,6 +2,8 @@ using System.IO;
 using System.Text.Json;
 using CogntApp.Models.Markdown;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
+using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
 using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
@@ -21,6 +23,7 @@ public sealed partial class BlockSuiteHostBridge
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
+    public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
     public event EventHandler<string>? DiagnosticReceived;
 
     internal void RaiseContentChanged(string content)
@@ -70,6 +73,28 @@ public sealed partial class BlockSuiteHostBridge
     {
         CreateLinkedNoteRequestedEventArgs args = new(sourcePath, viewMode);
         CreateLinkedNoteRequested?.Invoke(this, args);
+        return args.Result;
+    }
+
+    internal async Task<AttachFileResult> RaiseAttachFileAsync(
+        string sourcePath,
+        string fileName,
+        string contentBase64)
+    {
+        AttachFileRequestedEventArgs args = new(sourcePath, fileName, contentBase64);
+        if (AttachFileRequested is null)
+        {
+            return args.Result;
+        }
+
+        foreach (Delegate handler in AttachFileRequested.GetInvocationList())
+        {
+            if (handler is Func<object?, AttachFileRequestedEventArgs, Task> attachHandler)
+            {
+                await attachHandler(this, args);
+            }
+        }
+
         return args.Result;
     }
 

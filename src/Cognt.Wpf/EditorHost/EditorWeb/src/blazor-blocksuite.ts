@@ -3,6 +3,7 @@ import '@toeverything/theme/style.css';
 import './styles.css';
 import {
   MarkdownBlockSuiteEditor,
+  type AttachFileResult,
   type CreateLinkedNoteResult,
 } from './blocksuite-editor';
 import type { DocumentLinksPayload } from './document-links';
@@ -90,6 +91,15 @@ export function mountBlockSuite(
           'HandleCreateLinkedNote',
           message.sourcePath,
           message.viewMode
+        )
+      ),
+    onAttachFile: async message =>
+      normalizeAttachFileResult(
+        await dotNet.invokeMethodAsync(
+          'HandleAttachFile',
+          message.sourcePath,
+          message.fileName,
+          message.contentBase64
         )
       ),
   });
@@ -258,4 +268,27 @@ function normalizeMentionTargets(value: unknown) {
       recentRank: target?.recentRank ?? target?.RecentRank ?? null,
     }];
   });
+}
+
+function normalizeAttachFileResult(value: unknown): AttachFileResult {
+  const result = value as {
+    ok?: boolean;
+    Ok?: boolean;
+    displayName?: string;
+    DisplayName?: string;
+    relativePath?: string;
+    RelativePath?: string;
+    kind?: string;
+    Kind?: string;
+    error?: string;
+    Error?: string;
+  } | null;
+
+  return {
+    ok: Boolean(result?.ok ?? result?.Ok),
+    displayName: result?.displayName ?? result?.DisplayName,
+    relativePath: result?.relativePath ?? result?.RelativePath,
+    kind: result?.kind ?? result?.Kind,
+    error: result?.error ?? result?.Error,
+  };
 }

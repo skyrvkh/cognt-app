@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Text;
+using System.Security.Cryptography;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Tree;
 
@@ -83,7 +84,19 @@ public interface INoteService : IDisposable
         int maxCharacters);
 
     string ResolveMentionPath(string notesDirectory, string relativePath);
+
+    Task<AttachedEditorFile> AttachEditorFileAsync(
+        string notesDirectory,
+        string notePath,
+        string fileName,
+        string contentBase64,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record AttachedEditorFile(
+    string DisplayName,
+    string RelativePath,
+    string Kind);
 
 public sealed class NoteService : INoteService
 {
@@ -592,6 +605,40 @@ public sealed class NoteService : INoteService
         return fullPath;
     }
 
+    public async Task<AttachedEditorFile> AttachEditorFileAsync(
+        string notesDirectory,
+        string notePath,
+        string fileName,
+        string contentBase64,
+        CancellationToken cancellationToken = default)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullNotePath = ResolveExistingNotePathInRoot(root, notePath);
+        if (!IsSafeCurrentNotePath(fullNotePath, fullNotePath, root))
+        {
+            throw new UnauthorizedAccessException("The attachment source is outside the open collection.");
+        }
+
+        string displayName = SanitizeAttachmentDisplayName(fileName);
+        byte[] content = Convert.FromBase64String(contentBase64);
+        string extension = NormalizeEditorAttachmentExtension(Path.GetExtension(displayName));
+        string kind = GetEditorAttachmentKind(extension);
+        string sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        string relativePath = string.Equals(kind, "Image", StringComparison.OrdinalIgnoreCase)
+            ? NormalizeRelativePath(Path.Combine("attachments", "images", $"{sha256}{extension}"))
+            : NormalizeRelativePath(Path.Combine("attachments", $"{sha256}{extension}"));
+        string destinationPath = Path.Combine(root, ToPlatformPath(relativePath));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)
+            ?? throw new InvalidOperationException("The attachment path does not have a parent directory."));
+
+        if (!File.Exists(destinationPath))
+        {
+            await File.WriteAllBytesAsync(destinationPath, content, cancellationToken);
+        }
+
+        return new AttachedEditorFile(displayName, relativePath, kind);
+    }
+
     private static string ResolveExistingNotePathInRoot(string root, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -898,6 +945,53 @@ public sealed class NoteService : INoteService
         return string.Equals(extension, BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase)
             ? BlockSuiteNoteExtension
             : MarkdownNoteExtension;
+    }
+
+    private static string SanitizeAttachmentDisplayName(string fileName)
+    {
+        string fallbackName = string.IsNullOrWhiteSpace(fileName)
+            ? "attachment.bin"
+            : fileName.Trim();
+        string displayName = Path.GetFileName(fallbackName);
+        if (string.IsNullOrWhiteSpace(displayName)
+            || displayName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new ArgumentException("Attachment file name contains invalid characters.", nameof(fileName));
+        }
+
+        if (!Path.HasExtension(displayName))
+        {
+            displayName = $"{displayName}.bin";
+        }
+
+        return displayName;
+    }
+
+    private static string NormalizeEditorAttachmentExtension(string extension)
+    {
+        string normalized = string.IsNullOrWhiteSpace(extension)
+            ? ".bin"
+            : extension.Trim().ToLowerInvariant();
+
+        if (normalized[0] != '.'
+            || normalized.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            || normalized.Contains(Path.DirectorySeparatorChar)
+            || normalized.Contains(Path.AltDirectorySeparatorChar))
+        {
+            throw new InvalidOperationException("Attachment file extension is invalid.");
+        }
+
+        return normalized;
+    }
+
+    private static string GetEditorAttachmentKind(string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".png" or ".jpg" or ".jpeg" or ".webp" or ".gif" => "Image",
+            ".pdf" => "Pdf",
+            _ => "Document"
+        };
     }
 
     private static string NormalizeFileSystemName(string name, string label)

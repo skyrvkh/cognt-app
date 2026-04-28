@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CogntApp.Models.Markdown;
 using Microsoft.JSInterop;
+using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
 
 namespace Cognt.Wpf.EditorHost.Components;
@@ -58,6 +59,15 @@ public partial class BlockSuiteHost
     public CreateLinkedNoteResult HandleCreateLinkedNote(string sourcePath, string viewMode)
     {
         return Bridge.RaiseCreateLinkedNote(sourcePath, viewMode);
+    }
+
+    [JSInvokable]
+    public Task<AttachFileResult> HandleAttachFile(
+        string sourcePath,
+        string fileName,
+        string contentBase64)
+    {
+        return Bridge.RaiseAttachFileAsync(sourcePath, fileName, contentBase64);
     }
 
     [JSInvokable]

@@ -1,9 +1,9 @@
-import { type AffineSlashMenuContext } from '@blocksuite/blocks';
+import { MarkdownTransformer, type AffineSlashMenuContext } from '@blocksuite/blocks';
 import { RefNodeSlotsProvider } from '@blocksuite/affine-components/rich-text';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { type PageEditor } from '@blocksuite/presets';
-import { type Doc } from '@blocksuite/store';
+import { type BlockModel, type Doc } from '@blocksuite/store';
 import {
   defineCogntPropertiesBlockElement,
 } from './blocks/properties';
@@ -129,6 +129,21 @@ export type CreateLinkedNoteResult = {
   error?: string;
 };
 
+export type AttachFileMessage = {
+  type: 'attachFile';
+  sourcePath: string;
+  fileName: string;
+  contentBase64: string;
+};
+
+export type AttachFileResult = {
+  ok: boolean;
+  displayName?: string;
+  relativePath?: string;
+  kind?: string;
+  error?: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
@@ -140,6 +155,7 @@ export type MarkdownEditorOptions = {
   onRequestMentionPreview(message: RequestMentionPreviewMessage): void;
   onOpenMention(message: OpenMentionMessage): void;
   onCreateLinkedNote(message: CreateLinkedNoteMessage): Promise<CreateLinkedNoteResult>;
+  onAttachFile(message: AttachFileMessage): Promise<AttachFileResult>;
 };
 
 export type LoadMarkdownOptions = {
@@ -163,6 +179,7 @@ export class MarkdownBlockSuiteEditor {
   private readonly onCreateLinkedNote: (
     message: CreateLinkedNoteMessage
   ) => Promise<CreateLinkedNoteResult>;
+  private readonly onAttachFile: (message: AttachFileMessage) => Promise<AttachFileResult>;
   private currentDoc: Doc | null = null;
   private currentPath = '';
   private loadingDocument = false;
@@ -199,6 +216,7 @@ export class MarkdownBlockSuiteEditor {
     this.onRequestMentionPreview = options.onRequestMentionPreview;
     this.onOpenMention = options.onOpenMention;
     this.onCreateLinkedNote = options.onCreateLinkedNote;
+    this.onAttachFile = options.onAttachFile;
     this.editor = document.createElement('page-editor') as PageEditor;
     this.editor.id = 'editor';
     this.editor.doc = createEmptyMarkdownDoc();
@@ -438,6 +456,8 @@ export class MarkdownBlockSuiteEditor {
       `Editor mode active (${getInteractivityDiagnostic(this.currentDoc, document)}).`
     );
   }
+
+}
 
 
   public async loadCard(content: string) {
@@ -1003,8 +1023,34 @@ export class MarkdownBlockSuiteEditor {
         return;
       }
 
+      if (this.hasClipboardFiles(event)) {
+        this.cancelNativeFileEvent(event);
+        void this.handlePastedFiles(event);
+        return;
+      }
+
       this.userEditGeneration++;
       this.scheduleContentChanged();
+    }, { signal: this.eventAbort.signal });
+    this.editor.addEventListener('dragover', event => {
+      if (!this.hasDroppedFiles(event)) {
+        return;
+      }
+
+      this.cancelNativeFileEvent(event);
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = this.currentPath && !this.isEditorInputLocked()
+          ? 'copy'
+          : 'none';
+      }
+    }, { signal: this.eventAbort.signal });
+    this.editor.addEventListener('drop', event => {
+      if (!this.hasDroppedFiles(event)) {
+        return;
+      }
+
+      this.cancelNativeFileEvent(event);
+      void this.handleDroppedFiles(event);
     }, { signal: this.eventAbort.signal });
 
     document.addEventListener('mousedown', event => {
@@ -1017,6 +1063,290 @@ export class MarkdownBlockSuiteEditor {
         this.mentions.hidePreview();
       }
     }, { signal: this.eventAbort.signal });
+  }
+
+  private hasDroppedFiles(event: DragEvent) {
+    const dataTransfer = event.dataTransfer;
+    if (!dataTransfer) {
+      return false;
+    }
+
+    return Array.from(dataTransfer.types ?? []).includes('Files')
+      || dataTransfer.files.length > 0;
+  }
+
+  private hasClipboardFiles(event: ClipboardEvent) {
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) {
+      return false;
+    }
+
+    if (clipboardData.files.length > 0) {
+      return true;
+    }
+
+    return Array.from(clipboardData.items ?? []).some(item => item.kind === 'file');
+  }
+
+  private cancelNativeFileEvent(event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  private async handleDroppedFiles(event: DragEvent) {
+    if (this.isEditorInputLocked()) {
+      this.showLockedInputStatus();
+      return;
+    }
+
+    if (!this.currentDoc || !this.currentPath) {
+      this.showStatus('Open a note before attaching files.');
+      return;
+    }
+
+    const files = Array.from(event.dataTransfer?.files ?? [])
+      .filter(file => file.size > 0);
+    await this.attachFiles(files);
+  }
+
+  private async handlePastedFiles(event: ClipboardEvent) {
+    if (this.isEditorInputLocked()) {
+      this.showLockedInputStatus();
+      return;
+    }
+
+    if (!this.currentDoc || !this.currentPath) {
+      this.showStatus('Open a note before attaching files.');
+      return;
+    }
+
+    await this.attachFiles(getClipboardFiles(event.clipboardData));
+  }
+
+  private async attachFiles(files: File[]) {
+    for (const file of files) {
+      const attachmentDoc = this.currentDoc;
+      const attachmentPath = this.currentPath;
+
+      try {
+        const fallbackName = getSafeAttachmentFileName(file);
+        const contentBase64 = await readFileAsBase64(file);
+        const result = await this.onAttachFile({
+          type: 'attachFile',
+          sourcePath: attachmentPath,
+          fileName: fallbackName,
+          contentBase64,
+        });
+
+        if (!result.ok) {
+          throw new Error(result.error ?? 'The file could not be attached.');
+        }
+
+        if (!this.isAttachmentContextCurrent(attachmentDoc, attachmentPath)) {
+          throw new Error('The note changed while the file was being attached.');
+        }
+
+        await this.insertAttachmentReferenceAtCurrentSelection(
+          result,
+          fallbackName,
+          file,
+          contentBase64);
+        this.showStatus(`Attached ${result.displayName ?? fallbackName}.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        reportDiagnostic('error', `Attachment failed: ${message}`);
+        this.showStatus(`Attach failed: ${message}`);
+      }
+    }
+  }
+
+  private isAttachmentContextCurrent(doc: Doc | null, path: string) {
+    return Boolean(doc)
+      && this.currentDoc === doc
+      && this.currentPath === path;
+  }
+
+  private async insertAttachmentReferenceAtCurrentSelection(
+    result: AttachFileResult,
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string
+  ) {
+    if (!this.currentDoc) {
+      return;
+    }
+
+    if (isImageAttachmentResult(result)) {
+      const model = this.getSelectedBlockModel();
+      let blockId = model
+        ? await this.tryInsertImageAttachmentBlockAfterModel(
+            model,
+            result,
+            fallbackName,
+            sourceFile,
+            contentBase64)
+        : null;
+      if (!blockId) {
+        blockId = await this.appendImageAttachmentBlock(result, fallbackName, sourceFile, contentBase64);
+      }
+
+      await this.persistAttachmentMutation();
+      return;
+    }
+
+    const referenceText = createAttachmentReferenceText(result, fallbackName);
+    if (!this.tryInsertCurrentSelectionAttachmentReference(referenceText)) {
+      await this.appendAttachmentReferenceBlock(referenceText);
+    }
+
+    await this.persistAttachmentMutation();
+  }
+
+  private async tryInsertImageAttachmentBlockAfterModel(
+    model: BlockModel,
+    result: AttachFileResult & { relativePath: string },
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string
+  ) {
+    if (!this.currentDoc) {
+      return null;
+    }
+
+    const parent = this.currentDoc.getParent(model);
+    if (!parent) {
+      return null;
+    }
+
+    const index = parent.children.indexOf(model);
+    return await this.insertImageAttachmentBlock(
+      parent,
+      Math.max(0, index + 1),
+      result,
+      fallbackName,
+      sourceFile,
+      contentBase64);
+  }
+
+  private async appendImageAttachmentBlock(
+    result: AttachFileResult & { relativePath: string },
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string
+  ) {
+    const note = this.currentDoc?.root?.children.find(child => child.flavour === 'affine:note') ?? null;
+    if (!note) {
+      return null;
+    }
+
+    return await this.insertImageAttachmentBlock(
+      note,
+      note.children.length,
+      result,
+      fallbackName,
+      sourceFile,
+      contentBase64);
+  }
+
+  private async insertImageAttachmentBlock(
+    parent: BlockModel,
+    index: number,
+    result: AttachFileResult & { relativePath: string },
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string
+  ) {
+    const doc = this.currentDoc;
+    if (!doc) {
+      return null;
+    }
+
+    const relativePath = await registerImageAttachmentBlob(
+      doc,
+      result,
+      fallbackName,
+      sourceFile,
+      contentBase64);
+
+    doc.captureSync();
+    const blockId = doc.addBlock(
+      'affine:image' as never,
+      {
+        sourceId: relativePath,
+        size: sourceFile.size,
+      } as never,
+      parent,
+      index);
+
+    if (blockId && this.currentDoc === doc) {
+      this.editor.host?.selection.setGroup('note', [
+        this.editor.host.selection.create('block', { blockId }),
+      ]);
+    }
+
+    return blockId;
+  }
+
+  private getSelectedBlockModel() {
+    const blockSelection = this.editor.host?.selection.find('block') as
+      | { blockId?: string | null }
+      | null
+      | undefined;
+    const blockId = typeof blockSelection?.blockId === 'string'
+      ? blockSelection.blockId
+      : null;
+
+    return blockId && this.currentDoc
+      ? this.currentDoc.getBlock(blockId)?.model ?? null
+      : null;
+  }
+
+  private async persistAttachmentMutation() {
+    await this.flushHost();
+    this.mentions.refreshHighlights();
+    this.cancelPendingContentChanged();
+    this.userEditGeneration++;
+    this.onContentChanged(await this.exportCurrentContent());
+  }
+
+  private tryInsertCurrentSelectionAttachmentReference(referenceText: string) {
+    const model = this.getSelectedBlockModel();
+    if (!model || !isTextBlockModel(model)) {
+      return false;
+    }
+
+    const text = (model as {
+      text?: {
+        length?: number;
+        replace(index: number, length: number, content: string): void;
+      };
+    }).text;
+    if (text && typeof text.replace === 'function') {
+      text.replace(text.length ?? 0, 0, referenceText);
+      return true;
+    }
+
+    return false;
+  }
+
+  private async appendAttachmentReferenceBlock(referenceText: string) {
+    if (!this.currentDoc?.root) {
+      return;
+    }
+
+    const note = this.currentDoc.root.children.find(child => child.flavour === 'affine:note') ?? null;
+    if (!note) {
+      return;
+    }
+
+    await MarkdownTransformer.importMarkdownToBlock({
+      doc: this.currentDoc,
+      markdown: referenceText,
+      blockId: note.id,
+    });
   }
 
   private bindDocChangeEvents(doc: Doc) {
@@ -1221,4 +1551,190 @@ export class MarkdownBlockSuiteEditor {
       context
     );
   }
+
+}
+
+function isImageAttachmentResult(
+  result: AttachFileResult
+): result is AttachFileResult & { relativePath: string } {
+  return result.kind?.toLowerCase() === 'image'
+    && typeof result.relativePath === 'string'
+    && result.relativePath.trim().length > 0;
+}
+
+async function registerImageAttachmentBlob(
+  doc: Doc,
+  result: AttachFileResult & { relativePath: string },
+  fallbackName: string,
+  sourceFile: File,
+  contentBase64: string
+) {
+  const relativePath = sanitizeAttachmentTarget(result.relativePath ?? fallbackName);
+  const blob = createBlobForImageAttachment(contentBase64, sourceFile, result, fallbackName);
+  await doc.blobSync.set(relativePath, blob);
+  return relativePath;
+}
+
+function createAttachmentReferenceText(result: AttachFileResult, fallbackName: string) {
+  const displayName = sanitizeAttachmentLabel(result.displayName ?? fallbackName);
+  const relativePath = sanitizeAttachmentTarget(result.relativePath ?? fallbackName);
+  const target = relativePath.includes(' ') || /[()<>]/.test(relativePath)
+    ? `<${relativePath.replace(/>/g, '%3E')}>`
+    : relativePath;
+
+  return result.kind?.toLowerCase() === 'image'
+    ? `![${displayName}](${target})`
+    : `[${displayName}](${target})`;
+}
+
+function createBlobForImageAttachment(
+  contentBase64: string,
+  sourceFile: File,
+  result: AttachFileResult,
+  fallbackName: string
+) {
+  const bytes = base64ToUint8Array(contentBase64);
+  const contentType = normalizeSupportedImageContentType(sourceFile.type)
+    ?? inferImageContentType(result.relativePath ?? result.displayName ?? fallbackName)
+    ?? inferImageContentType(fallbackName)
+    ?? 'application/octet-stream';
+
+  return new File(
+    [bytes],
+    sanitizeAttachmentLabel(result.displayName ?? fallbackName),
+    { type: contentType });
+}
+
+function base64ToUint8Array(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function normalizeImageContentType(value: string) {
+  const contentType = value.trim().toLowerCase();
+  return contentType.startsWith('image/') ? contentType : null;
+}
+
+function normalizeSupportedImageContentType(value: string) {
+  const contentType = normalizeImageContentType(value);
+  return contentType && isSupportedImageExtension(inferFileExtension(contentType))
+    ? contentType
+    : null;
+}
+
+function inferImageContentType(value: string) {
+  const extension = value
+    .split(/[?#]/, 1)[0]
+    .split('.')
+    .pop()
+    ?.trim()
+    .toLowerCase();
+
+  return extension === 'png'
+    ? 'image/png'
+    : extension === 'jpg' || extension === 'jpeg'
+      ? 'image/jpeg'
+      : extension === 'webp'
+        ? 'image/webp'
+        : extension === 'gif'
+          ? 'image/gif'
+          : null;
+}
+
+function isSupportedImageExtension(value: string | null | undefined) {
+  return value === '.png'
+    || value === '.jpg'
+    || value === '.jpeg'
+    || value === '.webp'
+    || value === '.gif';
+}
+
+function sanitizeAttachmentLabel(value: string) {
+  return value
+    .replace(/[\]\[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || 'Attachment';
+}
+
+function sanitizeAttachmentTarget(value: string) {
+  return value
+    .replace(/\\/g, '/')
+    .replace(/[\r\n]+/g, '')
+    .trim() || 'Attachment';
+}
+
+function readFileAsBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const separatorIndex = result.indexOf(',');
+      resolve(separatorIndex >= 0 ? result.slice(separatorIndex + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function getClipboardFiles(clipboardData: DataTransfer | null): File[] {
+  if (!clipboardData) {
+    return [];
+  }
+
+  const directFiles = Array.from(clipboardData.files ?? []).filter(file => file.size > 0);
+  if (directFiles.length > 0) {
+    return directFiles;
+  }
+
+  return Array.from(clipboardData.items ?? [])
+    .filter(item => item.kind === 'file')
+    .map(item => item.getAsFile())
+    .filter((file): file is File => Boolean(file && file.size > 0));
+}
+
+function getSafeAttachmentFileName(file: File) {
+  const trimmedName = file.name.trim();
+  const inferredExtension = inferFileExtension(file.type);
+  if (trimmedName.length > 0) {
+    return hasFileExtension(trimmedName) || inferredExtension === '.bin'
+      ? trimmedName
+      : `${trimmedName}${inferredExtension}`;
+  }
+
+  return `clipboard-image${inferredExtension}`;
+}
+
+function hasFileExtension(value: string) {
+  return /(?:^|[/\\])[^/\\]+\.[^./\\]+$/.test(value);
+}
+
+function inferFileExtension(contentType: string) {
+  const normalized = contentType.trim().toLowerCase();
+  return normalized === 'image/png'
+    ? '.png'
+    : normalized === 'image/jpeg'
+      ? '.jpg'
+      : normalized === 'image/webp'
+        ? '.webp'
+        : normalized === 'image/gif'
+          ? '.gif'
+          : '.bin';
+}
+
+function isTextBlockModel(value: unknown): value is BlockModel {
+  return isBlockModel(value)
+    && typeof (value as { text?: unknown }).text === 'object'
+    && (value as { text?: unknown }).text !== null;
+}
+
+function isBlockModel(value: unknown): value is BlockModel {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { id?: unknown }).id === 'string'
+    && typeof (value as { flavour?: unknown }).flavour === 'string';
 }

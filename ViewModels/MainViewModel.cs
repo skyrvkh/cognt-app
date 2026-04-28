@@ -481,6 +481,35 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         return noteService.ResolveMentionPath(currentNotesDirectory, relativePath);
     }
 
+
+    public Task<AttachedEditorFile> AttachFileToCurrentNoteAsync(
+        string sourcePath,
+        string fileName,
+        string contentBase64,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
+        {
+            throw new InvalidOperationException("No collection is open.");
+        }
+
+        if (string.IsNullOrWhiteSpace(currentNotePath)
+            || !string.Equals(
+                Path.GetFullPath(currentNotePath),
+                Path.GetFullPath(sourcePath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The attachment source is not the current note file.");
+        }
+
+        return noteService.AttachEditorFileAsync(
+            currentNotesDirectory,
+            sourcePath,
+            fileName,
+            contentBase64,
+            cancellationToken);
+    }
+
     public LinkedNote CreateLinkedNote(string sourcePath, string viewMode)
     {
         if (string.IsNullOrWhiteSpace(currentNotePath)

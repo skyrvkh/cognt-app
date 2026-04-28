@@ -16,6 +16,8 @@ using CogntApp.Shell.Overlay;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
+using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
+using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
 using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
@@ -104,6 +106,7 @@ public partial class MainWindow : Window
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
         EditorViewControl.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
+        EditorViewControl.AttachFileRequested += EditorView_AttachFileRequested;
         allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
         allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
         allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
@@ -748,6 +751,22 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
+    {
+        try
+        {
+            AttachedEditorFile file = await viewModel.AttachFileToCurrentNoteAsync(
+                e.SourcePath,
+                e.FileName,
+                e.ContentBase64);
+            e.Complete(AttachFileResult.Success(file.DisplayName, file.RelativePath, file.Kind));
+        }
+        catch (Exception ex)
+        {
+            e.Complete(AttachFileResult.Fail(ex.Message));
         }
     }
 

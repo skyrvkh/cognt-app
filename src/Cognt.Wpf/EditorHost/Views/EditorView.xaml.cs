@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Components.WebView.Wpf;
 using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
 using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
+using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
+using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
@@ -41,6 +43,7 @@ public partial class EditorView : UserControl
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
+    public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
 
     public bool IsShowingTransientEditor => isShowingTransientEditor;
 
@@ -376,6 +379,7 @@ public partial class EditorView : UserControl
         blockSuiteBridge.MentionPreviewRequested += BlockSuiteBridge_MentionPreviewRequested;
         blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
         blockSuiteBridge.CreateLinkedNoteRequested += BlockSuiteBridge_CreateLinkedNoteRequested;
+        blockSuiteBridge.AttachFileRequested += BlockSuiteBridge_AttachFileRequested;
         blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
     }
 
@@ -548,6 +552,30 @@ public partial class EditorView : UserControl
         catch (Exception ex)
         {
             e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task BlockSuiteBridge_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
+    {
+        if (!IsCurrentSourcePath(e.SourcePath))
+        {
+            e.Complete(AttachFileResult.Fail("The attachment source is not the current note file."));
+            return;
+        }
+
+        if (AttachFileRequested is null)
+        {
+            e.Complete(AttachFileResult.Fail("No attachment handler is registered."));
+            return;
+        }
+
+        try
+        {
+            await AttachFileRequested.Invoke(this, e);
+        }
+        catch (Exception ex)
+        {
+            e.Complete(AttachFileResult.Fail(ex.Message));
         }
     }
 
