@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
@@ -28,6 +29,10 @@ internal sealed partial class NoteService : IDisposable
     private const string JpegExtension = ".jpeg";
     private const string WebpExtension = ".webp";
     private const string GifExtension = ".gif";
+    private static readonly JsonSerializerOptions BlockSuiteJsonOptions = new()
+    {
+        WriteIndented = true
+    };
     private static readonly HashSet<string> DocumentAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         PdfExtension,
