@@ -50,7 +50,6 @@ public partial class MainWindow : Window
     private readonly NoteTreeInteractionController noteTreeInteractions;
     private readonly OverlayHostController overlayHostController;
     private readonly AllNotesView allNotesView = new();
-
     private readonly BrowserPaneView browserPaneView = new();
     private readonly PdfReaderView pdfReaderView = new();
     private bool isDesktopSidebarCollapsed;
@@ -259,7 +258,6 @@ public partial class MainWindow : Window
         CloseSidebarSheet();
         window.ShowDialog();
     }
-
 
     private async void BrowserButton_Click(object sender, RoutedEventArgs e)
     {
@@ -620,6 +618,11 @@ public partial class MainWindow : Window
 
     private async Task<bool> OpenNoteAsync(string notePath, bool selectInTree)
     {
+        if (IsPdfFilePath(notePath))
+        {
+            return await OpenPdfAsync(notePath, selectInTree);
+        }
+
         PreparedNote? note;
 
         try
@@ -680,6 +683,39 @@ public partial class MainWindow : Window
         }
 
         return true;
+    }
+
+    private async Task<bool> OpenPdfAsync(string documentPath, bool selectInTree)
+    {
+        try
+        {
+            viewModel.SaveCurrentNoteFromEditor();
+            int requestId = ++editorOpenRequestId;
+            await CloseReviewIfActiveAsync();
+            ShowOverlay(pdfReaderView);
+            await pdfReaderView.LoadPdfFileAsync(documentPath);
+
+            if (requestId != editorOpenRequestId)
+            {
+                return false;
+            }
+
+            if (selectInTree)
+            {
+                SelectNote(documentPath);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The PDF could not be opened: {ex.Message}",
+                "Open PDF Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
     }
 
     private async Task ShowEmptyEditorViewAsync()
@@ -1385,5 +1421,13 @@ public partial class MainWindow : Window
     private void HideOverlay()
     {
         overlayHostController.Hide();
+    }
+
+    private static bool IsPdfFilePath(string filePath)
+    {
+        return string.Equals(
+            Path.GetExtension(filePath),
+            ".pdf",
+            StringComparison.OrdinalIgnoreCase);
     }
 }
