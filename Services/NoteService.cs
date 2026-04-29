@@ -91,12 +91,24 @@ public interface INoteService : IDisposable
         string fileName,
         string contentBase64,
         CancellationToken cancellationToken = default);
+
+    Task<ReadEditorAttachment> ReadEditorAttachmentAsync(
+        string notesDirectory,
+        string notePath,
+        string imageSource,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record AttachedEditorFile(
     string DisplayName,
     string RelativePath,
     string Kind);
+
+public sealed record ReadEditorAttachment(
+    string FileName,
+    string RelativePath,
+    string ContentType,
+    string ContentBase64);
 
 public sealed class NoteService : INoteService
 {
@@ -639,6 +651,36 @@ public sealed class NoteService : INoteService
         return new AttachedEditorFile(displayName, relativePath, kind);
     }
 
+    public async Task<ReadEditorAttachment> ReadEditorAttachmentAsync(
+        string notesDirectory,
+        string notePath,
+        string imageSource,
+        CancellationToken cancellationToken = default)
+    {
+        string root = GetExistingNotesRoot(notesDirectory);
+        string fullNotePath = ResolveExistingNotePathInRoot(root, notePath);
+        if (!IsSafeCurrentNotePath(fullNotePath, fullNotePath, root))
+        {
+            throw new UnauthorizedAccessException("The attachment source is outside the open collection.");
+        }
+
+        string attachmentPath = ResolveExistingEditorAttachmentPath(root, imageSource);
+        string extension = NormalizeEditorAttachmentExtension(Path.GetExtension(attachmentPath));
+        if (!string.Equals(GetEditorAttachmentKind(extension), "Image", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only image attachments can be loaded into the editor.");
+        }
+
+        byte[] content = await File.ReadAllBytesAsync(attachmentPath, cancellationToken);
+        string relativePath = NormalizeRelativePath(Path.GetRelativePath(root, attachmentPath));
+        string contentType = GetEditorImageContentType(extension);
+        return new ReadEditorAttachment(
+            Path.GetFileName(attachmentPath),
+            relativePath,
+            contentType,
+            Convert.ToBase64String(content));
+    }
+
     private static string ResolveExistingNotePathInRoot(string root, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -991,6 +1033,74 @@ public sealed class NoteService : INoteService
             ".png" or ".jpg" or ".jpeg" or ".webp" or ".gif" => "Image",
             ".pdf" => "Pdf",
             _ => "Document"
+        };
+    }
+
+    private static string ResolveExistingEditorAttachmentPath(string root, string imageSource)
+    {
+        string source = imageSource
+            .Replace('\\', '/')
+            .Split(['?', '#'], 2)[0]
+            .Trim();
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new ArgumentException("Image source is required.", nameof(imageSource));
+        }
+
+        string fullPath;
+        if (TryGetEditorFileUriPath(source, out string? fileUriPath))
+        {
+            fullPath = Path.GetFullPath(fileUriPath!);
+        }
+        else if (Path.IsPathRooted(source))
+        {
+            fullPath = Path.GetFullPath(source);
+        }
+        else
+        {
+            string relativePath = source.TrimStart('/');
+            if (relativePath.Split('/').Any(segment => segment is ".."))
+            {
+                throw new UnauthorizedAccessException("Attachment paths must stay inside the open collection.");
+            }
+
+            fullPath = Path.GetFullPath(Path.Combine(root, ToPlatformPath(relativePath)));
+        }
+
+        if (!IsPathInsideRoot(fullPath, root))
+        {
+            throw new UnauthorizedAccessException("Attachment paths must stay inside the open collection.");
+        }
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The editor image attachment does not exist.", fullPath);
+        }
+
+        return fullPath;
+    }
+
+    private static bool TryGetEditorFileUriPath(string source, out string? path)
+    {
+        if (Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.IsFile)
+        {
+            path = uri.LocalPath;
+            return true;
+        }
+
+        path = null;
+        return false;
+    }
+
+    private static string GetEditorImageContentType(string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "application/octet-stream"
         };
     }
 

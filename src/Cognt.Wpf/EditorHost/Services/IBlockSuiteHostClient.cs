@@ -4,7 +4,7 @@ namespace CogntApp.Services;
 
 public interface IBlockSuiteHostClient
 {
-    Task LoadNoteAsync(string? path, string title, string content);
+    Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null);
 
     Task LoadCardAsync(string content);
 

@@ -144,6 +144,21 @@ export type AttachFileResult = {
   error?: string;
 };
 
+export type ReadAttachmentMessage = {
+  type: 'readAttachment';
+  sourcePath: string;
+  imageSource: string;
+};
+
+export type ReadAttachmentResult = {
+  ok: boolean;
+  fileName?: string;
+  relativePath?: string;
+  contentType?: string;
+  contentBase64?: string;
+  error?: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
@@ -156,6 +171,7 @@ export type MarkdownEditorOptions = {
   onOpenMention(message: OpenMentionMessage): void;
   onCreateLinkedNote(message: CreateLinkedNoteMessage): Promise<CreateLinkedNoteResult>;
   onAttachFile(message: AttachFileMessage): Promise<AttachFileResult>;
+  onReadAttachment(message: ReadAttachmentMessage): Promise<ReadAttachmentResult>;
 };
 
 export type LoadMarkdownOptions = {
@@ -163,6 +179,7 @@ export type LoadMarkdownOptions = {
   path?: string;
   title?: string;
   content?: string;
+  collectionRoot?: string;
 };
 
 export class MarkdownBlockSuiteEditor {
@@ -180,8 +197,10 @@ export class MarkdownBlockSuiteEditor {
     message: CreateLinkedNoteMessage
   ) => Promise<CreateLinkedNoteResult>;
   private readonly onAttachFile: (message: AttachFileMessage) => Promise<AttachFileResult>;
+  private readonly onReadAttachment: (message: ReadAttachmentMessage) => Promise<ReadAttachmentResult>;
   private currentDoc: Doc | null = null;
   private currentPath = '';
+  private currentCollectionRoot = '';
   private loadingDocument = false;
   private readOnlyMode = false;
   private saveTimer: number | undefined;
@@ -217,6 +236,7 @@ export class MarkdownBlockSuiteEditor {
     this.onOpenMention = options.onOpenMention;
     this.onCreateLinkedNote = options.onCreateLinkedNote;
     this.onAttachFile = options.onAttachFile;
+    this.onReadAttachment = options.onReadAttachment;
     this.editor = document.createElement('page-editor') as PageEditor;
     this.editor.id = 'editor';
     this.editor.doc = createEmptyMarkdownDoc();
@@ -261,6 +281,7 @@ export class MarkdownBlockSuiteEditor {
     this.mentions.cancelScheduledHighlightUpdate();
     this.mentions.hidePreview();
     this.currentPath = options.path ?? '';
+    this.currentCollectionRoot = normalizeLocalPath(options.collectionRoot ?? '');
     this.clearLinkedDocState();
 
     try {
@@ -300,6 +321,11 @@ export class MarkdownBlockSuiteEditor {
       linkedDoc => this.registerLinkedDoc(linkedDoc, generation),
       relativePath => this.resolveLinkedNoteTitle(relativePath)
     );
+    await hydrateAttachmentImageBlocks(
+      nextDoc,
+      this.currentPath,
+      this.currentCollectionRoot,
+      this.onReadAttachment);
     logEditorTiming('full Markdown import', importStartedAt, `${markdown.length} chars`);
 
     if (generation !== this.loadGeneration) {
@@ -346,6 +372,11 @@ export class MarkdownBlockSuiteEditor {
       linkedDoc => this.registerLinkedDoc(linkedDoc, generation),
       relativePath => this.resolveLinkedNoteTitle(relativePath)
     );
+    await hydrateAttachmentImageBlocks(
+      nextDoc,
+      this.currentPath,
+      this.currentCollectionRoot,
+      this.onReadAttachment);
     logEditorTiming('BlockSuite JSON import', importStartedAt, `${content.length} chars`);
 
     if (generation !== this.loadGeneration) {
@@ -1554,6 +1585,192 @@ export class MarkdownBlockSuiteEditor {
 
 }
 
+async function hydrateAttachmentImageBlocks(
+  doc: Doc,
+  sourcePath: string,
+  collectionRoot: string,
+  readAttachment: (message: ReadAttachmentMessage) => Promise<ReadAttachmentResult>
+) {
+  if (!sourcePath) {
+    return;
+  }
+
+  for (const block of doc.getBlocks()) {
+    const model = (block as { model?: unknown }).model ?? block;
+    if (!isImageBlockModel(model)) {
+      continue;
+    }
+
+    const sourceId = getImageSourceId(model);
+    if (!sourceId) {
+      continue;
+    }
+
+    if (await doc.blobSync.get(sourceId)) {
+      continue;
+    }
+
+    const imageSource = normalizeImageSourceForHost(sourceId, collectionRoot) ?? sourceId;
+    try {
+      const result = await readAttachment({
+        type: 'readAttachment',
+        sourcePath,
+        imageSource,
+      });
+      if (!result.ok) {
+        const message = result.error ?? 'The image attachment could not be loaded.';
+        reportDiagnostic('warn', `Image hydration skipped for ${imageSource}: ${message}`);
+        continue;
+      }
+
+      const blob = createBlobFromReadAttachmentResult(result, imageSource);
+      if (!blob) {
+        reportDiagnostic('warn', `Image hydration skipped for ${imageSource}: missing image content.`);
+        continue;
+      }
+
+      const hydratedSourceId = sanitizeAttachmentTarget(result.relativePath ?? imageSource);
+      await doc.blobSync.set(hydratedSourceId, blob);
+      if (hydratedSourceId !== sourceId) {
+        setImageSourceId(model, hydratedSourceId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      reportDiagnostic('warn', `Image hydration failed for ${imageSource}: ${message}`);
+    }
+  }
+}
+
+function isImageBlockModel(value: unknown): value is BlockModel & {
+  id: string;
+  sourceId?: unknown;
+  props?: {
+    sourceId?: unknown;
+  };
+} {
+  return typeof value === 'object'
+    && value !== null
+    && (value as { flavour?: unknown }).flavour === 'affine:image'
+    && typeof (value as { id?: unknown }).id === 'string';
+}
+
+function getImageSourceId(value: {
+  sourceId?: unknown;
+  props?: {
+    sourceId?: unknown;
+  };
+}) {
+  const candidate = typeof value.sourceId === 'string'
+    ? value.sourceId
+    : typeof value.props?.sourceId === 'string'
+      ? value.props.sourceId
+      : '';
+
+  return candidate.replace(/\\/g, '/').trim() || null;
+}
+
+function setImageSourceId(
+  value: {
+    sourceId?: unknown;
+    props?: {
+      sourceId?: unknown;
+    };
+  },
+  sourceId: string
+) {
+  if (typeof value.sourceId === 'string') {
+    value.sourceId = sourceId;
+    return;
+  }
+
+  if (value.props) {
+    value.props.sourceId = sourceId;
+    return;
+  }
+
+  value.sourceId = sourceId;
+}
+
+function normalizeImageSourceForHost(sourceId: string, collectionRoot?: string | null) {
+  const normalizedSource = sourceId.replace(/\\/g, '/').trim();
+  if (normalizedSource.length === 0) {
+    return null;
+  }
+
+  const filePath = tryGetFileUriPath(normalizedSource);
+  if (filePath && collectionRoot) {
+    const relativePath = tryGetCollectionRelativePath(filePath, collectionRoot);
+    if (relativePath) {
+      return relativePath;
+    }
+  }
+
+  const localPath = tryGetLocalPath(normalizedSource);
+  if (localPath && collectionRoot) {
+    const relativePath = tryGetCollectionRelativePath(localPath, collectionRoot);
+    if (relativePath) {
+      return relativePath;
+    }
+  }
+
+  return isCollectionImageReference(normalizedSource)
+    ? normalizedSource.replace(/^\/+/, '')
+    : null;
+}
+
+function tryGetFileUriPath(source: string) {
+  try {
+    const uri = new URL(source);
+    if (uri.protocol !== 'file:') {
+      return null;
+    }
+
+    return decodeURIComponent(uri.pathname)
+      .replace(/^\/([A-Za-z]:\/)/, '$1')
+      .replace(/\\/g, '/');
+  } catch {
+    return null;
+  }
+}
+
+function tryGetLocalPath(source: string) {
+  if (!/^[A-Za-z]:\//.test(source) && !source.startsWith('//')) {
+    return null;
+  }
+
+  return source.replace(/^\/([A-Za-z]:\/)/, '$1');
+}
+
+function tryGetCollectionRelativePath(filePath: string, collectionRoot: string) {
+  const root = collectionRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+  const fullPath = filePath.replace(/\\/g, '/');
+  const rootPrefix = `${root}/`;
+  if (root.length === 0 || !fullPath.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+    return null;
+  }
+
+  return fullPath.slice(rootPrefix.length).replace(/^\/+/, '');
+}
+
+function isCollectionImageReference(source: string) {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(source)) {
+    return false;
+  }
+
+  const path = source.replace(/^\/+/, '').split(/[?#]/, 1)[0];
+  if (!inferImageContentType(path)) {
+    return false;
+  }
+
+  return !/^[A-Za-z]:\//.test(path)
+    && !path.startsWith('//')
+    && !path.includes('..');
+}
+
+function normalizeLocalPath(path: string) {
+  return path.replace(/\\/g, '/').trim().replace(/\/+$/, '');
+}
+
 function isImageAttachmentResult(
   result: AttachFileResult
 ): result is AttachFileResult & { relativePath: string } {
@@ -1602,6 +1819,23 @@ function createBlobForImageAttachment(
   return new File(
     [bytes],
     sanitizeAttachmentLabel(result.displayName ?? fallbackName),
+    { type: contentType });
+}
+
+function createBlobFromReadAttachmentResult(result: ReadAttachmentResult, fallbackName: string) {
+  const contentBase64 = result.contentBase64?.trim();
+  if (!contentBase64) {
+    return null;
+  }
+
+  const bytes = base64ToUint8Array(contentBase64);
+  const contentType = normalizeImageContentType(result.contentType ?? '')
+    ?? inferImageContentType(result.relativePath ?? result.fileName ?? fallbackName)
+    ?? 'application/octet-stream';
+
+  return new File(
+    [bytes],
+    sanitizeAttachmentLabel(result.fileName ?? fallbackName),
     { type: contentType });
 }
 

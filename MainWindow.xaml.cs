@@ -25,6 +25,8 @@ using KnowledgeMentionTargetReadModel = Cognt.Modules.PersonalKnowledgeManagemen
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
+using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 
 namespace CogntApp;
 
@@ -109,6 +111,7 @@ public partial class MainWindow : Window
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
         EditorViewControl.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
         EditorViewControl.AttachFileRequested += EditorView_AttachFileRequested;
+        EditorViewControl.ReadAttachmentRequested += EditorView_ReadAttachmentRequested;
         allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
         allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
         allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
@@ -653,7 +656,8 @@ public partial class MainWindow : Window
             await EditorViewControl.LoadNoteAsync(
                 note.Title,
                 note.Content,
-                note.NotePath);
+                note.NotePath,
+                viewModel.CurrentCollectionPath);
         }
         catch (Exception ex)
         {
@@ -828,6 +832,25 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             e.Complete(AttachFileResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    {
+        try
+        {
+            ReadEditorAttachment file = await viewModel.ReadEditorAttachmentAsync(
+                e.SourcePath,
+                e.ImageSource);
+            e.Complete(ReadAttachmentResult.Success(
+                file.FileName,
+                file.RelativePath,
+                file.ContentType,
+                file.ContentBase64));
+        }
+        catch (Exception ex)
+        {
+            e.Complete(ReadAttachmentResult.Fail(ex.Message));
         }
     }
 

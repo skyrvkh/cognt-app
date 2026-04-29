@@ -53,9 +53,9 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         }
     }
 
-    public async Task LoadNoteAsync(string? path, string title, string content)
+    public async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
     {
-        await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content);
+        await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content, collectionRoot);
     }
 
     public async Task LoadCardAsync(string content)

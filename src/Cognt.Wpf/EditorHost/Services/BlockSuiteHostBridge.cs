@@ -37,10 +37,10 @@ public sealed partial class BlockSuiteHostBridge
         return readyCompletion.Task;
     }
 
-    public async Task LoadNoteAsync(string? path, string title, string content)
+    public async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
-        await blockSuiteHost.LoadNoteAsync(path, title, content);
+        await blockSuiteHost.LoadNoteAsync(path, title, content, collectionRoot);
     }
 
     public async Task LoadCardAsync(string content)

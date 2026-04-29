@@ -10,6 +10,8 @@ using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNo
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
+using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
 
 namespace Cognt.Wpf.EditorHost.Services;
@@ -24,6 +26,7 @@ public sealed partial class BlockSuiteHostBridge
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
     public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
+    public event Func<object?, ReadAttachmentRequestedEventArgs, Task>? ReadAttachmentRequested;
     public event EventHandler<string>? DiagnosticReceived;
 
     internal void RaiseContentChanged(string content)
@@ -92,6 +95,27 @@ public sealed partial class BlockSuiteHostBridge
             if (handler is Func<object?, AttachFileRequestedEventArgs, Task> attachHandler)
             {
                 await attachHandler(this, args);
+            }
+        }
+
+        return args.Result;
+    }
+
+    internal async Task<ReadAttachmentResult> RaiseReadAttachmentAsync(
+        string sourcePath,
+        string imageSource)
+    {
+        ReadAttachmentRequestedEventArgs args = new(sourcePath, imageSource);
+        if (ReadAttachmentRequested is null)
+        {
+            return args.Result;
+        }
+
+        foreach (Delegate handler in ReadAttachmentRequested.GetInvocationList())
+        {
+            if (handler is Func<object?, ReadAttachmentRequestedEventArgs, Task> readHandler)
+            {
+                await readHandler(this, args);
             }
         }
 

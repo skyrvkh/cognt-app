@@ -16,6 +16,8 @@ using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
+using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
 
 namespace CogntApp.Views;
@@ -32,6 +34,7 @@ public partial class EditorView : UserControl
     private string currentContent = string.Empty;
     private string currentTitle = string.Empty;
     private string? currentSourcePath;
+    private string? currentCollectionRoot;
     private Action<string>? transientContentChanged;
     private int loadRequestId;
     private bool isShowingCardSide;
@@ -44,6 +47,7 @@ public partial class EditorView : UserControl
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
     public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
+    public event Func<object?, ReadAttachmentRequestedEventArgs, Task>? ReadAttachmentRequested;
 
     public bool IsShowingTransientEditor => isShowingTransientEditor;
 
@@ -68,13 +72,15 @@ public partial class EditorView : UserControl
     public async Task LoadNoteAsync(
         string title,
         string content,
-        string? path = null)
+        string? path = null,
+        string? collectionRoot = null)
     {
         ClearTransientEditorState();
         int requestId = ++loadRequestId;
         UpdateCurrentNoteTitle(title);
         currentContent = content;
         currentSourcePath = path;
+        currentCollectionRoot = collectionRoot;
 
         await WarmUpAsync();
 
@@ -85,7 +91,7 @@ public partial class EditorView : UserControl
         }
 
         await WaitWithTimeoutAsync(
-            blockSuiteBridge.LoadNoteAsync(path, title, content),
+            blockSuiteBridge.LoadNoteAsync(path, title, content, collectionRoot),
             GetDocumentLoadTimeout(content),
             "The editor did not finish loading the note.");
 
@@ -242,7 +248,7 @@ public partial class EditorView : UserControl
         try
         {
             await WaitWithTimeoutAsync(
-                blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent),
+                blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent, currentCollectionRoot),
                 GetDocumentLoadTimeout(currentContent),
                 "The editor did not restore the current note after card editing.");
             await FlushMentionTargetsAsync();
@@ -271,7 +277,7 @@ public partial class EditorView : UserControl
 
         try
         {
-            await LoadNoteAsync(currentTitle, currentContent, currentSourcePath);
+            await LoadNoteAsync(currentTitle, currentContent, currentSourcePath, currentCollectionRoot);
         }
         finally
         {
@@ -380,6 +386,7 @@ public partial class EditorView : UserControl
         blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
         blockSuiteBridge.CreateLinkedNoteRequested += BlockSuiteBridge_CreateLinkedNoteRequested;
         blockSuiteBridge.AttachFileRequested += BlockSuiteBridge_AttachFileRequested;
+        blockSuiteBridge.ReadAttachmentRequested += BlockSuiteBridge_ReadAttachmentRequested;
         blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
     }
 
@@ -576,6 +583,30 @@ public partial class EditorView : UserControl
         catch (Exception ex)
         {
             e.Complete(AttachFileResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task BlockSuiteBridge_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    {
+        if (!IsCurrentSourcePath(e.SourcePath))
+        {
+            e.Complete(ReadAttachmentResult.Fail("The attachment source is not the current note file."));
+            return;
+        }
+
+        if (ReadAttachmentRequested is null)
+        {
+            e.Complete(ReadAttachmentResult.Fail("No attachment reader is registered."));
+            return;
+        }
+
+        try
+        {
+            await ReadAttachmentRequested.Invoke(this, e);
+        }
+        catch (Exception ex)
+        {
+            e.Complete(ReadAttachmentResult.Fail(ex.Message));
         }
     }
 

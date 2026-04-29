@@ -5,6 +5,7 @@ import {
   MarkdownBlockSuiteEditor,
   type AttachFileResult,
   type CreateLinkedNoteResult,
+  type ReadAttachmentResult,
 } from './blocksuite-editor';
 import type { DocumentLinksPayload } from './document-links';
 import { installHostDiagnostics, waitForAnimationFrames } from './host';
@@ -102,6 +103,14 @@ export function mountBlockSuite(
           message.contentBase64
         )
       ),
+    onReadAttachment: async message =>
+      normalizeReadAttachmentResult(
+        await dotNet.invokeMethodAsync(
+          'HandleReadAttachment',
+          message.sourcePath,
+          message.imageSource
+        )
+      ),
   });
 
   instances.set(instanceId, { editor });
@@ -112,10 +121,16 @@ export async function loadNote(
   instanceId: number,
   path: string | null,
   title: string,
-  content: string
+  content: string,
+  collectionRoot?: string | null
 ) {
   const instance = getInstance(instanceId);
-  await instance.editor.load({ path: path ?? undefined, title, content });
+  await instance.editor.load({
+    path: path ?? undefined,
+    title,
+    content,
+    collectionRoot: collectionRoot ?? undefined,
+  });
   await waitForAnimationFrames(2);
 }
 
@@ -289,6 +304,32 @@ function normalizeAttachFileResult(value: unknown): AttachFileResult {
     displayName: result?.displayName ?? result?.DisplayName,
     relativePath: result?.relativePath ?? result?.RelativePath,
     kind: result?.kind ?? result?.Kind,
+    error: result?.error ?? result?.Error,
+  };
+}
+
+function normalizeReadAttachmentResult(value: unknown): ReadAttachmentResult {
+  const result = value as {
+    ok?: boolean;
+    Ok?: boolean;
+    fileName?: string;
+    FileName?: string;
+    relativePath?: string;
+    RelativePath?: string;
+    contentType?: string;
+    ContentType?: string;
+    contentBase64?: string;
+    ContentBase64?: string;
+    error?: string;
+    Error?: string;
+  } | null;
+
+  return {
+    ok: Boolean(result?.ok ?? result?.Ok),
+    fileName: result?.fileName ?? result?.FileName,
+    relativePath: result?.relativePath ?? result?.RelativePath,
+    contentType: result?.contentType ?? result?.ContentType,
+    contentBase64: result?.contentBase64 ?? result?.ContentBase64,
     error: result?.error ?? result?.Error,
   };
 }
