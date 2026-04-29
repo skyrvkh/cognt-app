@@ -9,6 +9,7 @@ using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.Cr
 using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
+using OpenImageOcclusionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenImageOcclusionRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
 using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
 using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
@@ -24,6 +25,7 @@ public sealed partial class BlockSuiteHostBridge
     public event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
+    public event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
     public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
     public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
     public event Func<object?, ReadAttachmentRequestedEventArgs, Task>? ReadAttachmentRequested;
@@ -70,6 +72,17 @@ public sealed partial class BlockSuiteHostBridge
     internal void RaiseOpenMention(string sourcePath, string relativePath, string content)
     {
         OpenMentionRequested?.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, content));
+    }
+
+    internal void RaiseOpenImageOcclusion(
+        string sourcePath,
+        string imageBlockId,
+        string imageRelPath,
+        string content)
+    {
+        OpenImageOcclusionRequested?.Invoke(
+            this,
+            new OpenImageOcclusionRequestedEventArgs(sourcePath, imageBlockId, imageRelPath, content));
     }
 
     internal CreateLinkedNoteResult RaiseCreateLinkedNote(string sourcePath, string viewMode)

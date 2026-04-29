@@ -80,6 +80,16 @@ public partial class BlockSuiteHost
     }
 
     [JSInvokable]
+    public void HandleOpenImageOcclusion(
+        string sourcePath,
+        string imageBlockId,
+        string imageRelPath,
+        string content)
+    {
+        Bridge.RaiseOpenImageOcclusion(sourcePath, imageBlockId, imageRelPath, content);
+    }
+
+    [JSInvokable]
     public void HandleHostMessage(JsonElement message)
     {
         Bridge.RaiseHostMessage(message);

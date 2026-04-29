@@ -1,0 +1,11 @@
+<UserControl x:Class="CogntApp.Features.NoteToCard.ImageOcclusion.ImageMaskPreviewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CogntApp.Features.NoteToCard.ImageOcclusion">
+    <Grid Background="#0F172A">
+        <Image Source="{Binding Editor.ImageSource, RelativeSource={RelativeSource AncestorType=local:ImageMaskPreviewControl}, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+               Stretch="Uniform" />
+        <local:ImageMaskOverlayCanvas Editor="{Binding Editor, RelativeSource={RelativeSource AncestorType=local:ImageMaskPreviewControl}, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+                                      SurfaceMode="Preview" />
+    </Grid>
+</UserControl>

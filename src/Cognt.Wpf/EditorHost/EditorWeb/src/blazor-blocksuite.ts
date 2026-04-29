@@ -111,6 +111,15 @@ export function mountBlockSuite(
           message.imageSource
         )
       ),
+    onOpenImageOcclusion: message => {
+      void dotNet.invokeMethodAsync(
+        'HandleOpenImageOcclusion',
+        message.sourcePath,
+        message.imageBlockId,
+        message.imageRelPath,
+        message.content
+      );
+    },
   });
 
   instances.set(instanceId, { editor });

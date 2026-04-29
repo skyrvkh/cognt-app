@@ -159,6 +159,14 @@ export type ReadAttachmentResult = {
   error?: string;
 };
 
+export type OpenImageOcclusionMessage = {
+  type: 'openImageOcclusion';
+  sourcePath: string;
+  imageBlockId: string;
+  imageRelPath: string;
+  content: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
@@ -172,6 +180,7 @@ export type MarkdownEditorOptions = {
   onCreateLinkedNote(message: CreateLinkedNoteMessage): Promise<CreateLinkedNoteResult>;
   onAttachFile(message: AttachFileMessage): Promise<AttachFileResult>;
   onReadAttachment(message: ReadAttachmentMessage): Promise<ReadAttachmentResult>;
+  onOpenImageOcclusion(message: OpenImageOcclusionMessage): void;
 };
 
 export type LoadMarkdownOptions = {
