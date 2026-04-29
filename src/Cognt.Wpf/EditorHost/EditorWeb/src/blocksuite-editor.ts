@@ -167,6 +167,11 @@ export type OpenImageOcclusionMessage = {
   content: string;
 };
 
+export type SelectedImageBlock = {
+  imageBlockId: string;
+  imageRelPath: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   statusElement: HTMLElement;
@@ -207,6 +212,7 @@ export class MarkdownBlockSuiteEditor {
   ) => Promise<CreateLinkedNoteResult>;
   private readonly onAttachFile: (message: AttachFileMessage) => Promise<AttachFileResult>;
   private readonly onReadAttachment: (message: ReadAttachmentMessage) => Promise<ReadAttachmentResult>;
+  private readonly onOpenImageOcclusion: (message: OpenImageOcclusionMessage) => void;
   private currentDoc: Doc | null = null;
   private currentPath = '';
   private currentCollectionRoot = '';
@@ -246,6 +252,7 @@ export class MarkdownBlockSuiteEditor {
     this.onCreateLinkedNote = options.onCreateLinkedNote;
     this.onAttachFile = options.onAttachFile;
     this.onReadAttachment = options.onReadAttachment;
+    this.onOpenImageOcclusion = options.onOpenImageOcclusion;
     this.editor = document.createElement('page-editor') as PageEditor;
     this.editor.id = 'editor';
     this.editor.doc = createEmptyMarkdownDoc();
@@ -483,6 +490,28 @@ export class MarkdownBlockSuiteEditor {
 
     this.editor.focus();
     target?.focus({ preventScroll: true });
+  }
+
+  public getSelectedImageBlock(): SelectedImageBlock | null {
+    const selectedBlockIds = uniqueBlockIds([
+      ...this.getBlockSelectionBlockIds(),
+      ...this.getTextSelectionImageCandidateBlockIds(),
+    ]);
+
+    for (const blockId of selectedBlockIds) {
+      const model = this.currentDoc?.getBlock(blockId)?.model;
+      const selectedImage = this.createSelectedImageBlockFromModel(model);
+      if (selectedImage) {
+        return selectedImage;
+      }
+    }
+
+    const persistableImages = this.getImageBlocksInDocument()
+      .map(image => this.createSelectedImageBlockFromModel(image))
+      .filter((image): image is SelectedImageBlock => image !== null);
+    return persistableImages.length === 1
+      ? persistableImages[0]
+      : null;
   }
 
   public async activateEditorMode() {
@@ -957,6 +986,11 @@ export class MarkdownBlockSuiteEditor {
 
         if (isEditorShortcut(event, 'z')) {
           void this.handleClozeShortcut(event);
+          return;
+        }
+
+        if (isEditorShortcut(event, 'i', { shift: true })) {
+          void this.handleImageOcclusionShortcut(event);
           return;
         }
 
@@ -1518,6 +1552,38 @@ export class MarkdownBlockSuiteEditor {
     );
   }
 
+  private async handleImageOcclusionShortcut(event: KeyboardEvent) {
+    if (this.isEditorInputLocked()) {
+      this.showLockedInputStatus();
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.currentDoc || !this.currentPath) {
+      this.showStatus('Open a note before adding image occlusion.');
+      return;
+    }
+
+    const selectedImage = this.getSelectedImageBlock();
+    if (!selectedImage) {
+      this.showStatus('Select an image block before adding image occlusion.');
+      return;
+    }
+
+    await this.flushHost();
+    this.cancelPendingContentChanged();
+    this.onOpenImageOcclusion({
+      type: 'openImageOcclusion',
+      sourcePath: this.currentPath,
+      imageBlockId: selectedImage.imageBlockId,
+      imageRelPath: selectedImage.imageRelPath,
+      content: await this.exportCurrentContent(),
+    });
+  }
+
   private async handleClozeShortcut(event: KeyboardEvent) {
     await runClozeCommand(
       {
@@ -1542,6 +1608,69 @@ export class MarkdownBlockSuiteEditor {
 
   private getTextSelection() {
     return this.editor.std?.selection.find('text') as TextSelection | null | undefined;
+  }
+
+  private getTextSelectionBlockIds(textSelection: TextSelection) {
+    const range = this.editor.std?.range.textSelectionToRange(textSelection as never);
+    const components = (range
+      ? this.editor.std.range.getSelectedBlockComponentsByRange(range, {
+          match: (element: { model?: { id?: string; role?: string } }) =>
+            Boolean(element.model?.id) && element.model?.role === 'content',
+          mode: 'flat',
+        })
+      : []) as Array<{ model?: { id?: string } }>;
+
+    const componentIds = components
+      .map((component: { model?: { id?: string } }) => component.model?.id)
+      .filter((blockId: string | undefined): blockId is string => Boolean(blockId));
+    if (componentIds.length > 0) {
+      return componentIds;
+    }
+
+    return [
+      textSelection.start?.blockId,
+      textSelection.from?.blockId,
+      textSelection.end?.blockId,
+      textSelection.to?.blockId,
+    ].filter((blockId: string | undefined): blockId is string => Boolean(blockId));
+  }
+
+  private getBlockSelectionBlockIds() {
+    const selection = this.editor.host?.selection as
+      | {
+          find(type: string): unknown;
+          filter?(type: string): unknown[];
+        }
+      | undefined;
+    if (!selection) {
+      return [];
+    }
+
+    const blockSelections = typeof selection.filter === 'function'
+      ? selection.filter('block')
+      : [selection.find('block')];
+
+    return blockSelections.flatMap(getBlockSelectionId);
+  }
+
+  private getTextSelectionImageCandidateBlockIds() {
+    const textSelection = this.getTextSelection();
+    return textSelection ? this.getTextSelectionBlockIds(textSelection) : [];
+  }
+
+  private getImageBlocksInDocument() {
+    if (!this.currentDoc) {
+      return [];
+    }
+
+    return this.currentDoc
+      .getBlocks()
+      .map(block => (block as { model?: unknown }).model ?? block)
+      .filter(isImageBlockModel);
+  }
+
+  private createSelectedImageBlockFromModel(value: unknown): SelectedImageBlock | null {
+    return createSelectedImageBlock(value, this.currentCollectionRoot);
   }
 
   public async createLinkedNoteFromSlashMenu(
@@ -1700,6 +1829,28 @@ function setImageSourceId(
   value.sourceId = sourceId;
 }
 
+function createSelectedImageBlock(
+  value: unknown,
+  collectionRoot?: string | null
+): SelectedImageBlock | null {
+  if (!isImageBlockModel(value)) {
+    return null;
+  }
+
+  const sourceId = getImageSourceId(value);
+  const imageRelPath = sourceId
+    ? normalizeImageSourceForHost(sourceId, collectionRoot)
+    : null;
+  if (!imageRelPath) {
+    return null;
+  }
+
+  return {
+    imageBlockId: value.id,
+    imageRelPath,
+  };
+}
+
 function normalizeImageSourceForHost(sourceId: string, collectionRoot?: string | null) {
   const normalizedSource = sourceId.replace(/\\/g, '/').trim();
   if (normalizedSource.length === 0) {
@@ -1778,6 +1929,30 @@ function isCollectionImageReference(source: string) {
 
 function normalizeLocalPath(path: string) {
   return path.replace(/\\/g, '/').trim().replace(/\/+$/, '');
+}
+
+function getBlockSelectionId(value: unknown) {
+  const blockId = typeof (value as { blockId?: unknown } | null)?.blockId === 'string'
+    ? (value as { blockId: string }).blockId.trim()
+    : '';
+
+  return blockId.length > 0 ? [blockId] : [];
+}
+
+function uniqueBlockIds(values: string[]) {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const blockId = value.trim();
+    if (!blockId || seen.has(blockId)) {
+      continue;
+    }
+
+    seen.add(blockId);
+    ids.push(blockId);
+  }
+
+  return ids;
 }
 
 function isImageAttachmentResult(
