@@ -16,6 +16,7 @@ using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
 using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
 using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
 using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using OpenImageOcclusionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenImageOcclusionRequestedEventArgs;
 using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
 using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
@@ -42,6 +43,7 @@ public partial class EditorView : UserControl
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
+    public event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
     public event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
     public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
     public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
@@ -381,6 +383,7 @@ public partial class EditorView : UserControl
         blockSuiteBridge.ContentChanged += BlockSuiteBridge_ContentChanged;
         blockSuiteBridge.CreateExtractRequested += BlockSuiteBridge_CreateExtractRequested;
         blockSuiteBridge.SaveClozeRequested += BlockSuiteBridge_SaveClozeRequested;
+        blockSuiteBridge.OpenImageOcclusionRequested += BlockSuiteBridge_OpenImageOcclusionRequested;
         blockSuiteBridge.MentionSearchRequested += BlockSuiteBridge_MentionSearchRequested;
         blockSuiteBridge.MentionPreviewRequested += BlockSuiteBridge_MentionPreviewRequested;
         blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
@@ -443,6 +446,32 @@ public partial class EditorView : UserControl
             currentContent = e.Content;
             ContentChanged?.Invoke(this, currentContent);
             PostSaveResult(e.SourcePath, ok: true);
+        }
+        catch (Exception ex)
+        {
+            PostSaveResult(e.SourcePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void BlockSuiteBridge_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
+    {
+        if (!IsCurrentSourcePath(e.SourcePath))
+        {
+            PostSaveResult(e.SourcePath, ok: false, error: "The image occlusion source is not the current note file.");
+            return;
+        }
+
+        EventHandler<OpenImageOcclusionRequestedEventArgs>? handler = OpenImageOcclusionRequested;
+        if (handler is null)
+        {
+            PostSaveResult(e.SourcePath, ok: false, error: "No image occlusion handler is registered.");
+            return;
+        }
+
+        try
+        {
+            currentContent = e.Content;
+            handler.Invoke(this, e);
         }
         catch (Exception ex)
         {
