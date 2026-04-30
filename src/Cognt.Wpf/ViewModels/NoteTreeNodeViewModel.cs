@@ -48,6 +48,11 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         private set => SetProperty(ref title, value);
     }
 
+    public string Header => Title;
+
+    public bool IsMarkdownFile => Kind == KnowledgeItemKind.Note
+        && !string.IsNullOrWhiteSpace(NotePath);
+
     public string Prefix => IsPlaceholder
         ? string.Empty
         : Kind switch
@@ -86,7 +91,13 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     public string? NotePath
     {
         get => notePath;
-        set => SetProperty(ref notePath, value);
+        set
+        {
+            if (SetProperty(ref notePath, value))
+            {
+                OnPropertyChanged(nameof(IsMarkdownFile));
+            }
+        }
     }
 
     public bool AreChildrenLoaded
@@ -113,6 +124,7 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(newTitle);
 
         Title = newTitle;
+        OnPropertyChanged(nameof(Header));
 
         if (!IsRenaming)
         {

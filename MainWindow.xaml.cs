@@ -1,35 +1,17 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
-using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Models.Decks;
+using Cognt.Wpf.EditorHost.Models.Editor;
+using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
-using CogntApp.Shell.Dialogs;
-using CogntApp.Shell.DocumentImport;
-using CogntApp.Shell.Editor;
-using CogntApp.Shell.Navigation;
-using CogntApp.Shell.Overlay;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
-using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
-using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
-using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
-using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
-using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
-using KnowledgeMentionTargetReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeMentionTargetReadModel;
-using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
-using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
-using OpenImageOcclusionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenImageOcclusionRequestedEventArgs;
-using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
-using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
-using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 
 namespace CogntApp;
 
@@ -41,7 +23,7 @@ public partial class MainWindow : Window
     private const double CollapsedSidebarWidth = 88;
     private const double DesktopSidebarWidth = 300;
     private const double CompactNavigationBreakpoint = 1180;
-    private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.ItemId";
+    private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.MarkdownPath";
     private static readonly Geometry ChevronLeftIcon = CreateFrozenGeometry("M11.5,4 L5.5,10 L11.5,16");
     private static readonly Geometry ChevronRightIcon = CreateFrozenGeometry("M5.5,4 L11.5,10 L5.5,16");
     private static readonly Geometry CloseIcon = CreateFrozenGeometry("M4,4 L14,14 M14,4 L4,14");
@@ -49,34 +31,11 @@ public partial class MainWindow : Window
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
     private readonly MainViewModel viewModel;
-    private readonly AllNotesViewModel allNotesViewModel;
-    private readonly IShellDialogService shellDialogs;
-    private readonly NoteTreeCommandController noteTreeCommands;
-    private readonly NoteTreeInteractionController noteTreeInteractions;
-    private readonly OverlayHostController overlayHostController;
-    private readonly AllNotesView allNotesView = new();
-    private readonly BrowserPaneView browserPaneView = new();
-    private readonly PdfReaderView pdfReaderView = new();
-    private readonly IImageMaskEditorDialogService imageMaskEditorDialogs = new ImageMaskEditorDialogService();
-    private readonly Dictionary<string, CardContext> imageMaskContexts = new(StringComparer.OrdinalIgnoreCase);
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
     private ReviewView? reviewView;
     private int editorOpenRequestId;
-    private int mentionTargetsRefreshRequestId;
-    private NoteTreeNodeViewModel? noteTreeContextNode;
-    private bool suppressTreeSelectionHandling;
-    private bool isStartupInitialized;
-
-    private enum TreeDropPlacement
-    {
-        Before,
-        After,
-        Inside,
-    }
-
-    private readonly record struct TreeDropTarget(long? ParentId, long? PreviousSiblingId, long? NextSiblingId);
 
     public MainWindow()
         : this(new NoteService())
@@ -91,15 +50,9 @@ public partial class MainWindow : Window
     internal MainWindow(MainViewModel viewModel)
     {
         this.viewModel = viewModel;
-        allNotesViewModel = new AllNotesViewModel(new AllNotesCatalogSource(new NoteService()));
 
         InitializeComponent();
         DataContext = viewModel;
-        allNotesView.DataContext = allNotesViewModel;
-        shellDialogs = new WindowShellDialogService(this);
-        noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
-        noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
-        overlayHostController = new OverlayHostController(OverlayHost, EditorViewControl);
 
         viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
@@ -107,45 +60,45 @@ public partial class MainWindow : Window
         viewModel.OpenNoteRequested += ViewModel_OpenNoteRequested;
         viewModel.MentionTargetsChanged += ViewModel_MentionTargetsChanged;
         viewModel.UserMessageRequested += ViewModel_UserMessageRequested;
-        viewModel.CurrentNoteTitleChanged += ViewModel_CurrentNoteTitleChanged;
 
         EditorViewControl.ContentChanged += EditorView_ContentChanged;
         EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
-        EditorViewControl.MentionSearchRequested += EditorView_MentionSearchRequested;
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
-        EditorViewControl.OpenImageOcclusionRequested += EditorView_OpenImageOcclusionRequested;
-        EditorViewControl.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
-        EditorViewControl.AttachFileRequested += EditorView_AttachFileRequested;
-        EditorViewControl.ReadAttachmentRequested += EditorView_ReadAttachmentRequested;
-        allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
-        allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
-        allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
         decksView.PracticeRequested += DecksView_PracticeRequested;
         decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
         decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
-    }
 
-    protected override void OnClosed(EventArgs e)
-    {
-        allNotesViewModel.Dispose();
-        viewModel.Dispose();
-        base.OnClosed(e);
+        viewModel.Initialize();
+        _ = EditorViewControl.WarmUpAsync();
     }
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        noteTreeInteractions.HandleSelectedItemChanged(e.NewValue);
+        if (viewModel.IsLoadingNotesDirectory)
+        {
+            return;
+        }
 
-        if (!string.IsNullOrWhiteSpace((e.NewValue as NoteTreeNodeViewModel)?.NotePath))
+        NoteTreeNodeViewModel? selectedNode = e.NewValue as NoteTreeNodeViewModel;
+        try
+        {
+            viewModel.SelectTreeNode(selectedNode);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The selected note could not be opened: {ex.Message}",
+                "Open Note Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedNode?.NotePath))
         {
             CloseSidebarSheet();
         }
-    }
-
-    private void NotesTreeItem_Expanded(object sender, RoutedEventArgs e)
-    {
-        noteTreeInteractions.HandleExpanded(e);
     }
 
     private void NotesTree_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -164,44 +117,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyResponsiveNavigation(animate: false);
-
-        if (isStartupInitialized)
-        {
-            return;
-        }
-
-        isStartupInitialized = true;
-
-        try
-        {
-            EditorViewControl.AttachBlockSuiteHostToEditor();
-            await Dispatcher.Yield(DispatcherPriority.Loaded);
-            await EditorViewControl.WarmUpAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The editor host could not finish starting: {ex.Message}",
-                "Editor Startup",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-
-        try
-        {
-            viewModel.Initialize();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The collection could not be initialized: {ex.Message}",
-                "Startup Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
     }
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -256,37 +174,6 @@ public partial class MainWindow : Window
     private void SidebarActionButton_Click(object sender, RoutedEventArgs e)
     {
         CloseSidebarSheet();
-    }
-
-    private void ImportDocumentsButton_Click(object sender, RoutedEventArgs e)
-    {
-        DocumentImportWindow window = new(new DocumentImportViewModel(viewModel))
-        {
-            Owner = this
-        };
-        CloseSidebarSheet();
-        window.ShowDialog();
-    }
-
-    private async void BrowserButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            editorOpenRequestId++;
-            CloseSidebarSheet();
-            await CloseReviewIfActiveAsync();
-            await CloseCreateCardEditorIfActiveAsync();
-            ShowOverlay(browserPaneView);
-            browserPaneView.FocusAddressBox();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The browser could not be opened: {ex.Message}",
-                "Browser Not Ready",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
     }
 
     private void CloseSidebarSheet()
@@ -433,13 +320,6 @@ public partial class MainWindow : Window
                     ShowOverlay(decksView);
                     return;
 
-                case OverlayViewKind.AllNotes:
-                    await CloseReviewIfActiveAsync();
-                    await CloseCreateCardEditorIfActiveAsync();
-                    await allNotesViewModel.LoadAsync(viewModel.OpenCollectionPath);
-                    ShowOverlay(allNotesView);
-                    return;
-
                 case OverlayViewKind.Review:
                     try
                     {
@@ -566,72 +446,52 @@ public partial class MainWindow : Window
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        await CreateEditorRequestController().HandleClearEditorRequestedAsync();
+        try
+        {
+            await ShowEmptyEditorViewAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The editor could not be cleared: {ex.Message}",
+                "Editor Not Ready",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        await CreateEditorRequestController().HandleOpenNoteRequestedAsync(e);
+        try
+        {
+            await OpenNoteAsync(e.NotePath, e.SelectInTree);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The note could not be opened: {ex.Message}",
+                "Open Note Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
     {
-        CreateEditorRequestController().HandleMentionTargetsChanged();
+        SendMentionTargets();
     }
 
     private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
     {
-        CreateEditorRequestController().HandleUserMessageRequested(e);
-    }
-
-    private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath))
-        {
-            return;
-        }
-
-        string notePath = Path.GetFullPath(Path.Combine(
-            viewModel.OpenCollectionPath,
-            e.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
-        await OpenNoteAsync(notePath, selectInTree: true);
-    }
-
-    private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
-    {
-        if (viewModel.AddNoteCommand.CanExecute(null))
-        {
-            viewModel.AddNoteCommand.Execute(null);
-        }
-    }
-
-    private void AllNotesViewModel_ImportDocumentsRequested(object? sender, EventArgs e)
-    {
-        ImportDocumentsButton_Click(sender ?? this, new RoutedEventArgs());
-    }
-
-    private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
-    {
-        CreateEditorRequestController().HandleCurrentNoteTitleChanged(title);
-    }
-
-    private EditorRequestController CreateEditorRequestController()
-    {
-        return new EditorRequestController(
-            ShowEmptyEditorViewAsync,
-            OpenNoteAsync,
-            QueueMentionTargetsRefresh,
-            EditorViewControl.UpdateCurrentNoteTitle,
-            new WindowShellDialogService(this));
+        MessageBox.Show(
+            e.Message,
+            e.Title,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     private async Task<bool> OpenNoteAsync(string notePath, bool selectInTree)
     {
-        if (IsPdfFilePath(notePath))
-        {
-            return await OpenPdfAsync(notePath, selectInTree);
-        }
-
         PreparedNote? note;
 
         try
@@ -659,11 +519,7 @@ public partial class MainWindow : Window
         try
         {
             EditorViewControl.AttachBlockSuiteHostToEditor();
-            await EditorViewControl.LoadNoteAsync(
-                note.Title,
-                note.Content,
-                note.NotePath,
-                viewModel.CurrentCollectionPath);
+            await EditorViewControl.LoadNoteAsync(note.Title, note.Content, note.NotePath);
         }
         catch (Exception ex)
         {
@@ -693,39 +549,6 @@ public partial class MainWindow : Window
         }
 
         return true;
-    }
-
-    private async Task<bool> OpenPdfAsync(string documentPath, bool selectInTree)
-    {
-        try
-        {
-            viewModel.SaveCurrentNoteFromEditor();
-            int requestId = ++editorOpenRequestId;
-            await CloseReviewIfActiveAsync();
-            ShowOverlay(pdfReaderView);
-            await pdfReaderView.LoadPdfFileAsync(documentPath);
-
-            if (requestId != editorOpenRequestId)
-            {
-                return false;
-            }
-
-            if (selectInTree)
-            {
-                SelectNote(documentPath);
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The PDF could not be opened: {ex.Message}",
-                "Open PDF Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return false;
-        }
     }
 
     private async Task ShowEmptyEditorViewAsync()
@@ -758,18 +581,13 @@ public partial class MainWindow : Window
 
         try
         {
-            string createdPath = viewModel.CreateExtractNote(sourcePath, e.SelectedContent, e.SelectedPlainText);
+            string createdPath = viewModel.CreateExtractFile(sourcePath, e.SelectedContent);
             EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
         }
         catch (Exception ex)
         {
             EditorViewControl.PostExtractResult(sourcePath, ok: false, error: ex.Message);
         }
-    }
-
-    private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
-    {
-        e.Complete(viewModel.SearchMentionTargets(e.Query, e.Limit).Select(ToKnowledgeMentionTarget));
     }
 
     private void EditorView_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
@@ -784,7 +602,7 @@ public partial class MainWindow : Window
                 e.Mode,
                 ok: true,
                 title: preview.Title,
-                documentContent: preview.DocumentContent);
+                documentContent: preview.MarkdownExcerpt);
         }
         catch (Exception ex)
         {
@@ -812,188 +630,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
-    {
-        try
-        {
-            string collectionPath = viewModel.CurrentCollectionPath;
-            if (string.IsNullOrWhiteSpace(collectionPath))
-            {
-                throw new InvalidOperationException("No collection is open.");
-            }
-
-            string sourceRelPath = NormalizeImageMaskRelPath(Path.GetRelativePath(collectionPath, e.SourcePath));
-            string imageFullPath = ResolveImageMaskEditorImagePath(collectionPath, e.ImageRelPath);
-            string contextKey = CreateImageMaskContextKey(sourceRelPath, e.ImageBlockId, e.ImageRelPath);
-            CardContext context = imageMaskContexts.TryGetValue(contextKey, out CardContext? existing)
-                ? existing
-                : CreateImageMaskEditorContext(e.ImageBlockId, e.ImageRelPath);
-
-            OpenImageMaskEditorRequest request = new(
-                collectionPath,
-                sourceRelPath,
-                e.ImageBlockId,
-                e.ImageRelPath,
-                imageFullPath,
-                context);
-
-            ImageMaskEditorResult result = await imageMaskEditorDialogs.ShowAsync(
-                request,
-                applied =>
-                {
-                    imageMaskContexts[contextKey] = applied.UpdatedContext;
-                    return Task.CompletedTask;
-                });
-
-            if (result.Saved)
-            {
-                imageMaskContexts[contextKey] = result.UpdatedContext;
-                EditorViewControl.PostSaveResult(e.SourcePath, ok: true);
-            }
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The image occlusion editor could not open: {ex.Message}",
-                "Image Occlusion",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            EditorViewControl.PostSaveResult(e.SourcePath, ok: false, error: ex.Message);
-        }
-    }
-
-    private void EditorView_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
-    {
-        try
-        {
-            LinkedNote note = viewModel.CreateLinkedNote(e.SourcePath, e.ViewMode);
-            e.Complete(CreateLinkedNoteResult.Success(note.RelativePath, note.Title, note.DocumentContent));
-        }
-        catch (Exception ex)
-        {
-            e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
-        }
-    }
-
-    private async Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
-    {
-        try
-        {
-            AttachedEditorFile file = await viewModel.AttachFileToCurrentNoteAsync(
-                e.SourcePath,
-                e.FileName,
-                e.ContentBase64);
-            e.Complete(AttachFileResult.Success(file.DisplayName, file.RelativePath, file.Kind));
-        }
-        catch (Exception ex)
-        {
-            e.Complete(AttachFileResult.Fail(ex.Message));
-        }
-    }
-
-    private async Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
-    {
-        try
-        {
-            ReadEditorAttachment file = await viewModel.ReadEditorAttachmentAsync(
-                e.SourcePath,
-                e.ImageSource);
-            e.Complete(ReadAttachmentResult.Success(
-                file.FileName,
-                file.RelativePath,
-                file.ContentType,
-                file.ContentBase64));
-        }
-        catch (Exception ex)
-        {
-            e.Complete(ReadAttachmentResult.Fail(ex.Message));
-        }
-    }
-
-    private static KnowledgeMentionTargetReadModel ToKnowledgeMentionTarget(MentionTarget target)
-    {
-        return new KnowledgeMentionTargetReadModel(target.RelativePath, target.Title);
-    }
-
-    private static CardContext CreateImageMaskEditorContext(string imageBlockId, string imageRelPath)
-    {
-        string contextId = $"context_{Guid.CreateVersion7():N}";
-        return new CardContext(
-            contextId,
-            "Image occlusion",
-            [imageBlockId],
-            [],
-            [],
-            [new CardContextImageSurface(imageBlockId, NormalizeImageMaskRelPath(imageRelPath), [])],
-            CardPresentationPolicies.AppDefault,
-            CardContextStatus.Draft,
-            null);
-    }
-
-    private static string CreateImageMaskContextKey(string sourceRelPath, string imageBlockId, string imageRelPath)
-    {
-        return $"{NormalizeImageMaskRelPath(sourceRelPath)}|{imageBlockId}|{NormalizeImageMaskRelPath(imageRelPath)}";
-    }
-
-    private static string ResolveImageMaskEditorImagePath(string collectionPath, string imageRelPath)
-    {
-        string collectionRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(collectionPath));
-        string source = imageRelPath
-            .Replace('\\', '/')
-            .Split(['?', '#'], 2)[0]
-            .Trim();
-        if (string.IsNullOrWhiteSpace(source))
-        {
-            throw new ArgumentException("Image path is required.", nameof(imageRelPath));
-        }
-
-        string fullPath;
-        if (Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.IsFile)
-        {
-            fullPath = Path.GetFullPath(uri.LocalPath);
-        }
-        else if (Path.IsPathRooted(source))
-        {
-            fullPath = Path.GetFullPath(source);
-        }
-        else
-        {
-            string relativePath = source.TrimStart('/');
-            if (relativePath.Split('/').Any(segment => segment is ".."))
-            {
-                throw new UnauthorizedAccessException("Image paths must stay inside the open collection.");
-            }
-
-            fullPath = Path.GetFullPath(Path.Combine(collectionRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        }
-
-        if (!IsPathInsideDirectory(fullPath, collectionRoot))
-        {
-            throw new UnauthorizedAccessException("Image paths must stay inside the open collection.");
-        }
-
-        if (!File.Exists(fullPath))
-        {
-            throw new FileNotFoundException("The selected image file does not exist.", fullPath);
-        }
-
-        return fullPath;
-    }
-
-    private static bool IsPathInsideDirectory(string fullPath, string fullDirectory)
-    {
-        string normalizedPath = Path.GetFullPath(fullPath);
-        string normalizedDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(fullDirectory));
-        string directoryPrefix = $"{normalizedDirectory}{Path.DirectorySeparatorChar}";
-
-        return normalizedPath.StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizeImageMaskRelPath(string path)
-    {
-        return path.Replace('\\', '/').Trim();
-    }
-
     private void EditorView_ContentChanged(object? sender, string content)
     {
         try
@@ -1012,40 +648,22 @@ public partial class MainWindow : Window
         {
             item.IsSelected = true;
             item.Focus();
-            noteTreeContextNode = item.DataContext as NoteTreeNodeViewModel;
-            return;
         }
-
-        noteTreeContextNode = null;
     }
 
-    private void NewFolderTreeItem_Click(object sender, RoutedEventArgs e)
+    private void RenameTreeItem_Click(object sender, RoutedEventArgs e)
     {
-        CreateFolderInTree(noteTreeContextNode);
+        RenameSelectedTreeNode();
     }
 
     private void DeleteTreeItem_Click(object sender, RoutedEventArgs e)
     {
-        DeleteTreeNode(noteTreeContextNode ?? (NotesTree.SelectedItem as NoteTreeNodeViewModel));
+        DeleteSelectedTreeNode();
     }
 
     private void RenameSelectedTreeNode()
     {
-        BeginInlineRename(NotesTree.SelectedItem as NoteTreeNodeViewModel);
-    }
-
-    private void NotesTree_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
-            || item.DataContext is not NoteTreeNodeViewModel node)
-        {
-            return;
-        }
-
-        item.IsSelected = true;
-        item.Focus();
-        e.Handled = true;
-        BeginInlineRename(node);
+        RenameTreeNode(NotesTree.SelectedItem as NoteTreeNodeViewModel);
     }
 
     private void DeleteSelectedTreeNode()
@@ -1053,88 +671,41 @@ public partial class MainWindow : Window
         DeleteTreeNode(NotesTree.SelectedItem as NoteTreeNodeViewModel);
     }
 
-    private void CreateFolderInTree(NoteTreeNodeViewModel? node)
+    private void RenameTreeNode(NoteTreeNodeViewModel? node)
     {
-        noteTreeCommands.CreateFolder(node, BeginInlineRenameById);
-    }
-
-    private void BeginInlineRename(NoteTreeNodeViewModel? node)
-    {
-        noteTreeCommands.BeginInlineRename(node);
-    }
-
-    private void BeginInlineRenameById(string itemId)
-    {
-        if (!long.TryParse(itemId, out long id))
+        if (node is null)
         {
             return;
         }
 
-        Dispatcher.BeginInvoke(
-            () =>
-            {
-                foreach (TreeViewItem item in EnumerateTreeItems(NotesTree))
-                {
-                    if (item.DataContext is NoteTreeNodeViewModel node && node.Id == id)
-                    {
-                        item.IsSelected = true;
-                        item.Focus();
-                        BeginInlineRename(node);
-                        return;
-                    }
-                }
-            },
-            DispatcherPriority.Background);
-    }
+        if (!viewModel.CanRenameNode(node))
+        {
+            MessageBox.Show(
+                "This item cannot be renamed.",
+                "Rename",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
 
-    private void CommitInlineRename(NoteTreeNodeViewModel? node)
-    {
-        noteTreeCommands.CommitInlineRename(node, BeginInlineRename);
-    }
-
-    private void TreeRenameTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        if (sender is not TextBox textBox || e.NewValue is not true)
+        string itemKind = viewModel.GetNodeKind(node);
+        string? itemName = ShowRenamePrompt(itemKind, viewModel.GetEditableName(node));
+        if (itemName is null)
         {
             return;
         }
 
-        Dispatcher.BeginInvoke(
-            () =>
-            {
-                textBox.Focus();
-                textBox.SelectAll();
-            },
-            DispatcherPriority.Input);
-    }
-
-    private void TreeRenameTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (sender is not TextBox textBox
-            || textBox.DataContext is not NoteTreeNodeViewModel node)
+        try
         {
-            return;
+            viewModel.RenameNode(node, itemName);
         }
-
-        if (e.Key == Key.Enter)
+        catch (Exception ex)
         {
-            CommitInlineRename(node);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.Escape)
-        {
-            node.CancelRename();
-            e.Handled = true;
-        }
-    }
-
-    private void TreeRenameTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (sender is TextBox { DataContext: NoteTreeNodeViewModel node })
-        {
-            CommitInlineRename(node);
+            MessageBox.Show(
+                $"The {itemKind} could not be renamed:{Environment.NewLine}{ex.Message}",
+                "Rename Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
@@ -1233,50 +804,97 @@ public partial class MainWindow : Window
 
     private void DeleteTreeNode(NoteTreeNodeViewModel? node)
     {
-        noteTreeCommands.DeleteNode(node);
-    }
+        if (node is null)
+        {
+            return;
+        }
 
-    private void NotesTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        noteTreeInteractions.PreviewMouseLeftButtonDown(e, BeginInlineRename);
+        if (!viewModel.CanDeleteNode(node))
+        {
+            MessageBox.Show(
+                "This item cannot be deleted.",
+                "Delete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string itemKind = viewModel.GetNodeKind(node);
+        string message = node.IsMarkdownFile
+            ? $"Delete Markdown file \"{node.Header}\"?"
+            : $"Delete folder \"{node.Header}\" and everything inside it?";
+
+        MessageBoxResult result = MessageBox.Show(
+            message,
+            "Confirm Delete",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            viewModel.DeleteNode(node);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The {itemKind} could not be deleted:{Environment.NewLine}{ex.Message}",
+                "Delete Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void NotesTree_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        noteTreeInteractions.PreviewMouseMove(e);
+        if (e.LeftButton != MouseButtonState.Pressed
+            || FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
+            || !TryGetMarkdownNodePath(item, requireFile: true, out string notePath))
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(item, new DataObject(NoteTreeDragDataFormat, notePath), DragDropEffects.Move);
     }
 
     private void NotesTree_DragOver(object sender, DragEventArgs e)
     {
-        noteTreeInteractions.DragOver(e);
+        e.Effects = FindTreeViewItem(e.OriginalSource) is TreeViewItem item
+            && CanDropNoteOnTarget(item, e, out _, out _)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
     }
 
-    private void NotesTree_Drop(object sender, DragEventArgs e)
+    private async void NotesTree_Drop(object sender, DragEventArgs e)
     {
-        noteTreeInteractions.Drop(e);
-    }
+        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
+            || !CanDropNoteOnTarget(item, e, out string droppedNotePath, out string targetNotePath))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
 
-    private void RunWithSuppressedTreeSelection(Action action, bool deferRestore = false)
-    {
-        bool wasSuppressed = suppressTreeSelectionHandling;
-        suppressTreeSelectionHandling = true;
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
 
         try
         {
-            action();
+            NoteGroupResult result = viewModel.GroupNoteWithTarget(droppedNotePath, targetNotePath);
+            await OpenNoteAsync(result.TargetNotePath, selectInTree: true);
         }
-        finally
+        catch (Exception ex)
         {
-            if (deferRestore)
-            {
-                Dispatcher.BeginInvoke(
-                    () => suppressTreeSelectionHandling = wasSuppressed,
-                    DispatcherPriority.Background);
-            }
-            else
-            {
-                suppressTreeSelectionHandling = wasSuppressed;
-            }
+            MessageBox.Show(
+                $"The notes could not be grouped:{Environment.NewLine}{ex.Message}",
+                "Drag and Drop Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
@@ -1297,153 +915,45 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private bool TryGetTreeDropTarget(
+    private static bool CanDropNoteOnTarget(
+        object sender,
         DragEventArgs e,
-        out long itemId,
-        out TreeDropTarget target)
+        out string droppedNotePath,
+        out string targetNotePath)
     {
-        itemId = 0;
-        target = default;
+        droppedNotePath = string.Empty;
+        targetNotePath = string.Empty;
 
-        if (!e.Data.GetDataPresent(NoteTreeDragDataFormat)
-            || e.Data.GetData(NoteTreeDragDataFormat) is not long draggedItemId
-            || draggedItemId <= 0)
+        if (sender is not TreeViewItem targetItem
+            || !TryGetMarkdownNodePath(targetItem, requireFile: true, out targetNotePath)
+            || !e.Data.GetDataPresent(NoteTreeDragDataFormat)
+            || e.Data.GetData(NoteTreeDragDataFormat) is not string draggedPath
+            || string.IsNullOrWhiteSpace(draggedPath)
+            || string.Equals(draggedPath, targetNotePath, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
-        itemId = draggedItemId;
-
-        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem targetItem)
-        {
-            target = new TreeDropTarget(ParentId: null, PreviousSiblingId: null, NextSiblingId: null);
-            return !string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath);
-        }
-
-        if (targetItem.DataContext is not NoteTreeNodeViewModel targetNode
-            || targetNode.IsPlaceholder
-            || draggedItemId == targetNode.Id)
-        {
-            return false;
-        }
-
-        TreeDropPlacement placement = GetDropPlacement(targetItem, targetNode, e);
-
-        if (placement == TreeDropPlacement.Inside)
-        {
-            target = new TreeDropTarget(targetNode.Id, PreviousSiblingId: null, NextSiblingId: null);
-            return true;
-        }
-
-        long? parentId = targetNode.ParentId;
-        long? previousSiblingId = placement == TreeDropPlacement.Before
-            ? GetPreviousSiblingId(targetNode, draggedItemId)
-            : targetNode.Id;
-        long? nextSiblingId = placement == TreeDropPlacement.Before
-            ? targetNode.Id
-            : GetNextSiblingId(targetNode, draggedItemId);
-
-        target = new TreeDropTarget(parentId, previousSiblingId, nextSiblingId);
+        droppedNotePath = draggedPath;
         return true;
     }
 
-    private static TreeDropPlacement GetDropPlacement(
+    private static bool TryGetMarkdownNodePath(
         TreeViewItem item,
-        NoteTreeNodeViewModel targetNode,
-        DragEventArgs e)
+        bool requireFile,
+        out string notePath)
     {
-        double height = Math.Max(1, item.ActualHeight);
-        double y = e.GetPosition(item).Y;
+        notePath = string.Empty;
 
-        if (targetNode.CanContainChildren && y > height * 0.25 && y < height * 0.75)
+        if (item.DataContext is not NoteTreeNodeViewModel node
+            || string.IsNullOrWhiteSpace(node.NotePath)
+            || (requireFile && !node.IsMarkdownFile))
         {
-            return TreeDropPlacement.Inside;
+            return false;
         }
 
-        return y < height / 2
-            ? TreeDropPlacement.Before
-            : TreeDropPlacement.After;
-    }
-
-    private long? GetPreviousSiblingId(NoteTreeNodeViewModel targetNode, long draggedItemId)
-    {
-        IReadOnlyList<NoteTreeNodeViewModel>? siblings = FindSiblingList(viewModel.NoteRoots, targetNode);
-        if (siblings is null)
-        {
-            return null;
-        }
-
-        for (int index = 0; index < siblings.Count; index++)
-        {
-            if (!ReferenceEquals(siblings[index], targetNode))
-            {
-                continue;
-            }
-
-            for (int siblingIndex = index - 1; siblingIndex >= 0; siblingIndex--)
-            {
-                NoteTreeNodeViewModel candidate = siblings[siblingIndex];
-                if (!candidate.IsPlaceholder && candidate.Id != draggedItemId)
-                {
-                    return candidate.Id;
-                }
-            }
-
-            return null;
-        }
-
-        return null;
-    }
-
-    private long? GetNextSiblingId(NoteTreeNodeViewModel targetNode, long draggedItemId)
-    {
-        IReadOnlyList<NoteTreeNodeViewModel>? siblings = FindSiblingList(viewModel.NoteRoots, targetNode);
-        if (siblings is null)
-        {
-            return null;
-        }
-
-        for (int index = 0; index < siblings.Count; index++)
-        {
-            if (!ReferenceEquals(siblings[index], targetNode))
-            {
-                continue;
-            }
-
-            for (int siblingIndex = index + 1; siblingIndex < siblings.Count; siblingIndex++)
-            {
-                NoteTreeNodeViewModel candidate = siblings[siblingIndex];
-                if (!candidate.IsPlaceholder && candidate.Id != draggedItemId)
-                {
-                    return candidate.Id;
-                }
-            }
-
-            return null;
-        }
-
-        return null;
-    }
-
-    private static IReadOnlyList<NoteTreeNodeViewModel>? FindSiblingList(
-        IReadOnlyList<NoteTreeNodeViewModel> nodes,
-        NoteTreeNodeViewModel targetNode)
-    {
-        if (nodes.Contains(targetNode))
-        {
-            return nodes;
-        }
-
-        foreach (NoteTreeNodeViewModel node in nodes)
-        {
-            IReadOnlyList<NoteTreeNodeViewModel>? childResult = FindSiblingList(node.Children, targetNode);
-            if (childResult is not null)
-            {
-                return childResult;
-            }
-        }
-
-        return null;
+        notePath = node.NotePath;
+        return true;
     }
 
     private void SelectNote(string notePath)
@@ -1480,28 +990,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void QueueMentionTargetsRefresh()
+    private void SendMentionTargets()
     {
-        int requestId = ++mentionTargetsRefreshRequestId;
-
         try
         {
-            IReadOnlyList<MentionTarget> targets = await Task.Run(viewModel.ListMentionTargets);
-
-            if (requestId != mentionTargetsRefreshRequestId)
-            {
-                return;
-            }
-
-            EditorViewControl.PostMentionTargets(targets);
+            EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
         }
         catch (Exception ex)
         {
-            if (requestId != mentionTargetsRefreshRequestId)
-            {
-                return;
-            }
-
             MessageBox.Show(
                 $"Mention targets could not be refreshed: {ex.Message}",
                 "Mentions",
@@ -1522,14 +1018,14 @@ public partial class MainWindow : Window
         return reviewView;
     }
 
-    private async Task RenderReviewCardAsync(string content)
+    private async Task RenderReviewCardAsync(string markdown)
     {
         if (reviewView is null)
         {
             throw new InvalidOperationException("Review mode is not active.");
         }
 
-        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, content);
+        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, markdown);
     }
 
     private async Task ShowReviewOverlayAsync(ReviewView review)
@@ -1548,7 +1044,10 @@ public partial class MainWindow : Window
         ReviewView view = reviewView;
         reviewView = null;
 
-        overlayHostController.ClearIfContent(view);
+        if (ReferenceEquals(OverlayHost.Content, view))
+        {
+            OverlayHost.Content = null;
+        }
 
         try
         {
@@ -1573,19 +1072,22 @@ public partial class MainWindow : Window
 
     private void ShowOverlay(UIElement overlay)
     {
-        overlayHostController.Show(overlay);
+        EditorViewControl.DetachBlockSuiteHost();
+        EditorViewControl.Visibility = Visibility.Visible;
+        EditorViewControl.IsEnabled = true;
+        EditorViewControl.IsHitTestVisible = true;
+        OverlayHost.Content = overlay;
+        OverlayHost.Visibility = Visibility.Visible;
+        OverlayHost.IsHitTestVisible = true;
     }
 
     private void HideOverlay()
     {
-        overlayHostController.Hide();
-    }
-
-    private static bool IsPdfFilePath(string filePath)
-    {
-        return string.Equals(
-            Path.GetExtension(filePath),
-            ".pdf",
-            StringComparison.OrdinalIgnoreCase);
+        OverlayHost.Content = null;
+        OverlayHost.Visibility = Visibility.Collapsed;
+        OverlayHost.IsHitTestVisible = false;
+        EditorViewControl.Visibility = Visibility.Visible;
+        EditorViewControl.IsEnabled = true;
+        EditorViewControl.IsHitTestVisible = true;
     }
 }
