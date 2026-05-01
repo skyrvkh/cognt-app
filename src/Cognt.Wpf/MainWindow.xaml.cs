@@ -1,17 +1,35 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Models.Decks;
-using Cognt.Wpf.EditorHost.Models.Editor;
-using CogntApp.Models.Editor;
 using CogntApp.Models.Markdown;
 using CogntApp.Models.Navigation;
+using CogntApp.Shell.Dialogs;
+using CogntApp.Shell.DocumentImport;
+using CogntApp.Shell.Editor;
+using CogntApp.Shell.Navigation;
+using CogntApp.Shell.Overlay;
 using CogntApp.Services;
 using CogntApp.ViewModels;
 using CogntApp.Views;
+using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
+using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
+using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
+using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
+using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
+using KnowledgeMentionTargetReadModel = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.KnowledgeMentionTargetReadModel;
+using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
+using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
+using OpenImageOcclusionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenImageOcclusionRequestedEventArgs;
+using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
+using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
+using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 
 namespace CogntApp;
 
@@ -23,7 +41,7 @@ public partial class MainWindow : Window
     private const double CollapsedSidebarWidth = 88;
     private const double DesktopSidebarWidth = 300;
     private const double CompactNavigationBreakpoint = 1180;
-    private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.MarkdownPath";
+    private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.ItemId";
     private static readonly Geometry ChevronLeftIcon = CreateFrozenGeometry("M11.5,4 L5.5,10 L11.5,16");
     private static readonly Geometry ChevronRightIcon = CreateFrozenGeometry("M5.5,4 L11.5,10 L5.5,16");
     private static readonly Geometry CloseIcon = CreateFrozenGeometry("M4,4 L14,14 M14,4 L4,14");
@@ -31,11 +49,34 @@ public partial class MainWindow : Window
     private readonly DashboardView dashboardView = new();
     private readonly DecksView decksView = new();
     private readonly MainViewModel viewModel;
+    private readonly AllNotesViewModel allNotesViewModel;
+    private readonly IShellDialogService shellDialogs;
+    private readonly NoteTreeCommandController noteTreeCommands;
+    private readonly NoteTreeInteractionController noteTreeInteractions;
+    private readonly OverlayHostController overlayHostController;
+    private readonly AllNotesView allNotesView = new();
+    private readonly BrowserPaneView browserPaneView = new();
+    private readonly PdfReaderView pdfReaderView = new();
+    private readonly IImageMaskEditorDialogService imageMaskEditorDialogs = new ImageMaskEditorDialogService();
+    private readonly Dictionary<string, CardContext> imageMaskContexts = new(StringComparer.OrdinalIgnoreCase);
     private bool isDesktopSidebarCollapsed;
     private bool isCompactNavigationMode;
     private bool isSidebarSheetOpen;
     private ReviewView? reviewView;
     private int editorOpenRequestId;
+    private int mentionTargetsRefreshRequestId;
+    private NoteTreeNodeViewModel? noteTreeContextNode;
+    private bool suppressTreeSelectionHandling;
+    private bool isStartupInitialized;
+
+    private enum TreeDropPlacement
+    {
+        Before,
+        After,
+        Inside,
+    }
+
+    private readonly record struct TreeDropTarget(long? ParentId, long? PreviousSiblingId, long? NextSiblingId);
 
     public MainWindow()
         : this(new NoteService())
@@ -50,9 +91,15 @@ public partial class MainWindow : Window
     internal MainWindow(MainViewModel viewModel)
     {
         this.viewModel = viewModel;
+        allNotesViewModel = new AllNotesViewModel(new AllNotesCatalogSource(new NoteService()));
 
         InitializeComponent();
         DataContext = viewModel;
+        allNotesView.DataContext = allNotesViewModel;
+        shellDialogs = new WindowShellDialogService(this);
+        noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
+        noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
+        overlayHostController = new OverlayHostController(OverlayHost, EditorViewControl);
 
         viewModel.GetCurrentEditorContent = EditorViewControl.GetContent;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
@@ -60,45 +107,45 @@ public partial class MainWindow : Window
         viewModel.OpenNoteRequested += ViewModel_OpenNoteRequested;
         viewModel.MentionTargetsChanged += ViewModel_MentionTargetsChanged;
         viewModel.UserMessageRequested += ViewModel_UserMessageRequested;
+        viewModel.CurrentNoteTitleChanged += ViewModel_CurrentNoteTitleChanged;
 
         EditorViewControl.ContentChanged += EditorView_ContentChanged;
         EditorViewControl.CreateExtractRequested += EditorView_CreateExtractRequested;
+        EditorViewControl.MentionSearchRequested += EditorView_MentionSearchRequested;
         EditorViewControl.MentionPreviewRequested += EditorView_MentionPreviewRequested;
         EditorViewControl.OpenMentionRequested += EditorView_OpenMentionRequested;
+        EditorViewControl.OpenImageOcclusionRequested += EditorView_OpenImageOcclusionRequested;
+        EditorViewControl.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
+        EditorViewControl.AttachFileRequested += EditorView_AttachFileRequested;
+        EditorViewControl.ReadAttachmentRequested += EditorView_ReadAttachmentRequested;
+        allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
+        allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
+        allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
         decksView.PracticeRequested += DecksView_PracticeRequested;
         decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
         decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
+    }
 
-        viewModel.Initialize();
-        _ = EditorViewControl.WarmUpAsync();
+    protected override void OnClosed(EventArgs e)
+    {
+        allNotesViewModel.Dispose();
+        viewModel.Dispose();
+        base.OnClosed(e);
     }
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (viewModel.IsLoadingNotesDirectory)
-        {
-            return;
-        }
+        noteTreeInteractions.HandleSelectedItemChanged(e.NewValue);
 
-        NoteTreeNodeViewModel? selectedNode = e.NewValue as NoteTreeNodeViewModel;
-        try
-        {
-            viewModel.SelectTreeNode(selectedNode);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The selected note could not be opened: {ex.Message}",
-                "Open Note Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(selectedNode?.NotePath))
+        if (!string.IsNullOrWhiteSpace((e.NewValue as NoteTreeNodeViewModel)?.NotePath))
         {
             CloseSidebarSheet();
         }
+    }
+
+    private void NotesTreeItem_Expanded(object sender, RoutedEventArgs e)
+    {
+        noteTreeInteractions.HandleExpanded(e);
     }
 
     private void NotesTree_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -117,9 +164,44 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyResponsiveNavigation(animate: false);
+
+        if (isStartupInitialized)
+        {
+            return;
+        }
+
+        isStartupInitialized = true;
+
+        try
+        {
+            EditorViewControl.AttachBlockSuiteHostToEditor();
+            await Dispatcher.Yield(DispatcherPriority.Loaded);
+            await EditorViewControl.WarmUpAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The editor host could not finish starting: {ex.Message}",
+                "Editor Startup",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        try
+        {
+            viewModel.Initialize();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The collection could not be initialized: {ex.Message}",
+                "Startup Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -174,6 +256,37 @@ public partial class MainWindow : Window
     private void SidebarActionButton_Click(object sender, RoutedEventArgs e)
     {
         CloseSidebarSheet();
+    }
+
+    private void ImportDocumentsButton_Click(object sender, RoutedEventArgs e)
+    {
+        DocumentImportWindow window = new(new DocumentImportViewModel(viewModel))
+        {
+            Owner = this
+        };
+        CloseSidebarSheet();
+        window.ShowDialog();
+    }
+
+    private async void BrowserButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            editorOpenRequestId++;
+            CloseSidebarSheet();
+            await CloseReviewIfActiveAsync();
+            await CloseCreateCardEditorIfActiveAsync();
+            ShowOverlay(browserPaneView);
+            browserPaneView.FocusAddressBox();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The browser could not be opened: {ex.Message}",
+                "Browser Not Ready",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void CloseSidebarSheet()
@@ -318,6 +431,13 @@ public partial class MainWindow : Window
                 case OverlayViewKind.Decks:
                     await CloseReviewIfActiveAsync();
                     ShowOverlay(decksView);
+                    return;
+
+                case OverlayViewKind.AllNotes:
+                    await CloseReviewIfActiveAsync();
+                    await CloseCreateCardEditorIfActiveAsync();
+                    await allNotesViewModel.LoadAsync(viewModel.OpenCollectionPath);
+                    ShowOverlay(allNotesView);
                     return;
 
                 case OverlayViewKind.Review:
@@ -1091,15 +1211,41 @@ public partial class MainWindow : Window
         EditorViewControl.IsHitTestVisible = true;
     }
 
-    private void BrowserButton_Click(object sender, RoutedEventArgs e)
+    private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
     {
     }
 
-    private void ImportDocumentsButton_Click(object sender, RoutedEventArgs e)
+    private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
     {
     }
 
-    private void NotesTreeItem_Expanded(object sender, RoutedEventArgs e)
+    private void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
+    {
+    }
+
+    private void EditorView_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
+    {
+    }
+
+    private Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
+    {
+        return Task.CompletedTask;
+    }
+
+    private Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    {
+        return Task.CompletedTask;
+    }
+
+    private void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
+    {
+    }
+
+    private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
+    {
+    }
+
+    private void AllNotesViewModel_ImportDocumentsRequested(object? sender, EventArgs e)
     {
     }
 
