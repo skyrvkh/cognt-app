@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="src\Cognt.Wpf\MainWindow.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\CountDisplayFormatter.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\AllNotesViewModel.Catalog.cs" />
@@ -90,6 +91,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Page Include="src\Cognt.Wpf\MainWindow.xaml" />
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />

@@ -526,9 +526,6 @@ export class MarkdownBlockSuiteEditor {
     );
   }
 
-}
-
-
   public async loadCard(content: string) {
     ++this.loadGeneration;
     this.loadingDocument = true;
