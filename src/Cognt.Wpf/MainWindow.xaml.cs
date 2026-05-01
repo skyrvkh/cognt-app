@@ -566,52 +566,72 @@ public partial class MainWindow : Window
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        try
-        {
-            await ShowEmptyEditorViewAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The editor could not be cleared: {ex.Message}",
-                "Editor Not Ready",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        await CreateEditorRequestController().HandleClearEditorRequestedAsync();
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        try
-        {
-            await OpenNoteAsync(e.NotePath, e.SelectInTree);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The note could not be opened: {ex.Message}",
-                "Open Note Failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
+        await CreateEditorRequestController().HandleOpenNoteRequestedAsync(e);
     }
 
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
     {
-        SendMentionTargets();
+        CreateEditorRequestController().HandleMentionTargetsChanged();
     }
 
     private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
     {
-        MessageBox.Show(
-            e.Message,
-            e.Title,
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        CreateEditorRequestController().HandleUserMessageRequested(e);
+    }
+
+    private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath))
+        {
+            return;
+        }
+
+        string notePath = Path.GetFullPath(Path.Combine(
+            viewModel.OpenCollectionPath,
+            e.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+        await OpenNoteAsync(notePath, selectInTree: true);
+    }
+
+    private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
+    {
+        if (viewModel.AddNoteCommand.CanExecute(null))
+        {
+            viewModel.AddNoteCommand.Execute(null);
+        }
+    }
+
+    private void AllNotesViewModel_ImportDocumentsRequested(object? sender, EventArgs e)
+    {
+        ImportDocumentsButton_Click(sender ?? this, new RoutedEventArgs());
+    }
+
+    private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
+    {
+        CreateEditorRequestController().HandleCurrentNoteTitleChanged(title);
+    }
+
+    private EditorRequestController CreateEditorRequestController()
+    {
+        return new EditorRequestController(
+            ShowEmptyEditorViewAsync,
+            OpenNoteAsync,
+            QueueMentionTargetsRefresh,
+            EditorViewControl.UpdateCurrentNoteTitle,
+            new WindowShellDialogService(this));
     }
 
     private async Task<bool> OpenNoteAsync(string notePath, bool selectInTree)
     {
+        if (IsPdfFilePath(notePath))
+        {
+            return await OpenPdfAsync(notePath, selectInTree);
+        }
+
         PreparedNote? note;
 
         try
@@ -639,7 +659,11 @@ public partial class MainWindow : Window
         try
         {
             EditorViewControl.AttachBlockSuiteHostToEditor();
-            await EditorViewControl.LoadNoteAsync(note.Title, note.Content, note.NotePath);
+            await EditorViewControl.LoadNoteAsync(
+                note.Title,
+                note.Content,
+                note.NotePath,
+                viewModel.CurrentCollectionPath);
         }
         catch (Exception ex)
         {
@@ -669,6 +693,39 @@ public partial class MainWindow : Window
         }
 
         return true;
+    }
+
+    private async Task<bool> OpenPdfAsync(string documentPath, bool selectInTree)
+    {
+        try
+        {
+            viewModel.SaveCurrentNoteFromEditor();
+            int requestId = ++editorOpenRequestId;
+            await CloseReviewIfActiveAsync();
+            ShowOverlay(pdfReaderView);
+            await pdfReaderView.LoadPdfFileAsync(documentPath);
+
+            if (requestId != editorOpenRequestId)
+            {
+                return false;
+            }
+
+            if (selectInTree)
+            {
+                SelectNote(documentPath);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The PDF could not be opened: {ex.Message}",
+                "Open PDF Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
     }
 
     private async Task ShowEmptyEditorViewAsync()
@@ -701,13 +758,18 @@ public partial class MainWindow : Window
 
         try
         {
-            string createdPath = viewModel.CreateExtractFile(sourcePath, e.SelectedContent);
+            string createdPath = viewModel.CreateExtractNote(sourcePath, e.SelectedContent, e.SelectedPlainText);
             EditorViewControl.PostExtractResult(sourcePath, ok: true, createdPath);
         }
         catch (Exception ex)
         {
             EditorViewControl.PostExtractResult(sourcePath, ok: false, error: ex.Message);
         }
+    }
+
+    private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
+    {
+        e.Complete(viewModel.SearchMentionTargets(e.Query, e.Limit).Select(ToKnowledgeMentionTarget));
     }
 
     private void EditorView_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
@@ -722,7 +784,7 @@ public partial class MainWindow : Window
                 e.Mode,
                 ok: true,
                 title: preview.Title,
-                documentContent: preview.MarkdownExcerpt);
+                documentContent: preview.DocumentContent);
         }
         catch (Exception ex)
         {
@@ -1211,12 +1273,47 @@ public partial class MainWindow : Window
         EditorViewControl.IsHitTestVisible = true;
     }
 
-    private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
+    private async void QueueMentionTargetsRefresh()
     {
+        int requestId = ++mentionTargetsRefreshRequestId;
+
+        try
+        {
+            IReadOnlyList<MentionTarget> targets = await Task.Run(viewModel.ListMentionTargets);
+
+            if (requestId != mentionTargetsRefreshRequestId)
+            {
+                return;
+            }
+
+            EditorViewControl.PostMentionTargets(targets);
+        }
+        catch (Exception ex)
+        {
+            if (requestId != mentionTargetsRefreshRequestId)
+            {
+                return;
+            }
+
+            MessageBox.Show(
+                $"Mention targets could not be refreshed: {ex.Message}",
+                "Mentions",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
+    private static KnowledgeMentionTargetReadModel ToKnowledgeMentionTarget(MentionTarget target)
     {
+        return new KnowledgeMentionTargetReadModel(target.RelativePath, target.Title);
+    }
+
+    private static bool IsPdfFilePath(string filePath)
+    {
+        return string.Equals(
+            Path.GetExtension(filePath),
+            ".pdf",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
@@ -1235,18 +1332,6 @@ public partial class MainWindow : Window
     private Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
     {
         return Task.CompletedTask;
-    }
-
-    private void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
-    {
-    }
-
-    private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
-    {
-    }
-
-    private void AllNotesViewModel_ImportDocumentsRequested(object? sender, EventArgs e)
-    {
     }
 
     private void NewFolderTreeItem_Click(object sender, RoutedEventArgs e)
