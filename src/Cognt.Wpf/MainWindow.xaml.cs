@@ -1090,4 +1090,40 @@ public partial class MainWindow : Window
         EditorViewControl.IsEnabled = true;
         EditorViewControl.IsHitTestVisible = true;
     }
+
+    private void BrowserButton_Click(object sender, RoutedEventArgs e)
+    {
+    }
+
+    private void ImportDocumentsButton_Click(object sender, RoutedEventArgs e)
+    {
+    }
+
+    private void NotesTreeItem_Expanded(object sender, RoutedEventArgs e)
+    {
+    }
+
+    private void NewFolderTreeItem_Click(object sender, RoutedEventArgs e)
+    {
+    }
+
+    private void NotesTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+    }
+
+    private void NotesTree_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+    }
+
+    private void TreeRenameTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+    }
+
+    private void TreeRenameTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+    }
+
+    private void TreeRenameTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+    }
 }
