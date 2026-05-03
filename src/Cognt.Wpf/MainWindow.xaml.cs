@@ -812,6 +812,183 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
+    {
+        try
+        {
+            string collectionPath = viewModel.CurrentCollectionPath;
+            if (string.IsNullOrWhiteSpace(collectionPath))
+            {
+                throw new InvalidOperationException("No collection is open.");
+            }
+
+            string sourceRelPath = NormalizeImageMaskRelPath(Path.GetRelativePath(collectionPath, e.SourcePath));
+            string imageFullPath = ResolveImageMaskEditorImagePath(collectionPath, e.ImageRelPath);
+            string contextKey = CreateImageMaskContextKey(sourceRelPath, e.ImageBlockId, e.ImageRelPath);
+            CardContext context = imageMaskContexts.TryGetValue(contextKey, out CardContext? existing)
+                ? existing
+                : CreateImageMaskEditorContext(e.ImageBlockId, e.ImageRelPath);
+
+            OpenImageMaskEditorRequest request = new(
+                collectionPath,
+                sourceRelPath,
+                e.ImageBlockId,
+                e.ImageRelPath,
+                imageFullPath,
+                context);
+
+            ImageMaskEditorResult result = await imageMaskEditorDialogs.ShowAsync(
+                request,
+                applied =>
+                {
+                    imageMaskContexts[contextKey] = applied.UpdatedContext;
+                    return Task.CompletedTask;
+                });
+
+            if (result.Saved)
+            {
+                imageMaskContexts[contextKey] = result.UpdatedContext;
+                EditorViewControl.PostSaveResult(e.SourcePath, ok: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"The image occlusion editor could not open: {ex.Message}",
+                "Image Occlusion",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            EditorViewControl.PostSaveResult(e.SourcePath, ok: false, error: ex.Message);
+        }
+    }
+
+    private void EditorView_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
+    {
+        try
+        {
+            LinkedNote note = viewModel.CreateLinkedNote(e.SourcePath, e.ViewMode);
+            e.Complete(CreateLinkedNoteResult.Success(note.RelativePath, note.Title, note.DocumentContent));
+        }
+        catch (Exception ex)
+        {
+            e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
+    {
+        try
+        {
+            AttachedEditorFile file = await viewModel.AttachFileToCurrentNoteAsync(
+                e.SourcePath,
+                e.FileName,
+                e.ContentBase64);
+            e.Complete(AttachFileResult.Success(file.DisplayName, file.RelativePath, file.Kind));
+        }
+        catch (Exception ex)
+        {
+            e.Complete(AttachFileResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    {
+        try
+        {
+            ReadEditorAttachment file = await viewModel.ReadEditorAttachmentAsync(
+                e.SourcePath,
+                e.ImageSource);
+            e.Complete(ReadAttachmentResult.Success(
+                file.FileName,
+                file.RelativePath,
+                file.ContentType,
+                file.ContentBase64));
+        }
+        catch (Exception ex)
+        {
+            e.Complete(ReadAttachmentResult.Fail(ex.Message));
+        }
+    }
+
+    private static CardContext CreateImageMaskEditorContext(string imageBlockId, string imageRelPath)
+    {
+        string contextId = $"context_{Guid.CreateVersion7():N}";
+        return new CardContext(
+            contextId,
+            "Image occlusion",
+            [imageBlockId],
+            [],
+            [],
+            [new CardContextImageSurface(imageBlockId, NormalizeImageMaskRelPath(imageRelPath), [])],
+            CardPresentationPolicies.AppDefault,
+            CardContextStatus.Draft,
+            null);
+    }
+
+    private static string CreateImageMaskContextKey(string sourceRelPath, string imageBlockId, string imageRelPath)
+    {
+        return $"{NormalizeImageMaskRelPath(sourceRelPath)}|{imageBlockId}|{NormalizeImageMaskRelPath(imageRelPath)}";
+    }
+
+    private static string ResolveImageMaskEditorImagePath(string collectionPath, string imageRelPath)
+    {
+        string collectionRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(collectionPath));
+        string source = imageRelPath
+            .Replace('\\', '/')
+            .Split(['?', '#'], 2)[0]
+            .Trim();
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new ArgumentException("Image path is required.", nameof(imageRelPath));
+        }
+
+        string fullPath;
+        if (Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.IsFile)
+        {
+            fullPath = Path.GetFullPath(uri.LocalPath);
+        }
+        else if (Path.IsPathRooted(source))
+        {
+            fullPath = Path.GetFullPath(source);
+        }
+        else
+        {
+            string relativePath = source.TrimStart('/');
+            if (relativePath.Split('/').Any(segment => segment is ".."))
+            {
+                throw new UnauthorizedAccessException("Image paths must stay inside the open collection.");
+            }
+
+            fullPath = Path.GetFullPath(Path.Combine(collectionRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        }
+
+        if (!IsPathInsideDirectory(fullPath, collectionRoot))
+        {
+            throw new UnauthorizedAccessException("Image paths must stay inside the open collection.");
+        }
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The selected image file does not exist.", fullPath);
+        }
+
+        return fullPath;
+    }
+
+    private static bool IsPathInsideDirectory(string fullPath, string fullDirectory)
+    {
+        string normalizedPath = Path.GetFullPath(fullPath);
+        string normalizedDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(fullDirectory));
+        string directoryPrefix = $"{normalizedDirectory}{Path.DirectorySeparatorChar}";
+
+        return normalizedPath.StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeImageMaskRelPath(string path)
+    {
+        return path.Replace('\\', '/').Trim();
+    }
+
     private void EditorView_ContentChanged(object? sender, string content)
     {
         try
@@ -1314,24 +1491,6 @@ public partial class MainWindow : Window
             Path.GetExtension(filePath),
             ".pdf",
             StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
-    {
-    }
-
-    private void EditorView_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
-    {
-    }
-
-    private Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
-    {
-        return Task.CompletedTask;
-    }
-
-    private Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
-    {
-        return Task.CompletedTask;
     }
 
     private void NewFolderTreeItem_Click(object sender, RoutedEventArgs e)
