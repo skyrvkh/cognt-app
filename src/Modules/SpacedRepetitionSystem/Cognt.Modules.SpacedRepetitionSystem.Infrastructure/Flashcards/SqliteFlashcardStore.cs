@@ -1,9 +1,10 @@
+using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
-internal sealed partial class SqliteFlashcardStore
+internal sealed partial class SqliteFlashcardStore : IFlashcardNoteGenerationReader
 {
     internal IReadOnlyList<FlashcardDeckSummaryReadModel> LoadDeckSummaries(string collectionId)
     {
