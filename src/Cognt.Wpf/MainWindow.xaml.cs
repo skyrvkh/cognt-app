@@ -910,6 +910,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private static KnowledgeMentionTargetReadModel ToKnowledgeMentionTarget(MentionTarget target)
+    {
+        return new KnowledgeMentionTargetReadModel(target.RelativePath, target.Title);
+    }
+
     private static CardContext CreateImageMaskEditorContext(string imageBlockId, string imageRelPath)
     {
         string contextId = $"context_{Guid.CreateVersion7():N}";
@@ -1475,107 +1480,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SendMentionTargets()
-    {
-        try
-        {
-            EditorViewControl.PostMentionTargets(viewModel.ListMentionTargets());
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"Mention targets could not be refreshed: {ex.Message}",
-                "Mentions",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-    }
-
-    private ReviewView EnsureReviewView()
-    {
-        if (reviewView is null)
-        {
-            reviewView = new ReviewView();
-            reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
-            reviewView.RenderCardAsync = RenderReviewCardAsync;
-        }
-
-        return reviewView;
-    }
-
-    private async Task RenderReviewCardAsync(string markdown)
-    {
-        if (reviewView is null)
-        {
-            throw new InvalidOperationException("Review mode is not active.");
-        }
-
-        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, markdown);
-    }
-
-    private async Task ShowReviewOverlayAsync(ReviewView review)
-    {
-        ShowOverlay(review);
-        await review.StartReviewAsync();
-    }
-
-    private async Task CloseReviewIfActiveAsync()
-    {
-        if (reviewView is null)
-        {
-            return;
-        }
-
-        ReviewView view = reviewView;
-        reviewView = null;
-
-        if (ReferenceEquals(OverlayHost.Content, view))
-        {
-            OverlayHost.Content = null;
-        }
-
-        try
-        {
-            await EditorViewControl.RestoreNoteAfterCardPreviewAsync();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Shared editor restore after review failed: {ex}");
-            EditorViewControl.AttachBlockSuiteHostToEditor();
-        }
-
-        view.ExitReviewRequested -= ReviewView_ExitReviewRequested;
-        view.DisposeReview();
-    }
-
-    private Task CloseCreateCardEditorIfActiveAsync()
-    {
-        return EditorViewControl.IsShowingTransientEditor
-            ? EditorViewControl.RestoreNoteAfterTransientEditorAsync()
-            : Task.CompletedTask;
-    }
-
-    private void ShowOverlay(UIElement overlay)
-    {
-        EditorViewControl.DetachBlockSuiteHost();
-        EditorViewControl.Visibility = Visibility.Visible;
-        EditorViewControl.IsEnabled = true;
-        EditorViewControl.IsHitTestVisible = true;
-        OverlayHost.Content = overlay;
-        OverlayHost.Visibility = Visibility.Visible;
-        OverlayHost.IsHitTestVisible = true;
-    }
-
-    private void HideOverlay()
-    {
-        OverlayHost.Content = null;
-        OverlayHost.Visibility = Visibility.Collapsed;
-        OverlayHost.IsHitTestVisible = false;
-        EditorViewControl.Visibility = Visibility.Visible;
-        EditorViewControl.IsEnabled = true;
-        EditorViewControl.IsHitTestVisible = true;
-    }
-
     private async void QueueMentionTargetsRefresh()
     {
         int requestId = ++mentionTargetsRefreshRequestId;
@@ -1606,9 +1510,75 @@ public partial class MainWindow : Window
         }
     }
 
-    private static KnowledgeMentionTargetReadModel ToKnowledgeMentionTarget(MentionTarget target)
+    private ReviewView EnsureReviewView()
     {
-        return new KnowledgeMentionTargetReadModel(target.RelativePath, target.Title);
+        if (reviewView is null)
+        {
+            reviewView = new ReviewView();
+            reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
+            reviewView.RenderCardAsync = RenderReviewCardAsync;
+        }
+
+        return reviewView;
+    }
+
+    private async Task RenderReviewCardAsync(string content)
+    {
+        if (reviewView is null)
+        {
+            throw new InvalidOperationException("Review mode is not active.");
+        }
+
+        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, content);
+    }
+
+    private async Task ShowReviewOverlayAsync(ReviewView review)
+    {
+        ShowOverlay(review);
+        await review.StartReviewAsync();
+    }
+
+    private async Task CloseReviewIfActiveAsync()
+    {
+        if (reviewView is null)
+        {
+            return;
+        }
+
+        ReviewView view = reviewView;
+        reviewView = null;
+
+        overlayHostController.ClearIfContent(view);
+
+        try
+        {
+            await EditorViewControl.RestoreNoteAfterCardPreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Shared editor restore after review failed: {ex}");
+            EditorViewControl.AttachBlockSuiteHostToEditor();
+        }
+
+        view.ExitReviewRequested -= ReviewView_ExitReviewRequested;
+        view.DisposeReview();
+    }
+
+    private Task CloseCreateCardEditorIfActiveAsync()
+    {
+        return EditorViewControl.IsShowingTransientEditor
+            ? EditorViewControl.RestoreNoteAfterTransientEditorAsync()
+            : Task.CompletedTask;
+    }
+
+    private void ShowOverlay(UIElement overlay)
+    {
+        overlayHostController.Show(overlay);
+    }
+
+    private void HideOverlay()
+    {
+        overlayHostController.Hide();
     }
 
     private static bool IsPdfFilePath(string filePath)
@@ -1618,5 +1588,4 @@ public partial class MainWindow : Window
             ".pdf",
             StringComparison.OrdinalIgnoreCase);
     }
-
 }

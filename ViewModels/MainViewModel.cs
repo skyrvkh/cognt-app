@@ -12,8 +12,6 @@ using KnowledgeItemKind = Cognt.Modules.PersonalKnowledgeManagement.Application.
 
 namespace CogntApp.ViewModels;
 
-public sealed record NoteGroupResult(string TargetNotePath);
-
 public sealed class MainViewModel : ObservableObject, IDisposable
 {
     private readonly IKnowledgeCollectionPathResolver collectionPathResolver = new FileSystemKnowledgeCollectionPathResolver();
@@ -430,19 +428,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             RefreshNotesTree(preserveExpansion: true);
         }
 
-    }
-
-    public string CreateExtractFile(string? sourcePath, string selectedContent)
-    {
-        return CreateExtractNote(sourcePath, selectedContent, selectedContent);
-    }
-
-    public NoteGroupResult GroupNoteWithTarget(string droppedNotePath, string targetNotePath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(droppedNotePath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetNotePath);
-
-        return new NoteGroupResult(targetNotePath);
     }
 
     public string CreateExtractNote(string? sourcePath, string selectedContent, string selectedPlainText)
