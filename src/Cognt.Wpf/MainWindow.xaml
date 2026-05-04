@@ -257,7 +257,11 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="0,18,18,0"
-                            Panel.ZIndex="11" />
+                            Panel.ZIndex="11">
+                    <Button Content="Cards"
+                            Width="72"
+                            Height="30" />
+                </StackPanel>
             </Grid>
         </Grid>
 
@@ -386,6 +390,8 @@
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDecksCommand}" />
+                        <Button Content="Cards from note"
+                                Style="{StaticResource SidebarButtonStyle}" />
                         <Button Content="Browser"
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="BrowserButton_Click" />
