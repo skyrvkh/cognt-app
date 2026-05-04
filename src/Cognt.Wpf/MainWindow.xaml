@@ -260,7 +260,8 @@
                             Panel.ZIndex="11">
                     <Button Content="Cards"
                             Width="72"
-                            Height="30" />
+                            Height="30"
+                            Click="NoteCardsButton_Click" />
                 </StackPanel>
             </Grid>
         </Grid>
@@ -391,7 +392,8 @@
                                 Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDecksCommand}" />
                         <Button Content="Cards from note"
-                                Style="{StaticResource SidebarButtonStyle}" />
+                                Style="{StaticResource SidebarButtonStyle}"
+                                Click="NoteCardsButton_Click" />
                         <Button Content="Browser"
                                 Style="{StaticResource SidebarButtonStyle}"
                                 Click="BrowserButton_Click" />

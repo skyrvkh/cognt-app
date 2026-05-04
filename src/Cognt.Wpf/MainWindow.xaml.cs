@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Models.Decks;
 using CogntApp.Models.Markdown;
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
     private readonly AllNotesView allNotesView = new();
     private readonly BrowserPaneView browserPaneView = new();
     private readonly PdfReaderView pdfReaderView = new();
+    private readonly NoteCardQueueView noteCardQueueView = new();
     private readonly IImageMaskEditorDialogService imageMaskEditorDialogs = new ImageMaskEditorDialogService();
     private readonly Dictionary<string, CardContext> imageMaskContexts = new(StringComparer.OrdinalIgnoreCase);
     private bool isDesktopSidebarCollapsed;
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         allNotesView.DataContext = allNotesViewModel;
+        InitializeNoteCardQueueView();
         shellDialogs = new WindowShellDialogService(this);
         noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
         noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
@@ -124,6 +127,17 @@ public partial class MainWindow : Window
         decksView.PracticeRequested += DecksView_PracticeRequested;
         decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
         decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
+    }
+
+    private void InitializeNoteCardQueueView()
+    {
+        noteCardQueueView.DataContext = viewModel;
+    }
+
+    private void NoteCardsButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloseSidebarSheet();
+        ShowOverlay(noteCardQueueView);
     }
 
     protected override void OnClosed(EventArgs e)

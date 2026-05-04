@@ -62,6 +62,7 @@
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskPreviewControl.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskTargetOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\OpenImageMaskEditorRequest.cs" />
+    <Compile Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\IShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Dialogs\WindowShellDialogService.CollectionCreationPrompt.cs" />
@@ -95,6 +96,7 @@
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />
+    <Page Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskPreviewControl.xaml" />
     <Page Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportWindow.xaml" />
