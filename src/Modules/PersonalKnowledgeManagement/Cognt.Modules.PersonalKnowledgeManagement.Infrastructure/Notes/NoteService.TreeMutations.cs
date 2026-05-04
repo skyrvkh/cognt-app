@@ -6,7 +6,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    internal long CreateFolder(
+    public long CreateFolder(
         string collectionId,
         long? parentId,
         string title,
@@ -17,7 +17,7 @@ internal sealed partial class NoteService
         return repository.CreateFolder(parentId, title, previousSiblingId, nextSiblingId);
     }
 
-    internal void MoveItem(
+    public void MoveItem(
         string collectionId,
         long itemId,
         long? newParentId,
@@ -35,15 +35,17 @@ internal sealed partial class NoteService
         }
 
         repository.MoveItem(itemId, newParentId, previousSiblingId, nextSiblingId);
+        InvalidateNoteCatalogCache(GetExistingCollectionRoot(collectionId));
     }
 
-    internal void RenameItem(string collectionId, long itemId, string title)
+    public void RenameItem(string collectionId, long itemId, string title)
     {
         ITreeRepository repository = OpenTreeRepositoryForCollectionId(collectionId);
         repository.RenameItem(itemId, title);
+        InvalidateNoteCatalogCache(GetExistingCollectionRoot(collectionId));
     }
 
-    internal IReadOnlyList<string> DeleteItem(string collectionId, long itemId)
+    public IReadOnlyList<string> DeleteItem(string collectionId, long itemId)
     {
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
@@ -56,12 +58,18 @@ internal sealed partial class NoteService
             TryDeleteFile(notePath);
         }
 
+        DeleteCardContextDrafts(
+            root,
+            deletedNotePaths.Select(path => NormalizeRelativePath(Path.GetRelativePath(root, path))));
+
+        InvalidateNoteCatalogCache(root);
+
         return deletedNotePaths
             .Select(path => NormalizeRelativePath(Path.GetRelativePath(root, path)))
             .ToArray();
     }
 
-    internal void SaveNote(string collectionId, string relativePath, string content)
+    public void SaveNote(string collectionId, string relativePath, string content)
     {
         if (string.IsNullOrWhiteSpace(collectionId) || string.IsNullOrWhiteSpace(relativePath))
         {
@@ -71,5 +79,7 @@ internal sealed partial class NoteService
         string root = GetExistingCollectionRoot(collectionId);
         string notePath = ResolveExistingRelativeNotePathInRoot(root, relativePath);
         File.WriteAllText(notePath, content, Encoding.UTF8);
+        InvalidateNoteCatalogCache(root);
+        TryRefreshSavedNoteMentionIndex(notePath, content);
     }
 }
