@@ -1,142 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
-using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
-using CogntApp.Services;
 
 namespace CogntApp.Views;
 
-public partial class ReviewView : UserControl
+public partial class ReviewView
 {
     private const double HeaderHeight = 72;
 
-    private static readonly ReviewSampleCard[] SampleCards = FlashcardPracticeSampleContent.Create()
-        .Select(card => new ReviewSampleCard(card.FrontContent, card.BackContent))
-        .ToArray();
-
-    private int currentCardIndex;
-    private bool isAnswerVisible;
-    private bool isDisposed;
     private Size lastLayoutSize = Size.Empty;
-
-    public event EventHandler? ExitReviewRequested;
-
-    public Func<string, Task>? RenderCardAsync { get; set; }
-
-    public ContentControl CardRendererHostControl => CardRendererHost;
-
-    public ReviewView()
-    {
-        InitializeComponent();
-    }
-
-    private void ReviewView_Loaded(object sender, RoutedEventArgs e)
-    {
-        ApplyResponsiveLayout();
-    }
-
-    private void ReviewView_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        ApplyResponsiveLayout();
-    }
-
-    public async Task StartReviewAsync()
-    {
-        ThrowIfDisposed();
-        currentCardIndex = 0;
-        isAnswerVisible = false;
-        UpdateCardState();
-        await LoadCurrentCardAsync();
-    }
-
-    private async void RevealAnswer_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            await RevealAnswerAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"The card answer could not be shown: {ex.Message}",
-                "Review Renderer Not Ready",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-    }
-
-    private void ExitReview_Click(object sender, RoutedEventArgs e)
-    {
-        ExitReviewRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    private async void RatingButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            await MoveToNextCardAsync();
-        }
-        catch (Exception ex)
-        {
-            ShowReviewError("The review card could not be advanced", ex);
-        }
-    }
-
-    public void DisposeReview()
-    {
-        if (isDisposed)
-        {
-            return;
-        }
-
-        isDisposed = true;
-        RenderCardAsync = null;
-        CardRendererHost.Content = null;
-    }
-
-    private async Task RevealAnswerAsync()
-    {
-        if (isAnswerVisible)
-        {
-            return;
-        }
-
-        isAnswerVisible = true;
-        UpdateCardState();
-        await LoadCurrentCardAsync();
-    }
-
-    private async Task MoveToNextCardAsync()
-    {
-        currentCardIndex = (currentCardIndex + 1) % SampleCards.Length;
-        isAnswerVisible = false;
-        UpdateCardState();
-        await LoadCurrentCardAsync();
-    }
-
-    private Task LoadCurrentCardAsync()
-    {
-        ReviewSampleCard card = SampleCards[currentCardIndex];
-        return LoadCardAsync(isAnswerVisible ? card.BackContent : card.FrontContent);
-    }
-
-    private async Task LoadCardAsync(string content)
-    {
-        ThrowIfDisposed();
-
-        if (RenderCardAsync is null)
-        {
-            throw new InvalidOperationException("No shared BlockSuite renderer is attached.");
-        }
-
-        await RenderCardAsync(content);
-    }
-
-    private void UpdateCardState()
-    {
-        CardSideLabel.Text = isAnswerVisible ? "BACK" : "FRONT";
-        RevealPromptPanel.Visibility = isAnswerVisible ? Visibility.Collapsed : Visibility.Visible;
-        AnswerStatePanel.Visibility = isAnswerVisible ? Visibility.Visible : Visibility.Collapsed;
-    }
 
     private void ApplyResponsiveLayout()
     {
@@ -177,13 +48,18 @@ public partial class ReviewView : UserControl
                     ? new Thickness(20, 18, 20, 22)
                     : new Thickness(36, 26, 36, 30);
 
-        CardRendererHost.Margin = ultraNarrow
+        ReviewCardContentHost.Margin = ultraNarrow
             ? new Thickness(10, 4, 10, 0)
             : veryNarrow
                 ? new Thickness(18, 4, 18, 0)
                 : width < 1100
                     ? new Thickness(42, 4, 42, 0)
                     : new Thickness(84, 6, 84, 0);
+        ReviewCardText.FontSize = ultraNarrow ? 24 : veryNarrow ? 28 : compact ? 31 : 34;
+        ReviewCardText.LineHeight = ReviewCardText.FontSize * 1.28;
+        ReviewCardRichText.FontSize = ReviewCardText.FontSize;
+        ReviewCardImageContainer.MaxWidth = ultraNarrow ? 320 : veryNarrow ? 440 : width < 1180 ? 620 : 860;
+        ReviewCardImageContainer.MaxHeight = ultraNarrow ? 190 : shortViewport ? 220 : compact ? 260 : 320;
 
         RevealPromptMessage.MaxWidth = ultraNarrow
             ? Math.Max(220, width - 72)
@@ -194,6 +70,7 @@ public partial class ReviewView : UserControl
         RevealAnswerButton.MinWidth = ultraNarrow ? 0 : 180;
 
         ShortcutStrip.Visibility = ResponsiveLayout.VisibleWhen(!veryNarrow && !shortViewport);
+        StageGapAfterSummaryRow.Height = new GridLength(compact ? 8 : 12);
         StageGapBeforeShortcutsRow.Height = new GridLength(
             ShortcutStrip.Visibility == Visibility.Visible
                 ? compact
@@ -220,42 +97,22 @@ public partial class ReviewView : UserControl
 
         double visibleContentHeight = Math.Max(0, height - HeaderHeight);
         double verticalMargins = StageContainer.Margin.Top + StageContainer.Margin.Bottom;
+        double summaryHeight = QueueSummaryStrip.ActualHeight + StageGapAfterSummaryRow.Height.Value;
         double shortcutHeight = ShortcutStrip.Visibility == Visibility.Visible
             ? 40 + StageGapBeforeShortcutsRow.Height.Value
             : 0;
         double ratingRows = RatingsPanel.Columns == 1 ? 4 : RatingsPanel.Columns == 2 ? 2 : 1;
         double ratingHeight = ratingRows * (ratingButtonHeight + ratingMargin.Top + ratingMargin.Bottom);
         double gaps = StageGapBeforeRatingsRow.Height.Value;
-        double targetCardHeight = visibleContentHeight - verticalMargins - shortcutHeight - ratingHeight - gaps;
+        double targetCardHeight = visibleContentHeight - verticalMargins - summaryHeight - shortcutHeight - ratingHeight - gaps;
         double minCardHeight = ultraNarrow ? 280 : veryNarrow || shortViewport ? 320 : 400;
         double maxCardHeight = veryShortViewport ? 520 : height >= 980 ? 720 : 660;
 
-        CardFrame.Height = Clamp(targetCardHeight, minCardHeight, maxCardHeight);
+        CardContext.Height = Clamp(targetCardHeight, minCardHeight, maxCardHeight);
     }
 
     private static double Clamp(double value, double minimum, double maximum)
     {
         return Math.Min(Math.Max(value, minimum), maximum);
     }
-
-    private void ThrowIfDisposed()
-    {
-        if (isDisposed)
-        {
-            throw new ObjectDisposedException(nameof(ReviewView));
-        }
-    }
-
-    private static void ShowReviewError(string title, Exception ex)
-    {
-        MessageBox.Show(
-            $"{title}: {ex.Message}",
-            "Review",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
-    }
-
-    private sealed record ReviewSampleCard(
-        string FrontContent,
-        string BackContent);
 }
