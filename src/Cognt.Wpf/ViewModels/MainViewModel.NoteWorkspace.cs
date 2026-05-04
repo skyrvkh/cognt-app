@@ -161,6 +161,11 @@ public sealed partial class MainViewModel
         currentNoteItemId = null;
         currentNoteTitle = string.Empty;
         lastSavedContent = string.Empty;
+        ClearCurrentNoteToCardQueue();
         OnPropertyChanged(nameof(CurrentNotePath));
+    }
+
+    private void ClearCurrentNoteToCardQueue()
+    {
     }
 }

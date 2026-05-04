@@ -44,6 +44,7 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\PdfReaderView.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Features\NoteToCard\CardPresentationPresetOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorViewModel.cs" />
