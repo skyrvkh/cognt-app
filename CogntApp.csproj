@@ -43,6 +43,8 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.BridgeCallbacks.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\DecksView.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\PdfReaderView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\CardPresentationPresetOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Views\ReviewView.xaml.cs" />
@@ -102,6 +104,9 @@
     <Page Include="src\Cognt.Wpf\MainWindow.xaml" />
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\DecksViewResources.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\DecksView.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\ReviewView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml" />

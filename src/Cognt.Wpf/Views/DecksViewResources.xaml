@@ -14,8 +14,6 @@
         <SolidColorBrush x:Key="OrangeBrush" Color="#D97706" />
         <SolidColorBrush x:Key="RedBrush" Color="#DC2626" />
         <SolidColorBrush x:Key="GreenBrush" Color="#16A34A" />
-        <SolidColorBrush x:Key="PurpleBrush" Color="#9333EA" />
-
         <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#6675FF" Offset="0" />
             <GradientStop Color="#4254E8" Offset="1" />
@@ -90,11 +88,75 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}" />
+
         <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
             <Setter Property="Background" Value="{StaticResource PrimaryGradientBrush}" />
             <Setter Property="BorderBrush" Value="#6675FF" />
             <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="PracticeButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource PrimaryGradientBrush}" />
+            <Setter Property="BorderBrush" Value="#6675FF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF2FF" />
+                    <Setter Property="BorderBrush" Value="#4254E8" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentStrongBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentStrongBrush}" />
+                    <Setter Property="BorderBrush" Value="#3442C9" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource InkBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#EEF2F7" />
+                    <Setter Property="BorderBrush" Value="#D9E1EE" />
+                    <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PracticeCountBadgeStyle" TargetType="Border">
+            <Setter Property="Margin" Value="10,0,0,0" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="#4F5EEA" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Background" Value="#FFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPressed, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Background" Value="#6675FF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}" Value="False">
+                    <Setter Property="Background" Value="#E4E9F2" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PracticeCountTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource AccentStrongBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPressed, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}" Value="False">
+                    <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
@@ -289,11 +351,13 @@
         </Style>
 
         <Style x:Key="GridTextBlockStyle" TargetType="TextBlock" BasedOn="{StaticResource TableTextStyle}">
+            <Setter Property="Margin" Value="12,0" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
         <Style x:Key="GridCenterTextBlockStyle" TargetType="TextBlock" BasedOn="{StaticResource GridTextBlockStyle}">
             <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
         </Style>
 
         <Style x:Key="FlashcardsDataGridStyle" TargetType="DataGrid">
@@ -301,12 +365,12 @@
             <Setter Property="CanUserAddRows" Value="False" />
             <Setter Property="CanUserDeleteRows" Value="False" />
             <Setter Property="CanUserReorderColumns" Value="False" />
-            <Setter Property="CanUserResizeColumns" Value="False" />
+            <Setter Property="CanUserResizeColumns" Value="True" />
             <Setter Property="CanUserResizeRows" Value="False" />
             <Setter Property="ColumnWidth" Value="SizeToCells" />
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
             <Setter Property="HeadersVisibility" Value="Column" />
-            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource LineSoftBrush}" />
             <Setter Property="IsReadOnly" Value="True" />
             <Setter Property="MinColumnWidth" Value="34" />
@@ -328,7 +392,7 @@
                         <Setter Property="FontSize" Value="12" />
                         <Setter Property="FontWeight" Value="Normal" />
                         <Setter Property="Height" Value="40" />
-                        <Setter Property="Padding" Value="10,0" />
+                        <Setter Property="Padding" Value="12,0" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                     </Style>
                 </Setter.Value>
@@ -339,7 +403,7 @@
                         <Setter Property="Background" Value="Transparent" />
                         <Setter Property="BorderThickness" Value="0" />
                         <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-                        <Setter Property="Padding" Value="10,0" />
+                        <Setter Property="Padding" Value="0" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Style.Triggers>
                             <Trigger Property="IsSelected" Value="True">
@@ -353,7 +417,7 @@
             <Setter Property="RowStyle">
                 <Setter.Value>
                     <Style TargetType="DataGridRow">
-                        <Setter Property="Background" Value="{Binding RowBackground, FallbackValue=#FFFFFF}" />
+                        <Setter Property="Background" Value="{Binding RowBackgroundColor, FallbackValue=#FFFFFF}" />
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="#F8FAFF" />

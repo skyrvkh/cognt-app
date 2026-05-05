@@ -1,0 +1,239 @@
+<UserControl x:Class="CogntApp.Views.Decks.DecksSubview"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:subviews="clr-namespace:CogntApp.Views.Decks"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="860"
+             d:DesignWidth="1292"
+             HorizontalAlignment="Stretch"
+             Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}, FallbackValue=1292}"
+             MaxWidth="1292"
+             Loaded="DecksSubview_Loaded"
+             SizeChanged="DecksSubview_SizeChanged">
+    <Grid x:Name="LayoutRoot"
+          MaxWidth="1292"
+          HorizontalAlignment="Stretch"
+          Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="16,14,16,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="DecksToolbarSpacerRow" Height="0" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Decks"
+                                   Style="{StaticResource PanelTitleStyle}" />
+                        <Border Margin="10,0,0,0"
+                                Padding="7,2"
+                                CornerRadius="6"
+                                Background="#EEF2FF">
+                            <TextBlock Text="{Binding DeckCountSummary}"
+                                       Foreground="#344054"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </Border>
+                        <Border Margin="10,0,0,0"
+                                Padding="7,2"
+                                CornerRadius="6"
+                                Background="#F8FAFC"
+                                BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="1">
+                            <TextBlock Text="{Binding SelectedDeckSummary}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+
+                    <WrapPanel x:Name="DecksToolbarActionsPanel"
+                               Grid.Column="1"
+                               Orientation="Horizontal"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center">
+                        <Button Content="All"
+                                Width="66"
+                                Command="{Binding SelectAllDecksCommand}"
+                                Style="{StaticResource OutlineButtonStyle}" />
+                        <Button Content="Clear"
+                                Width="72"
+                                Margin="10,0,0,0"
+                                Command="{Binding ClearDeckSelectionCommand}"
+                                Style="{StaticResource OutlineButtonStyle}" />
+                        <Button Content="Statistics"
+                                Width="102"
+                                Margin="10,0,0,0"
+                                Command="{Binding ShowStatisticsCommand}"
+                                Style="{StaticResource OutlineButtonStyle}" />
+                        <Button Content="+ Add Card"
+                                Width="110"
+                                Margin="10,0,0,0"
+                                Command="{Binding AddCardCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}" />
+                    </WrapPanel>
+                </Grid>
+
+                <DataGrid Grid.Row="1"
+                          MinWidth="0"
+                          ItemsSource="{Binding DeckRows}"
+                          MinRowHeight="58"
+                          SelectionMode="Extended"
+                          SelectionUnit="FullRow"
+                          IsReadOnly="False"
+                          Style="{StaticResource FlashcardsDataGridStyle}">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="#FFFFFF" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Background" Value="#EEF2FF" />
+                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#F8FAFF" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="" Width="46">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Deck" Width="*" MinWidth="240" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="12,0"
+                                          VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Style="{StaticResource GridTextBlockStyle}"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="NoWrap" />
+                                        <Border Grid.Column="1"
+                                                Margin="10,0,0,0"
+                                                Padding="7,3"
+                                                CornerRadius="4"
+                                                BorderBrush="{Binding BadgeBorderColor}"
+                                                BorderThickness="1"
+                                                Background="{Binding BadgeBackgroundColor}">
+                                            <TextBlock Text="{Binding Category}"
+                                                       Foreground="{Binding BadgeForegroundColor}"
+                                                       Style="{StaticResource BadgeTextStyle}" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Learning" Width="76" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding LearningQueueCards}"
+                                               Foreground="{StaticResource BlueBrush}"
+                                               Style="{StaticResource GridCenterTextBlockStyle}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Due" Width="56" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DueCards}"
+                                               Foreground="{StaticResource RedBrush}"
+                                               Style="{StaticResource GridCenterTextBlockStyle}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Binding="{Binding TotalCards}"
+                                            Header="Total Cards"
+                                            Width="86"
+                                            IsReadOnly="True"
+                                            ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
+                        <DataGridTemplateColumn Header="Progress" Width="150" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ProgressLabel}"
+                                                   Style="{StaticResource TableTextStyle}"
+                                                   Width="42" />
+                                        <ProgressBar Width="92"
+                                                     Height="5"
+                                                     BorderThickness="0"
+                                                     Background="#D8DEEA"
+                                                     Foreground="{StaticResource AccentBrush}"
+                                                     Maximum="100"
+                                                     Value="{Binding Progress, Mode=OneWay}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="1"
+                        Margin="0,8,0,8"
+                        Padding="18"
+                        Background="#F8FAFF"
+                        BorderBrush="#DDE4EF"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Border.Style>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShouldShowNoDecksState}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Text="No decks yet"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="#142033" />
+                        <TextBlock Text="Create cards to add the first deck for this collection."
+                                   Margin="0,5,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="13"
+                                   Foreground="#667085" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Grid.Row="2"
+                           Text="{Binding DecksShowingSummary}"
+                           Margin="0,10,0,12"
+                           Style="{StaticResource MutedTextStyle}" />
+            </Grid>
+
+        <subviews:CardsSubview Grid.Row="1"
+                               DataContext="{Binding Cards}" />
+
+    </Grid>
+</UserControl>
