@@ -45,6 +45,9 @@
     <Compile Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\DecksView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\Decks\CardsSubview.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\Decks\CardPreviewViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\Decks\CardPreviewWindow.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\PdfReaderView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\CardPresentationPresetOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Views\ReviewView.xaml.cs" />
@@ -107,6 +110,8 @@
     <Page Include="src\Cognt.Wpf\Views\DecksViewResources.xaml" />
     <Page Include="src\Cognt.Wpf\Views\DecksView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\Decks\CardsSubview.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\Decks\CardPreviewWindow.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\ReviewView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml" />
