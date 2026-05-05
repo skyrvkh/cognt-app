@@ -9,6 +9,8 @@
              Background="#F7F9FC"
              Loaded="ReviewView_Loaded"
              SizeChanged="ReviewView_SizeChanged"
+             PreviewKeyDown="ReviewView_PreviewKeyDown"
+             Focusable="True"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
              TextOptions.TextFormattingMode="Display">
@@ -22,6 +24,7 @@
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -35,10 +38,14 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#3156D4" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#F8FAFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -118,8 +125,7 @@
             </Grid>
         </Border>
 
-        <ScrollViewer x:Name="ReviewContentScrollViewer"
-                      Grid.Row="1"
+        <ScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       CanContentScroll="False">
@@ -131,14 +137,55 @@
                       VerticalAlignment="Center">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="StageGapAfterSummaryRow" Height="12" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition x:Name="StageGapBeforeShortcutsRow" Height="14" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition x:Name="StageGapBeforeRatingsRow" Height="16" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Border x:Name="CardFrame"
+                    <Border x:Name="QueueSummaryStrip"
                             Grid.Row="0"
+                            HorizontalAlignment="Stretch"
+                            Padding="14,10"
+                            CornerRadius="8"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1"
+                            Background="#FFFFFF">
+                        <WrapPanel HorizontalAlignment="Center"
+                                   VerticalAlignment="Center">
+                            <TextBlock x:Name="QueueLearningText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueRelearningText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueOverdueText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueDueText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueNewText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueSuspendedText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueLimitedText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueTotalText"
+                                       Margin="8,0"
+                                       Foreground="{StaticResource InkBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </WrapPanel>
+                    </Border>
+
+                    <Border x:Name="CardContext"
+                            Grid.Row="2"
                             Height="660"
                             HorizontalAlignment="Stretch"
                             Background="#FFFFFF"
@@ -168,11 +215,55 @@
                                        FontSize="13"
                                        FontWeight="SemiBold" />
 
-                            <ContentControl x:Name="CardRendererHost"
-                                            Grid.Row="1"
-                                            Margin="84,6,84,0"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch" />
+                            <Grid x:Name="ReviewCardContentHost"
+                                  Grid.Row="1"
+                                  Margin="84,6,84,0">
+                                <TextBlock x:Name="ReviewCardText"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           MaxWidth="1180"
+                                           Foreground="{StaticResource InkBrush}"
+                                           FontSize="34"
+                                           FontWeight="SemiBold"
+                                           LineHeight="43"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap" />
+                                <StackPanel x:Name="ReviewCardMultimodalHost"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            MaxWidth="1180"
+                                            Visibility="Collapsed">
+                                    <RichTextBox x:Name="ReviewCardRichText"
+                                                 IsReadOnly="True"
+                                                 IsDocumentEnabled="False"
+                                                 Focusable="False"
+                                                 BorderThickness="0"
+                                                 Padding="0"
+                                                 Background="Transparent"
+                                                 HorizontalScrollBarVisibility="Disabled"
+                                                 VerticalScrollBarVisibility="Disabled"
+                                                 MinWidth="120"
+                                                 MaxWidth="1180" />
+                                    <Border x:Name="ReviewCardImageContainer"
+                                            Margin="0,22,0,0"
+                                            Padding="10"
+                                            Background="#F8FAFC"
+                                            BorderBrush="{StaticResource LineBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Visibility="Collapsed"
+                                            MaxWidth="860"
+                                            MaxHeight="320">
+                                        <Grid x:Name="ReviewCardImageHost"
+                                              SizeChanged="ReviewCardImageHost_SizeChanged">
+                                            <Image x:Name="ReviewCardImage"
+                                                   Stretch="Uniform" />
+                                            <Canvas x:Name="ReviewCardMaskCanvas"
+                                                    IsHitTestVisible="False" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
 
                             <Border Grid.Row="2"
                                     BorderBrush="{StaticResource LineSoftBrush}"
@@ -196,8 +287,7 @@
                                                            FontSize="14"
                                                            FontWeight="SemiBold" />
                                             </Border>
-                                            <TextBlock x:Name="RevealPromptText"
-                                                      Text="Think before revealing the answer"
+                                            <TextBlock Text="Think before revealing the answer"
                                                       Margin="10,0,0,0"
                                                       VerticalAlignment="Center"
                                                       Foreground="{StaticResource MutedBrush}"
@@ -210,9 +300,9 @@
                                                 MinWidth="180"
                                                 MaxWidth="320"
                                                 Height="50"
-                                                Click="RevealAnswer_Click"
+                                                Command="{Binding RevealAnswerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 Style="{StaticResource PrimaryButtonStyle}">
-                                            <TextBlock Text="Reveal Answer"
+                                            <TextBlock Text="Reveal (Space)"
                                                        HorizontalAlignment="Center" />
                                         </Button>
                                     </StackPanel>
@@ -234,13 +324,34 @@
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap" />
                                     </StackPanel>
+
+                                    <StackPanel x:Name="WaitingStatePanel"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Visibility="Collapsed">
+                                        <TextBlock x:Name="WaitingStateTitleText"
+                                                   Text="No cards are due right now"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource InkBrush}"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock x:Name="WaitingStateDetailText"
+                                                   Margin="0,6,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="14"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </Grid>
                     </Border>
 
                     <Border x:Name="ShortcutStrip"
-                            Grid.Row="2"
+                            Grid.Row="4"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Padding="18,0"
@@ -304,13 +415,12 @@
                     </Border>
 
                     <UniformGrid x:Name="RatingsPanel"
-                                 Grid.Row="4"
+                                 Grid.Row="6"
                                  Columns="4"
                                  HorizontalAlignment="Stretch"
                                  VerticalAlignment="Center">
                         <Button Margin="6"
-                                Click="RatingButton_Click"
-                                Tag="Again"
+                                Command="{Binding RateAgainCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Background="#FFF5F5"
                                 BorderBrush="#FCA5A5"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
@@ -330,7 +440,7 @@
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
-                                    <TextBlock Text="Again"
+                                    <TextBlock Text="Again (1)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
                                                Foreground="{StaticResource RedBrush}"
@@ -346,8 +456,7 @@
                         </Button>
 
                         <Button Margin="6"
-                                Click="RatingButton_Click"
-                                Tag="Hard"
+                                Command="{Binding RateHardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Background="#FFF8ED"
                                 BorderBrush="#FDBA74"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
@@ -367,7 +476,7 @@
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
-                                    <TextBlock Text="Hard"
+                                    <TextBlock Text="Hard (2)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
                                                Foreground="{StaticResource OrangeBrush}"
@@ -383,8 +492,7 @@
                         </Button>
 
                         <Button Margin="6"
-                                Click="RatingButton_Click"
-                                Tag="Good"
+                                Command="{Binding RateGoodCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Background="#F5F8FF"
                                 BorderBrush="#93B4FF"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
@@ -404,7 +512,7 @@
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
-                                    <TextBlock Text="Good"
+                                    <TextBlock Text="Good (3)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
                                                Foreground="{StaticResource BlueBrush}"
@@ -420,8 +528,7 @@
                         </Button>
 
                         <Button Margin="6"
-                                Click="RatingButton_Click"
-                                Tag="Easy"
+                                Command="{Binding RateEasyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Background="#F0FDF4"
                                 BorderBrush="#86EFAC"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
@@ -441,7 +548,7 @@
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
-                                    <TextBlock Text="Easy"
+                                    <TextBlock Text="Easy (4)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
                                                Foreground="{StaticResource GreenBrush}"
