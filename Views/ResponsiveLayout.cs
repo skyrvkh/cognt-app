@@ -10,6 +10,8 @@ internal static class ResponsiveLayout
     public static readonly GridLength Auto = GridLength.Auto;
     public static readonly GridLength OneStar = new(1, GridUnitType.Star);
     public static readonly Thickness NoMargin = new(0);
+    public static readonly Thickness ActionInlineMargin = new(12, 0, 0, 0);
+    public static readonly Thickness ActionWrappedMargin = new(0, 12, 0, 0);
 
     public static GridLength Pixel(double value)
     {
