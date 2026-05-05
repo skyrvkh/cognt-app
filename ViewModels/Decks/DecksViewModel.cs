@@ -11,7 +11,7 @@ public sealed class DecksViewModel : ObservableObject
     {
         Decks = new DecksSubviewViewModel();
         Cards = new CardsSubviewViewModel(ShowCreateCardReview);
-        CreateCardReview = new CreateCardReviewSubviewViewModel(() => SetActiveTab(FlashcardsTab.Cards));
+        CreateCardReview = new CreateCardReviewSubviewViewModel(() => SetActiveTab(FlashcardsTab.Cards), string.Empty);
         Statistics = new StatisticsSubviewViewModel();
 
         currentSubview = Decks;

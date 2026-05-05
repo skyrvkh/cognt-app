@@ -1,5 +1,5 @@
 using System.Windows.Controls;
-using CogntApp.Models.Decks;
+using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.Views.Decks;
 
 namespace CogntApp.Views;
@@ -8,9 +8,11 @@ public partial class DecksView : UserControl
 {
     public event EventHandler? PracticeRequested;
 
-    public event EventHandler<CreateCardEditorHostRequestedEventArgs>? CreateCardEditorHostRequested;
+    internal event EventHandler<CreateCardEditorHostRequestedEventArgs>? CreateCardEditorHostRequested;
 
-    public event EventHandler? CreateCardEditorReleased;
+    internal event EventHandler? CreateCardEditorReleased;
+
+    internal event EventHandler<CreateCardsRequestedEventArgs>? CreateCardsRequested;
 
     public DecksView()
     {
@@ -37,6 +39,16 @@ public partial class DecksView : UserControl
         if (sender is CreateCardReviewSubview)
         {
             CreateCardEditorReleased?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void CreateCardReviewSubview_CreateCardsRequested(
+        object sender,
+        CreateCardsRequestedEventArgs e)
+    {
+        if (sender is CreateCardReviewSubview)
+        {
+            CreateCardsRequested?.Invoke(this, e);
         }
     }
 }

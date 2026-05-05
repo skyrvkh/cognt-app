@@ -25,7 +25,8 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type deckViewModels:CreateCardReviewSubviewViewModel}">
             <subviews:CreateCardReviewSubview CardEditorHostRequested="CreateCardReviewSubview_CardEditorHostRequested"
-                                              CardEditorReleased="CreateCardReviewSubview_CardEditorReleased" />
+                                              CardEditorReleased="CreateCardReviewSubview_CardEditorReleased"
+                                              CreateCardsRequested="CreateCardReviewSubview_CreateCardsRequested" />
         </DataTemplate>
     </UserControl.Resources>
 

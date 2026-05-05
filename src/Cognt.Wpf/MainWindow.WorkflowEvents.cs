@@ -1,6 +1,6 @@
 using System.IO;
 using System.Windows;
-using CogntApp.Models.Decks;
+using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Editor;
