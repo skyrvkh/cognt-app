@@ -1,6 +1,5 @@
 using System.Windows.Controls;
 using CogntApp.Models.Decks;
-using CogntApp.ViewModels.Decks;
 using CogntApp.Views.Decks;
 
 namespace CogntApp.Views;
@@ -17,8 +16,6 @@ public partial class DecksView : UserControl
     {
         InitializeComponent();
     }
-
-    private DecksViewModel ViewModel => (DecksViewModel)DataContext;
 
     private void PracticeButton_Click(object sender, System.Windows.RoutedEventArgs e)
     {

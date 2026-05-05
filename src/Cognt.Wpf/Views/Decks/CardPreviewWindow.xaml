@@ -1,0 +1,58 @@
+<Window x:Class="CogntApp.Views.Decks.CardPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Card Preview"
+        Width="560"
+        Height="460"
+        MinWidth="420"
+        MinHeight="340"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Card Preview"
+                   Style="{StaticResource PanelTitleStyle}" />
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,16,0,0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <TextBlock Text="FRONT"
+                           Margin="0,0,0,8"
+                           Style="{StaticResource SmallMutedTextStyle}"
+                           FontWeight="SemiBold" />
+                <TextBox Text="{Binding FrontText}"
+                         MinHeight="110"
+                         Padding="14"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalContentAlignment="Center"
+                         Style="{StaticResource InputTextBoxStyle}" />
+
+                <TextBlock Text="BACK"
+                           Margin="0,16,0,8"
+                           Style="{StaticResource SmallMutedTextStyle}"
+                           FontWeight="SemiBold" />
+                <TextBox Text="{Binding BackText}"
+                         MinHeight="140"
+                         Padding="14"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalContentAlignment="Center"
+                         Style="{StaticResource InputTextBoxStyle}" />
+
+                <TextBlock Text="METADATA"
+                           Margin="0,18,0,8"
+                           Style="{StaticResource SmallMutedTextStyle}"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Metadata}"
+                           Style="{StaticResource MutedTextStyle}"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
