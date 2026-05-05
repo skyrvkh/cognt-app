@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Models.Decks;
@@ -1197,26 +1198,18 @@ public partial class MainWindow : Window
         {
             reviewView = new ReviewView();
             reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
-            reviewView.RenderCardAsync = RenderReviewCardAsync;
         }
 
         return reviewView;
     }
 
-    private async Task RenderReviewCardAsync(string content)
-    {
-        if (reviewView is null)
-        {
-            throw new InvalidOperationException("Review mode is not active.");
-        }
-
-        await EditorViewControl.RenderCardInHostAsync(reviewView.CardRendererHostControl, content);
-    }
-
-    private async Task ShowReviewOverlayAsync(ReviewView review)
+    private Task ShowReviewOverlayAsync(ReviewView review)
     {
         ShowOverlay(review);
-        await review.StartReviewAsync();
+        review.ShowWaitingState(
+            new FlashcardReviewQueueSummaryReadModel(0, 0, 0, 0, 0, 0, 0, 0, 0),
+            null);
+        return Task.CompletedTask;
     }
 
     private async Task CloseReviewIfActiveAsync()

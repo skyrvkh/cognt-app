@@ -45,6 +45,11 @@
     <Compile Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\PdfReaderView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\CardPresentationPresetOptionViewModel.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\ReviewView.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\ReviewView.Interaction.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\ReviewView.Layout.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\ReviewView.Multimodal.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\ReviewView.Presentation.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorDialogService.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorViewModel.cs" />
@@ -74,6 +79,8 @@
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Navigation\NoteTreeInteractionController.DragDrop.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\Overlay\OverlayHostController.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Review\ReviewOverlayCoordinator.cs" />
+    <Compile Include="src\Cognt.Wpf\Shell\Review\ReviewOverlayCoordinator.Queue.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportModels.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportQueueItem.cs" />
     <Compile Include="src\Cognt.Wpf\Shell\DocumentImport\DocumentImportViewModel.cs" />
@@ -96,6 +103,7 @@
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\ReviewView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskEditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\ImageOcclusion\ImageMaskPreviewControl.xaml" />
