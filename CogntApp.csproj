@@ -37,6 +37,7 @@
     <Compile Include="src\Cognt.Wpf\ViewModels\Decks\CreateCardReviewSubviewViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Decks\PresentationModels\CreateCardEditorHostRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Decks\PresentationModels\CreateCardsRequestedEventArgs.cs" />
+    <Compile Include="src\Cognt.Wpf\ViewModels\DashboardModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\NavigationModels.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Navigation\UserMessageRequestedEventArgs.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.cs" />
@@ -46,12 +47,14 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.BridgeCallbacks.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\DashboardView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\DecksView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\Decks\CardsSubview.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\ViewModels\Decks\CardPreviewViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Views\Decks\CardPreviewWindow.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\Decks\CreateCardReviewSubview.xaml.cs" />
+    <Compile Include="src\Cognt.Wpf\Views\Decks\StatisticsSubview.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Views\PdfReaderView.xaml.cs" />
     <Compile Include="src\Cognt.Wpf\Features\NoteToCard\CardPresentationPresetOptionViewModel.cs" />
     <Compile Include="src\Cognt.Wpf\Views\ReviewView.xaml.cs" />
@@ -111,12 +114,14 @@
     <Page Include="src\Cognt.Wpf\MainWindow.xaml" />
     <Page Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\BrowserPaneView.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\DashboardView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\DecksViewResources.xaml" />
     <Page Include="src\Cognt.Wpf\Views\DecksView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\Decks\DecksSubview.xaml" />
     <Page Include="src\Cognt.Wpf\Views\Decks\CardsSubview.xaml" />
     <Page Include="src\Cognt.Wpf\Views\Decks\CardPreviewWindow.xaml" />
     <Page Include="src\Cognt.Wpf\Views\Decks\CreateCardReviewSubview.xaml" />
+    <Page Include="src\Cognt.Wpf\Views\Decks\StatisticsSubview.xaml" />
     <Page Include="src\Cognt.Wpf\Views\PdfReaderView.xaml" />
     <Page Include="src\Cognt.Wpf\Views\ReviewView.xaml" />
     <Page Include="src\Cognt.Wpf\Features\NoteToCard\NoteCardQueueView.xaml" />
