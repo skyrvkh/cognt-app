@@ -22,7 +22,7 @@ internal sealed partial class SqliteFlashcardStore
                 continue;
             }
 
-            if (!TryLoadMaterializedCard(
+            if (!FlashcardCollectionStorage.TryLoadMaterializedCard(
                     root,
                     card.Id,
                     card.FrontRelPath,
@@ -41,31 +41,6 @@ internal sealed partial class SqliteFlashcardStore
         }
 
         return ReviewQueueCards.Create(reviewCards, staleCardIds);
-    }
-
-    private static bool TryLoadMaterializedCard(
-        string root,
-        long cardId,
-        string relPath,
-        List<long> staleCardIds,
-        out MaterializedFlashcardContent materialized)
-    {
-        try
-        {
-            string content = FlashcardCollectionStorage.ReadFlashcardFile(root, relPath);
-            materialized = FlashcardCardContentCodec.MaterializeSingleFile(content, root);
-            return true;
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-
-        staleCardIds.Add(cardId);
-        materialized = null!;
-        return false;
     }
 
     private static AppReadModels.FlashcardReviewCardReadModel ToReviewCardReadModel(

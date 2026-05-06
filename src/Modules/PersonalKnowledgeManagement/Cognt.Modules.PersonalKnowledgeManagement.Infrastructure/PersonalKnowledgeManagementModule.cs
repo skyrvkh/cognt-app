@@ -1,4 +1,5 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
@@ -29,7 +30,7 @@ public static class PersonalKnowledgeManagementModule
 
     private static IServiceCollection AddNoteServices(this IServiceCollection services)
     {
-        services.AddSingleton(_ => new NoteService());
+        services.AddSingleton<INoteService>(_ => new NoteService());
 
         return services;
     }
@@ -37,7 +38,7 @@ public static class PersonalKnowledgeManagementModule
     private static IServiceCollection AddSearchServices(this IServiceCollection services)
     {
         services.AddSingleton(provider =>
-            new GlobalSearchService(provider.GetRequiredService<NoteService>()));
+            new GlobalSearchService(provider.GetRequiredService<INoteService>()));
         services.AddSingleton<IGlobalSearchService>(provider =>
             provider.GetRequiredService<GlobalSearchService>());
 

@@ -1,13 +1,18 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
 internal sealed partial class SqliteFlashcardStore :
-    IFlashcardAuthoringWriter,
+    IFlashcardDeckReader,
+    IFlashcardDashboardReader,
+    IFlashcardReviewReader,
     IFlashcardNoteGenerationReader,
+    IFlashcardAuthoringWriter,
     IFlashcardReviewWriter
 {
     private readonly IFlashcardScheduler scheduler;
@@ -17,6 +22,65 @@ internal sealed partial class SqliteFlashcardStore :
         ArgumentNullException.ThrowIfNull(scheduler);
 
         this.scheduler = scheduler;
+    }
+
+    IReadOnlyList<FlashcardDeckSummaryReadModel> IFlashcardDeckReader.LoadDeckSummaries(string collectionId)
+    {
+        return LoadDeckSummaries(collectionId);
+    }
+
+    IReadOnlyList<FlashcardCardSummaryReadModel> IFlashcardDeckReader.LoadCardSummaries(
+        string collectionId,
+        long? deckId,
+        FlashcardCardsFilterKind filter,
+        string? sourceRelPath,
+        string? tag,
+        int limit)
+    {
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        var (todayStartUtc, tomorrowStartUtc) = GetLocalTodayUtcBounds(nowUtc);
+        IReadOnlyList<FlashcardCardSummaryRecord> cards = repository.LoadCardSummaries(
+            nowUtc,
+            todayStartUtc,
+            tomorrowStartUtc,
+            deckId,
+            filter,
+            sourceRelPath,
+            limit);
+        CardSummaries loadedSummaries = LoadMaterializedCardSummaries(collectionPath, cards, tag);
+
+        repository.MarkCardsDeleted(loadedSummaries.StaleCardIds);
+        return loadedSummaries.Summaries;
+    }
+
+    FlashcardDashboardSummaryReadModel IFlashcardDashboardReader.LoadDashboardSummary(
+        string collectionId,
+        IReadOnlyList<string>? deckNames)
+    {
+        return LoadDashboardSummary(collectionId, deckNames);
+    }
+
+    FlashcardProgressAnalyticsReadModel IFlashcardDashboardReader.LoadProgressAnalytics(
+        string collectionId,
+        DateOnly today,
+        IReadOnlyList<string>? deckNames)
+    {
+        return LoadProgressAnalytics(collectionId, today, deckNames);
+    }
+
+    Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels.FlashcardReviewSettingsReadModel IFlashcardReviewReader.LoadReviewSettings(
+        string collectionId)
+    {
+        return LoadReviewSettings(collectionId);
+    }
+
+    FlashcardReviewQueueReadModel IFlashcardReviewReader.LoadReviewQueue(
+        string collectionId)
+    {
+        return LoadReviewQueue(collectionId);
     }
 
     internal IReadOnlyList<FlashcardDeckSummaryReadModel> LoadDeckSummaries(string collectionId)

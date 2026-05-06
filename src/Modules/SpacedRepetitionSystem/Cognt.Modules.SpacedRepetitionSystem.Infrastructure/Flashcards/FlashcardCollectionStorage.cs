@@ -1,3 +1,4 @@
+using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
@@ -41,7 +42,9 @@ internal static partial class FlashcardCollectionStorage
 
     internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionPath(string collectionPath)
     {
-        return OpenRepositoryForCollectionPath(collectionPath);
+        SqliteFlashcardRepository repository = OpenRepositoryForCollectionPath(collectionPath);
+        PruneMissingActiveCardFiles(collectionPath, repository);
+        return repository;
     }
 
     internal static string CreateFlashcardRelPath()
@@ -63,4 +66,24 @@ internal static partial class FlashcardCollectionStorage
         return File.ReadAllText(fullPath);
     }
 
+    internal static bool TryLoadMaterializedCard(
+        string root,
+        long cardId,
+        string frontRelPath,
+        ICollection<long> staleCardIds,
+        out MaterializedFlashcardContent materialized)
+    {
+        try
+        {
+            materialized = LoadMaterializedContent(root, frontRelPath);
+            return true;
+        }
+        catch (IOException ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            materialized = null!;
+        }
+
+        staleCardIds.Add(cardId);
+        return false;
+    }
 }

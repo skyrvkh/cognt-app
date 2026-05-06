@@ -1,6 +1,6 @@
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
-using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
@@ -18,9 +18,9 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
     private const double MaximumRecencyBonusScore = 20;
     private const double RecencyBonusDecayDays = 7;
 
-    private readonly NoteService noteService;
+    private readonly INoteService noteService;
 
-    internal GlobalSearchService(NoteService noteService)
+    internal GlobalSearchService(INoteService noteService)
     {
         ArgumentNullException.ThrowIfNull(noteService);
 

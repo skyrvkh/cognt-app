@@ -7,7 +7,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
-internal sealed partial class NoteService : IDisposable
+internal sealed partial class NoteService : INoteService
 {
     private const string MetadataDatabaseFileName = "cognt.sqlite";
     private const string FilesDirectoryName = "collection";
@@ -62,14 +62,14 @@ internal sealed partial class NoteService : IDisposable
         return ResolveExistingCollectionRoot(collectionId);
     }
 
-    internal string ReadNoteFile(string collectionId, string relativePath)
+    public string ReadNoteFile(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string fullPath = ResolveExistingRelativeNotePathInRoot(root, relativePath);
         return File.ReadAllText(fullPath, Encoding.UTF8);
     }
 
-    internal KnowledgeOpenedNoteReadModel ReadNoteForOpen(string collectionId, string relativePath)
+    public KnowledgeOpenedNoteReadModel ReadNoteForOpen(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
@@ -85,11 +85,12 @@ internal sealed partial class NoteService : IDisposable
             note?.Id);
     }
 
-    internal void CloseCurrentCollection()
+    public void CloseCurrentCollection()
     {
         lock (repositoryLock)
         {
             ThrowIfDisposed();
+            InvalidateNoteCatalogCache();
             CloseTreeRepository();
         }
     }
