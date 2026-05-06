@@ -10,9 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace CogntApp;
 
-/// <summary>
-/// Interaction logic for App.xaml
-/// </summary>
 public partial class App : Application
 {
     private IServiceProvider? serviceProvider;
@@ -55,7 +52,7 @@ public partial class App : Application
 
     private static IServiceProvider CreateServiceProvider()
     {
-        ServiceCollection services = [];
+        ServiceCollection services = new();
         services
             .AddCogntModules()
             .AddCogntWpfShell();
@@ -118,6 +115,10 @@ public partial class App : Application
 
     private void ShowException(string title, string message, Exception exception)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(exception);
+
         Debug.WriteLine(exception);
 
         try
@@ -134,12 +135,15 @@ public partial class App : Application
         }
         catch
         {
-            // Do not let the exception reporting path cause another crash.
         }
     }
 
     private void ShowExceptionOnUiThread(string title, string message, Exception exception)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(exception);
+
         if (isShowingExceptionDialog)
         {
             return;

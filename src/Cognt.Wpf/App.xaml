@@ -1,11 +1,11 @@
-﻿<Application x:Class="CogntApp.App"
+<Application x:Class="CogntApp.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CogntApp">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="src/Cognt.Wpf/Views/DecksViewResources.xaml" />
+                <ResourceDictionary Source="Views/DecksViewResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
