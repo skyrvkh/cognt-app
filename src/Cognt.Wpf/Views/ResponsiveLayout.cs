@@ -10,16 +10,20 @@ internal static class ResponsiveLayout
     public static readonly GridLength Auto = GridLength.Auto;
     public static readonly GridLength OneStar = new(1, GridUnitType.Star);
     public static readonly Thickness NoMargin = new(0);
-    public static readonly Thickness ActionInlineMargin = new(12, 0, 0, 0);
     public static readonly Thickness ActionWrappedMargin = new(0, 12, 0, 0);
+    public static readonly Thickness ActionInlineMargin = new(12, 0, 0, 0);
 
     public static GridLength Pixel(double value)
     {
+        EnsureFiniteNonNegative(value, nameof(value));
+
         return new GridLength(value);
     }
 
     public static GridLength Star(double value)
     {
+        EnsureFiniteNonNegative(value, nameof(value));
+
         return new GridLength(value, GridUnitType.Star);
     }
 
@@ -68,6 +72,12 @@ internal static class ResponsiveLayout
         int columnSpan = 1,
         int rowSpan = 1)
     {
+        ArgumentNullException.ThrowIfNull(element);
+        EnsureNonNegative(row, nameof(row));
+        EnsureNonNegative(column, nameof(column));
+        EnsurePositive(columnSpan, nameof(columnSpan));
+        EnsurePositive(rowSpan, nameof(rowSpan));
+
         Grid.SetRow(element, row);
         Grid.SetColumn(element, column);
         Grid.SetColumnSpan(element, columnSpan);
@@ -82,6 +92,8 @@ internal static class ResponsiveLayout
         Thickness inlineMargin,
         int inlineColumn = 1)
     {
+        ArgumentNullException.ThrowIfNull(spacerRow);
+
         spacerRow.Height = shouldWrap ? Auto : Zero;
         ApplyWrappingRow(element, shouldWrap, wrappedMargin, inlineMargin, inlineColumn);
     }
@@ -93,6 +105,8 @@ internal static class ResponsiveLayout
         Thickness inlineMargin,
         int inlineColumn = 1)
     {
+        EnsureNonNegative(inlineColumn, nameof(inlineColumn));
+
         Place(
             element,
             shouldWrap ? 1 : 0,
@@ -108,5 +122,29 @@ internal static class ResponsiveLayout
     private static bool IsUsableSize(double value)
     {
         return value > 0 && !double.IsNaN(value) && !double.IsInfinity(value);
+    }
+
+    private static void EnsureFiniteNonNegative(double value, string paramName)
+    {
+        if (value < 0 || double.IsNaN(value) || double.IsInfinity(value))
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, "Grid length values must be finite and non-negative.");
+        }
+    }
+
+    private static void EnsureNonNegative(int value, string paramName)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, "Grid positions must be non-negative.");
+        }
+    }
+
+    private static void EnsurePositive(int value, string paramName)
+    {
+        if (value <= 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, "Grid spans must be positive.");
+        }
     }
 }
