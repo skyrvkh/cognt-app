@@ -1,0 +1,105 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <AssemblyName>CogntApp</AssemblyName>
+    <RootNamespace>CogntApp</RootNamespace>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <BaseOutputPath>..\..\bin\</BaseOutputPath>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="EditorHost\**\*.cs" />
+    <Compile Remove="bin\**\*.cs" />
+    <Compile Remove="obj\**\*.cs" />
+    <Compile Remove="ViewModels\MainViewModel.Documents.cs" />
+    <Page Remove="EditorHost\**\*.xaml" />
+    <Page Remove="bin\**\*.xaml" />
+    <Page Remove="obj\**\*.xaml" />
+    <ApplicationDefinition Remove="EditorHost\**\*.xaml" />
+    <ApplicationDefinition Remove="bin\**\*.xaml" />
+    <ApplicationDefinition Remove="obj\**\*.xaml" />
+    <Resource Remove="EditorHost\**\*" />
+    <Resource Remove="bin\**\*" />
+    <Resource Remove="obj\**\*" />
+    <Content Remove="EditorHost\**\*" />
+    <Content Remove="bin\**\*" />
+    <Content Remove="obj\**\*" />
+    <None Remove="EditorHost\**\*" />
+    <None Remove="bin\**\*" />
+    <None Remove="obj\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\icon.ico" />
+    <None Remove="Assets\icon.png" />
+    <Page Remove="App.xaml" />
+    <ApplicationDefinition Include="App.xaml" />
+    <Resource Include="Assets\icon.ico" />
+    <Resource Include="Assets\icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cognt.Composition\Cognt.Composition.csproj" />
+    <ProjectReference Include="EditorHost\Cognt.Wpf.EditorHost.csproj" />
+    <ProjectReference Include="..\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Application\Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
+    <ProjectReference Include="..\Modules\ProgressTrackingAndAnalytics\Cognt.Modules.ProgressTrackingAndAnalytics.Application\Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
+    <ProjectReference Include="..\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Application\Cognt.Modules.SpacedRepetitionSystem.Application.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyEditorHostWebOutput"
+          AfterTargets="Build"
+          Condition="Exists('$(MSBuildProjectDirectory)\EditorHost\obj\EditorWebBuild\dist\assets\blazor-blocksuite.js')">
+    <ItemGroup>
+      <EditorHostStaticOutput Include="$(MSBuildProjectDirectory)\EditorHost\wwwroot\**\*" />
+      <EditorHostWebOutput Include="$(MSBuildProjectDirectory)\EditorHost\obj\EditorWebBuild\dist\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)wwwroot\editorweb"
+               Condition="Exists('$(TargetDir)wwwroot\editorweb')" />
+    <Copy SourceFiles="@(EditorHostStaticOutput)"
+          DestinationFiles="@(EditorHostStaticOutput->'$(TargetDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(EditorHostWebOutput)"
+          DestinationFiles="@(EditorHostWebOutput->'$(TargetDir)wwwroot\editorweb\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyEditorHostWebOutputToPublish"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != '' And Exists('$(MSBuildProjectDirectory)\EditorHost\obj\EditorWebBuild\dist\assets\blazor-blocksuite.js')">
+    <ItemGroup>
+      <EditorHostStaticPublishOutput Include="$(MSBuildProjectDirectory)\EditorHost\wwwroot\**\*" />
+      <EditorHostWebPublishOutput Include="$(MSBuildProjectDirectory)\EditorHost\obj\EditorWebBuild\dist\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(PublishDir)wwwroot\editorweb"
+               Condition="Exists('$(PublishDir)wwwroot\editorweb')" />
+    <Copy SourceFiles="@(EditorHostStaticPublishOutput)"
+          DestinationFiles="@(EditorHostStaticPublishOutput->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(EditorHostWebPublishOutput)"
+          DestinationFiles="@(EditorHostWebPublishOutput->'$(PublishDir)wwwroot\editorweb\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="RemoveStaticWebAssetsRuntimeManifests"
+          AfterTargets="Build;Publish">
+    <ItemGroup>
+      <StaticWebAssetsRuntimeManifest Include="$(TargetDir)*.staticwebassets.runtime.json" />
+      <StaticWebAssetsRuntimeManifest Include="$(PublishDir)*.staticwebassets.runtime.json"
+                                      Condition="'$(PublishDir)' != ''" />
+    </ItemGroup>
+    <Delete Files="@(StaticWebAssetsRuntimeManifest)" />
+  </Target>
+
+</Project>
