@@ -1,9 +1,12 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Cognt.Composition;
+using CogntApp.DependencyInjection;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CogntApp;
 
@@ -12,19 +15,20 @@ namespace CogntApp;
 /// </summary>
 public partial class App : Application
 {
+    private IServiceProvider? serviceProvider;
     private bool isShowingExceptionDialog;
-    private IDisposable? moduleComposition;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        Directory.SetCurrentDirectory(AppContext.BaseDirectory);
         RegisterExceptionHandlers();
         LiveCharts.Configure(settings => settings.UseDefaults());
+        serviceProvider = CreateServiceProvider();
         base.OnStartup(e);
 
         try
         {
-            MainWindow = new MainWindow();
-            moduleComposition = CogntModuleComposition.BuildModuleScope();
+            MainWindow = serviceProvider.GetRequiredService<MainWindow>();
             MainWindow.Show();
         }
         catch (Exception ex)
@@ -39,8 +43,28 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        moduleComposition?.Dispose();
+        UnregisterExceptionHandlers();
+
+        if (serviceProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+
         base.OnExit(e);
+    }
+
+    private static IServiceProvider CreateServiceProvider()
+    {
+        ServiceCollection services = [];
+        services
+            .AddCogntModules()
+            .AddCogntWpfShell();
+
+        return services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true,
+        });
     }
 
     private void RegisterExceptionHandlers()
@@ -48,6 +72,13 @@ public partial class App : Application
         DispatcherUnhandledException += App_DispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
         TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+    }
+
+    private void UnregisterExceptionHandlers()
+    {
+        DispatcherUnhandledException -= App_DispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
+        TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
     }
 
     private void App_DispatcherUnhandledException(

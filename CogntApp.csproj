@@ -43,6 +43,7 @@
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\BlockSuiteHostBridge.Events.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Services\IBlockSuiteHostClient.cs" />
+    <Compile Include="src\Cognt.Wpf\DependencyInjection\WpfServiceCollectionExtensions.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.razor.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Components\BlockSuiteHost.BridgeCallbacks.cs" />
     <Compile Include="src\Cognt.Wpf\EditorHost\Views\EditorView.xaml.cs" />
@@ -141,6 +142,7 @@
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.70" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
