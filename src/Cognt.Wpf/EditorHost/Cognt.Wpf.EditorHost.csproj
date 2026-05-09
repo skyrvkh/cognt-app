@@ -7,25 +7,13 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Cognt.Wpf.EditorHost</RootNamespace>
     <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
+    <EditorWebBuildDirectory>$(MSBuildProjectDirectory)\obj\EditorWebBuild</EditorWebBuildDirectory>
+    <EditorWebNodeModulesDirectory>$(MSBuildProjectDirectory)\..\..\..\.npm-cache\editorweb-node_modules</EditorWebNodeModulesDirectory>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Components\**\*.cs" />
-    <Compile Remove="Services\**\*.cs" />
-    <Compile Remove="Views\**\*.cs" />
-    <Content Remove="Components\**\*.razor" />
-    <Page Remove="Views\**\*.xaml" />
-    <ApplicationDefinition Remove="Views\**\*.xaml" />
-    <None Remove="Components\**\*.razor" />
-    <RazorComponent Remove="Components\**\*.razor" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.70" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,9 +21,85 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\..\Models\Markdown\NoteModels.cs" Link="Models\Markdown\NoteModels.cs" />
+    <Compile Include="..\..\..\Models\Editor\SaveClozeRequestedEventArgs.cs" Link="Models\Editor\SaveClozeRequestedEventArgs.cs" />
+    <Compile Include="..\..\..\Services\BlazorHybridServices.cs" Link="Services\BlazorHybridServices.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Update="wwwroot\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="$(NuGetPackageRoot)microsoft.aspnetcore.components.webview\10.0.0\staticwebassets\**\*">
+      <Link>wwwroot\_framework\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <EditorWebSource Include="EditorWeb\package.json">
+      <EditorWebRelativePath>package.json</EditorWebRelativePath>
+    </EditorWebSource>
+    <EditorWebSource Include="EditorWeb\tsconfig.json">
+      <EditorWebRelativePath>tsconfig.json</EditorWebRelativePath>
+    </EditorWebSource>
+    <EditorWebSource Include="EditorWeb\vite.config.js">
+      <EditorWebRelativePath>vite.config.js</EditorWebRelativePath>
+    </EditorWebSource>
+    <EditorWebSource Include="EditorWeb\build.mjs">
+      <EditorWebRelativePath>build.mjs</EditorWebRelativePath>
+    </EditorWebSource>
+    <EditorWebSource Include="EditorWeb\src\**\*">
+      <EditorWebRelativePath>src\%(RecursiveDir)%(Filename)%(Extension)</EditorWebRelativePath>
+    </EditorWebSource>
+  </ItemGroup>
+
+  <Target Name="PrepareEditorWebBuild"
+          Condition="Exists('$(EditorWebDirectory)\package.json')">
+    <RemoveDir Directories="$(EditorWebBuildDirectory)\src"
+               Condition="Exists('$(EditorWebBuildDirectory)\src')" />
+    <Delete Files="$(EditorWebBuildDirectory)\package.json;$(EditorWebBuildDirectory)\tsconfig.json;$(EditorWebBuildDirectory)\vite.config.js;$(EditorWebBuildDirectory)\build.mjs;$(EditorWebBuildDirectory)\.prepared" />
+    <MakeDir Directories="$(EditorWebBuildDirectory)" />
+    <Copy SourceFiles="@(EditorWebSource)"
+          DestinationFiles="@(EditorWebSource->'$(EditorWebBuildDirectory)\%(EditorWebRelativePath)')" />
+    <WriteLinesToFile File="$(EditorWebBuildDirectory)\.prepared"
+                      Lines="prepared"
+                      Overwrite="true" />
+  </Target>
+
+  <Target Name="EnsureEditorWebNodeModules"
+          DependsOnTargets="PrepareEditorWebBuild"
+          Condition="Exists('$(EditorWebDirectory)\package.json')">
+    <Exec Condition="Exists('$(EditorWebNodeModulesDirectory)') and !Exists('$(EditorWebBuildDirectory)\node_modules')"
+          Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;Copy-Item -LiteralPath '$(EditorWebNodeModulesDirectory)' -Destination '$(EditorWebBuildDirectory)\node_modules' -Recurse -Force&quot;" />
+    <Exec Condition="!Exists('$(EditorWebNodeModulesDirectory)') and !Exists('$(EditorWebBuildDirectory)\node_modules')"
+          WorkingDirectory="$(EditorWebBuildDirectory)"
+          Command="npm install" />
+    <Error Condition="!Exists('$(EditorWebBuildDirectory)\node_modules')"
+           Text="EditorWeb dependencies were not found at $(EditorWebNodeModulesDirectory), and npm install did not create $(EditorWebBuildDirectory)\node_modules." />
+  </Target>
+
+  <Target Name="BuildEditorWeb"
+          BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="EnsureEditorWebNodeModules"
+          Inputs="@(EditorWebSource)"
+          Outputs="$(EditorWebBuildDirectory)\dist\assets\blazor-blocksuite.js"
+          Condition="Exists('$(EditorWebDirectory)\package.json')">
+    <Exec WorkingDirectory="$(EditorWebBuildDirectory)" Command="npm run build" />
+  </Target>
+
+  <Target Name="CopyEditorWebOutput"
+          AfterTargets="Build"
+          DependsOnTargets="BuildEditorWeb"
+          Condition="Exists('$(EditorWebBuildDirectory)\dist\assets\blazor-blocksuite.js')">
+    <ItemGroup>
+      <EditorWebOutput Include="$(EditorWebBuildDirectory)\dist\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)wwwroot\editorweb"
+               Condition="Exists('$(TargetDir)wwwroot\editorweb')" />
+    <Copy SourceFiles="@(EditorWebOutput)"
+          DestinationFiles="@(EditorWebOutput->'$(TargetDir)wwwroot\editorweb\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
