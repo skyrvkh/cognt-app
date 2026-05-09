@@ -4,12 +4,15 @@ namespace CogntApp.Shell.DocumentImport;
 
 public enum DocumentImportType
 {
+    Docx,
+    Pdf,
     Markdown
 }
 
 public enum DocumentImportMode
 {
-    ConvertToNativeDocument
+    ConvertToNativeDocument,
+    ImportAsPdf
 }
 
 public enum DocumentImportStatus
@@ -24,7 +27,7 @@ internal sealed record DocumentImportOptions(bool OpenImportedDocumentAfterImpor
 
 internal static class DocumentImportPolicy
 {
-    private static readonly string[] SupportedExtensions = [".md", ".markdown"];
+    private static readonly string[] SupportedExtensions = [".docx", ".pdf", ".md", ".markdown"];
 
     internal static bool IsSupportedPath(string path)
     {
@@ -35,25 +38,41 @@ internal static class DocumentImportPolicy
     {
         return Path.GetExtension(path).ToLowerInvariant() switch
         {
+            ".docx" => DocumentImportType.Docx,
+            ".pdf" => DocumentImportType.Pdf,
             ".md" or ".markdown" => DocumentImportType.Markdown,
             string extension => throw new InvalidOperationException(
-                $"Unsupported file type \"{extension}\". Add a Markdown file.")
+                $"Unsupported file type \"{extension}\". Add a DOCX, PDF, or Markdown file.")
         };
     }
 
     internal static DocumentImportMode GetImportMode(DocumentImportType type)
     {
-        return DocumentImportMode.ConvertToNativeDocument;
+        return type switch
+        {
+            DocumentImportType.Pdf => DocumentImportMode.ImportAsPdf,
+            _ => DocumentImportMode.ConvertToNativeDocument
+        };
     }
 
     internal static string GetTypeLabel(DocumentImportType type)
     {
-        return "MD";
+        return type switch
+        {
+            DocumentImportType.Docx => "DOCX",
+            DocumentImportType.Pdf => "PDF",
+            DocumentImportType.Markdown => "MD",
+            _ => "FILE"
+        };
     }
 
     internal static string GetModeLabel(DocumentImportMode mode)
     {
-        return "Convert to native document";
+        return mode switch
+        {
+            DocumentImportMode.ImportAsPdf => "Import as PDF",
+            _ => "Convert to native document"
+        };
     }
 
     internal static string FormatFileSize(long bytes)

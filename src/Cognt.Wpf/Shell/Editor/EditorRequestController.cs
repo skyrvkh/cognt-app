@@ -1,40 +1,29 @@
 using CogntApp.Shell.Dialogs;
-using CogntApp.Models.Navigation;
+using CogntApp.ViewModels;
+using CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.Shell.Editor;
 
 internal sealed class EditorRequestController
 {
-    private readonly Func<Task> showEmptyEditorViewAsync;
-    private readonly Func<string, bool, Task> openNoteAsync;
-    private readonly Action queueMentionTargetsRefresh;
-    private readonly Action<string> updateCurrentNoteTitle;
+    private readonly EditorWorkflowCoordinator editorWorkflow;
     private readonly IShellDialogService dialogs;
 
     internal EditorRequestController(
-        Func<Task> showEmptyEditorViewAsync,
-        Func<string, bool, Task> openNoteAsync,
-        Action queueMentionTargetsRefresh,
-        Action<string> updateCurrentNoteTitle,
+        EditorWorkflowCoordinator editorWorkflow,
         IShellDialogService dialogs)
     {
-        ArgumentNullException.ThrowIfNull(showEmptyEditorViewAsync);
-        ArgumentNullException.ThrowIfNull(openNoteAsync);
-        ArgumentNullException.ThrowIfNull(queueMentionTargetsRefresh);
-        ArgumentNullException.ThrowIfNull(updateCurrentNoteTitle);
+        ArgumentNullException.ThrowIfNull(editorWorkflow);
         ArgumentNullException.ThrowIfNull(dialogs);
 
-        this.showEmptyEditorViewAsync = showEmptyEditorViewAsync;
-        this.openNoteAsync = openNoteAsync;
-        this.queueMentionTargetsRefresh = queueMentionTargetsRefresh;
-        this.updateCurrentNoteTitle = updateCurrentNoteTitle;
+        this.editorWorkflow = editorWorkflow;
         this.dialogs = dialogs;
     }
 
     internal async Task HandleClearEditorRequestedAsync()
     {
         await EditorShellOperationGuard.RunWithWarningAsync(
-            showEmptyEditorViewAsync,
+            editorWorkflow.ShowEmptyEditorViewAsync,
             dialogs,
             "Editor Not Ready",
             "The editor could not be cleared");
@@ -45,7 +34,7 @@ internal sealed class EditorRequestController
         ArgumentNullException.ThrowIfNull(e);
 
         await EditorShellOperationGuard.RunWithWarningAsync(
-            () => openNoteAsync(e.NotePath, e.SelectInTree),
+            () => editorWorkflow.OpenNoteAsync(e.NotePath, e.SelectInTree),
             dialogs,
             "Open Note Failed",
             "The note could not be opened");
@@ -53,7 +42,8 @@ internal sealed class EditorRequestController
 
     internal void HandleMentionTargetsChanged()
     {
-        queueMentionTargetsRefresh();
+        editorWorkflow.QueueMentionTargetsRefresh();
+        editorWorkflow.RefreshDocumentLinksFromCurrentContent();
     }
 
     internal void HandleUserMessageRequested(UserMessageRequestedEventArgs e)
@@ -64,6 +54,15 @@ internal sealed class EditorRequestController
 
     internal void HandleCurrentNoteTitleChanged(string title)
     {
-        updateCurrentNoteTitle(title);
+        editorWorkflow.UpdateCurrentNoteTitle(title);
+    }
+
+    internal async Task HandleEditorReadOnlyChangedAsync(bool isReadOnly)
+    {
+        await EditorShellOperationGuard.RunWithWarningAsync(
+            () => editorWorkflow.SetReadOnlyAsync(isReadOnly),
+            dialogs,
+            "Editor Mode",
+            "The editor mode could not be changed");
     }
 }

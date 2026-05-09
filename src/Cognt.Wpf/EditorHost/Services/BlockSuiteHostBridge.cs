@@ -1,5 +1,5 @@
-using CogntApp.Models.Markdown;
-using CogntApp.Services;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Wpf.EditorHost.Models.Editor;
 
 namespace Cognt.Wpf.EditorHost.Services;
 
@@ -9,6 +9,10 @@ public sealed partial class BlockSuiteHostBridge
 
     private readonly TaskCompletionSource readyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IBlockSuiteHostClient? host;
+
+    internal BlockSuiteHostBridge()
+    {
+    }
 
     internal void Register(IBlockSuiteHostClient blockSuiteHost)
     {
@@ -32,65 +36,85 @@ public sealed partial class BlockSuiteHostBridge
         }
     }
 
-    public Task WaitUntilReadyAsync()
+    internal Task WaitUntilReadyAsync()
     {
         return readyCompletion.Task;
     }
 
-    public async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
+    internal async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.LoadNoteAsync(path, title, content, collectionRoot);
     }
 
-    public async Task LoadCardAsync(string content)
-    {
-        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
-        await blockSuiteHost.LoadCardAsync(content);
-    }
-
-    public async Task BeginCardRenderAsync()
-    {
-        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
-        await blockSuiteHost.BeginCardRenderAsync();
-    }
-
-    public async Task ActivateEditorAsync()
+    internal async Task ActivateEditorAsync()
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ActivateEditorAsync();
     }
 
-    public async Task FocusEditorAsync()
+    internal async Task SetReadOnlyModeAsync(bool isReadOnly)
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        await blockSuiteHost.SetReadOnlyModeAsync(isReadOnly);
+    }
+
+    internal async Task FocusEditorAsync()
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.FocusEditorAsync();
     }
 
-    public async Task ShowSaveResultAsync(bool ok, string? error = null)
+    internal async Task CreateClozeFromSelectionAsync(
+        string? cardContextId = null,
+        string? slotId = null,
+        int? displayClozeIndex = null)
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        await blockSuiteHost.CreateClozeFromSelectionAsync(cardContextId, slotId, displayClozeIndex);
+    }
+
+    internal async Task<SelectedImageBlockReadModel?> GetSelectedImageBlockAsync()
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        return await blockSuiteHost.GetSelectedImageBlockAsync();
+    }
+
+    internal async Task<SelectedCardContextBlocksReadModel?> GetSelectedCardContextBlocksAsync()
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        return await blockSuiteHost.GetSelectedCardContextBlocksAsync();
+    }
+
+    internal async Task ShowSaveResultAsync(bool ok, string? error = null)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ShowSaveResultAsync(ok, error);
     }
 
-    public async Task ShowExtractResultAsync(bool ok, string? createdPath = null, string? error = null)
+    internal async Task ShowExtractResultAsync(bool ok, string? createdPath = null, string? error = null)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.ShowExtractResultAsync(ok, createdPath, error);
     }
 
-    public async Task SetMentionTargetsAsync(IEnumerable<MentionTarget> targets)
+    internal async Task SetMentionTargetsAsync(IEnumerable<KnowledgeMentionTargetReadModel> targets)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.SetMentionTargetsAsync(targets);
     }
 
-    public async Task HandleMentionPreviewResultAsync(
+    internal async Task SetDocumentLinksAsync(KnowledgeDocumentLinksReadModel links)
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        await blockSuiteHost.SetDocumentLinksAsync(links);
+    }
+
+    internal async Task HandleMentionPreviewResultAsync(
         string requestId,
         string relativePath,
         string mode,
         bool ok,
-        string? title = null,
         string? documentContent = null,
         string? error = null)
     {
@@ -100,12 +124,11 @@ public sealed partial class BlockSuiteHostBridge
             relativePath,
             mode,
             ok,
-            title,
             documentContent,
             error);
     }
 
-    public async Task HandleMentionOpenResultAsync(bool ok, string? error = null)
+    internal async Task HandleMentionOpenResultAsync(bool ok, string? error = null)
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.HandleMentionOpenResultAsync(ok, error);
@@ -116,6 +139,4 @@ public sealed partial class BlockSuiteHostBridge
         await WaitUntilReadyAsync();
         return host ?? throw new InvalidOperationException("The BlockSuite host is not ready.");
     }
-
 }
-

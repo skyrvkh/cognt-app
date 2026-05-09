@@ -1,10 +1,10 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 
-namespace CogntApp.Models.Navigation;
+namespace CogntApp.ViewModels.Navigation;
 
-public sealed class PreparedNote
+internal sealed class PreparedNote
 {
-    public PreparedNote(
+    internal PreparedNote(
         string notePath,
         string title,
         string content,
@@ -20,18 +20,18 @@ public sealed class PreparedNote
         ItemId = itemId;
     }
 
-    public string NotePath { get; }
+    internal string NotePath { get; }
 
-    public string Title { get; }
+    internal string Title { get; }
 
-    public string Content { get; }
+    internal string Content { get; }
 
-    public long? ItemId { get; }
+    internal long? ItemId { get; }
 }
 
-public sealed class OpenNoteRequestedEventArgs
+internal sealed class OpenNoteRequestedEventArgs
 {
-    public OpenNoteRequestedEventArgs(string notePath, bool SelectInTree)
+    internal OpenNoteRequestedEventArgs(string notePath, bool SelectInTree)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(notePath);
 
@@ -39,46 +39,46 @@ public sealed class OpenNoteRequestedEventArgs
         this.SelectInTree = SelectInTree;
     }
 
-    public string NotePath { get; }
+    internal string NotePath { get; }
 
-    public bool SelectInTree { get; }
+    internal bool SelectInTree { get; }
 }
 
-public sealed class OpenPdfRequestedEventArgs
+internal sealed class OpenPdfRequestedEventArgs
 {
-    public OpenPdfRequestedEventArgs(KnowledgePdfDocumentReadModel document)
+    internal OpenPdfRequestedEventArgs(KnowledgePdfDocumentReadModel document)
     {
         ArgumentNullException.ThrowIfNull(document);
 
         Document = document;
     }
 
-    public KnowledgePdfDocumentReadModel Document { get; }
+    internal KnowledgePdfDocumentReadModel Document { get; }
 }
 
-public sealed class OverlayRequestedEventArgs
+internal sealed class OverlayRequestedEventArgs
 {
-    public OverlayRequestedEventArgs(OverlayViewKind viewKind)
+    internal OverlayRequestedEventArgs(OverlayViewKind viewKind)
     {
         ViewKind = viewKind;
     }
 
-    public OverlayViewKind ViewKind { get; }
+    internal OverlayViewKind ViewKind { get; }
 }
 
-public sealed class OpenAllNotesRequestedEventArgs
+internal sealed class OpenAllNotesRequestedEventArgs
 {
-    public OpenAllNotesRequestedEventArgs(string relativePath)
+    internal OpenAllNotesRequestedEventArgs(string relativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
 
         RelativePath = relativePath;
     }
 
-    public string RelativePath { get; }
+    internal string RelativePath { get; }
 }
 
-public sealed class CollectionRemovalPlan
+internal sealed class CollectionRemovalPlan
 {
     private CollectionRemovalPlan(bool canRemove, string message)
     {
@@ -88,18 +88,18 @@ public sealed class CollectionRemovalPlan
         Message = message;
     }
 
-    public bool CanRemove { get; }
+    internal bool CanRemove { get; }
 
-    public string Message { get; }
+    internal string Message { get; }
 
-    public static CollectionRemovalPlan Allowed(string message)
+    internal static CollectionRemovalPlan Allowed(string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
         return new CollectionRemovalPlan(true, message);
     }
 
-    public static CollectionRemovalPlan Blocked(string message)
+    internal static CollectionRemovalPlan Blocked(string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
@@ -107,11 +107,11 @@ public sealed class CollectionRemovalPlan
     }
 }
 
-public sealed record CollectionCreationRequest(
+internal sealed record CollectionCreationRequest(
     string Name,
     string ParentPath);
 
-public enum OverlayViewKind
+internal enum OverlayViewKind
 {
     Dashboard,
     AllNotes,

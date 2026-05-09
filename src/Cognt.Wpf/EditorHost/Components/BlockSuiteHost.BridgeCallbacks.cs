@@ -1,9 +1,7 @@
 using System.Text.Json;
-using CogntApp.Models.Markdown;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Wpf.EditorHost.Models.Editor;
 using Microsoft.JSInterop;
-using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
-using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
-using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
 
 namespace Cognt.Wpf.EditorHost.Components;
 
@@ -32,11 +30,33 @@ public partial class BlockSuiteHost
     [JSInvokable]
     public void HandleSaveCloze(
         string sourcePath,
+        string blockId,
         string selectedPlainText,
         string clozeText,
+        string content,
+        string? cardContextId = null,
+        string? slotId = null,
+        int? displayClozeIndex = null)
+    {
+        Bridge.RaiseSaveCloze(
+            sourcePath,
+            blockId,
+            selectedPlainText,
+            clozeText,
+            content,
+            cardContextId,
+            slotId,
+            displayClozeIndex);
+    }
+
+    [JSInvokable]
+    public void HandleOpenImageOcclusion(
+        string sourcePath,
+        string imageBlockId,
+        string imageRelPath,
         string content)
     {
-        Bridge.RaiseSaveCloze(sourcePath, selectedPlainText, clozeText, content);
+        Bridge.RaiseOpenImageOcclusion(sourcePath, imageBlockId, imageRelPath, content);
     }
 
     [JSInvokable]
@@ -80,29 +100,29 @@ public partial class BlockSuiteHost
     }
 
     [JSInvokable]
-    public void HandleOpenImageOcclusion(
-        string sourcePath,
-        string imageBlockId,
-        string imageRelPath,
-        string content)
-    {
-        Bridge.RaiseOpenImageOcclusion(sourcePath, imageBlockId, imageRelPath, content);
-    }
-
-    [JSInvokable]
     public void HandleHostMessage(JsonElement message)
     {
         Bridge.RaiseHostMessage(message);
     }
 
-    private static object CreateMentionTargetPayload(MentionTarget target)
+    private static object CreateMentionTargetPayload(KnowledgeMentionTargetReadModel target)
     {
         return new
         {
             relativePath = target.RelativePath,
             title = target.Title,
-            fileName = target.FileName,
-            recentRank = target.RecentRank,
+        };
+    }
+
+    private static object CreateDocumentLinkPayload(KnowledgeDocumentLinkReadModel link)
+    {
+        return new
+        {
+            openRelativePath = link.OpenRelativePath,
+            displayTitle = link.DisplayTitle,
+            snippet = link.Snippet,
+            matchedText = link.MatchedText,
+            updatedAt = link.UpdatedAt,
         };
     }
 }

@@ -1,5 +1,6 @@
-using CogntApp.Models.Markdown;
-using CogntApp.Services;
+using System.Text.Json;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Wpf.EditorHost.Models.Editor;
 using Cognt.Wpf.EditorHost.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -22,7 +23,7 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
     private ElementReference EditorHostElement { get; set; }
 
-    private ElementReference MentionPreviewElement { get; set; }
+    private ElementReference DocumentLinksElement { get; set; }
 
     private ElementReference StatusElement { get; set; }
 
@@ -40,8 +41,8 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
             instanceId = await module.InvokeAsync<int>(
                 "mountBlockSuite",
                 EditorHostElement,
+                DocumentLinksElement,
                 StatusElement,
-                MentionPreviewElement,
                 dotNetReference);
 
             Bridge.Register(this);
@@ -53,60 +54,86 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         }
     }
 
-    public async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
+    async Task IBlockSuiteHostClient.LoadNoteAsync(string? path, string title, string content, string? collectionRoot)
     {
         await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content, collectionRoot);
     }
 
-    public async Task LoadCardAsync(string content)
-    {
-        await RequireModule().InvokeVoidAsync("loadCard", instanceId, content);
-    }
-
-    public async Task BeginCardRenderAsync()
-    {
-        await RequireModule().InvokeVoidAsync("beginCardRender", instanceId);
-    }
-
-    public async Task ActivateEditorAsync()
+    async Task IBlockSuiteHostClient.ActivateEditorAsync()
     {
         await RequireModule().InvokeVoidAsync("activateEditor", instanceId);
     }
 
-    public async Task FocusEditorAsync()
+    async Task IBlockSuiteHostClient.SetReadOnlyModeAsync(bool isReadOnly)
+    {
+        await RequireModule().InvokeVoidAsync("setReadOnlyMode", instanceId, isReadOnly);
+    }
+
+    async Task IBlockSuiteHostClient.FocusEditorAsync()
     {
         await RequireModule().InvokeVoidAsync("focusEditor", instanceId);
     }
 
-    public async Task ShowSaveResultAsync(bool ok, string? error)
+    async Task IBlockSuiteHostClient.CreateClozeFromSelectionAsync(
+        string? cardContextId,
+        string? slotId,
+        int? displayClozeIndex)
+    {
+        await RequireModule().InvokeVoidAsync(
+            "createClozeFromSelection",
+            instanceId,
+            cardContextId,
+            slotId,
+            displayClozeIndex);
+    }
+
+    async Task<SelectedImageBlockReadModel?> IBlockSuiteHostClient.GetSelectedImageBlockAsync()
+    {
+        return await RequireModule().InvokeAsync<SelectedImageBlockReadModel?>(
+            "getSelectedImageBlock",
+            instanceId);
+    }
+
+    async Task<SelectedCardContextBlocksReadModel?> IBlockSuiteHostClient.GetSelectedCardContextBlocksAsync()
+    {
+        return await RequireModule().InvokeAsync<SelectedCardContextBlocksReadModel?>(
+            "getSelectedCardContextBlocks",
+            instanceId);
+    }
+
+    async Task IBlockSuiteHostClient.ShowSaveResultAsync(bool ok, string? error)
     {
         await RequireModule().InvokeVoidAsync("showSaveResult", instanceId, ok, error);
     }
 
-    public async Task ShowExtractResultAsync(bool ok, string? createdPath, string? error)
+    async Task IBlockSuiteHostClient.ShowExtractResultAsync(bool ok, string? createdPath, string? error)
     {
         await RequireModule().InvokeVoidAsync("showExtractResult", instanceId, ok, createdPath, error);
     }
 
-    public async Task SetMentionTargetsAsync(IEnumerable<MentionTarget> targets)
+    async Task IBlockSuiteHostClient.SetMentionTargetsAsync(IEnumerable<KnowledgeMentionTargetReadModel> targets)
     {
-        var payload = targets.Select(target => new
-        {
-            relativePath = target.RelativePath,
-            title = target.Title,
-            fileName = target.FileName,
-            recentRank = target.RecentRank,
-        });
+        IEnumerable<object> payload = targets.Select(CreateMentionTargetPayload);
 
         await RequireModule().InvokeVoidAsync("setMentionTargets", instanceId, payload);
     }
 
-    public async Task HandleMentionPreviewResultAsync(
+    async Task IBlockSuiteHostClient.SetDocumentLinksAsync(KnowledgeDocumentLinksReadModel links)
+    {
+        var payload = new
+        {
+            incoming = links.Incoming.Select(CreateDocumentLinkPayload),
+            outgoing = links.Outgoing.Select(CreateDocumentLinkPayload),
+        };
+
+        await RequireModule().InvokeVoidAsync("setDocumentLinks", instanceId, payload);
+    }
+
+    async Task IBlockSuiteHostClient.HandleMentionPreviewResultAsync(
         string requestId,
         string relativePath,
         string mode,
         bool ok,
-        string? title,
         string? documentContent,
         string? error)
     {
@@ -117,12 +144,11 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
             relativePath,
             mode,
             ok,
-            title,
             documentContent,
             error);
     }
 
-    public async Task HandleMentionOpenResultAsync(bool ok, string? error)
+    async Task IBlockSuiteHostClient.HandleMentionOpenResultAsync(bool ok, string? error)
     {
         await RequireModule().InvokeVoidAsync("handleMentionOpenResult", instanceId, ok, error);
     }
@@ -157,4 +183,3 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         return module ?? throw new InvalidOperationException("The BlockSuite JavaScript module is not ready.");
     }
 }
-
