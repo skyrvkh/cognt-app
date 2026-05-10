@@ -11,7 +11,6 @@
         WindowStartupLocation="CenterScreen"
         Background="#F8FAFF"
         Loaded="MainWindow_Loaded"
-        SizeChanged="MainWindow_SizeChanged"
         PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Window.Resources>
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
@@ -100,11 +99,12 @@
     <Grid Background="#F7F9FC"
           ClipToBounds="True">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SidebarSpacerColumn" Width="300" />
+            <ColumnDefinition x:Name="SidebarColumn" Width="300" />
+            <ColumnDefinition x:Name="SidebarSplitterColumn" Width="0" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="1"
+        <Grid Grid.Column="2"
               ClipToBounds="True">
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="MobileHeaderRow" Height="0" />
@@ -124,8 +124,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Button Style="{StaticResource SidebarIconButtonStyle}"
-                            Click="NavigationToggleButton_Click">
+                    <Button Style="{StaticResource SidebarIconButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <Path Width="16"
                                   Height="16"
@@ -185,7 +184,7 @@
 
                 <Grid Grid.Column="0"
                       ClipToBounds="True">
-                    <views:EditorView x:Name="EditorViewControl" />
+                    <ContentControl x:Name="EditorViewHost" />
 
                     <ContentControl x:Name="OverlayHost"
                                     Panel.ZIndex="10" />
@@ -260,24 +259,22 @@
                             Panel.ZIndex="11">
                     <Button Content="Cards"
                             Width="72"
-                            Height="30"
-                            Click="NoteCardsButton_Click" />
+                            Height="30" />
                 </StackPanel>
             </Grid>
         </Grid>
 
         <Button x:Name="SidebarBackdrop"
-                Grid.ColumnSpan="2"
+                Grid.ColumnSpan="3"
                 Visibility="Collapsed"
                 Opacity="0"
                 IsHitTestVisible="False"
                 Background="#66141B2D"
                 BorderThickness="0"
-                Panel.ZIndex="15"
-                Click="SidebarBackdrop_Click" />
+                Panel.ZIndex="15" />
 
         <Border x:Name="SidebarHost"
-                Grid.ColumnSpan="2"
+                Grid.Column="0"
                 Width="300"
                 HorizontalAlignment="Left"
                 Background="#FBFCFF"
@@ -349,7 +346,7 @@
                     </Button>
                 </Grid>
 
-                <StackPanel x:Name="SidebarCollectionSection"
+                <StackPanel x:Name="SidebarTopNavigationSection"
                             Grid.Row="1">
                     <TextBlock Text="COLLECTION"
                                Style="{StaticResource SectionHeaderStyle}"
@@ -369,7 +366,6 @@
                     <Button Content="Load Collection"
                             Style="{StaticResource SidebarButtonStyle}"
                             Margin="0,0,0,10"
-                            Click="SidebarActionButton_Click"
                             Command="{Binding LoadCollectionCommand}" />
                 </StackPanel>
 
@@ -381,22 +377,17 @@
                         <Button Content="Dashboard"
                                 Style="{StaticResource PrimarySidebarButtonStyle}"
                                 Margin="0,0,0,8"
-                                Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDashboardCommand}" />
                         <Button Content="All Documents"
                                 Style="{StaticResource SidebarButtonStyle}"
-                                Click="SidebarActionButton_Click"
                                 Command="{Binding ShowAllNotesCommand}" />
                         <Button Content="Flashcards"
                                 Style="{StaticResource SidebarButtonStyle}"
-                                Click="SidebarActionButton_Click"
                                 Command="{Binding ShowDecksCommand}" />
                         <Button Content="Cards from note"
-                                Style="{StaticResource SidebarButtonStyle}"
-                                Click="NoteCardsButton_Click" />
+                                Style="{StaticResource SidebarButtonStyle}" />
                         <Button Content="Browser"
-                                Style="{StaticResource SidebarButtonStyle}"
-                                Click="BrowserButton_Click" />
+                                Style="{StaticResource SidebarButtonStyle}" />
 
                         <Border Height="1"
                                 Background="#E1E6F0"
@@ -503,14 +494,23 @@
                             Margin="0,14,0,0">
                     <Button Content="+ Create Document"
                             Style="{StaticResource PrimarySidebarButtonStyle}"
-                            Click="SidebarActionButton_Click"
                             Command="{Binding AddNoteCommand}" />
                     <Button Content="Import Documents"
                             Style="{StaticResource PrimarySidebarButtonStyle}"
-                            Margin="0,8,0,0"
-                            Click="ImportDocumentsButton_Click" />
+                            Margin="0,8,0,0" />
                 </StackPanel>
             </Grid>
         </Border>
+
+        <GridSplitter x:Name="SidebarSplitter"
+                      Grid.Column="1"
+                      Width="6"
+                      Visibility="Collapsed" />
+
+        <Button x:Name="FloatingNavigationButton"
+                Grid.Column="2"
+                Visibility="Collapsed" />
+
+        <Popup x:Name="CollectionSelectorPopup" />
     </Grid>
 </Window>

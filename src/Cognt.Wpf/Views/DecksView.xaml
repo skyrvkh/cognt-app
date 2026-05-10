@@ -35,10 +35,6 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <UserControl.DataContext>
-        <deckViewModels:DecksViewModel />
-    </UserControl.DataContext>
-
     <Grid Background="{StaticResource PageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="72" />

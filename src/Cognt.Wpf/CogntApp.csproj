@@ -18,7 +18,10 @@
     <Compile Remove="EditorHost\**\*.cs" />
     <Compile Remove="bin\**\*.cs" />
     <Compile Remove="obj\**\*.cs" />
+    <Compile Remove="MainWindow.xaml.cs" />
     <Compile Remove="ViewModels\MainViewModel.Documents.cs" />
+    <Compile Remove="ViewModels\MainViewModel.NoteWorkspace.cs" />
+    <Compile Remove="ViewModels\MainViewModel.Tree.cs" />
     <Page Remove="EditorHost\**\*.xaml" />
     <Page Remove="bin\**\*.xaml" />
     <Page Remove="obj\**\*.xaml" />
