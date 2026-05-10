@@ -4,8 +4,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
-using CogntApp.Models.Navigation;
 using CogntApp.ViewModels;
+using CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.Views;
 

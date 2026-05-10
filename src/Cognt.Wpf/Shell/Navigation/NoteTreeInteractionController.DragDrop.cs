@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using CogntApp.ViewModels;
+using CogntApp.ViewModels.Navigation;
 using NoteTreeNodeViewModel = CogntApp.ViewModels.NoteTreeNodeViewModel;
 
 namespace CogntApp.Shell.Navigation;

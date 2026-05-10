@@ -70,7 +70,7 @@ public partial class DocumentImportWindow : Window
         OpenFileDialog dialog = new()
         {
             Title = "Import Documents",
-            Filter = "Markdown documents (*.md;*.markdown)|*.md;*.markdown",
+            Filter = "Documents (*.docx;*.pdf;*.md;*.markdown)|*.docx;*.pdf;*.md;*.markdown",
             Multiselect = true,
             CheckFileExists = true
         };

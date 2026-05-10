@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using CogntApp.Views;
+using Cognt.Wpf.EditorHost.Views;
 
 namespace CogntApp.Shell.Overlay;
 

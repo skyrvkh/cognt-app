@@ -28,6 +28,11 @@
                                               CardEditorReleased="CreateCardReviewSubview_CardEditorReleased"
                                               CreateCardsRequested="CreateCardReviewSubview_CreateCardsRequested" />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type deckViewModels:EditCardViewModel}">
+            <subviews:EditCardView CardEditorHostRequested="EditCardView_CardEditorHostRequested"
+                                   CardEditorReleased="EditCardView_CardEditorReleased"
+                                   SaveCardRequested="EditCardView_SaveCardRequested" />
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.DataContext>

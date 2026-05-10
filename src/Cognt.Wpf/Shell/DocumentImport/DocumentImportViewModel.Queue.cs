@@ -19,7 +19,7 @@ internal sealed partial class DocumentImportViewModel
 
         if (!DocumentImportPolicy.IsSupportedPath(fullPath))
         {
-            return $"{Path.GetFileName(path)} is not supported. Add a Markdown file.";
+            return $"{Path.GetFileName(path)} is not supported. Add a DOCX, PDF, or Markdown file.";
         }
 
         FileInfo file = new(fullPath);

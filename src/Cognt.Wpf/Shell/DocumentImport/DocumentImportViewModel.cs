@@ -28,9 +28,9 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
 
     public ICommand ImportCommand { get; }
 
-    public string DestinationLabel => string.IsNullOrWhiteSpace(target.CurrentCollectionPath)
+    public string DestinationLabel => string.IsNullOrWhiteSpace(target.CurrentCollectionName)
         ? "Current workspace"
-        : Path.GetFileName(target.CurrentCollectionPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        : target.CurrentCollectionName;
 
     public bool IsImporting
     {

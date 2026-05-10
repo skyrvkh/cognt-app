@@ -2,9 +2,9 @@ using System.IO;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
-using CogntApp.Models.Navigation;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Overlay;
+using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
 
 namespace CogntApp.Shell.Review;

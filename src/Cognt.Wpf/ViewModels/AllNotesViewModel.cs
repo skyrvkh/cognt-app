@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
-using CogntApp.Models.Navigation;
+using CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
 
@@ -10,7 +10,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
 {
     private const string AllTagsValue = "__all_tags";
     private const string AllTypesValue = "__all_types";
-    private readonly IAllNotesCatalogSource catalogSource;
+    private readonly INoteService noteService;
     private readonly RelayCommand openNoteCommand;
     private string currentCollectionId = string.Empty;
     private string searchQuery = string.Empty;
@@ -28,11 +28,11 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private IReadOnlyList<AllNotesTreeItemViewModel> allTreeRoots = [];
     private bool isTreeViewMode;
 
-    public AllNotesViewModel(IAllNotesCatalogSource catalogSource)
+    public AllNotesViewModel(INoteService noteService)
     {
-        ArgumentNullException.ThrowIfNull(catalogSource);
+        ArgumentNullException.ThrowIfNull(noteService);
 
-        this.catalogSource = catalogSource;
+        this.noteService = noteService;
         openNoteCommand = new RelayCommand(OpenNoteFromCommand, CanOpenNoteFromCommand);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         CreateNoteCommand = new RelayCommand(() => CreateNoteRequested?.Invoke(this, EventArgs.Empty));
@@ -164,7 +164,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         ? "No collection selected"
         : Path.GetFileName(currentCollectionId.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-    public string PageSubtitle => $"{CollectionLabel} - {NoteCountLabel}";
+    public string PageSubtitle => $"{CollectionLabel} · {NoteCountLabel}";
 
     public AllNotesFilterOptionViewModel? SelectedTagOption
     {

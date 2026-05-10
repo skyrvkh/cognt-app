@@ -1,13 +1,13 @@
-using System.Windows.Controls;
+using Cognt.Wpf.EditorHost.Abstractions;
 
 namespace CogntApp.ViewModels.Decks.PresentationModels;
 
 internal sealed class CreateCardEditorHostRequestedEventArgs(
-    ContentControl host,
+    ITransientEditorHost host,
     string content,
     Action<string> contentChanged) : EventArgs
 {
-    public ContentControl Host { get; } = host ?? throw new ArgumentNullException(nameof(host));
+    public ITransientEditorHost Host { get; } = host ?? throw new ArgumentNullException(nameof(host));
 
     public string Content { get; } = content ?? throw new ArgumentNullException(nameof(content));
 

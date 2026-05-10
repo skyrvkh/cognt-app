@@ -1,35 +1,22 @@
-using System.IO;
 using System.Text.Json;
-using CogntApp.Models.Markdown;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
-using AttachFileRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.AttachFileRequestedEventArgs;
-using AttachFileResult = Cognt.Wpf.EditorHost.Models.Editor.AttachFileResult;
-using CreateExtractRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateExtractRequestedEventArgs;
-using CreateLinkedNoteRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteRequestedEventArgs;
-using CreateLinkedNoteResult = Cognt.Wpf.EditorHost.Models.Editor.CreateLinkedNoteResult;
-using MentionPreviewRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionPreviewRequestedEventArgs;
-using MentionSearchRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.MentionSearchRequestedEventArgs;
-using OpenImageOcclusionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenImageOcclusionRequestedEventArgs;
-using OpenMentionRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.OpenMentionRequestedEventArgs;
-using ReadAttachmentRequestedEventArgs = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentRequestedEventArgs;
-using ReadAttachmentResult = Cognt.Wpf.EditorHost.Models.Editor.ReadAttachmentResult;
-using SaveClozeRequestedEventArgs = CogntApp.Models.Editor.SaveClozeRequestedEventArgs;
+using Cognt.Wpf.EditorHost.Models.Editor;
 
 namespace Cognt.Wpf.EditorHost.Services;
 
 public sealed partial class BlockSuiteHostBridge
 {
-    public event EventHandler<string>? ContentChanged;
-    public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
-    public event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;
-    public event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
-    public event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
-    public event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
-    public event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
-    public event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
-    public event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
-    public event Func<object?, ReadAttachmentRequestedEventArgs, Task>? ReadAttachmentRequested;
-    public event EventHandler<string>? DiagnosticReceived;
+    internal event EventHandler<string>? ContentChanged;
+    internal event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
+    internal event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;
+    internal event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
+    internal event EventHandler<MentionSearchRequestedEventArgs>? MentionSearchRequested;
+    internal event EventHandler<MentionPreviewRequestedEventArgs>? MentionPreviewRequested;
+    internal event EventHandler<OpenMentionRequestedEventArgs>? OpenMentionRequested;
+    internal event EventHandler<CreateLinkedNoteRequestedEventArgs>? CreateLinkedNoteRequested;
+    internal event Func<object?, AttachFileRequestedEventArgs, Task>? AttachFileRequested;
+    internal event Func<object?, ReadAttachmentRequestedEventArgs, Task>? ReadAttachmentRequested;
+    internal event EventHandler<string>? DiagnosticReceived;
 
     internal void RaiseContentChanged(string content)
     {
@@ -43,11 +30,38 @@ public sealed partial class BlockSuiteHostBridge
             new CreateExtractRequestedEventArgs(sourcePath, selectedContent, selectedPlainText));
     }
 
-    internal void RaiseSaveCloze(string sourcePath, string selectedPlainText, string clozeText, string content)
+    internal void RaiseSaveCloze(
+        string sourcePath,
+        string blockId,
+        string selectedPlainText,
+        string clozeText,
+        string content,
+        string? cardContextId = null,
+        string? slotId = null,
+        int? displayClozeIndex = null)
     {
         SaveClozeRequested?.Invoke(
             this,
-            new SaveClozeRequestedEventArgs(sourcePath, selectedPlainText, clozeText, content));
+            new SaveClozeRequestedEventArgs(
+                sourcePath,
+                blockId,
+                selectedPlainText,
+                clozeText,
+                content,
+                cardContextId,
+                slotId,
+                displayClozeIndex));
+    }
+
+    internal void RaiseOpenImageOcclusion(
+        string sourcePath,
+        string imageBlockId,
+        string imageRelPath,
+        string content)
+    {
+        OpenImageOcclusionRequested?.Invoke(
+            this,
+            new OpenImageOcclusionRequestedEventArgs(sourcePath, imageBlockId, imageRelPath, content));
     }
 
     internal void RaiseMentionPreview(
@@ -62,27 +76,16 @@ public sealed partial class BlockSuiteHostBridge
             new MentionPreviewRequestedEventArgs(requestId, sourcePath, relativePath, mode, maxCharacters));
     }
 
-    internal IReadOnlyList<MentionTarget> RaiseMentionSearch(string sourcePath, string query, int limit)
+    internal IReadOnlyList<KnowledgeMentionTargetReadModel> RaiseMentionSearch(string sourcePath, string query, int limit)
     {
         MentionSearchRequestedEventArgs args = new(sourcePath, query, limit);
         MentionSearchRequested?.Invoke(this, args);
-        return args.Targets.Select(ToMentionTarget).ToArray();
+        return args.Targets;
     }
 
     internal void RaiseOpenMention(string sourcePath, string relativePath, string content)
     {
         OpenMentionRequested?.Invoke(this, new OpenMentionRequestedEventArgs(sourcePath, relativePath, content));
-    }
-
-    internal void RaiseOpenImageOcclusion(
-        string sourcePath,
-        string imageBlockId,
-        string imageRelPath,
-        string content)
-    {
-        OpenImageOcclusionRequested?.Invoke(
-            this,
-            new OpenImageOcclusionRequestedEventArgs(sourcePath, imageBlockId, imageRelPath, content));
     }
 
     internal CreateLinkedNoteResult RaiseCreateLinkedNote(string sourcePath, string viewMode)
@@ -145,14 +148,5 @@ public sealed partial class BlockSuiteHostBridge
         }
 
         DiagnosticReceived?.Invoke(this, messageElement.GetString() ?? string.Empty);
-    }
-
-    private static MentionTarget ToMentionTarget(KnowledgeMentionTargetReadModel target)
-    {
-        return new MentionTarget(
-            target.RelativePath,
-            target.Title,
-            Path.GetFileName(target.RelativePath),
-            0);
     }
 }

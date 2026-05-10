@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using CogntApp.Models.Decks;
 using CogntApp.ViewModels.Decks;
+using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.Views;
 
 namespace CogntApp.Views.Decks;

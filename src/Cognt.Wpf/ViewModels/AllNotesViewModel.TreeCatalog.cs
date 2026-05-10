@@ -8,8 +8,8 @@ public sealed partial class AllNotesViewModel
     private AllNotesTreeItemViewModel[] BuildTreeItems(long? parentId, int depth)
     {
         IReadOnlyList<KnowledgeTreeItemReadModel> items = parentId.HasValue
-            ? catalogSource.LoadChildren(currentCollectionId, parentId.Value)
-            : catalogSource.LoadRootItems(currentCollectionId);
+            ? noteService.LoadChildren(currentCollectionId, parentId.Value)
+            : noteService.LoadRootItems(currentCollectionId);
 
         return items
             .Select(item =>

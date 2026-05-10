@@ -1,13 +1,18 @@
 using System.IO;
-using CogntApp.Models.Markdown;
-using CogntApp.Models.Navigation;
-using CogntApp.Models.Tree;
-using CogntApp.Services;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Wpf.EditorHost.Models.Editor;
 
 namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private static readonly JsonSerializerOptions BlockSuiteJsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
     public string CreateExtractNote(string? sourcePath, string selectedContent, string selectedPlainText)
     {
         if (string.IsNullOrWhiteSpace(currentNotePath)
@@ -32,24 +37,143 @@ public sealed partial class MainViewModel
         }
 
         const string title = "Extract";
-        string content = string.IsNullOrWhiteSpace(selectedContent)
-            ? BlockSuiteDocumentContent.FromPlainText(selectedPlainText, title)
-            : selectedContent;
-        CreatedNote note = noteService.CreateExtractNote(
-            currentNotesDirectory,
+        string content = CreateExtractContent(selectedContent, selectedPlainText, title);
+        KnowledgeCreatedNoteReadModel createdNote = noteService.CreateExtractNote(
+            openCollectionPath,
             parentId,
-            sourcePath,
-            title,
+            GetRequiredRelativeNotePath(sourcePath),
             content);
 
-        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
-        AddLoadedTreeNode(item);
-        AddOrUpdateRecentNote(item, note.NotePath);
+        ApplyCreatedNoteState(createdNote);
+        RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-        return note.FileRelPath;
+        return createdNote.RelativePath;
     }
 
-    public LinkedNote CreateLinkedNote(string sourcePath, string viewMode)
+    private string CreateExtractContent(string selectedContent, string selectedPlainText, string title)
+    {
+        string? normalizedBlockSuiteContent = NormalizeBlockSuiteExtractContent(selectedContent);
+        if (!string.IsNullOrWhiteSpace(normalizedBlockSuiteContent))
+        {
+            return normalizedBlockSuiteContent;
+        }
+
+        if (string.IsNullOrWhiteSpace(selectedPlainText))
+        {
+            throw new InvalidOperationException("The selected content is empty.");
+        }
+
+        return documentContentFactory.FromPlainText(selectedPlainText, title);
+    }
+
+    private static string? NormalizeBlockSuiteExtractContent(string selectedContent)
+    {
+        if (string.IsNullOrWhiteSpace(selectedContent))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(selectedContent) is not JsonObject root
+                || root["kind"]?.GetValue<string>() != "cognt-blocksuite-doc"
+                || root["snapshot"] is not JsonObject snapshot
+                || snapshot["blocks"] is not JsonObject blocks)
+            {
+                return null;
+            }
+
+            if (!BlockSuiteBlockHasBodyContent(blocks, isRootBlock: true))
+            {
+                return null;
+            }
+
+            NormalizeExtractRootChildren(blocks);
+            return root.ToJsonString(BlockSuiteJsonOptions) + Environment.NewLine;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void NormalizeExtractRootChildren(JsonObject blocks)
+    {
+        if (blocks["children"] is not JsonArray children)
+        {
+            return;
+        }
+
+        for (int index = children.Count - 1; index >= 0; index--)
+        {
+            if (children[index] is JsonObject child
+                && string.Equals(child["flavour"]?.GetValue<string>(), "affine:surface", StringComparison.Ordinal))
+            {
+                children.RemoveAt(index);
+            }
+        }
+
+        foreach (JsonNode? child in children)
+        {
+            if (child is JsonObject childBlock
+                && string.Equals(childBlock["flavour"]?.GetValue<string>(), "affine:note", StringComparison.Ordinal)
+                && childBlock["props"] is JsonObject props)
+            {
+                props["xywh"] = "[0,0,498,92]";
+                props["background"] = "--affine-note-background-white";
+                props["lockedBySelf"] = false;
+            }
+        }
+    }
+
+    private static bool BlockSuiteBlockHasBodyContent(JsonObject block, bool isRootBlock = false)
+    {
+        if (!isRootBlock
+            && block["props"] is JsonObject props
+            && BlockSuiteTextValueHasBodyContent(props["text"]))
+        {
+            return true;
+        }
+
+        if (block["children"] is not JsonArray children)
+        {
+            return false;
+        }
+
+        foreach (JsonNode? child in children)
+        {
+            if (child is JsonObject childBlock
+                && BlockSuiteBlockHasBodyContent(childBlock))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool BlockSuiteTextValueHasBodyContent(JsonNode? textValue)
+    {
+        if (textValue is not JsonObject textObject
+            || textObject["delta"] is not JsonArray delta)
+        {
+            return false;
+        }
+
+        foreach (JsonNode? entryNode in delta)
+        {
+            if (entryNode is JsonObject entry
+                && entry["insert"]?.GetValue<string>() is { } insertedText
+                && !string.IsNullOrWhiteSpace(insertedText))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public CreateLinkedNoteResult CreateLinkedNote(string sourcePath)
     {
         if (string.IsNullOrWhiteSpace(currentNotePath)
             || !string.Equals(
@@ -75,37 +199,49 @@ public sealed partial class MainViewModel
         }
 
         const string title = "Untitled";
-        string documentContent = BlockSuiteDocumentContent.FromPlainText(string.Empty, title);
-        CreatedNote note = noteService.CreateNote(
-            currentNotesDirectory,
+        string documentContent = documentContentFactory.FromPlainText(string.Empty, title);
+        KnowledgeCreatedNoteReadModel createdNote = noteService.CreateNote(
+            openCollectionPath,
             parentId,
             title,
             documentContent);
 
-        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
-        AddLoadedTreeNode(item);
-        AddOrUpdateRecentNote(item, note.NotePath);
-
+        ApplyCreatedNoteState(createdNote);
+        RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-        return new LinkedNote(note.NotePath, note.FileRelPath, title, documentContent);
+        return CreateLinkedNoteResult.Success(createdNote.RelativePath, title, documentContent);
     }
 
     private void AddNote()
     {
-        if (string.IsNullOrWhiteSpace(currentNotesDirectory))
+        if (string.IsNullOrWhiteSpace(openCollectionPath))
         {
             return;
         }
 
-        CreatedNote note = noteService.CreateNote(
-            currentNotesDirectory,
+        KnowledgeCreatedNoteReadModel createdNote = noteService.CreateNote(
+            openCollectionPath,
             parentId: null,
             "Untitled",
-            BlockSuiteDocumentContent.FromPlainText(string.Empty, "Untitled"));
-        TreeItemRow? item = noteService.FindNoteByPath(currentNotesDirectory, note.NotePath);
-        AddLoadedTreeNode(item);
-        AddOrUpdateRecentNote(item, note.NotePath);
+            documentContentFactory.FromPlainText(string.Empty, "Untitled"));
+        ApplyCreatedNoteState(createdNote);
+        RefreshDashboardData();
+        RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-        OpenNoteRequested?.Invoke(this, new OpenNoteRequestedEventArgs(note.NotePath, SelectInTree: true));
+        OpenNoteByRelativePath(createdNote.RelativePath, selectInTree: true);
+    }
+
+    private void ApplyCreatedNoteState(KnowledgeCreatedNoteReadModel createdNote)
+    {
+        string notePath = ResolveCollectionFilePath(openCollectionPath, createdNote.RelativePath);
+        KnowledgeTreeItemReadModel item = new(
+            createdNote.ItemId,
+            createdNote.ParentId,
+            KnowledgeItemKind.Note,
+            createdNote.Title,
+            createdNote.RelativePath,
+            0);
+        AddLoadedTreeNode(item);
+        AddOrUpdateRecentNote(item, notePath);
     }
 }

@@ -1,4 +1,4 @@
-using CogntApp.Models.Decks;
+using CogntApp.ViewModels.Decks.PresentationModels;
 
 namespace CogntApp.ViewModels.Decks;
 
@@ -9,7 +9,7 @@ public sealed class CardPreviewViewModel
         ArgumentNullException.ThrowIfNull(card);
 
         FrontText = NormalizeText(card.Question);
-        BackText = "-";
+        BackText = NormalizeText(card.Answer);
         Metadata = $"{card.Deck} - {card.Status} - {card.Due}";
     }
 

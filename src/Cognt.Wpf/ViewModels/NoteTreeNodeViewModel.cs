@@ -162,4 +162,5 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
             childCount: 0,
             isPlaceholder: true);
     }
+
 }

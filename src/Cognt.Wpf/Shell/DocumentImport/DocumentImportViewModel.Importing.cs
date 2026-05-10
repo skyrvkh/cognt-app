@@ -36,17 +36,32 @@ internal sealed partial class DocumentImportViewModel
         RefreshDerivedState();
     }
 
-    private Task ImportQueuedFileAsync(DocumentImportQueueItem file, bool openAfterImport)
+    private async Task ImportQueuedFileAsync(DocumentImportQueueItem file, bool openAfterImport)
     {
         try
         {
             file.ErrorMessage = string.Empty;
             file.Status = DocumentImportStatus.Importing;
 
-            IReadOnlyList<string> importedPaths = target.ImportDocuments([file.FullPath]);
-            if (openAfterImport && importedPaths.Count > 0 && target.OpenNoteCommand.CanExecute(importedPaths[0]))
+            switch (file.Type)
             {
-                target.OpenNoteCommand.Execute(importedPaths[0]);
+                case DocumentImportType.Docx:
+                    await target.ImportNativeDocumentAsync(
+                        file.FullPath,
+                        NativeDocumentImportFormat.Docx,
+                        openAfterImport);
+                    break;
+                case DocumentImportType.Markdown:
+                    await target.ImportNativeDocumentAsync(
+                        file.FullPath,
+                        NativeDocumentImportFormat.Markdown,
+                        openAfterImport);
+                    break;
+                case DocumentImportType.Pdf:
+                    await target.ImportPdfDocumentAsync(file.FullPath, openAfterImport);
+                    break;
+                default:
+                    throw new InvalidOperationException("Unsupported document import type.");
             }
 
             file.Status = DocumentImportStatus.Success;
@@ -60,7 +75,5 @@ internal sealed partial class DocumentImportViewModel
         {
             RefreshDerivedState();
         }
-
-        return Task.CompletedTask;
     }
 }

@@ -61,6 +61,7 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(HasSelectedCardCandidate));
                 OnPropertyChanged(nameof(CanDisableSelectedCardCandidate));
                 OnPropertyChanged(nameof(CanEditNoteToCardPresentation));
+                SynchronizeSelectedNoteToCardPresentationPreset();
             }
         }
     }
@@ -83,6 +84,7 @@ public sealed partial class MainViewModel
             }
 
             OnPropertyChanged(nameof(IsCustomNoteToCardPresentationPreset));
+            ApplySelectedNoteToCardPresentationPreset(value?.Preset);
         }
     }
 
@@ -100,7 +102,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            OnPropertyChanged(nameof(IsCustomNoteToCardPresentationPreset));
+            ApplySelectedNoteToCardCustomPresentation();
         }
     }
 
@@ -115,7 +117,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            OnPropertyChanged(nameof(IsCustomNoteToCardPresentationPreset));
+            ApplySelectedNoteToCardCustomPresentation();
         }
     }
 
@@ -130,7 +132,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            OnPropertyChanged(nameof(IsCustomNoteToCardPresentationPreset));
+            ApplySelectedNoteToCardCustomPresentation();
         }
     }
 

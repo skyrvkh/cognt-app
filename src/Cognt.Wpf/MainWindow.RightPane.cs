@@ -26,6 +26,11 @@ public partial class MainWindow
         browserView.FocusAddressBox();
     }
 
+    private void RightViewerNoteCardsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowNoteCardsRightPane();
+    }
+
     private void RightViewerCloseButton_Click(object sender, RoutedEventArgs e)
     {
         CollapseRightPane();
@@ -127,6 +132,11 @@ public partial class MainWindow
         rightPaneBrowserView ??= new BrowserPaneView();
         ShowRightPaneContent("Browser", rightPaneBrowserView);
         return rightPaneBrowserView;
+    }
+
+    private void ShowNoteCardsRightPane()
+    {
+        ShowRightPaneContent("Cards from note", noteCardQueueView);
     }
 
     private PdfReaderView GetOrCreatePdfRightPane()

@@ -1,8 +1,8 @@
-namespace CogntApp.Models.Navigation;
+namespace CogntApp.ViewModels.Navigation;
 
-public sealed class UserMessageRequestedEventArgs
+internal sealed class UserMessageRequestedEventArgs
 {
-    public UserMessageRequestedEventArgs(string title, string message)
+    internal UserMessageRequestedEventArgs(string title, string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentNullException.ThrowIfNull(message);
@@ -11,7 +11,7 @@ public sealed class UserMessageRequestedEventArgs
         Message = message;
     }
 
-    public string Title { get; }
+    internal string Title { get; }
 
-    public string Message { get; }
+    internal string Message { get; }
 }

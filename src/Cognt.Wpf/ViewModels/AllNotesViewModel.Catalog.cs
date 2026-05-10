@@ -37,7 +37,7 @@ public sealed partial class AllNotesViewModel
         try
         {
             allNotes = await Task.Run(
-                () => catalogSource.LoadNoteCatalog(currentCollectionId),
+                () => noteService.LoadNoteCatalog(currentCollectionId),
                 cancellationToken);
             noteLookupByRelativePath = allNotes.ToDictionary(note => note.RelativePath, StringComparer.OrdinalIgnoreCase);
             allTreeRoots = await Task.Run(
@@ -104,7 +104,7 @@ public sealed partial class AllNotesViewModel
         if (!string.IsNullOrWhiteSpace(query) && allNotes.Count > 0)
         {
             matchingRelativePaths = await Task.Run(
-                () => catalogSource.SearchNoteCatalog(currentCollectionId, query),
+                () => noteService.SearchNoteCatalog(currentCollectionId, query),
                 cancellationToken);
         }
 

@@ -70,7 +70,7 @@ public partial class CreateCardReviewSubview : UserControl, ITransientEditorHost
         CardEditorHostRequested?.Invoke(
             this,
             new CreateCardEditorHostRequestedEventArgs(
-                CardTextEditorHost,
+                this,
                 currentCardContent,
                 UpdateCardContent));
     }

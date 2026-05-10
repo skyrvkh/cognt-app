@@ -1,6 +1,6 @@
 using System.Windows;
-using CogntApp.Models.Decks;
 using CogntApp.ViewModels.Decks;
+using CogntApp.ViewModels.Decks.PresentationModels;
 
 namespace CogntApp.Views.Decks;
 
