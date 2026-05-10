@@ -6,13 +6,17 @@
         xmlns:local="clr-namespace:CogntApp"
         xmlns:views="clr-namespace:CogntApp.Views"
         xmlns:viewModels="clr-namespace:CogntApp.ViewModels"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="Cognt App" Height="860" Width="1320" MinHeight="720" MinWidth="980"
         WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/icon.ico"
         Background="#F8FAFF"
         Loaded="MainWindow_Loaded"
         PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Window.Resources>
+        <sys:Double x:Key="EditorBreadcrumbFontSize">11</sys:Double>
+
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -21,12 +25,13 @@
         </Style>
 
         <Style x:Key="SidebarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Margin" Value="0,2" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="#586078" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Template">
@@ -54,17 +59,161 @@
         <Style x:Key="PrimarySidebarButtonStyle"
                BasedOn="{StaticResource SidebarButtonStyle}"
                TargetType="Button">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="#D8DEEC" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Foreground" Value="#3156D4" />
         </Style>
 
         <Style x:Key="NoteTreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="#586078" />
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="4,2" />
             <Setter Property="Margin" Value="0,1" />
+        </Style>
+
+        <Style x:Key="NavigationTreeExpanderStyle" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="ExpanderBorder"
+                                Width="10"
+                                Height="24"
+                                Background="Transparent"
+                                CornerRadius="4">
+                            <Path x:Name="ExpanderGlyph"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="M3,8 L6.5,12 L3,16"
+                                  Stroke="#78809A"
+                                  StrokeThickness="1.6"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ExpanderGlyph" Property="Data" Value="M1.5,10 L5,14 L8.5,10" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ExpanderBorder" Property="Background" Value="#EEF2FF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NavigationTreeViewItemStyle"
+               TargetType="TreeViewItem"
+               BasedOn="{StaticResource NoteTreeViewItemStyle}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <Grid SnapsToDevicePixels="True">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ToggleButton x:Name="Expander"
+                                          Grid.Row="0"
+                                          Grid.Column="0"
+                                          Margin="0,0,0,0"
+                                          VerticalAlignment="Top"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press"
+                                          Style="{StaticResource NavigationTreeExpanderStyle}" />
+
+                            <Border x:Name="ItemBorder"
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="{TemplateBinding Margin}"
+                                    Padding="{TemplateBinding Padding}"
+                                    Background="Transparent"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  ContentSource="Header"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                            </Border>
+
+                            <ItemsPresenter x:Name="ItemsHost"
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            Margin="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
+                            </Trigger>
+                            <Trigger Property="IsExpanded" Value="False">
+                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#E8EEFF" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#F2F5FF" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsSelectionActive" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#F1F4FF" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarNavigationPathStyle" TargetType="Path">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </Style>
+
+        <Style x:Key="NoteTreeNodePathStyle" TargetType="Path">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="#B7791F" />
+            <Setter Property="Fill" Value="#FFF2B8" />
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Data" Value="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Prefix}" Value="[N]">
+                    <Setter Property="Stroke" Value="#3156D4" />
+                    <Setter Property="Fill" Value="#EEF4FF" />
+                    <Setter Property="Data" Value="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.8,12 L15.2,12 M8.8,15 L15.2,15" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Prefix}" Value="[PDF]">
+                    <Setter Property="Stroke" Value="#EF4444" />
+                    <Setter Property="Fill" Value="#FFF1F2" />
+                    <Setter Property="Data" Value="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="SidebarIconButtonStyle" TargetType="Button">
