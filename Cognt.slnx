@@ -1,3 +1,13 @@
 <Solution>
-  <Project Path="CogntApp.csproj" />
+  <Project Path="src/Cognt.Wpf/CogntApp.csproj" />
+  <Project Path="src/Cognt.Composition/Cognt.Composition.csproj" />
+  <Project Path="src/Cognt.Wpf/EditorHost/Cognt.Wpf.EditorHost.csproj" />
+  <Project Path="src/Modules/PersonalKnowledgeManagement/Cognt.Modules.PersonalKnowledgeManagement.Application/Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
+  <Project Path="src/Modules/PersonalKnowledgeManagement/Cognt.Modules.PersonalKnowledgeManagement.Domain/Cognt.Modules.PersonalKnowledgeManagement.Domain.csproj" />
+  <Project Path="src/Modules/PersonalKnowledgeManagement/Cognt.Modules.PersonalKnowledgeManagement.Infrastructure/Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.csproj" />
+  <Project Path="src/Modules/ProgressTrackingAndAnalytics/Cognt.Modules.ProgressTrackingAndAnalytics.Application/Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
+  <Project Path="src/Modules/ProgressTrackingAndAnalytics/Cognt.Modules.ProgressTrackingAndAnalytics.Infrastructure/Cognt.Modules.ProgressTrackingAndAnalytics.Infrastructure.csproj" />
+  <Project Path="src/Modules/SpacedRepetitionSystem/Cognt.Modules.SpacedRepetitionSystem.Application/Cognt.Modules.SpacedRepetitionSystem.Application.csproj" />
+  <Project Path="src/Modules/SpacedRepetitionSystem/Cognt.Modules.SpacedRepetitionSystem.Domain/Cognt.Modules.SpacedRepetitionSystem.Domain.csproj" />
+  <Project Path="src/Modules/SpacedRepetitionSystem/Cognt.Modules.SpacedRepetitionSystem.Infrastructure/Cognt.Modules.SpacedRepetitionSystem.Infrastructure.csproj" />
 </Solution>
