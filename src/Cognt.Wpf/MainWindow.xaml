@@ -386,12 +386,12 @@
         </Grid.ColumnDefinitions>
         <Border x:Name="SidebarHost"
                 Grid.Column="0"
-                Width="300"
-                HorizontalAlignment="Left"
+                MinWidth="240"
+                MaxWidth="320"
                 Background="#FBFCFF"
                 BorderBrush="#E1E6F0"
                 BorderThickness="0,0,1,0"
-                Padding="12,14"
+                Padding="14,16"
                 Panel.ZIndex="20">
             <Border.Effect>
                 <DropShadowEffect x:Name="SidebarShadowEffect"
@@ -400,9 +400,6 @@
                                   Color="#22000000"
                                   Opacity="0.45" />
             </Border.Effect>
-            <Border.RenderTransform>
-                <TranslateTransform x:Name="SidebarSheetTransform" />
-            </Border.RenderTransform>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -420,25 +417,29 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Width="28"
-                            Height="28"
-                            Background="#EEF2FF"
-                            CornerRadius="8">
-                        <TextBlock Text="*"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="#4C6FFF" />
+                    <Border Width="44"
+                            Height="44"
+                            Background="#FFFFFF"
+                            BorderBrush="#D8DEEC"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            ClipToBounds="True">
+                        <Image Source="pack://application:,,,/Assets/icon.png"
+                               Width="34"
+                               Height="34"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Stretch="Uniform" />
                     </Border>
                     <TextBlock x:Name="SidebarBrandText"
                                Grid.Column="1"
                                Text="Cognt"
                                Margin="10,0,0,0"
                                VerticalAlignment="Center"
-                               FontSize="14"
+                               FontSize="15"
                                FontWeight="SemiBold"
-                               Foreground="#1F2433" />
+                               Foreground="#1F2433"
+                               TextTrimming="CharacterEllipsis" />
                     <Button x:Name="SidebarToggleButton"
                             Grid.Column="2"
                             Width="36"
@@ -459,25 +460,233 @@
 
                 <StackPanel x:Name="SidebarTopNavigationSection"
                             Grid.Row="1">
-                    <TextBlock Text="COLLECTION"
-                               Style="{StaticResource SectionHeaderStyle}"
-                               Margin="8,0,0,8" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                    <TextBox x:Name="NotesDirectoryTextBox"
-                             Height="32"
-                             Margin="0,0,0,8"
-                             Padding="10,4"
-                             Background="#FFFFFF"
-                             BorderBrush="#D8DEEC"
-                             Foreground="#586078"
-                             FontSize="12"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding CollectionPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Style="{StaticResource PrimarySidebarButtonStyle}"
+                                    AutomationProperties.Name="Dashboard"
+                                    Command="{Binding ShowDashboardCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M4,12 L12,5 L20,12 M6.5,10.5 L6.5,19 L17.5,19 L17.5,10.5"
+                                          Style="{StaticResource SidebarNavigationPathStyle}" />
+                                    <TextBlock Text="Dashboard"
+                                               Margin="10,0,0,0"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="2"
+                                    Width="38"
+                                    Height="38"
+                                    ToolTip="Flashcards"
+                                    AutomationProperties.Name="Flashcards"
+                                    Style="{StaticResource SidebarIconButtonStyle}"
+                                    Command="{Binding ShowDecksCommand}">
+                                <Path Data="M5,8.5 L17.8,4.5 L20.5,13 L7.6,17 Z M4,11 L16.8,11 L16.8,20 L4,20 Z M7,14 L13.5,14"
+                                      Width="17"
+                                      Height="17"
+                                      Stretch="Uniform"
+                                      Stroke="#3156D4"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                        </Grid>
+                        <Button Margin="0,0,0,10"
+                                Style="{StaticResource PrimarySidebarButtonStyle}"
+                                AutomationProperties.Name="All Notes"
+                                Command="{Binding ShowAllNotesCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="M6,5.5 L18,5.5 M6,10.5 L18,10.5 M6,15.5 L14,15.5"
+                                      Style="{StaticResource SidebarNavigationPathStyle}" />
+                                <TextBlock Text="All Notes"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
 
-                    <Button Content="Load Collection"
-                            Style="{StaticResource SidebarButtonStyle}"
-                            Margin="0,0,0,10"
-                            Command="{Binding LoadCollectionCommand}" />
+                        <Grid Margin="0,10,0,0">
+                            <Border x:Name="SidebarSearchBox"
+                                    MinHeight="38"
+                                    Background="#FFFFFF"
+                                    BorderBrush="#D9E1F0"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Path Width="16"
+                                          Height="16"
+                                          Margin="14,0,0,0"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          Stretch="Uniform"
+                                          Stroke="#7D86A3"
+                                          StrokeThickness="1.8"
+                                          Data="M10.5,10.5 L15,15 M12,6.5 A5.5,5.5 0 1 1 1,6.5 A5.5,5.5 0 1 1 12,6.5 Z" />
+                                    <TextBox x:Name="SidebarSearchTextBox"
+                                             Margin="40,0,10,0"
+                                             Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                             Tag="Search notes"
+                                             ToolTip="Search notes"
+                                             AutomationProperties.Name="Search notes"
+                                             Style="{StaticResource SidebarSearchTextBoxStyle}"
+                                             GotKeyboardFocus="SidebarSearchTextBox_GotKeyboardFocus"
+                                             PreviewKeyDown="SidebarSearchTextBox_PreviewKeyDown" />
+                                </Grid>
+                            </Border>
+
+                            <Popup PlacementTarget="{Binding ElementName=SidebarSearchBox}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade"
+                                   StaysOpen="False"
+                                   IsOpen="{Binding IsGlobalSearchPopupOpen, Mode=TwoWay}">
+                                <Border Width="{Binding ActualWidth, ElementName=SidebarSearchBox}"
+                                        MaxHeight="310"
+                                        Margin="0,6,0,0"
+                                        Padding="8"
+                                        Background="#FFFFFF"
+                                        BorderBrush="#DDE5F3"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="18"
+                                                          ShadowDepth="6"
+                                                          Direction="270"
+                                                          Opacity="0.16"
+                                                          Color="#000000" />
+                                    </Border.Effect>
+                                    <Grid>
+                                        <Border Padding="10"
+                                                Background="#F8FAFF"
+                                                BorderBrush="#E1E6F0"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <Border.Style>
+                                                <Style TargetType="{x:Type Border}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsGlobalSearchLoading}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="Searching..."
+                                                       FontSize="12"
+                                                       Foreground="#667085" />
+                                        </Border>
+
+                                        <Border Padding="10"
+                                                Background="#FFF7F7"
+                                                BorderBrush="#F1C9C9"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <Border.Style>
+                                                <Style TargetType="{x:Type Border}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasGlobalSearchError}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding GlobalSearchErrorMessage}"
+                                                           TextWrapping="Wrap"
+                                                           FontSize="12"
+                                                           Foreground="#9C2F2F" />
+                                                <Button Grid.Column="1"
+                                                        Content="Retry"
+                                                        Margin="8,0,0,0"
+                                                        Padding="8,3"
+                                                        Command="{Binding RetryGlobalSearchCommand}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border Padding="10"
+                                                Background="#F8FAFF"
+                                                BorderBrush="#E1E6F0"
+                                                BorderThickness="1"
+                                                CornerRadius="7">
+                                            <Border.Style>
+                                                <Style TargetType="{x:Type Border}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShouldShowGlobalSearchState}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding GlobalSearchStateMessage}"
+                                                       TextWrapping="Wrap"
+                                                       FontSize="12"
+                                                       Foreground="#667085" />
+                                        </Border>
+
+                                        <ScrollViewer MaxHeight="280"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled">
+                                            <ScrollViewer.Style>
+                                                <Style TargetType="{x:Type ScrollViewer}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShouldShowGlobalSearchResults}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ScrollViewer.Style>
+                                            <ItemsControl ItemsSource="{Binding GlobalSearchResults}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                                                Command="{Binding DataContext.OpenGlobalSearchResultCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontSize="13"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#1F2433"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding Title}" />
+                                                                <TextBlock Text="{Binding Snippet}"
+                                                                           Margin="0,3,0,0"
+                                                                           TextWrapping="Wrap"
+                                                                           FontSize="12"
+                                                                           Foreground="#586078"
+                                                                           MaxHeight="48" />
+                                                                <TextBlock Text="{Binding CollectionName}"
+                                                                           Margin="0,3,0,0"
+                                                                           FontSize="11"
+                                                                           Foreground="#78809A"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding CollectionName}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <Border Height="1"
+                                Background="#E1E6F0"
+                                Margin="8,14,8,12" />
                 </StackPanel>
 
                 <ScrollViewer x:Name="SidebarScrollContent"
