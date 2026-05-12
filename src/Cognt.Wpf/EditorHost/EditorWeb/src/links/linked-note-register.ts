@@ -35,7 +35,7 @@ import {
   getDeltaReference,
   walkBlockModels,
 } from './linked-note-block-text';
-import { createLinkedPageReference } from './linked-note-insert';
+import { createLinkedPageReference } from './linked-note-reference';
 
 export function hydrateCogntEmbedLinkedNotes(
   doc: Doc,

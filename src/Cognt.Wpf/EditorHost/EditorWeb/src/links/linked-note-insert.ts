@@ -18,6 +18,7 @@ import {
   getLinkedNoteTitle,
   mergeCogntLinkedNoteParams,
 } from './linked-note-paths';
+import { createLinkedPageReference } from './linked-note-reference';
 import {
   getBlockText,
   getDeltaReference,
@@ -175,13 +176,3 @@ export function replaceExtractSelectionWithLinkedPage(
   return linkedDoc;
 }
 
-export function createLinkedPageReference(pageId: string, relativePath: string, title: string) {
-  return {
-    type: 'LinkedPage',
-    pageId,
-    params: createCogntLinkedNoteParams(relativePath),
-    title,
-    description: relativePath,
-    [cogntLinkedNotePathProp]: relativePath,
-  };
-}

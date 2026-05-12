@@ -119,7 +119,7 @@ export function isBlockSuiteJsonPath(path: string | null | undefined) {
 
 export function getSnapshotTextValue(snapshot: BlockSnapshot) {
   const text = snapshot.props.text;
-  return isRecord(text) ? text : null;
+  return isPlainRecord(text) ? text : null;
 }
 
 export function getSnapshotTextDelta(textValue: Record<string, unknown>) {
@@ -127,14 +127,14 @@ export function getSnapshotTextDelta(textValue: Record<string, unknown>) {
 }
 
 export function isBlockSnapshot(value: unknown): value is BlockSnapshot {
-  return isRecord(value)
+  return isPlainRecord(value)
     && value.type === 'block'
     && typeof value.id === 'string'
     && typeof value.flavour === 'string'
-    && isRecord(value.props)
+    && isPlainRecord(value.props)
     && Array.isArray(value.children);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+export function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

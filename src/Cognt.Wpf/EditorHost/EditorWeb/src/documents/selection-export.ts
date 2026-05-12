@@ -10,6 +10,8 @@ import type { TextSelection } from '../cloze';
 import {
   createBlockSuiteDocumentJsonFromBlockSnapshots,
   createTitleFromPlainText,
+  isBlockSnapshot,
+  isPlainRecord,
   getSnapshotTextDelta,
   getSnapshotTextValue,
   normalizeSelectionText,
@@ -26,6 +28,10 @@ export type TextSelectionSnapshot = {
   to: TextSelectionPointSnapshot | null;
   start?: TextSelectionPointSnapshot;
   end?: TextSelectionPointSnapshot;
+};
+
+export type BlockSelectionSnapshot = {
+  blockId: string;
 };
 
 export type CurrentSelection = {
@@ -45,38 +51,99 @@ export function getCurrentSelection(): CurrentSelection | null {
   };
 }
 
+export function getPlainTextFromTextSelection(
+  doc: Doc,
+  editor: PageEditor,
+  textSelection: TextSelection
+) {
+  const snapshots = createSnapshotsFromTextSelection(doc, editor, textSelection);
+  return snapshots
+    .map(getSnapshotPlainText)
+    .filter(text => text.length > 0)
+    .join(' ');
+}
+
+export function getBlockIdsFromTextSelection(
+  doc: Doc,
+  editor: PageEditor,
+  textSelection: TextSelection
+) {
+  return getSelectedTextBlockModels(editor, doc, textSelection)
+    .map(model => model.id)
+    .filter((blockId): blockId is string => typeof blockId === 'string' && blockId.length > 0);
+}
+
+export function getOrderedTextSelectionPoints(textSelection: TextSelection) {
+  return {
+    start: cloneTextSelectionPoint(getTextSelectionStart(textSelection)),
+    end: cloneTextSelectionPoint(getTextSelectionEnd(textSelection)),
+  };
+}
+
 export function createBlockSuiteDocumentJsonFromSelection(
   doc: Doc,
   editor: PageEditor,
-  plainText: string
+  plainText: string,
+  selection?: TextSelection
 ) {
-  const textSelection = editor.std?.selection.find('text') as TextSelection | null | undefined;
+  const textSelection = selection
+    ?? editor.std?.selection.find('text') as TextSelection | null | undefined;
   if (!textSelection || textSelection.isCollapsed()) {
     return null;
   }
 
-  const models = getSelectedTextBlockModels(editor, doc, textSelection);
-  if (models.length === 0) {
-    return null;
-  }
+  const snapshots = createSnapshotsFromTextSelection(doc, editor, textSelection);
 
-  const job = new Job({ collection: doc.collection });
-  const start = getTextSelectionStart(textSelection);
-  const end = getTextSelectionEnd(textSelection);
-  const snapshots = models
-    .map(model => job.blockToSnapshot(model as DraftModel))
-    .filter(isBlockSnapshot)
-    .map(cloneBlockSnapshot)
-    .map(snapshot => trimSnapshotForTextSelection(snapshot, start, end));
-
-  if (snapshots.length === 0 || !snapshots.some(hasSnapshotBodyContent)) {
+  const contentSnapshots = prepareExtractSnapshots(snapshots);
+  if (contentSnapshots.length === 0 || !contentSnapshots.some(hasSnapshotBodyContent)) {
     return null;
   }
 
   return createBlockSuiteDocumentJsonFromBlockSnapshots(
-    snapshots,
+    contentSnapshots,
     createTitleFromPlainText(plainText, 'Extract')
   );
+}
+
+export function createBlockSuiteDocumentJsonFromBlockSelection(
+  doc: Doc,
+  blockIds: string[]
+) {
+  const job = new Job({ collection: doc.collection });
+  const snapshots = uniqueBlockIds(blockIds)
+    .map(blockId => doc.getBlock(blockId)?.model)
+    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model))
+    .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
+    .filter(isBlockSnapshot)
+    .map(cloneBlockSnapshot);
+
+  const contentSnapshots = prepareExtractSnapshots(snapshots);
+  if (contentSnapshots.length === 0 || !contentSnapshots.some(hasSnapshotBodyContent)) {
+    return null;
+  }
+
+  const plainText = contentSnapshots
+    .map(getSnapshotPlainText)
+    .filter(text => text.length > 0)
+    .join(' ');
+
+  return createBlockSuiteDocumentJsonFromBlockSnapshots(
+    contentSnapshots,
+    createTitleFromPlainText(plainText, 'Extract')
+  );
+}
+
+export function getPlainTextFromBlockSelection(doc: Doc, blockIds: string[]) {
+  const job = new Job({ collection: doc.collection });
+  return uniqueBlockIds(blockIds)
+    .map(blockId => doc.getBlock(blockId)?.model)
+    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model))
+    .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
+    .filter(isBlockSnapshot)
+    .flatMap(snapshot => prepareExtractSnapshots([snapshot]))
+    .map(getSnapshotPlainText)
+    .filter(text => text.length > 0)
+    .join(' ');
 }
 
 export function cloneTextSelection(selection: TextSelection): TextSelectionSnapshot {
@@ -135,14 +202,101 @@ function getSelectedTextBlockModels(
 
   const models = components
     .map((component: { model?: BlockModel }) => component.model)
-    .filter((model): model is BlockModel => Boolean(model));
+    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model));
 
   if (models.length > 0) {
+    return expandTextSelectionBlockModels(doc, textSelection, uniqueModels(models));
+  }
+
+  return getFallbackTextSelectionBlockModels(doc, textSelection);
+}
+
+function expandTextSelectionBlockModels(
+  doc: Doc,
+  textSelection: TextSelection,
+  models: BlockModel[]
+) {
+  const start = getTextSelectionStart(textSelection);
+  const end = getTextSelectionEnd(textSelection);
+  if (start.blockId === end.blockId) {
     return models;
   }
 
-  const fallback = doc.getBlock(textSelection.from.blockId)?.model;
-  return fallback ? [fallback as BlockModel] : [];
+  const startModel = doc.getBlock(start.blockId)?.model;
+  const endModel = doc.getBlock(end.blockId)?.model;
+  if (!startModel || !endModel) {
+    return models;
+  }
+
+  const startParent = doc.getParent(startModel as never) as { children?: unknown[] } | null;
+  const endParent = doc.getParent(endModel as never);
+  const siblings = Array.isArray(startParent?.children) ? startParent.children : [];
+  const startIndex = siblings.indexOf(startModel);
+  const endIndex = siblings.indexOf(endModel);
+  if (!startParent || startParent !== endParent || startIndex < 0 || endIndex < 0) {
+    return models;
+  }
+
+  const firstIndex = Math.min(startIndex, endIndex);
+  const lastIndex = Math.max(startIndex, endIndex);
+  return siblings
+    .slice(firstIndex, lastIndex + 1)
+    .filter((model): model is BlockModel => isSelectableTextBlockModel(model));
+}
+
+function getFallbackTextSelectionBlockModels(
+  doc: Doc,
+  textSelection: TextSelection
+) {
+  const start = getTextSelectionStart(textSelection);
+  const end = getTextSelectionEnd(textSelection);
+  const startModel = doc.getBlock(start.blockId)?.model;
+  const endModel = doc.getBlock(end.blockId)?.model;
+
+  if (!startModel || !endModel) {
+    const fallback = doc.getBlock(textSelection.from.blockId)?.model;
+    return fallback ? [fallback as BlockModel] : [];
+  }
+
+  if (startModel === endModel) {
+    return [startModel as BlockModel];
+  }
+
+  const startParent = doc.getParent(startModel as never) as { children?: unknown[] } | null;
+  const endParent = doc.getParent(endModel as never);
+  const siblings = Array.isArray(startParent?.children) ? startParent.children : [];
+  const startIndex = siblings.indexOf(startModel);
+  const endIndex = siblings.indexOf(endModel);
+
+  if (startParent && startParent === endParent && startIndex >= 0 && endIndex >= 0) {
+    const firstIndex = Math.min(startIndex, endIndex);
+    const lastIndex = Math.max(startIndex, endIndex);
+    return siblings
+      .slice(firstIndex, lastIndex + 1)
+      .filter((model): model is BlockModel => isSelectableTextBlockModel(model));
+  }
+
+  return uniqueModels([startModel as BlockModel, endModel as BlockModel]);
+}
+
+function createSnapshotsFromTextSelection(
+  doc: Doc,
+  editor: PageEditor,
+  textSelection: TextSelection
+) {
+  const models = getSelectedTextBlockModels(editor, doc, textSelection);
+  if (models.length === 0) {
+    return [];
+  }
+
+  const job = new Job({ collection: doc.collection });
+  const start = getTextSelectionStart(textSelection);
+  const end = getTextSelectionEnd(textSelection);
+  return models
+    .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
+    .filter(isBlockSnapshot)
+    .map(cloneBlockSnapshot)
+    .map((snapshot: BlockSnapshot) => trimSnapshotForTextSelection(snapshot, start, end));
 }
 
 function getTextSelectionStart(textSelection: TextSelection) {
@@ -179,7 +333,9 @@ function trimSnapshotForTextSelection(
     trimSnapshotText(snapshot, 0, getSelectionPointEndOffset(end));
   }
 
-  snapshot.children = snapshot.children.map(child => trimSnapshotForTextSelection(child, start, end));
+  snapshot.children = snapshot.children.map((child: BlockSnapshot) =>
+    trimSnapshotForTextSelection(child, start, end)
+  );
   return snapshot;
 }
 
@@ -206,7 +362,7 @@ function getSelectionPointEndOffset(point: { index: number; length: number }) {
 function getSnapshotTextLength(snapshot: BlockSnapshot) {
   return getSnapshotTextDelta(getSnapshotTextValue(snapshot) ?? {})
     .reduce((length, entry) => (
-      isRecord(entry) && typeof entry.insert === 'string'
+      isPlainRecord(entry) && typeof entry.insert === 'string'
         ? length + entry.insert.length
         : length
     ), 0);
@@ -214,9 +370,92 @@ function getSnapshotTextLength(snapshot: BlockSnapshot) {
 
 function hasSnapshotBodyContent(snapshot: BlockSnapshot): boolean {
   const hasText = getSnapshotTextDelta(getSnapshotTextValue(snapshot) ?? {})
-    .some(entry => isRecord(entry) && typeof entry.insert === 'string' && entry.insert.trim().length > 0);
+    .some(entry => isPlainRecord(entry) && typeof entry.insert === 'string' && entry.insert.trim().length > 0);
 
   return hasText || snapshot.children.some(hasSnapshotBodyContent);
+}
+
+function normalizeExtractSnapshots(snapshots: BlockSnapshot[]): BlockSnapshot[] {
+  return snapshots.flatMap(snapshot => {
+    if (snapshot.flavour === 'affine:surface') {
+      return [];
+    }
+
+    if (snapshot.flavour === 'affine:page' || snapshot.flavour === 'affine:note') {
+      return snapshot.children
+        .filter(isBlockSnapshot)
+        .flatMap(child => normalizeExtractSnapshots([child]));
+    }
+
+    return [snapshot];
+  });
+}
+
+function prepareExtractSnapshots(snapshots: BlockSnapshot[]): BlockSnapshot[] {
+  return regenerateSnapshotIds(
+    removeSnapshotsNestedInOtherSelectedSnapshots(normalizeExtractSnapshots(snapshots))
+  );
+}
+
+function removeSnapshotsNestedInOtherSelectedSnapshots(snapshots: BlockSnapshot[]): BlockSnapshot[] {
+  const filtered: BlockSnapshot[] = [];
+  const seenTopLevelIds = new Set<string>();
+
+  for (const snapshot of snapshots) {
+    if (seenTopLevelIds.has(snapshot.id)) {
+      continue;
+    }
+
+    const isNestedInAnotherSelectedSnapshot = snapshots.some(other =>
+      other !== snapshot && containsDescendantBlockId(other, snapshot.id)
+    );
+    if (!isNestedInAnotherSelectedSnapshot) {
+      filtered.push(snapshot);
+      seenTopLevelIds.add(snapshot.id);
+    }
+  }
+
+  return filtered;
+}
+
+function containsDescendantBlockId(snapshot: BlockSnapshot, blockId: string): boolean {
+  return snapshot.children
+    .filter(isBlockSnapshot)
+    .some(child => child.id === blockId || containsDescendantBlockId(child, blockId));
+}
+
+function regenerateSnapshotIds(snapshots: BlockSnapshot[]): BlockSnapshot[] {
+  return snapshots.map(regenerateSnapshotId);
+}
+
+function regenerateSnapshotId(snapshot: BlockSnapshot): BlockSnapshot {
+  const nextSnapshot = cloneBlockSnapshot(snapshot);
+  nextSnapshot.id = createExtractBlockId();
+  nextSnapshot.children = nextSnapshot.children
+    .filter(isBlockSnapshot)
+    .map(regenerateSnapshotId);
+  return nextSnapshot;
+}
+
+function createExtractBlockId() {
+  return `extract-${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
+}
+
+function getSnapshotPlainText(snapshot: BlockSnapshot): string {
+  const ownText = getSnapshotTextDelta(getSnapshotTextValue(snapshot) ?? {})
+    .flatMap(entry => (
+      isPlainRecord(entry) && typeof entry.insert === 'string'
+        ? [entry.insert]
+        : []
+    ))
+    .join('');
+  const childText = snapshot.children
+    .filter(isBlockSnapshot)
+    .map(getSnapshotPlainText)
+    .filter(text => text.length > 0)
+    .join(' ');
+
+  return normalizeSelectionText([ownText, childText].filter(Boolean).join(' '));
 }
 
 function trimSnapshotText(snapshot: BlockSnapshot, index: number, length: number) {
@@ -241,7 +480,7 @@ function sliceTextDelta(delta: unknown[], index: number, length: number) {
   let offset = 0;
 
   for (const entry of delta) {
-    if (!isRecord(entry) || typeof entry.insert !== 'string') {
+    if (!isPlainRecord(entry) || typeof entry.insert !== 'string') {
       continue;
     }
 
@@ -264,15 +503,40 @@ function sliceTextDelta(delta: unknown[], index: number, length: number) {
   return result;
 }
 
-function isBlockSnapshot(value: unknown): value is BlockSnapshot {
-  return isRecord(value)
-    && value.type === 'block'
-    && typeof value.id === 'string'
-    && typeof value.flavour === 'string'
-    && isRecord(value.props)
-    && Array.isArray(value.children);
+function uniqueBlockIds(values: string[]) {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const blockId = value.trim();
+    if (!blockId || seen.has(blockId)) {
+      continue;
+    }
+
+    seen.add(blockId);
+    ids.push(blockId);
+  }
+
+  return ids;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+function uniqueModels(models: BlockModel[]) {
+  const result: BlockModel[] = [];
+  const seen = new Set<BlockModel>();
+  for (const model of models) {
+    if (seen.has(model)) {
+      continue;
+    }
+
+    seen.add(model);
+    result.push(model);
+  }
+
+  return result;
+}
+
+function isSelectableTextBlockModel(value: unknown): value is BlockModel {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { id?: unknown }).id === 'string'
+    && Boolean((value as { text?: unknown }).text);
 }

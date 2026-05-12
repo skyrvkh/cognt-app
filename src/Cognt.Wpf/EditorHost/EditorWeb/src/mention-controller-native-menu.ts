@@ -1,23 +1,18 @@
 import { REFERENCE_NODE } from '@blocksuite/affine-components/rich-text';
 import { createDefaultDoc } from '@blocksuite/blocks';
 import type { PageEditor } from '@blocksuite/presets';
-import { html } from 'lit';
+import { html } from 'lit-html';
 import {
   filterMentionTargets,
   type MentionTarget,
 } from './mentions';
-import {
-  findNativeMentionMenuItem,
-  getNativeMentionMenuItemFromEvent,
-  getNativeMentionMenuItemPath,
-} from './mention-controller-anchors';
-import { removeNativeMentionSearchPreview } from './mention-controller-native-preview';
 import {
   getMentionDisplayTitle,
   getMentionMenuSuffix,
   normalizeMentionPathKey,
 } from './mention-controller-targets';
 import { delayWithAbort } from './mention-controller-timing';
+import { createLinkedPageReference } from './links/linked-note-reference';
 import type {
   NativeInlineEditor,
   NativeLinkedMenuGroup,
@@ -28,7 +23,6 @@ const mentionSearchDebounceMs = 500;
 const maxNativeMentionItems = 8;
 const nativeMentionSearchLimit = 32;
 const noteMentionGroupName = 'Notes';
-const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
 const noteMentionIcon = html`<span
   style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-weight:700;color:var(--affine-text-secondary-color);"
   >#</span
@@ -59,26 +53,13 @@ export class NativeMentionMenuController {
     abortSignal?: AbortSignal
   ) {
     const targets = await this.searchMentionTargets(query, abortSignal);
-    this.scheduleFirstPreview(targets, abortSignal);
 
     return targets.length === 0
       ? []
       : [this.createMentionGroup(targets, abort, inlineEditor)];
   }
 
-  public handleMouseMove(event: MouseEvent) {
-    const target = getNativeMentionMenuItemFromEvent(event);
-    if (!target) {
-      return;
-    }
-
-    const relativePath = getNativeMentionMenuItemPath(target);
-    if (!relativePath) {
-      return;
-    }
-
-    this.options.requestPreview(relativePath, target);
-  }
+  public handleMouseMove(_event: MouseEvent) {}
 
   private insertMention(inlineEditor: NativeInlineEditor, target: MentionTarget) {
     const range = inlineEditor.getInlineRange();
@@ -89,16 +70,7 @@ export class NativeMentionMenuController {
 
     const title = getMentionDisplayTitle(target);
     const linkedDoc = createDefaultDoc(this.options.editor.doc.collection, { title });
-    const reference = {
-      type: 'LinkedPage',
-      pageId: linkedDoc.id,
-      params: {
-        [cogntLinkedNotePathProp]: target.relativePath,
-      },
-      title,
-      description: target.relativePath,
-      [cogntLinkedNotePathProp]: target.relativePath,
-    };
+    const reference = createLinkedPageReference(linkedDoc.id, target.relativePath, title);
 
     try {
       inlineEditor.insertText(range, REFERENCE_NODE, {
@@ -188,25 +160,6 @@ export class NativeMentionMenuController {
         nativeMentionSearchLimit
       );
     }
-  }
-
-  private scheduleFirstPreview(targets: MentionTarget[], abortSignal?: AbortSignal) {
-    const firstTarget = targets[0];
-    if (!firstTarget || abortSignal?.aborted) {
-      removeNativeMentionSearchPreview();
-      return;
-    }
-
-    window.setTimeout(() => {
-      if (abortSignal?.aborted) {
-        return;
-      }
-
-      const anchor = findNativeMentionMenuItem(firstTarget.relativePath);
-      if (anchor) {
-        this.options.requestPreview(firstTarget.relativePath, anchor);
-      }
-    }, 0);
   }
 
   private mergeTargets(targets: MentionTarget[]) {

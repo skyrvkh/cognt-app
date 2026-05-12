@@ -14,7 +14,7 @@ import {
   isCogntNoteRelativePath,
   isRecord,
 } from './linked-note-paths';
-import { createLinkedPageReference } from './linked-note-insert';
+import { createLinkedPageReference } from './linked-note-reference';
 
 export function upgradeSerializedRawCogntInlineMentionSnapshots(snapshot: DocSnapshot) {
   upgradeBlockSnapshotRawCogntInlineMentions(snapshot.blocks);
