@@ -21,12 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\Models\Markdown\NoteModels.cs" Link="Models\Markdown\NoteModels.cs" />
-    <Compile Include="..\..\..\Models\Editor\SaveClozeRequestedEventArgs.cs" Link="Models\Editor\SaveClozeRequestedEventArgs.cs" />
-    <Compile Include="..\..\..\Services\BlazorHybridServices.cs" Link="Services\BlazorHybridServices.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Update="wwwroot\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
