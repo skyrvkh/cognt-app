@@ -694,118 +694,133 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
-                        <Button Content="Dashboard"
-                                Style="{StaticResource PrimarySidebarButtonStyle}"
-                                Margin="0,0,0,8"
-                                Command="{Binding ShowDashboardCommand}" />
-                        <Button Content="All Documents"
-                                Style="{StaticResource SidebarButtonStyle}"
-                                Command="{Binding ShowAllNotesCommand}" />
-                        <Button Content="Flashcards"
-                                Style="{StaticResource SidebarButtonStyle}"
-                                Command="{Binding ShowDecksCommand}" />
-                        <Button Content="Cards from note"
-                                Style="{StaticResource SidebarButtonStyle}" />
-                        <Button Content="Browser"
-                                Style="{StaticResource SidebarButtonStyle}" />
-
-                        <Border Height="1"
-                                Background="#E1E6F0"
-                                Margin="8,14,8,12" />
-
-                        <TreeView x:Name="NotesTree"
-                                  BorderThickness="0"
-                                  Margin="0"
-                                  Background="Transparent"
-                                  FontSize="13"
-                                  Foreground="#586078"
-                                  AllowDrop="True"
-                                  ItemsSource="{Binding NoteRoots}"
-                                  PreviewKeyDown="NotesTree_PreviewKeyDown"
-                                  PreviewMouseLeftButtonDown="NotesTree_PreviewMouseLeftButtonDown"
-                                  PreviewMouseDoubleClick="NotesTree_PreviewMouseDoubleClick"
-                                  PreviewMouseRightButtonDown="NotesTree_PreviewMouseRightButtonDown"
-                                  PreviewMouseMove="NotesTree_PreviewMouseMove"
-                                  DragOver="NotesTree_DragOver"
-                                  Drop="NotesTree_Drop"
-                                  SelectedItemChanged="NotesTree_SelectedItemChanged">
-                            <TreeView.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="New Folder"
-                                              Click="NewFolderTreeItem_Click" />
-                                    <Separator />
-                                    <MenuItem Header="Delete"
-                                              Click="DeleteTreeItem_Click" />
-                                </ContextMenu>
-                            </TreeView.ContextMenu>
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type viewModels:NoteTreeNodeViewModel}"
-                                                          ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal"
-                                                MinHeight="24">
-                                        <TextBlock Text="{Binding Prefix}"
-                                                   Margin="0,0,5,0"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="#586078" />
-                                        <Grid MinWidth="96">
-                                            <TextBlock Text="{Binding Title}"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="{x:Type TextBlock}">
-                                                        <Setter Property="Visibility"
-                                                                Value="Visible" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsRenaming}"
-                                                                         Value="True">
-                                                                <Setter Property="Visibility"
-                                                                        Value="Collapsed" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                            <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
-                                                     MinWidth="110"
-                                                     Height="24"
-                                                     Padding="4,1"
-                                                     BorderBrush="#CBD6FF"
-                                                     Background="#FFFFFF"
-                                                     Foreground="#1F2433"
-                                                     VerticalContentAlignment="Center"
-                                                     IsVisibleChanged="TreeRenameTextBox_IsVisibleChanged"
-                                                     LostKeyboardFocus="TreeRenameTextBox_LostKeyboardFocus"
-                                                     PreviewKeyDown="TreeRenameTextBox_PreviewKeyDown">
-                                                <TextBox.Style>
-                                                    <Style TargetType="{x:Type TextBox}">
-                                                        <Setter Property="Visibility"
-                                                                Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsRenaming}"
-                                                                         Value="True">
-                                                                <Setter Property="Visibility"
-                                                                        Value="Visible" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBox.Style>
-                                            </TextBox>
+                        <Grid>
+                                <TreeView x:Name="NotesTree"
+                                          BorderThickness="0"
+                                          Margin="0"
+                                          Background="Transparent"
+                                          FontSize="13"
+                                          Foreground="#586078"
+                                          AllowDrop="True"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ItemsSource="{Binding NoteRoots}"
+                                          PreviewKeyDown="NotesTree_PreviewKeyDown"
+                                      PreviewMouseLeftButtonDown="NotesTree_PreviewMouseLeftButtonDown"
+                                      PreviewMouseDoubleClick="NotesTree_PreviewMouseDoubleClick"
+                                      PreviewMouseRightButtonDown="NotesTree_PreviewMouseRightButtonDown"
+                                      PreviewMouseMove="NotesTree_PreviewMouseMove"
+                                      DragOver="NotesTree_DragOver"
+                                      Drop="NotesTree_Drop"
+                                      SelectedItemChanged="NotesTree_SelectedItemChanged">
+                                <TreeView.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="New Folder"
+                                                  Click="NewFolderTreeItem_Click" />
+                                        <Separator />
+                                        <MenuItem Header="Delete"
+                                                  Click="DeleteTreeItem_Click" />
+                                    </ContextMenu>
+                                </TreeView.ContextMenu>
+                                <TreeView.Resources>
+                                    <HierarchicalDataTemplate DataType="{x:Type viewModels:NoteTreeNodeViewModel}"
+                                                              ItemsSource="{Binding Children}">
+                                        <Grid MinHeight="24">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Path Style="{StaticResource NoteTreeNodePathStyle}" />
+                                            <Grid Grid.Column="1"
+                                                  MinWidth="0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="13"
+                                                           ToolTip="{Binding Title}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="{x:Type TextBlock}"
+                                                               BasedOn="{StaticResource NavigationTreeItemTextStyle}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRenaming}"
+                                                                             Value="True">
+                                                                    <Setter Property="Visibility"
+                                                                            Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                         MinWidth="110"
+                                                        Height="24"
+                                                        Padding="4,1"
+                                                         FontSize="13"
+                                                         BorderBrush="#CBD6FF"
+                                                         Background="#FFFFFF"
+                                                         Foreground="#1F2433"
+                                                         VerticalContentAlignment="Center"
+                                                         IsVisibleChanged="TreeRenameTextBox_IsVisibleChanged"
+                                                         LostKeyboardFocus="TreeRenameTextBox_LostKeyboardFocus"
+                                                         PreviewKeyDown="TreeRenameTextBox_PreviewKeyDown">
+                                                    <TextBox.Style>
+                                                        <Style TargetType="{x:Type TextBox}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRenaming}"
+                                                                             Value="True">
+                                                                    <Setter Property="Visibility"
+                                                                            Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBox.Style>
+                                                </TextBox>
+                                            </Grid>
                                         </Grid>
-                                    </StackPanel>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="{x:Type TreeViewItem}"
-                                       BasedOn="{StaticResource NoteTreeViewItemStyle}">
-                                    <Setter Property="IsExpanded"
-                                            Value="{Binding IsExpanded, Mode=TwoWay}" />
-                                    <Setter Property="AllowDrop"
-                                            Value="True" />
-                                    <EventSetter Event="Expanded"
-                                                 Handler="NotesTreeItem_Expanded" />
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.Resources>
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="{x:Type TreeViewItem}"
+                                           BasedOn="{StaticResource NavigationTreeViewItemStyle}">
+                                        <Setter Property="IsExpanded"
+                                                Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                        <Setter Property="AllowDrop"
+                                                Value="True" />
+                                        <EventSetter Event="Expanded"
+                                                    Handler="NotesTreeItem_Expanded" />
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                            </TreeView>
+                            <Border Padding="14"
+                                    Background="#F8FAFF"
+                                    BorderBrush="#E1E6F0"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Border.Style>
+                                    <Style TargetType="{x:Type Border}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShouldShowNoNotesState}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <TextBlock Text="No documents"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2433" />
+                                    <TextBlock Text="Create a document to start this collection."
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Foreground="#78809A" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
                     </StackPanel>
                 </ScrollViewer>
 
