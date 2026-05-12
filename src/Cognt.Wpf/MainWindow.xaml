@@ -243,6 +243,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
         <Style x:Key="SidebarCollectionSelectorButtonStyle"
                BasedOn="{StaticResource SidebarButtonStyle}"
                TargetType="Button">
@@ -387,6 +388,7 @@
             <ColumnDefinition x:Name="SidebarSplitterColumn" Width="6" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+
         <Border x:Name="SidebarHost"
                 Grid.Column="0"
                 MinWidth="240"
@@ -1245,82 +1247,299 @@
                                 Panel.ZIndex="10" />
             </Grid>
 
-                <GridSplitter x:Name="RightViewerSplitter"
-                              Grid.Column="1"
-                              Width="6"
-                              HorizontalAlignment="Stretch"
-                              VerticalAlignment="Stretch"
-                              Background="#E1E6F0"
-                              ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"
-                              Visibility="Collapsed" />
+            <GridSplitter x:Name="RightViewerSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="#E9EDF6"
+                          Cursor="SizeWE"
+                          ResizeBehavior="PreviousAndNext"
+                          ResizeDirection="Columns"
+                          ShowsPreview="False"
+                          Visibility="Collapsed"
+                          DragDelta="RightViewerSplitter_DragDelta"
+                          DragCompleted="RightViewerSplitter_DragCompleted"
+                          Panel.ZIndex="12" />
 
-                <Border x:Name="RightViewerPane"
-                        Grid.Column="2"
-                        Background="#FFFFFF"
-                        BorderBrush="#E1E6F0"
-                        BorderThickness="1,0,0,0"
-                        Visibility="Collapsed">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="44" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+            <Border x:Name="RightViewerPane"
+                    Grid.Column="2"
+                    Background="#FBFCFF"
+                    BorderBrush="#DCE3F0"
+                    BorderThickness="1,0,0,0"
+                    Visibility="Collapsed"
+                    AllowDrop="True"
+                    DragEnter="RightViewerPane_DragEnter"
+                    DragLeave="RightViewerPane_DragLeave"
+                    DragOver="RightViewerPane_DragOver"
+                    Drop="RightViewerPane_Drop">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0"
-                              Background="#F7F9FC"
-                              Margin="0"
-                              VerticalAlignment="Stretch">
+                    <Border Grid.Row="0"
+                            Background="#FFFFFF"
+                            BorderBrush="#E1E6F0"
+                            BorderThickness="0,0,0,1"
+                            Padding="12,9">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-
                             <TextBlock x:Name="RightViewerTitleText"
-                                       Grid.Column="0"
-                                       Margin="14,0,8,0"
+                                       Text="Viewer"
                                        VerticalAlignment="Center"
-                                       FontSize="13"
+                                       FontSize="12"
                                        FontWeight="SemiBold"
-                                       Foreground="#1F2433" />
+                                       Foreground="#1F2433"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="1"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    ToolTip="Close viewer"
+                                    AutomationProperties.Name="Close viewer"
+                                    Style="{StaticResource SidebarIconButtonStyle}"
+                                    Click="RightViewerCloseButton_Click">
+                                <Path Width="11"
+                                      Height="11"
+                                      Data="M3,3 L13,13 M13,3 L3,13"
+                                      Stretch="Uniform"
+                                      Stroke="#586078"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Button>
                         </Grid>
+                    </Border>
 
-                        <ContentControl x:Name="RightViewerContentHost"
-                                        Grid.Row="1" />
+                    <ContentControl x:Name="RightViewerContentHost"
+                                    Grid.Row="1" />
 
-                        <Border x:Name="RightViewerDropOverlay"
-                                Grid.RowSpan="2"
-                                Background="#CCEEF2FF"
-                                BorderBrush="#7C8FB8"
-                                BorderThickness="1"
-                                Visibility="Collapsed"
-                                Panel.ZIndex="2">
-                            <TextBlock Text="Drop PDF to open"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="#24324F" />
-                        </Border>
+                    <Border x:Name="RightViewerDropOverlay"
+                            Grid.RowSpan="2"
+                            Margin="14"
+                            Background="#EAF0FF"
+                            BorderBrush="#6A83FF"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Visibility="Collapsed"
+                            IsHitTestVisible="False"
+                            Panel.ZIndex="20">
+                        <Grid>
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <Path Width="34"
+                                      Height="34"
+                                      HorizontalAlignment="Center"
+                                      Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2"
+                                      Fill="#FFF1F2"
+                                      Stretch="Uniform"
+                                      Stroke="#EF4444"
+                                      StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                                <TextBlock Text="Drop PDF to open"
+                                           Margin="0,12,0,0"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2433"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="The current note will stay open."
+                                           Margin="0,4,0,0"
+                                           FontSize="12"
+                                           Foreground="#586078"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <StackPanel x:Name="RightViewerHangingButtons"
+                        Grid.Column="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0"
+                        Panel.ZIndex="11">
+                <StackPanel.Style>
+                    <Style TargetType="{x:Type StackPanel}">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Visibility, ElementName=OverlayHost}" Value="Visible">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Button Width="38"
+                        Height="38"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        ToolTip="Cards from this note"
+                        AutomationProperties.Name="Cards from this note"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="RightViewerNoteCardsButton_Click">
+                    <Grid Width="19"
+                          Height="19">
+                        <Path Data="M5,4 L15,4 L18,7 L18,18 L5,18 Z M15,4 L15,7 L18,7 M8,10 L15,10 M8,13 L15,13"
+                              Stretch="Uniform"
+                              Stroke="#3156D4"
+                              StrokeThickness="1.6"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" />
                     </Grid>
-                </Border>
-
-                <StackPanel x:Name="RightViewerHangingButtons"
-                            Grid.Column="0"
-                            Orientation="Vertical"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,18,18,0"
-                            Panel.ZIndex="11">
-                    <Button Content="Cards"
-                            Width="72"
-                            Height="30" />
-                </StackPanel>
-            </Grid>
+                </Button>
+                <Button Width="38"
+                        Height="38"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        ToolTip="Create card context from selected blocks"
+                        AutomationProperties.Name="Create card context from selected blocks"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="CreateCardContextFromSelectionButton_Click">
+                    <Grid Width="19"
+                          Height="19">
+                        <Rectangle Width="13"
+                                   Height="15"
+                                   Margin="3,2,0,0"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top"
+                                   RadiusX="2"
+                                   RadiusY="2"
+                                   Fill="#EEF2FF"
+                                   Stroke="#3156D4"
+                                   StrokeThickness="1.4" />
+                        <Path Data="M6,6 L13,6 M6,9.5 L14,9.5 M6,13 L11,13"
+                              Stretch="Uniform"
+                              Stroke="#3156D4"
+                              StrokeThickness="1.4"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round" />
+                    </Grid>
+                </Button>
+                <Button Width="38"
+                        Height="38"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        ToolTip="Create cloze deletion from selection (Ctrl+Shift+C)"
+                        AutomationProperties.Name="Create cloze deletion from selection"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="CreateClozeFromSelectionButton_Click">
+                    <Grid Width="20"
+                          Height="20">
+                        <Path Data="M3.5,6.5 L16.5,6.5 M3.5,13.5 L16.5,13.5 M6.5,3.5 C4.8,5.5 4.8,14.5 6.5,16.5 M13.5,3.5 C15.2,5.5 15.2,14.5 13.5,16.5"
+                              Stretch="Uniform"
+                              Stroke="#3156D4"
+                              StrokeThickness="1.6"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" />
+                        <Border Width="8"
+                                Height="8"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="#FEE2E2"
+                                BorderBrush="#DC2626"
+                                BorderThickness="1"
+                                CornerRadius="4" />
+                    </Grid>
+                </Button>
+                <Button Width="38"
+                        Height="38"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        ToolTip="Mask selected image (Ctrl+Shift+I)"
+                        AutomationProperties.Name="Mask selected image"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="OpenImageOcclusionEditorButton_Click">
+                    <Grid Width="19"
+                          Height="19">
+                        <Rectangle Width="14"
+                                   Height="11"
+                                   Margin="2,5,0,0"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top"
+                                   RadiusX="2"
+                                   RadiusY="2"
+                                   Fill="#EEF2FF"
+                                   Stroke="#3156D4"
+                                   StrokeThickness="1.4" />
+                        <Ellipse Width="7"
+                                 Height="7"
+                                 Margin="9,2,0,0"
+                                 HorizontalAlignment="Left"
+                                 VerticalAlignment="Top"
+                                 Fill="#FEE2E2"
+                                 Stroke="#DC2626"
+                                 StrokeThickness="1.4" />
+                    </Grid>
+                </Button>
+                <Button Width="38"
+                        Height="38"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        ToolTip="PDF viewer"
+                        AutomationProperties.Name="PDF viewer"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="RightViewerPdfButton_Click">
+                    <Path Width="18"
+                          Height="18"
+                          Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2"
+                          Fill="#FFF1F2"
+                          Stretch="Uniform"
+                          Stroke="#EF4444"
+                          StrokeThickness="1.6"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round" />
+                </Button>
+                <Button Width="38"
+                        Height="38"
+                        Padding="0"
+                        ToolTip="Browser view"
+                        AutomationProperties.Name="Browser view"
+                        Style="{StaticResource SidebarIconButtonStyle}"
+                        Click="RightViewerBrowserButton_Click">
+                    <Grid Width="18"
+                          Height="18">
+                        <Ellipse Stroke="#3156D4"
+                                 StrokeThickness="1.6" />
+                        <Path Data="M2,9 L16,9 M9,2 C6.6,4.2 6.6,13.8 9,16 M9,2 C11.4,4.2 11.4,13.8 9,16"
+                              Stretch="Uniform"
+                              Stroke="#3156D4"
+                              StrokeThickness="1.4"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round" />
+                    </Grid>
+                </Button>
+            </StackPanel>
+        </Grid>
 
         <Button x:Name="FloatingNavigationButton"
                 Grid.Column="2"
-                Visibility="Collapsed" />
-
+                Width="54"
+                Height="54"
+                Margin="18"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Visibility="Collapsed"
+                ToolTip="Show navigation"
+                AutomationProperties.Name="Show navigation"
+                Style="{StaticResource SidebarIconButtonStyle}"
+                Panel.ZIndex="30"
+                Click="FloatingNavigationButton_Click">
+            <Image Source="pack://application:,,,/Assets/icon.png"
+                   Width="42"
+                   Height="42"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Stretch="Uniform" />
+        </Button>
     </Grid>
 </Window>
