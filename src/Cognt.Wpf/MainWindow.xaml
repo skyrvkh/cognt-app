@@ -380,8 +380,11 @@
     <Grid Background="#F7F9FC"
           ClipToBounds="True">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SidebarColumn" Width="300" />
-            <ColumnDefinition x:Name="SidebarSplitterColumn" Width="0" />
+            <ColumnDefinition x:Name="SidebarColumn"
+                              Width="264"
+                              MinWidth="240"
+                              MaxWidth="320" />
+            <ColumnDefinition x:Name="SidebarSplitterColumn" Width="6" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Border x:Name="SidebarHost"
@@ -1107,91 +1110,140 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Column="2"
+        <GridSplitter x:Name="SidebarSplitter"
+                      Grid.Column="1"
+                      Width="6"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Background="#E9EDF6"
+                      Cursor="SizeWE"
+                      ResizeBehavior="PreviousAndNext"
+                      ResizeDirection="Columns"
+                      ShowsPreview="False"
+                      DragDelta="SidebarSplitter_DragDelta"
+                      DragCompleted="SidebarSplitter_DragCompleted"
+                      Panel.ZIndex="25" />
+
+        <Grid x:Name="MainContentSplitRoot"
+              Grid.Column="2"
               ClipToBounds="True">
-            <Grid.RowDefinitions>
-                <RowDefinition x:Name="MobileHeaderRow" Height="0" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="PrimaryContentColumn"
+                                  Width="*"
+                                  MinWidth="0" />
+                <ColumnDefinition x:Name="RightViewerSplitterColumn"
+                                  Width="0" />
+                <ColumnDefinition x:Name="RightViewerColumn"
+                                  Width="0"
+                                  MinWidth="0" />
+            </Grid.ColumnDefinitions>
 
-            <Border x:Name="MobileHeader"
-                    Grid.Row="0"
-                    Visibility="Collapsed"
-                    Background="#F7F9FC"
-                    BorderBrush="#E1E6F0"
-                    BorderThickness="0,0,0,1"
-                    Padding="14,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button Style="{StaticResource SidebarIconButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Width="16"
-                                  Height="16"
-                                  Data="M3,5 L21,5 M3,12 L21,12 M3,19 L15,19"
-                                  Stroke="#1F2433"
-                                  StrokeThickness="1.8"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Stretch="Uniform" />
-                            <TextBlock Text="Menu"
-                                       Margin="8,0,0,0"
-                                       VerticalAlignment="Center"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2433" />
-                        </StackPanel>
-                    </Button>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Margin="14,0,0,0"
-                                VerticalAlignment="Center">
-                        <Border Width="28"
-                                Height="28"
-                                Background="#EEF2FF"
-                                CornerRadius="8">
-                            <TextBlock Text="*"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="#4C6FFF" />
-                        </Border>
-                        <TextBlock Text="Cognt"
-                                   Margin="10,0,0,0"
-                                   VerticalAlignment="Center"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2433" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Grid x:Name="MainContentSplitRoot"
-                  Grid.Row="1"
+            <Grid Grid.Column="0"
                   ClipToBounds="True">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="PrimaryContentColumn"
-                                      Width="*"
-                                      MinWidth="0" />
-                    <ColumnDefinition x:Name="RightViewerSplitterColumn"
-                                      Width="0" />
-                    <ColumnDefinition x:Name="RightViewerColumn"
-                                      Width="0"
-                                      MinWidth="0" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <Grid Grid.Column="0"
-                      ClipToBounds="True">
-                    <ContentControl x:Name="EditorViewHost" />
+                <Border Grid.Row="0"
+                        Background="#FFFFFF"
+                        BorderBrush="#E1E6F0"
+                        BorderThickness="0,0,0,1"
+                        Padding="18,8">
+                    <Border.Style>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EditorBreadcrumbItems.Count, Mode=OneWay}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <ContentControl x:Name="OverlayHost"
-                                    Panel.ZIndex="10" />
-                </Grid>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding EditorBreadcrumbItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <Grid VerticalAlignment="Center">
+                                                <Button AutomationProperties.Name="{Binding Title}"
+                                                        ToolTip="{Binding Title}"
+                                                        Click="EditorBreadcrumbButton_Click"
+                                                        PreviewKeyDown="EditorBreadcrumbButton_PreviewKeyDown"
+                                                        PreviewMouseDoubleClick="EditorBreadcrumbButton_PreviewMouseDoubleClick">
+                                                    <Button.Style>
+                                                        <Style TargetType="{x:Type Button}"
+                                                               BasedOn="{StaticResource EditorBreadcrumbButtonStyle}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#1F2433" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                    <TextBlock Text="{Binding DisplayTitle}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                                </Button>
+
+                                                <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                         IsVisibleChanged="EditorBreadcrumbTextBox_IsVisibleChanged"
+                                                         LostKeyboardFocus="EditorBreadcrumbTextBox_LostKeyboardFocus"
+                                                         PreviewKeyDown="EditorBreadcrumbTextBox_PreviewKeyDown">
+                                                    <TextBox.Style>
+                                                        <Style TargetType="{x:Type TextBox}"
+                                                               BasedOn="{StaticResource EditorBreadcrumbTextBoxStyle}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBox.Style>
+                                                </TextBox>
+                                            </Grid>
+
+                                            <TextBlock Text="{Binding Separator}"
+                                                       Margin="5,0"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="#9AA3B8"
+                                                       FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <ContentControl x:Name="EditorViewHost"
+                                Grid.Row="1"
+                                AllowDrop="True"
+                                DragOver="EditorViewHost_DragOver"
+                                Drop="EditorViewHost_Drop" />
+
+                <ContentControl x:Name="OverlayHost"
+                                Grid.RowSpan="2"
+                                Panel.ZIndex="10" />
+            </Grid>
 
                 <GridSplitter x:Name="RightViewerSplitter"
                               Grid.Column="1"
@@ -1265,22 +1317,6 @@
                             Height="30" />
                 </StackPanel>
             </Grid>
-        </Grid>
-
-        <Button x:Name="SidebarBackdrop"
-                Grid.ColumnSpan="3"
-                Visibility="Collapsed"
-                Opacity="0"
-                IsHitTestVisible="False"
-                Background="#66141B2D"
-                BorderThickness="0"
-                Panel.ZIndex="15" />
-
-
-        <GridSplitter x:Name="SidebarSplitter"
-                      Grid.Column="1"
-                      Width="6"
-                      Visibility="Collapsed" />
 
         <Button x:Name="FloatingNavigationButton"
                 Grid.Column="2"
