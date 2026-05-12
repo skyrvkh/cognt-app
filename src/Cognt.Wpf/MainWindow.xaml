@@ -824,16 +824,286 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <StackPanel x:Name="SidebarFooterSection"
-                            Grid.Row="3"
-                            Margin="0,14,0,0">
-                    <Button Content="+ Create Document"
-                            Style="{StaticResource PrimarySidebarButtonStyle}"
-                            Command="{Binding AddNoteCommand}" />
-                    <Button Content="Import Documents"
-                            Style="{StaticResource PrimarySidebarButtonStyle}"
-                            Margin="0,8,0,0" />
-                </StackPanel>
+                <Grid x:Name="SidebarFooterSection"
+                      Grid.Row="3"
+                      Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Style="{StaticResource PrimarySidebarButtonStyle}"
+                                AutomationProperties.Name="New note"
+                                Command="{Binding AddNoteCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M9,13 L15,13 M12,10 L12,16"
+                                      Style="{StaticResource SidebarNavigationPathStyle}" />
+                                <TextBlock Text="New note"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="2"
+                                Style="{StaticResource PrimarySidebarButtonStyle}"
+                                AutomationProperties.Name="Import"
+                                Click="ImportButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="M12,4 L12,15 M7.5,10.5 L12,15 L16.5,10.5 M5,18.5 L19,18.5"
+                                      Style="{StaticResource SidebarNavigationPathStyle}" />
+                                <TextBlock Text="Import"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                    <Grid Grid.Row="1"
+                          Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="CollectionSelectorButton"
+                                Style="{StaticResource SidebarCollectionSelectorButtonStyle}"
+                                AutomationProperties.Name="Current collection"
+                                ToolTip="Select collection"
+                                Click="CollectionSelectorButton_Click">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Path Data="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z"
+                                      Width="16"
+                                      Height="16"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="#3156D4"
+                                      Fill="#EEF4FF"
+                                      StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CurrentCollectionName}"
+                                           Margin="9,0,8,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="{Binding GlobalTextFontSize}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding CurrentCollectionName}" />
+                                <Path Grid.Column="2"
+                                      Data="M5,8 L10,13 L15,8"
+                                      Width="12"
+                                      Height="12"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="#586078"
+                                      StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Grid>
+                        </Button>
+
+                        <Popup x:Name="CollectionSelectorPopup"
+                               PlacementTarget="{Binding ElementName=CollectionSelectorButton}"
+                               Placement="Top"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade"
+                               DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <Border Width="{Binding ActualWidth, ElementName=SidebarFooterSection}"
+                                    MaxHeight="320"
+                                    Margin="0,0,0,8"
+                                    Padding="10"
+                                    Background="#FFFFFF"
+                                    BorderBrush="#D8DEEC"
+                                    BorderThickness="1"
+                                    CornerRadius="12">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="26"
+                                                      ShadowDepth="0"
+                                                      Color="#22000000"
+                                                      Opacity="0.4" />
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock Text="COLLECTIONS"
+                                               Style="{StaticResource SectionHeaderStyle}"
+                                               Margin="2,0,0,8" />
+
+                                    <ScrollViewer MaxHeight="150"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ScrollViewer.Style>
+                                            <Style TargetType="{x:Type ScrollViewer}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasAvailableCollections}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ScrollViewer.Style>
+                                        <ItemsControl ItemsSource="{Binding AvailableCollections}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                                                AutomationProperties.Name="{Binding Name}"
+                                                                Click="CollectionOptionButton_Click">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#1F2433"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding Name}" />
+                                                                <TextBlock Text="{Binding CountsSummary}"
+                                                                           Margin="0,2,0,0"
+                                                                           FontSize="11"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#586078"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Path}"
+                                                                           Margin="0,2,0,0"
+                                                                           FontSize="11"
+                                                                           Foreground="#78809A"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding Path}" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Grid.Column="2"
+                                                                Width="30"
+                                                                Height="30"
+                                                                VerticalAlignment="Top"
+                                                                ToolTip="Remove collection"
+                                                                AutomationProperties.Name="Remove collection"
+                                                                Click="RemoveCollectionButton_Click"
+                                                                Background="#FFF7F7"
+                                                                BorderBrush="#F0C2C2"
+                                                                BorderThickness="1"
+                                                                Foreground="#A23B3B">
+                                                            <Button.Style>
+                                                                <Style TargetType="{x:Type Button}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Setter Property="Cursor" Value="Hand" />
+                                                                    <Setter Property="Template">
+                                                                        <Setter.Value>
+                                                                            <ControlTemplate TargetType="Button">
+                                                                                <Border Background="{TemplateBinding Background}"
+                                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                        CornerRadius="8">
+                                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                                      VerticalAlignment="Center" />
+                                                                                </Border>
+                                                                            </ControlTemplate>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter Property="Background" Value="#FFECEC" />
+                                                                            <Setter Property="BorderBrush" Value="#E9A8A8" />
+                                                                        </Trigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                            <Path Data="M5,5 L13,13 M13,5 L5,13"
+                                                                  Width="12"
+                                                                  Height="12"
+                                                                  Stretch="Uniform"
+                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                                  StrokeThickness="1.8"
+                                                                  StrokeStartLineCap="Round"
+                                                                  StrokeEndLineCap="Round" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <Border Padding="10"
+                                            Background="#F8FAFF"
+                                            BorderBrush="#E1E6F0"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                        <Border.Style>
+                                            <Style TargetType="{x:Type Border}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShouldShowNoCollectionsState}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="No collections exist. Create a collection to start."
+                                                   TextWrapping="Wrap"
+                                                   FontSize="12"
+                                                   Foreground="#78809A" />
+                                    </Border>
+
+                                    <Border Height="1"
+                                            Background="#E1E6F0"
+                                            Margin="0,9,0,8" />
+
+                                    <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                            Click="AddCollectionButton_Click">
+                                        <TextBlock Text="Add Collection"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#3156D4" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+
+                        <Button Grid.Column="2"
+                                Width="38"
+                                Height="38"
+                                ToolTip="Settings"
+                                AutomationProperties.Name="Settings"
+                                Style="{StaticResource SidebarIconButtonStyle}"
+                                Command="{Binding ShowSettingsCommand}">
+                            <Grid Width="16" Height="16">
+                                <Ellipse Width="6"
+                                         Height="6"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Stroke="#3156D4"
+                                         StrokeThickness="1.8" />
+                                <Path Data="M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3.1,3.1 L4.5,4.5 M11.5,11.5 L12.9,12.9 M12.9,3.1 L11.5,4.5 M4.5,11.5 L3.1,12.9"
+                                      Stroke="#3156D4"
+                                      StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Grid>
+                        </Button>
+                    </Grid>
+                </Grid>
             </Grid>
         </Border>
 
@@ -1016,6 +1286,5 @@
                 Grid.Column="2"
                 Visibility="Collapsed" />
 
-        <Popup x:Name="CollectionSelectorPopup" />
     </Grid>
 </Window>
