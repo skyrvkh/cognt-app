@@ -384,176 +384,6 @@
             <ColumnDefinition x:Name="SidebarSplitterColumn" Width="0" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-
-        <Grid Grid.Column="2"
-              ClipToBounds="True">
-            <Grid.RowDefinitions>
-                <RowDefinition x:Name="MobileHeaderRow" Height="0" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Border x:Name="MobileHeader"
-                    Grid.Row="0"
-                    Visibility="Collapsed"
-                    Background="#F7F9FC"
-                    BorderBrush="#E1E6F0"
-                    BorderThickness="0,0,0,1"
-                    Padding="14,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button Style="{StaticResource SidebarIconButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Width="16"
-                                  Height="16"
-                                  Data="M3,5 L21,5 M3,12 L21,12 M3,19 L15,19"
-                                  Stroke="#1F2433"
-                                  StrokeThickness="1.8"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Stretch="Uniform" />
-                            <TextBlock Text="Menu"
-                                       Margin="8,0,0,0"
-                                       VerticalAlignment="Center"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2433" />
-                        </StackPanel>
-                    </Button>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Margin="14,0,0,0"
-                                VerticalAlignment="Center">
-                        <Border Width="28"
-                                Height="28"
-                                Background="#EEF2FF"
-                                CornerRadius="8">
-                            <TextBlock Text="*"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="#4C6FFF" />
-                        </Border>
-                        <TextBlock Text="Cognt"
-                                   Margin="10,0,0,0"
-                                   VerticalAlignment="Center"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1F2433" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Grid x:Name="MainContentSplitRoot"
-                  Grid.Row="1"
-                  ClipToBounds="True">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="PrimaryContentColumn"
-                                      Width="*"
-                                      MinWidth="0" />
-                    <ColumnDefinition x:Name="RightViewerSplitterColumn"
-                                      Width="0" />
-                    <ColumnDefinition x:Name="RightViewerColumn"
-                                      Width="0"
-                                      MinWidth="0" />
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0"
-                      ClipToBounds="True">
-                    <ContentControl x:Name="EditorViewHost" />
-
-                    <ContentControl x:Name="OverlayHost"
-                                    Panel.ZIndex="10" />
-                </Grid>
-
-                <GridSplitter x:Name="RightViewerSplitter"
-                              Grid.Column="1"
-                              Width="6"
-                              HorizontalAlignment="Stretch"
-                              VerticalAlignment="Stretch"
-                              Background="#E1E6F0"
-                              ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"
-                              Visibility="Collapsed" />
-
-                <Border x:Name="RightViewerPane"
-                        Grid.Column="2"
-                        Background="#FFFFFF"
-                        BorderBrush="#E1E6F0"
-                        BorderThickness="1,0,0,0"
-                        Visibility="Collapsed">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="44" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <Grid Grid.Row="0"
-                              Background="#F7F9FC"
-                              Margin="0"
-                              VerticalAlignment="Stretch">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <TextBlock x:Name="RightViewerTitleText"
-                                       Grid.Column="0"
-                                       Margin="14,0,8,0"
-                                       VerticalAlignment="Center"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2433" />
-                        </Grid>
-
-                        <ContentControl x:Name="RightViewerContentHost"
-                                        Grid.Row="1" />
-
-                        <Border x:Name="RightViewerDropOverlay"
-                                Grid.RowSpan="2"
-                                Background="#CCEEF2FF"
-                                BorderBrush="#7C8FB8"
-                                BorderThickness="1"
-                                Visibility="Collapsed"
-                                Panel.ZIndex="2">
-                            <TextBlock Text="Drop PDF to open"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="#24324F" />
-                        </Border>
-                    </Grid>
-                </Border>
-
-                <StackPanel x:Name="RightViewerHangingButtons"
-                            Grid.Column="0"
-                            Orientation="Vertical"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,18,18,0"
-                            Panel.ZIndex="11">
-                    <Button Content="Cards"
-                            Width="72"
-                            Height="30" />
-                </StackPanel>
-            </Grid>
-        </Grid>
-
-        <Button x:Name="SidebarBackdrop"
-                Grid.ColumnSpan="3"
-                Visibility="Collapsed"
-                Opacity="0"
-                IsHitTestVisible="False"
-                Background="#66141B2D"
-                BorderThickness="0"
-                Panel.ZIndex="15" />
-
         <Border x:Name="SidebarHost"
                 Grid.Column="0"
                 Width="300"
@@ -782,6 +612,176 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <Grid Grid.Column="2"
+              ClipToBounds="True">
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="MobileHeaderRow" Height="0" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border x:Name="MobileHeader"
+                    Grid.Row="0"
+                    Visibility="Collapsed"
+                    Background="#F7F9FC"
+                    BorderBrush="#E1E6F0"
+                    BorderThickness="0,0,0,1"
+                    Padding="14,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Style="{StaticResource SidebarIconButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16"
+                                  Height="16"
+                                  Data="M3,5 L21,5 M3,12 L21,12 M3,19 L15,19"
+                                  Stroke="#1F2433"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Stretch="Uniform" />
+                            <TextBlock Text="Menu"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2433" />
+                        </StackPanel>
+                    </Button>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center">
+                        <Border Width="28"
+                                Height="28"
+                                Background="#EEF2FF"
+                                CornerRadius="8">
+                            <TextBlock Text="*"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="#4C6FFF" />
+                        </Border>
+                        <TextBlock Text="Cognt"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="#1F2433" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid x:Name="MainContentSplitRoot"
+                  Grid.Row="1"
+                  ClipToBounds="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="PrimaryContentColumn"
+                                      Width="*"
+                                      MinWidth="0" />
+                    <ColumnDefinition x:Name="RightViewerSplitterColumn"
+                                      Width="0" />
+                    <ColumnDefinition x:Name="RightViewerColumn"
+                                      Width="0"
+                                      MinWidth="0" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0"
+                      ClipToBounds="True">
+                    <ContentControl x:Name="EditorViewHost" />
+
+                    <ContentControl x:Name="OverlayHost"
+                                    Panel.ZIndex="10" />
+                </Grid>
+
+                <GridSplitter x:Name="RightViewerSplitter"
+                              Grid.Column="1"
+                              Width="6"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              Background="#E1E6F0"
+                              ResizeBehavior="PreviousAndNext"
+                              ResizeDirection="Columns"
+                              Visibility="Collapsed" />
+
+                <Border x:Name="RightViewerPane"
+                        Grid.Column="2"
+                        Background="#FFFFFF"
+                        BorderBrush="#E1E6F0"
+                        BorderThickness="1,0,0,0"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="44" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0"
+                              Background="#F7F9FC"
+                              Margin="0"
+                              VerticalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock x:Name="RightViewerTitleText"
+                                       Grid.Column="0"
+                                       Margin="14,0,8,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2433" />
+                        </Grid>
+
+                        <ContentControl x:Name="RightViewerContentHost"
+                                        Grid.Row="1" />
+
+                        <Border x:Name="RightViewerDropOverlay"
+                                Grid.RowSpan="2"
+                                Background="#CCEEF2FF"
+                                BorderBrush="#7C8FB8"
+                                BorderThickness="1"
+                                Visibility="Collapsed"
+                                Panel.ZIndex="2">
+                            <TextBlock Text="Drop PDF to open"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="#24324F" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="RightViewerHangingButtons"
+                            Grid.Column="0"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,18,18,0"
+                            Panel.ZIndex="11">
+                    <Button Content="Cards"
+                            Width="72"
+                            Height="30" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <Button x:Name="SidebarBackdrop"
+                Grid.ColumnSpan="3"
+                Visibility="Collapsed"
+                Opacity="0"
+                IsHitTestVisible="False"
+                Background="#66141B2D"
+                BorderThickness="0"
+                Panel.ZIndex="15" />
+
 
         <GridSplitter x:Name="SidebarSplitter"
                       Grid.Column="1"
