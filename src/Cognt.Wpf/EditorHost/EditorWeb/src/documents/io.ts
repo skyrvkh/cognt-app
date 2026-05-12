@@ -16,10 +16,13 @@ import {
   createCogntSchemas,
   upgradeSerializedCogntPropertiesSnapshots,
 } from '../blocks/properties';
+import { stripSerializedCogntReferencesSnapshots } from '../blocks/references';
 import {
   cogntBlockSuiteDocumentKind,
   cogntBlockSuiteDocumentVersion,
+  isBlockSnapshot,
   isBlockSuiteJsonPath,
+  isPlainRecord,
 } from './block-suite-document';
 import {
   hydrateCogntEmbedLinkedNotes,
@@ -64,6 +67,7 @@ export async function createDocFromBlockSuiteJson(
 
   upgradeSerializedRawCogntInlineMentionSnapshots(snapshot);
   upgradeSerializedCogntPropertiesSnapshots(snapshot);
+  stripSerializedCogntReferencesSnapshots(snapshot);
   const seedDoc = createEmptyMarkdownDoc();
   const job = new Job({ collection: seedDoc.collection });
   const doc = await job.snapshotToDoc(snapshot);
@@ -93,6 +97,7 @@ export async function importBlockSuiteJsonIntoExistingDoc(
 
   upgradeSerializedRawCogntInlineMentionSnapshots(snapshot);
   upgradeSerializedCogntPropertiesSnapshots(snapshot);
+  stripSerializedCogntReferencesSnapshots(snapshot);
   const sourceNote = findFirstBlockSnapshot(snapshot.blocks, 'affine:note');
   const children = sourceNote?.children?.filter(isBlockSnapshot) ?? [];
 
@@ -154,13 +159,17 @@ export async function importMarkdownIntoExistingDoc(doc: Doc, markdown: string) 
   doc.resetHistory();
 }
 
-export async function exportDocContent(doc: Doc | null, path: string | null | undefined) {
+export async function exportDocContent(
+  doc: Doc | null,
+  path: string | null | undefined,
+  collectionRoot?: string | null
+) {
   return isBlockSuiteJsonPath(path)
-    ? exportDocBlockSuiteJson(doc)
-    : exportDocMarkdown(doc);
+    ? exportDocBlockSuiteJson(doc, collectionRoot)
+    : exportDocMarkdown(doc, collectionRoot);
 }
 
-async function exportDocMarkdown(doc: Doc | null) {
+async function exportDocMarkdown(doc: Doc | null, collectionRoot?: string | null) {
   if (!doc) {
     return '';
   }
@@ -172,6 +181,8 @@ async function exportDocMarkdown(doc: Doc | null) {
     return '';
   }
 
+  normalizeSerializedImageSources(snapshot.blocks, collectionRoot);
+  stripSerializedCogntReferencesSnapshots(snapshot);
   const adapter = new MarkdownAdapter(job, defaultBlockMarkdownAdapterMatchers);
   const result = await adapter.fromDocSnapshot({
     snapshot,
@@ -181,7 +192,7 @@ async function exportDocMarkdown(doc: Doc | null) {
   return result.file.trimEnd();
 }
 
-async function exportDocBlockSuiteJson(doc: Doc | null) {
+async function exportDocBlockSuiteJson(doc: Doc | null, collectionRoot?: string | null) {
   if (!doc) {
     return `${JSON.stringify(
       {
@@ -197,7 +208,9 @@ async function exportDocBlockSuiteJson(doc: Doc | null) {
   const job = new Job({ collection: doc.collection });
   const snapshot = job.docToSnapshot(doc);
   if (snapshot) {
+    normalizeSerializedImageSources(snapshot.blocks, collectionRoot);
     upgradeSerializedCogntPropertiesSnapshots(snapshot);
+    stripSerializedCogntReferencesSnapshots(snapshot);
   }
   const payload: CogntBlockSuiteDocument = {
     kind: cogntBlockSuiteDocumentKind,
@@ -233,7 +246,7 @@ function parseBlockSuiteDocumentSnapshot(content: string): DocSnapshot | null {
     return parsed;
   }
 
-  if (!isRecord(parsed)) {
+  if (!isPlainRecord(parsed)) {
     throw new Error('The note file is not a BlockSuite JSON document.');
   }
 
@@ -261,19 +274,10 @@ function parseBlockSuiteDocumentSnapshot(content: string): DocSnapshot | null {
 }
 
 function isDocSnapshot(value: unknown): value is DocSnapshot {
-  return isRecord(value)
+  return isPlainRecord(value)
     && value.type === 'page'
-    && isRecord(value.meta)
+    && isPlainRecord(value.meta)
     && isBlockSnapshot(value.blocks);
-}
-
-function isBlockSnapshot(value: unknown): value is BlockSnapshot {
-  return isRecord(value)
-    && value.type === 'block'
-    && typeof value.id === 'string'
-    && typeof value.flavour === 'string'
-    && isRecord(value.props)
-    && Array.isArray(value.children);
 }
 
 function findFirstBlockSnapshot(block: BlockSnapshot, flavour: string): BlockSnapshot | null {
@@ -295,6 +299,63 @@ function findFirstBlockSnapshot(block: BlockSnapshot, flavour: string): BlockSna
   return null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function normalizeSerializedImageSources(block: BlockSnapshot, collectionRoot?: string | null) {
+  if (block.flavour === 'affine:image') {
+    const sourceId = typeof block.props.sourceId === 'string'
+      ? block.props.sourceId
+      : '';
+    const relativeSource = normalizeImageSourceForStorage(sourceId, collectionRoot);
+    if (relativeSource) {
+      block.props.sourceId = relativeSource;
+    }
+  }
+
+  for (const child of block.children) {
+    if (isBlockSnapshot(child)) {
+      normalizeSerializedImageSources(child, collectionRoot);
+    }
+  }
+}
+
+function normalizeImageSourceForStorage(sourceId: string, collectionRoot?: string | null) {
+  const normalizedSource = sourceId.replace(/\\/g, '/').trim();
+  if (normalizedSource.length === 0) {
+    return null;
+  }
+
+  const filePath = tryGetFileUriPath(normalizedSource);
+  if (filePath && collectionRoot) {
+    const relativePath = tryGetCollectionRelativePath(filePath, collectionRoot);
+    if (relativePath) {
+      return relativePath;
+    }
+  }
+
+  return normalizedSource;
+}
+
+function tryGetFileUriPath(source: string) {
+  try {
+    const uri = new URL(source);
+    if (uri.protocol !== 'file:') {
+      return null;
+    }
+
+    return decodeURIComponent(uri.pathname)
+      .replace(/^\/([A-Za-z]:\/)/, '$1')
+      .replace(/\\/g, '/');
+  } catch {
+    return null;
+  }
+}
+
+function tryGetCollectionRelativePath(filePath: string, collectionRoot: string) {
+  const root = collectionRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+  const fullPath = filePath.replace(/\\/g, '/');
+  const rootPrefix = `${root}/`;
+  if (root.length === 0 || !fullPath.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+    return null;
+  }
+
+  return fullPath.slice(rootPrefix.length).replace(/^\/+/, '');
 }

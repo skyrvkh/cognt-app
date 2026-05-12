@@ -2,8 +2,8 @@ import '@toeverything/theme/fonts.css';
 import '@toeverything/theme/style.css';
 import './styles.css';
 import {
-  MarkdownBlockSuiteEditor,
   type AttachFileResult,
+  MarkdownBlockSuiteEditor,
   type CreateLinkedNoteResult,
   type ReadAttachmentResult,
 } from './blocksuite-editor';
@@ -25,8 +25,8 @@ let nextInstanceId = 1;
 
 export function mountBlockSuite(
   hostElement: HTMLElement,
+  documentLinksElement: HTMLElement,
   statusElement: HTMLElement,
-  mentionPreviewElement: HTMLElement,
   dotNet: DotNetReference
 ) {
   const instanceId = nextInstanceId++;
@@ -37,8 +37,8 @@ export function mountBlockSuite(
 
   const editor = new MarkdownBlockSuiteEditor({
     hostElement,
+    documentLinksElement,
     statusElement,
-    mentionPreviewElement,
     onContentChanged: content => {
       void dotNet.invokeMethodAsync('HandleContentChanged', content);
     },
@@ -54,9 +54,13 @@ export function mountBlockSuite(
       void dotNet.invokeMethodAsync(
         'HandleSaveCloze',
         message.sourcePath,
+        message.blockId,
         message.selectedPlainText,
         message.clozeText,
-        message.content
+        message.content,
+        message.cardContextId ?? null,
+        message.slotId ?? null,
+        message.displayClozeIndex ?? null
       );
     },
     onSearchMentionTargets: async message =>
@@ -143,26 +147,42 @@ export async function loadNote(
   await waitForAnimationFrames(2);
 }
 
-export async function loadCard(instanceId: number, content: string) {
-  const instance = getInstance(instanceId);
-  await instance.editor.loadCard(content);
-  await waitForAnimationFrames(2);
-}
-
 export async function focusEditor(instanceId: number) {
   const instance = getInstance(instanceId);
   await instance.editor.focusEditor();
   await waitForAnimationFrames(1);
 }
 
-export function beginCardRender(instanceId: number) {
+export function getSelectedImageBlock(instanceId: number) {
   const instance = getInstance(instanceId);
-  instance.editor.beginCardRender();
+  return instance.editor.getSelectedImageBlock();
+}
+
+export function getSelectedCardContextBlocks(instanceId: number) {
+  const instance = getInstance(instanceId);
+  return instance.editor.getSelectedCardContextBlocks();
+}
+
+export async function createClozeFromSelection(
+  instanceId: number,
+  cardContextId?: string | null,
+  slotId?: string | null,
+  displayClozeIndex?: number | null
+) {
+  const instance = getInstance(instanceId);
+  await instance.editor.createClozeFromSelection(cardContextId, slotId, displayClozeIndex);
+  await waitForAnimationFrames(1);
 }
 
 export async function activateEditor(instanceId: number) {
   const instance = getInstance(instanceId);
   await instance.editor.activateEditorMode();
+  await waitForAnimationFrames(1);
+}
+
+export async function setReadOnlyMode(instanceId: number, isReadOnly: boolean) {
+  const instance = getInstance(instanceId);
+  await instance.editor.setReadOnlyMode(isReadOnly);
   await waitForAnimationFrames(1);
 }
 
@@ -183,10 +203,15 @@ export function showExtractResult(
 
 export function setMentionTargets(
   instanceId: number,
-  targets: Array<{ relativePath: string; title: string; fileName: string; recentRank: number }>
+  targets: Array<{ relativePath: string; title: string }>
 ) {
   const instance = getInstance(instanceId);
   instance.editor.setMentionTargets(targets);
+}
+
+export function setDocumentLinks(instanceId: number, payload: DocumentLinksPayload) {
+  const instance = getInstance(instanceId);
+  instance.editor.setDocumentLinks(payload);
 }
 
 export function handleMentionPreviewResult(
@@ -195,7 +220,6 @@ export function handleMentionPreviewResult(
   relativePath: string,
   mode: string,
   ok: boolean,
-  title?: string,
   documentContent?: string,
   error?: string
 ) {
@@ -205,7 +229,6 @@ export function handleMentionPreviewResult(
     relativePath,
     mode: mode === 'full' ? 'full' : 'preview',
     ok,
-    title,
     documentContent,
     error,
   });
@@ -214,11 +237,6 @@ export function handleMentionPreviewResult(
 export function handleMentionOpenResult(instanceId: number, ok: boolean, error?: string) {
   const instance = getInstance(instanceId);
   instance.editor.handleMentionOpenResult(ok, error);
-}
-
-export function setDocumentLinks(instanceId: number, payload: DocumentLinksPayload) {
-  const instance = getInstance(instanceId);
-  instance.editor.setDocumentLinks(payload);
 }
 
 export function disposeBlockSuite(instanceId: number) {
@@ -274,10 +292,6 @@ function normalizeMentionTargets(value: unknown) {
       RelativePath?: string;
       title?: string;
       Title?: string;
-      fileName?: string;
-      FileName?: string;
-      recentRank?: number | null;
-      RecentRank?: number | null;
     } | null;
 
     const relativePath = target?.relativePath ?? target?.RelativePath;
@@ -288,8 +302,6 @@ function normalizeMentionTargets(value: unknown) {
     return [{
       relativePath,
       title: target?.title ?? target?.Title ?? '',
-      fileName: target?.fileName ?? target?.FileName ?? '',
-      recentRank: target?.recentRank ?? target?.RecentRank ?? null,
     }];
   });
 }
