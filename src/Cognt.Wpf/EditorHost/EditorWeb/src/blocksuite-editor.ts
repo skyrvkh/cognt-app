@@ -1,5 +1,8 @@
 import { MarkdownTransformer, type AffineSlashMenuContext } from '@blocksuite/blocks';
-import { RefNodeSlotsProvider } from '@blocksuite/affine-components/rich-text';
+import {
+  getInlineEditorByModel,
+  RefNodeSlotsProvider,
+} from '@blocksuite/affine-components/rich-text';
 import { effects as blockEffects } from '@blocksuite/blocks/effects';
 import { effects as presetEffects } from '@blocksuite/presets/effects';
 import { type PageEditor } from '@blocksuite/presets';
@@ -10,7 +13,7 @@ import {
 import {
   defineCogntReferencesBlockElement,
 } from './blocks/references';
-import { updateClozeHighlights, type TextSelection } from './cloze';
+import { type TextSelection } from './cloze';
 import {
   type CreateExtractCommandMessage,
   type PendingExtract,
@@ -21,7 +24,9 @@ import {
   type SaveClozeCommandMessage,
 } from './commands';
 import {
+  createTitleFromPlainText,
   isBlockSuiteJsonPath,
+  normalizeSelectionText,
 } from './documents/block-suite-document';
 import {
   createDocFromBlockSuiteJson,
@@ -43,6 +48,7 @@ import {
   flushEditorHost,
   focusFirstTextBlock,
   forceEditableRichText,
+  forceReadonlyRichText,
   setDocReadonly,
 } from './editor/host-operations';
 import {
@@ -74,8 +80,6 @@ import {
   getCogntLinkedDocToolbarModel,
   getCogntLinkedNotePathFromModel,
   getExtractTitleFromRelPath,
-  getInlineLinkedPageReference,
-  getInlineLinkedPageReferenceElementFromEvent,
   getInlineLinkedPageReferenceFromEvent,
   getLinkedDocReferenceFromModel,
   getLinkedNotePathFromResult,
@@ -89,10 +93,12 @@ import {
   normalizeLinkedNotePathKey,
   registerSerializedCogntEmbedLinkedNotes,
   registerSerializedCogntInlineLinkedNotes,
-  replaceExtractSelectionWithLinkedPage,
+  replaceExtractBlocksWithLinkedPage,
+  replaceExtractTextRangeWithLinkedPage,
   type LinkedPageReference,
 } from './links/linked-notes';
 import { type MentionPreviewResult, type MentionTarget } from './mentions';
+import type { CogntSlashMenuRootComponent } from './blocksuite-compat';
 
 const saveDebounceMs = 500;
 const statusHideMs = 2600;
@@ -172,10 +178,31 @@ export type SelectedImageBlock = {
   imageRelPath: string;
 };
 
+export type SelectedCardContextBlocks = {
+  blockIds: string[];
+  title?: string;
+};
+
+type AttachedFilePayload = {
+  result: AttachFileResult;
+  fallbackName: string;
+  sourceFile: File;
+  contentBase64: string;
+};
+
+type PendingImageAttachmentPreview = {
+  doc: Doc;
+  blockId: string;
+  sourceId: string;
+  fallbackName: string;
+  sourceFile: File;
+  contentBase64: string;
+};
+
 export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
+  documentLinksElement: HTMLElement;
   statusElement: HTMLElement;
-  mentionPreviewElement: HTMLElement;
   onContentChanged(content: string): void;
   onCreateExtract(message: CreateExtractCommandMessage): void;
   onSaveCloze(message: SaveClozeCommandMessage): void;
@@ -220,7 +247,6 @@ export class MarkdownBlockSuiteEditor {
   private readOnlyMode = false;
   private saveTimer: number | undefined;
   private statusTimer: number | undefined;
-  private clozeHighlightFrame: number | undefined;
   private blockUpdatedDisposable: { dispose(): void } | null = null;
   private linkedDocOpenDisposable: { dispose(): void } | null = null;
   private readonly linkedDocPathsByPageId = new Map<string, string>();
@@ -238,9 +264,11 @@ export class MarkdownBlockSuiteEditor {
   private linkedDocPreviewRefreshTimer: number | undefined;
   private linkedDocOpenRetryTimer: number | undefined;
   private pendingExtract: PendingExtract | null = null;
+  private suppressNextNativeCut = false;
   private loadGeneration = 0;
   private userEditGeneration = 0;
   private lockedInputStatusShownAt = 0;
+  private pendingAttachmentPreviews = 0;
 
   public constructor(options: MarkdownEditorOptions) {
     this.statusElement = options.statusElement;
@@ -260,9 +288,7 @@ export class MarkdownBlockSuiteEditor {
     this.editor.hasViewport = true;
     this.mentions = new MentionController({
       editor: this.editor,
-      previewElement: options.mentionPreviewElement,
       getCurrentPath: () => this.currentPath,
-      exportContent: () => this.exportCurrentContent(),
       flushHost: () => this.flushHost(),
       scheduleContentChanged: () => this.scheduleContentChanged(),
       showStatus: message => this.showStatus(message),
@@ -271,10 +297,9 @@ export class MarkdownBlockSuiteEditor {
         this.mergeMentionTargetTitles(targets, false);
         return targets;
       },
-      onRequestPreview: options.onRequestMentionPreview,
-      onOpenMention: options.onOpenMention,
     });
     this.documentLinks = new DocumentLinksController({
+      container: options.documentLinksElement,
       getDoc: () => this.currentDoc,
       openDocument: relativePath => this.openDocumentLink(relativePath),
     });
@@ -293,9 +318,7 @@ export class MarkdownBlockSuiteEditor {
     this.loadingDocument = true;
     this.enableEditorMode();
     window.clearTimeout(this.saveTimer);
-    this.cancelScheduledClozeHighlightUpdate();
     this.mentions.cancelScheduledHighlightUpdate();
-    this.mentions.hidePreview();
     this.currentPath = options.path ?? '';
     this.currentCollectionRoot = normalizeLocalPath(options.collectionRoot ?? '');
     this.clearLinkedDocState();
@@ -319,6 +342,7 @@ export class MarkdownBlockSuiteEditor {
       const message = error instanceof Error ? error.message : String(error);
       reportDiagnostic('error', `Could not load document: ${message}`);
       this.showStatus(`Could not load document: ${message}`);
+      throw error;
     } finally {
       if (generation === this.loadGeneration) {
         this.loadingDocument = false;
@@ -358,6 +382,7 @@ export class MarkdownBlockSuiteEditor {
       incoming: [],
       outgoing: [],
     });
+    nextDoc.resetHistory();
     logEditorTiming('editor.doc assignment', assignStartedAt, options.title);
 
     const flushStartedAt = performance.now();
@@ -409,6 +434,7 @@ export class MarkdownBlockSuiteEditor {
       incoming: [],
       outgoing: [],
     });
+    nextDoc.resetHistory();
     logEditorTiming('editor.doc assignment', assignStartedAt, options.title);
 
     const flushStartedAt = performance.now();
@@ -462,10 +488,6 @@ export class MarkdownBlockSuiteEditor {
       focusFirstTextBlock(this.editor, this.currentDoc);
       logEditorTiming('focus first text block', focusStartedAt);
 
-      const clozeStartedAt = performance.now();
-      this.refreshClozeHighlights();
-      logEditorTiming('cloze highlight refresh', clozeStartedAt);
-
       const mentionStartedAt = performance.now();
       this.mentions.refreshHighlights();
       logEditorTiming('mention highlight refresh', mentionStartedAt);
@@ -514,6 +536,18 @@ export class MarkdownBlockSuiteEditor {
       : null;
   }
 
+  public getSelectedCardContextBlocks(): SelectedCardContextBlocks | null {
+    const blockIds = this.getSelectedCardContextBlockIds();
+    if (blockIds.length === 0) {
+      return null;
+    }
+
+    return {
+      blockIds,
+      title: this.createSelectedCardContextTitle(blockIds),
+    };
+  }
+
   public async activateEditorMode() {
     this.enableEditorMode();
     await this.flushHost();
@@ -526,47 +560,28 @@ export class MarkdownBlockSuiteEditor {
     );
   }
 
-  public async loadCard(content: string) {
-    ++this.loadGeneration;
-    this.loadingDocument = true;
-    this.beginCardRender();
-
-    try {
-      const nextDoc = await createDocFromBlockSuiteJson(content);
-      this.trackCurrentDoc(nextDoc);
-      this.editor.doc = nextDoc;
-      this.editor.hasViewport = true;
-      this.bindDocChangeEvents(nextDoc);
-      await this.flushHost();
-      this.refreshClozeHighlights();
-      reportDiagnostic('info', `Rendered review card in shared editor (${content.length} characters).`);
-      this.editor.classList.remove('card-render-pending');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      reportDiagnostic('error', `Could not render review card: ${message}`);
-      throw error;
-    } finally {
-      this.loadingDocument = false;
+  public async setReadOnlyMode(readOnly: boolean) {
+    if (!readOnly) {
+      await this.activateEditorMode();
+      return;
     }
-  }
 
-  public beginCardRender() {
-    ++this.loadGeneration;
     this.readOnlyMode = true;
-    document.body.dataset.mode = 'review';
-    this.editor.classList.add('review-renderer', 'card-render-pending');
-    window.clearTimeout(this.saveTimer);
-    this.cancelScheduledClozeHighlightUpdate();
-    this.mentions.cancelScheduledHighlightUpdate();
-    this.mentions.hidePreview();
-    this.currentPath = '';
-    this.clearLinkedDocState();
+    document.body.dataset.mode = 'readonly';
+    setDocReadonly(this.currentDoc, true);
+    await this.flushHost();
+    await waitForNextAnimationFrame();
+    await forceReadonlyRichText(this.editor);
+    this.showStatus('Read-only.');
+    reportDiagnostic(
+      'info',
+      `Read-only mode active (${getInteractivityDiagnostic(this.currentDoc, document)}).`
+    );
   }
 
   private enableEditorMode() {
     this.readOnlyMode = false;
     document.body.dataset.mode = 'editor';
-    this.editor.classList.remove('review-renderer', 'card-render-pending');
     setDocReadonly(this.currentDoc, false);
   }
 
@@ -623,13 +638,11 @@ export class MarkdownBlockSuiteEditor {
         relativePath,
         this.resolveLinkedNoteTitle(relativePath) ?? getExtractTitleFromRelPath(relativePath)
       );
-      const linkedDoc = replaceExtractSelectionWithLinkedPage(
-        this.currentDoc,
-        pending.selection,
-        relativePath,
-        title
-      );
+      const linkedDoc = pending.replacement.kind === 'blocks'
+        ? replaceExtractBlocksWithLinkedPage(this.currentDoc, pending.replacement.blockIds, relativePath, title)
+        : replaceExtractTextRangeWithLinkedPage(this.currentDoc, pending.replacement, relativePath, title);
       this.trackLinkedDoc(linkedDoc, relativePath);
+      this.requestLinkedDocPreview(linkedDoc, relativePath, pending.generation);
 
       this.editor.host?.selection.clear(['text']);
       window.getSelection()?.removeAllRanges();
@@ -704,20 +717,14 @@ export class MarkdownBlockSuiteEditor {
   public handleMentionPreviewResult(result: MentionPreviewResult) {
     if (this.linkedDocPreviewRequests.has(result.requestId)) {
       void this.handleLinkedDocPreviewResult(result);
-      return;
     }
-
-    this.mentions.handlePreviewResult(result);
   }
 
-  public handleMentionOpenResult(ok: boolean, error?: string) {
-    this.mentions.handleOpenResult(ok, error);
-  }
+  public handleMentionOpenResult(_ok: boolean, _error?: string) {}
 
   public dispose() {
     window.clearTimeout(this.saveTimer);
     window.clearTimeout(this.statusTimer);
-    this.cancelScheduledClozeHighlightUpdate();
     this.blockUpdatedDisposable?.dispose();
     this.blockUpdatedDisposable = null;
     this.linkedDocOpenDisposable?.dispose();
@@ -765,7 +772,7 @@ export class MarkdownBlockSuiteEditor {
     window.clearTimeout(this.linkedDocOpenRetryTimer);
     this.linkedDocOpenRetryTimer = undefined;
     this.linkedDocOpenDisposable =
-      refNodeSlotsProvider.docLinkClicked.on(reference => {
+      refNodeSlotsProvider.docLinkClicked.on((reference: LinkedPageReference) => {
         void this.openLinkedDocReference(reference);
       });
   }
@@ -793,7 +800,6 @@ export class MarkdownBlockSuiteEditor {
       return;
     }
 
-    this.mentions.hidePreview();
     this.onOpenMention({
       type: 'openMention',
       sourcePath: this.currentPath,
@@ -891,7 +897,6 @@ export class MarkdownBlockSuiteEditor {
       return;
     }
 
-    this.mentions.hidePreview();
     this.onOpenMention({
       type: 'openMention',
       sourcePath: this.currentPath,
@@ -981,8 +986,8 @@ export class MarkdownBlockSuiteEditor {
           return;
         }
 
-        if (isEditorShortcut(event, 'z')) {
-          void this.handleClozeShortcut(event);
+        if (isEditorShortcut(event, 'c', { shift: true })) {
+          void this.handleClozeCommand(event);
           return;
         }
 
@@ -1019,10 +1024,69 @@ export class MarkdownBlockSuiteEditor {
       },
       { capture: true, signal: this.eventAbort.signal }
     );
+    document.addEventListener(
+      'paste',
+      event => {
+        if (!this.isEditorEvent(event) || !this.hasClipboardFiles(event)) {
+          return;
+        }
+
+        this.cancelNativeFileEvent(event);
+        void this.handlePastedFiles(event);
+      },
+      { capture: true, signal: this.eventAbort.signal }
+    );
+    document.addEventListener(
+      'dragover',
+      event => this.handleFileDragOver(event),
+      { capture: true, signal: this.eventAbort.signal }
+    );
+    document.addEventListener(
+      'drop',
+      event => {
+        if (!this.isEditorEvent(event) || !this.hasDroppedFiles(event)) {
+          return;
+        }
+
+        this.cancelNativeFileEvent(event);
+        void this.handleDroppedFiles(event);
+      },
+      { capture: true, signal: this.eventAbort.signal }
+    );
+    document.addEventListener(
+      'dblclick',
+      event => {
+        const reference = getInlineLinkedPageReferenceFromEvent(event);
+        if (reference) {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.openLinkedDocReference(reference);
+          return;
+        }
+
+        const model =
+          getCogntLinkedDocOpenIntent(event) ??
+          this.getSelectedLinkedDocModelForOpenIntent(event);
+        if (!model) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        void this.openLinkedDocFromModel(model);
+      },
+      { capture: true, signal: this.eventAbort.signal }
+    );
 
     this.editor.addEventListener(
       'beforeinput',
       event => {
+        if (this.suppressNextNativeCut && event.inputType === 'deleteByCut') {
+          event.preventDefault();
+          this.suppressNextNativeCut = false;
+          return;
+        }
+
         if (this.isEditorInputLocked()) {
           event.preventDefault();
           this.showLockedInputStatus();
@@ -1033,7 +1097,6 @@ export class MarkdownBlockSuiteEditor {
 
     document.addEventListener('selectionchange', () => {
       if (this.currentDoc) {
-        this.scheduleClozeHighlightUpdate();
         this.mentions.scheduleHighlightUpdate();
       }
     }, { signal: this.eventAbort.signal });
@@ -1044,7 +1107,6 @@ export class MarkdownBlockSuiteEditor {
       }
 
       this.userEditGeneration++;
-      this.scheduleClozeHighlightUpdate();
       this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
     }, { signal: this.eventAbort.signal });
@@ -1053,39 +1115,8 @@ export class MarkdownBlockSuiteEditor {
         return;
       }
 
-      this.scheduleClozeHighlightUpdate();
       this.mentions.scheduleHighlightUpdate();
       this.scheduleContentChanged();
-    }, { signal: this.eventAbort.signal });
-    this.editor.addEventListener('click', event => {
-      void this.mentions.handleClick(event);
-    }, { signal: this.eventAbort.signal });
-    this.editor.addEventListener(
-      'mousemove',
-      event => {
-        const referenceElement = getInlineLinkedPageReferenceElementFromEvent(event);
-        const reference = referenceElement
-          ? getInlineLinkedPageReference(referenceElement)
-          : null;
-        const relativePath = reference ? this.getLinkedPageReferencePath(reference) : null;
-        if (relativePath && referenceElement) {
-          this.mentions.handleLinkedPageHover(relativePath, referenceElement);
-          return;
-        }
-
-        this.mentions.handleHoverMiss();
-      },
-      { signal: this.eventAbort.signal }
-    );
-    this.editor.addEventListener('mouseleave', event => {
-      const target = event.relatedTarget as Node | null;
-      if (target && this.mentions.containsFloatingUi(target)) {
-        return;
-      }
-
-      if (this.mentions.isShowingPreview()) {
-        this.mentions.schedulePreviewHide();
-      }
     }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('paste', event => {
       if (this.isEditorInputLocked()) {
@@ -1103,35 +1134,24 @@ export class MarkdownBlockSuiteEditor {
       this.userEditGeneration++;
       this.scheduleContentChanged();
     }, { signal: this.eventAbort.signal });
-    this.editor.addEventListener('dragover', event => {
-      if (!this.hasDroppedFiles(event)) {
+    this.editor.addEventListener('cut', event => {
+      if (this.suppressNextNativeCut) {
+        event.preventDefault();
+        this.suppressNextNativeCut = false;
         return;
       }
 
-      this.cancelNativeFileEvent(event);
-      if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = this.currentPath && !this.isEditorInputLocked()
-          ? 'copy'
-          : 'none';
+      if (this.isEditorInputLocked()) {
+        event.preventDefault();
+        this.showLockedInputStatus();
       }
     }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('drop', event => {
-      if (!this.hasDroppedFiles(event)) {
-        return;
-      }
-
-      this.cancelNativeFileEvent(event);
-      void this.handleDroppedFiles(event);
-    }, { signal: this.eventAbort.signal });
-
-    document.addEventListener('mousedown', event => {
-      const target = event.target as Node | null;
-      if (target && this.mentions.containsFloatingUi(target)) {
-        return;
-      }
-
-      if (this.mentions.isShowingPreview()) {
-        this.mentions.hidePreview();
+      if (this.isEditorInputLocked() || this.hasDroppedFiles(event)) {
+        this.cancelNativeFileEvent(event);
+        if (this.isEditorInputLocked()) {
+          this.showLockedInputStatus();
+        }
       }
     }, { signal: this.eventAbort.signal });
   }
@@ -1159,15 +1179,22 @@ export class MarkdownBlockSuiteEditor {
     return Array.from(clipboardData.items ?? []).some(item => item.kind === 'file');
   }
 
-  private cancelNativeFileEvent(event: Event) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (typeof event.stopImmediatePropagation === 'function') {
-      event.stopImmediatePropagation();
+  private handleFileDragOver(event: DragEvent) {
+    if (!this.hasDroppedFiles(event)) {
+      return;
+    }
+
+    this.cancelNativeFileEvent(event);
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = this.currentPath && !this.isEditorInputLocked()
+        ? 'copy'
+        : 'none';
     }
   }
 
   private async handleDroppedFiles(event: DragEvent) {
+    this.cancelNativeFileEvent(event);
+
     if (this.isEditorInputLocked()) {
       this.showLockedInputStatus();
       return;
@@ -1180,10 +1207,32 @@ export class MarkdownBlockSuiteEditor {
 
     const files = Array.from(event.dataTransfer?.files ?? [])
       .filter(file => file.size > 0);
-    await this.attachFiles(files);
+    if (files.length === 0) {
+      return;
+    }
+
+    await this.attachFiles(
+      files,
+      file =>
+        this.insertDroppedAttachmentReference(
+          event,
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64),
+      file =>
+        this.insertDroppedAttachmentReference(
+          event,
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64,
+          false));
   }
 
   private async handlePastedFiles(event: ClipboardEvent) {
+    this.cancelNativeFileEvent(event);
+
     if (this.isEditorInputLocked()) {
       this.showLockedInputStatus();
       return;
@@ -1194,17 +1243,81 @@ export class MarkdownBlockSuiteEditor {
       return;
     }
 
-    await this.attachFiles(getClipboardFiles(event.clipboardData));
+    const files = getClipboardFiles(event.clipboardData);
+    if (files.length === 0) {
+      return;
+    }
+
+    await this.attachFiles(
+      files,
+      file =>
+        this.insertAttachmentReferenceAtCurrentSelection(
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64),
+      file =>
+        this.insertAttachmentReferenceAtCurrentSelection(
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64,
+          false));
   }
 
-  private async attachFiles(files: File[]) {
+  private isEditorEvent(event: Event) {
+    return event.composedPath().includes(this.editor);
+  }
+
+  private cancelNativeFileEvent(event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  private async attachFiles(
+    files: File[],
+    onAttached: (file: AttachedFilePayload) => Promise<void | string | null>,
+    onImagePreview?: (file: AttachedFilePayload & {
+      result: AttachFileResult & { relativePath: string };
+    }) => Promise<void | string | null>
+  ) {
     for (const file of files) {
+      let preview: PendingImageAttachmentPreview | null = null;
+      let previewSaveGateActive = false;
+      let rescheduleAfterPreviewFailure = false;
+      const previewHandler = onImagePreview;
       const attachmentDoc = this.currentDoc;
       const attachmentPath = this.currentPath;
 
       try {
         const fallbackName = getSafeAttachmentFileName(file);
         const contentBase64 = await readFileAsBase64(file);
+        const localImagePayload = previewHandler && attachmentDoc
+          ? await createLocalImageAttachmentPayload(file, fallbackName, contentBase64)
+          : null;
+
+        if (localImagePayload && previewHandler && attachmentDoc) {
+          this.beginAttachmentPreviewSaveGate();
+          previewSaveGateActive = true;
+          const blockId = await previewHandler(localImagePayload);
+          if (typeof blockId === 'string' && blockId.trim().length > 0) {
+            preview = {
+              doc: attachmentDoc,
+              blockId,
+              sourceId: localImagePayload.result.relativePath,
+              fallbackName,
+              sourceFile: file,
+              contentBase64,
+            };
+          } else {
+            this.endAttachmentPreviewSaveGate();
+            previewSaveGateActive = false;
+          }
+        }
+
         const result = await this.onAttachFile({
           type: 'attachFile',
           sourcePath: attachmentPath,
@@ -1220,18 +1333,46 @@ export class MarkdownBlockSuiteEditor {
           throw new Error('The note changed while the file was being attached.');
         }
 
-        await this.insertAttachmentReferenceAtCurrentSelection(
-          result,
-          fallbackName,
-          file,
-          contentBase64);
+        if (preview && isImageAttachmentResult(result)) {
+          await this.finalizeImageAttachmentPreview(preview, result);
+          await this.persistAttachmentMutation();
+        } else {
+          if (preview) {
+            this.removeImageAttachmentPreview(preview);
+            preview = null;
+          }
+
+          await onAttached({ result, fallbackName, sourceFile: file, contentBase64 });
+        }
+
         this.showStatus(`Attached ${result.displayName ?? fallbackName}.`);
       } catch (error) {
+        if (preview) {
+          this.removeImageAttachmentPreview(preview);
+          rescheduleAfterPreviewFailure = true;
+        }
+
         const message = error instanceof Error ? error.message : String(error);
         reportDiagnostic('error', `Attachment failed: ${message}`);
         this.showStatus(`Attach failed: ${message}`);
+      } finally {
+        if (previewSaveGateActive) {
+          this.endAttachmentPreviewSaveGate();
+          if (rescheduleAfterPreviewFailure) {
+            this.scheduleContentChanged();
+          }
+        }
       }
     }
+  }
+
+  private beginAttachmentPreviewSaveGate() {
+    this.pendingAttachmentPreviews++;
+    this.cancelPendingContentChanged();
+  }
+
+  private endAttachmentPreviewSaveGate() {
+    this.pendingAttachmentPreviews = Math.max(0, this.pendingAttachmentPreviews - 1);
   }
 
   private isAttachmentContextCurrent(doc: Doc | null, path: string) {
@@ -1240,14 +1381,125 @@ export class MarkdownBlockSuiteEditor {
       && this.currentPath === path;
   }
 
+  private async finalizeImageAttachmentPreview(
+    preview: PendingImageAttachmentPreview,
+    result: AttachFileResult & { relativePath: string }
+  ) {
+    const finalSourceId = await registerImageAttachmentBlob(
+      preview.doc,
+      result,
+      preview.fallbackName,
+      preview.sourceFile,
+      preview.contentBase64);
+
+    if (finalSourceId === preview.sourceId) {
+      return;
+    }
+
+    const model = preview.doc.getBlock(preview.blockId)?.model;
+    if (!isImageBlockModel(model)) {
+      return;
+    }
+
+    preview.doc.updateBlock(model, {
+      sourceId: finalSourceId,
+      size: preview.sourceFile.size,
+    } as never);
+  }
+
+  private removeImageAttachmentPreview(preview: PendingImageAttachmentPreview) {
+    const model = preview.doc.getBlock(preview.blockId)?.model;
+    if (model) {
+      preview.doc.deleteBlock(model as never, { deleteChildren: true });
+    }
+  }
+
+  private async insertDroppedAttachmentReference(
+    event: DragEvent,
+    result: AttachFileResult,
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string,
+    persist = true
+  ) {
+    if (!this.currentDoc) {
+      return null;
+    }
+
+    if (isImageAttachmentResult(result)) {
+      const model = getEventBlockModel(event);
+      let blockId = model
+        ? await this.tryInsertImageAttachmentBlockAfterModel(
+            model,
+            result,
+            fallbackName,
+            sourceFile,
+            contentBase64)
+        : null;
+      if (!blockId) {
+        blockId = await this.appendImageAttachmentBlock(result, fallbackName, sourceFile, contentBase64);
+      }
+
+      if (persist) {
+        await this.persistAttachmentMutation();
+      }
+
+      return blockId;
+    }
+
+    const referenceText = createAttachmentReferenceText(result, fallbackName);
+    if (!this.tryInsertInlineAttachmentReference(event, referenceText)) {
+      await this.appendAttachmentReferenceBlock(referenceText);
+    }
+
+    if (persist) {
+      await this.persistAttachmentMutation();
+    }
+
+    return null;
+  }
+
+  private tryInsertInlineAttachmentReference(event: DragEvent, referenceText: string) {
+    const model = getEventBlockModel(event);
+    if (!model) {
+      return false;
+    }
+
+    const host = this.editor.host;
+    const inlineEditor = host ? getInlineEditorByModel(host, model) : null;
+    const range = inlineEditor?.getInlineRange();
+    if (inlineEditor && range) {
+      inlineEditor.insertText(range, referenceText);
+      inlineEditor.setInlineRange({
+        index: range.index + referenceText.length,
+        length: 0,
+      });
+      return true;
+    }
+
+    const text = (model as {
+      text?: {
+        length?: number;
+        replace(index: number, length: number, content: string): void;
+      };
+    }).text;
+    if (text && typeof text.replace === 'function') {
+      text.replace(text.length ?? 0, 0, referenceText);
+      return true;
+    }
+
+    return false;
+  }
+
   private async insertAttachmentReferenceAtCurrentSelection(
     result: AttachFileResult,
     fallbackName: string,
     sourceFile: File,
-    contentBase64: string
+    contentBase64: string,
+    persist = true
   ) {
     if (!this.currentDoc) {
-      return;
+      return null;
     }
 
     if (isImageAttachmentResult(result)) {
@@ -1264,8 +1516,11 @@ export class MarkdownBlockSuiteEditor {
         blockId = await this.appendImageAttachmentBlock(result, fallbackName, sourceFile, contentBase64);
       }
 
-      await this.persistAttachmentMutation();
-      return;
+      if (persist) {
+        await this.persistAttachmentMutation();
+      }
+
+      return blockId;
     }
 
     const referenceText = createAttachmentReferenceText(result, fallbackName);
@@ -1273,7 +1528,64 @@ export class MarkdownBlockSuiteEditor {
       await this.appendAttachmentReferenceBlock(referenceText);
     }
 
-    await this.persistAttachmentMutation();
+    if (persist) {
+      await this.persistAttachmentMutation();
+    }
+
+    return null;
+  }
+
+  private async insertImageAttachmentFromSlashContext(
+    context: AffineSlashMenuContext,
+    result: AttachFileResult,
+    fallbackName: string,
+    sourceFile: File,
+    contentBase64: string,
+    persist = true
+  ) {
+    if (!this.currentDoc) {
+      return null;
+    }
+
+    if (!isImageAttachmentResult(result)) {
+      await this.insertAttachmentReferenceAtCurrentSelection(
+        result,
+        fallbackName,
+        sourceFile,
+        contentBase64,
+        persist);
+      return null;
+    }
+
+    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
+    const { model } = context;
+    const parent = rootComponent.doc.getParent(model);
+    if (!parent) {
+      const blockId = await this.appendImageAttachmentBlock(result, fallbackName, sourceFile, contentBase64);
+      if (persist) {
+        await this.persistAttachmentMutation();
+      }
+
+      return blockId;
+    }
+
+    const index = parent.children.indexOf(model);
+    const blockId = await this.insertImageAttachmentBlock(
+      parent,
+      Math.max(0, index + 1),
+      result,
+      fallbackName,
+      sourceFile,
+      contentBase64);
+    if (isEmptyTextBlockModel(model)) {
+      rootComponent.doc.deleteBlock(model);
+    }
+
+    if (persist) {
+      await this.persistAttachmentMutation();
+    }
+
+    return blockId;
   }
 
   private async tryInsertImageAttachmentBlockAfterModel(
@@ -1350,7 +1662,8 @@ export class MarkdownBlockSuiteEditor {
         size: sourceFile.size,
       } as never,
       parent,
-      index);
+      index
+    );
 
     if (blockId && this.currentDoc === doc) {
       this.editor.host?.selection.setGroup('note', [
@@ -1375,6 +1688,93 @@ export class MarkdownBlockSuiteEditor {
       : null;
   }
 
+  private getSelectedCardContextBlockIds() {
+    const textSelection = this.getTextSelection();
+    const ids = textSelection && !textSelection.isCollapsed()
+      ? this.getTextSelectionBlockIds(textSelection)
+      : [];
+
+    return uniqueBlockIds(ids.length > 0 ? ids : this.getBlockSelectionBlockIds());
+  }
+
+  private getTextSelectionBlockIds(textSelection: TextSelection) {
+    const range = this.editor.std?.range.textSelectionToRange(textSelection as never);
+    const components = (range
+      ? this.editor.std.range.getSelectedBlockComponentsByRange(range, {
+          match: (element: { model?: { id?: string; role?: string } }) =>
+            Boolean(element.model?.id) && element.model?.role === 'content',
+          mode: 'flat',
+        })
+      : []) as Array<{ model?: { id?: string } }>;
+
+    const componentIds = components
+      .map((component: { model?: { id?: string } }) => component.model?.id)
+      .filter((blockId: string | undefined): blockId is string => Boolean(blockId));
+    if (componentIds.length > 0) {
+      return componentIds;
+    }
+
+    return [
+      textSelection.start?.blockId,
+      textSelection.from?.blockId,
+      textSelection.end?.blockId,
+      textSelection.to?.blockId,
+    ].filter((blockId: string | undefined): blockId is string => Boolean(blockId));
+  }
+
+  private getBlockSelectionBlockIds() {
+    const selection = this.editor.host?.selection as
+      | {
+          find(type: string): unknown;
+          filter?(type: string): unknown[];
+        }
+      | undefined;
+    if (!selection) {
+      return [];
+    }
+
+    const blockSelections = typeof selection.filter === 'function'
+      ? selection.filter('block')
+      : [selection.find('block')];
+
+    return blockSelections.flatMap(getBlockSelectionId);
+  }
+
+  private getTextSelectionImageCandidateBlockIds() {
+    const textSelection = this.getTextSelection();
+    return textSelection ? this.getTextSelectionBlockIds(textSelection) : [];
+  }
+
+  private getImageBlocksInDocument() {
+    if (!this.currentDoc) {
+      return [];
+    }
+
+    return this.currentDoc
+      .getBlocks()
+      .map(block => (block as { model?: unknown }).model ?? block)
+      .filter(isImageBlockModel);
+  }
+
+  private createSelectedImageBlockFromModel(value: unknown): SelectedImageBlock | null {
+    return createSelectedImageBlock(value, this.currentCollectionRoot);
+  }
+
+  private createSelectedCardContextTitle(blockIds: string[]) {
+    const selectedText = normalizeSelectionText(window.getSelection()?.toString() ?? '');
+    if (selectedText.length > 0) {
+      return createTitleFromPlainText(selectedText, 'Card context');
+    }
+
+    const blockText = blockIds
+      .map(blockId => this.currentDoc?.getBlock(blockId)?.model)
+      .map(getBlockPlainText)
+      .filter(text => text.length > 0)
+      .join(' ');
+
+    return createTitleFromPlainText(blockText, 'Card context');
+  }
+
   private async persistAttachmentMutation() {
     await this.flushHost();
     this.mentions.refreshHighlights();
@@ -1384,9 +1784,32 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private tryInsertCurrentSelectionAttachmentReference(referenceText: string) {
-    const model = this.getSelectedBlockModel();
+    const blockSelection = this.editor.host?.selection.find('block') as
+      | { blockId?: string | null }
+      | null
+      | undefined;
+    const blockId = typeof blockSelection?.blockId === 'string'
+      ? blockSelection.blockId
+      : null;
+    if (!blockId || !this.currentDoc) {
+      return false;
+    }
+
+    const model = this.currentDoc.getBlock(blockId)?.model ?? null;
     if (!model || !isTextBlockModel(model)) {
       return false;
+    }
+
+    const host = this.editor.host;
+    const inlineEditor = host ? getInlineEditorByModel(host, model) : null;
+    const range = inlineEditor?.getInlineRange();
+    if (inlineEditor && range) {
+      inlineEditor.insertText(range, referenceText);
+      inlineEditor.setInlineRange({
+        index: range.index + referenceText.length,
+        length: 0,
+      });
+      return true;
     }
 
     const text = (model as {
@@ -1467,13 +1890,18 @@ export class MarkdownBlockSuiteEditor {
       return;
     }
 
-    const changed = registerSerializedCogntEmbedLinkedNotes(
+    const resolveTitle = (relativePath: string) => this.resolveLinkedNoteTitle(relativePath);
+    const embedChanged = registerSerializedCogntEmbedLinkedNotes(
       this.currentDoc,
       linkedDoc => this.registerLinkedDoc(linkedDoc, this.loadGeneration),
-      relativePath => this.resolveLinkedNoteTitle(relativePath)
+      resolveTitle
+    );
+    const inlineChanged = registerSerializedCogntInlineLinkedNotes(
+      this.currentDoc,
+      resolveTitle
     );
 
-    if (changed) {
+    if (embedChanged || inlineChanged) {
       this.scheduleContentChanged();
     }
   }
@@ -1483,18 +1911,23 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private async exportCurrentContent() {
-    return exportDocContent(this.currentDoc, this.currentPath);
+    this.documentLinks.ensureReferencesBlock();
+    return exportDocContent(this.currentDoc, this.currentPath, this.currentCollectionRoot);
   }
 
   private scheduleContentChanged() {
-    if (this.loadingDocument || this.isEditorInputLocked() || !this.currentDoc) {
+    if (
+      this.loadingDocument
+      || this.isEditorInputLocked()
+      || !this.currentDoc
+      || this.pendingAttachmentPreviews > 0
+    ) {
       return;
     }
 
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(async () => {
       this.saveTimer = undefined;
-      this.refreshClozeHighlights();
       this.mentions.refreshHighlights();
       const content = await this.exportCurrentContent();
       this.onContentChanged(content);
@@ -1506,34 +1939,8 @@ export class MarkdownBlockSuiteEditor {
     this.saveTimer = undefined;
   }
 
-  private scheduleClozeHighlightUpdate() {
-    if (this.clozeHighlightFrame !== undefined) {
-      return;
-    }
-
-    this.clozeHighlightFrame = window.requestAnimationFrame(() => {
-      this.clozeHighlightFrame = undefined;
-      if (this.currentDoc) {
-        updateClozeHighlights(this.editor);
-      }
-    });
-  }
-
-  private refreshClozeHighlights() {
-    this.cancelScheduledClozeHighlightUpdate();
-    updateClozeHighlights(this.editor);
-  }
-
-  private cancelScheduledClozeHighlightUpdate() {
-    if (this.clozeHighlightFrame === undefined) {
-      return;
-    }
-
-    window.cancelAnimationFrame(this.clozeHighlightFrame);
-    this.clozeHighlightFrame = undefined;
-  }
-
   private async handleCreateExtractShortcut(event: KeyboardEvent) {
+    this.suppressNextNativeCut = true;
     this.pendingExtract = runCreateExtractCommand(
       {
         isInputLocked: () => this.isEditorInputLocked(),
@@ -1542,11 +1949,16 @@ export class MarkdownBlockSuiteEditor {
         getLoadGeneration: () => this.loadGeneration,
         getEditor: () => this.editor,
         getTextSelection: () => this.getTextSelection(),
+        getBlockSelectionBlockIds: () => this.getBlockSelectionBlockIds(),
         createExtract: message => this.onCreateExtract(message),
         showStatus: message => this.showStatus(message),
       },
       event
     );
+
+    if (!this.pendingExtract) {
+      this.suppressNextNativeCut = false;
+    }
   }
 
   private async handleImageOcclusionShortcut(event: KeyboardEvent) {
@@ -1581,93 +1993,46 @@ export class MarkdownBlockSuiteEditor {
     });
   }
 
-  private async handleClozeShortcut(event: KeyboardEvent) {
+  public async createClozeFromSelection(
+    cardContextId?: string | null,
+    slotId?: string | null,
+    displayClozeIndex?: number | null
+  ) {
+    await this.handleClozeCommand(undefined, { cardContextId, slotId, displayClozeIndex });
+  }
+
+  private async handleClozeCommand(
+    event?: KeyboardEvent,
+    options: {
+      cardContextId?: string | null;
+      slotId?: string | null;
+      displayClozeIndex?: number | null;
+    } = {}
+  ) {
     await runClozeCommand(
       {
         isInputLocked: () => this.isEditorInputLocked(),
         getCurrentDoc: () => this.currentDoc,
         getCurrentPath: () => this.currentPath,
+        getEditorRoot: () => this.editor,
         getTextSelection: () => this.getTextSelection(),
         clearTextSelection: () => {
           this.editor.host?.selection.clear(['text']);
           window.getSelection()?.removeAllRanges();
         },
         flushHost: () => this.flushHost(),
-        refreshClozeHighlights: () => this.refreshClozeHighlights(),
         cancelPendingContentChanged: () => this.cancelPendingContentChanged(),
         exportContent: () => this.exportCurrentContent(),
         saveCloze: message => this.onSaveCloze(message),
         showStatus: message => this.showStatus(message),
       },
-      event
+      event,
+      options
     );
   }
 
   private getTextSelection() {
     return this.editor.std?.selection.find('text') as TextSelection | null | undefined;
-  }
-
-  private getTextSelectionBlockIds(textSelection: TextSelection) {
-    const range = this.editor.std?.range.textSelectionToRange(textSelection as never);
-    const components = (range
-      ? this.editor.std.range.getSelectedBlockComponentsByRange(range, {
-          match: (element: { model?: { id?: string; role?: string } }) =>
-            Boolean(element.model?.id) && element.model?.role === 'content',
-          mode: 'flat',
-        })
-      : []) as Array<{ model?: { id?: string } }>;
-
-    const componentIds = components
-      .map((component: { model?: { id?: string } }) => component.model?.id)
-      .filter((blockId: string | undefined): blockId is string => Boolean(blockId));
-    if (componentIds.length > 0) {
-      return componentIds;
-    }
-
-    return [
-      textSelection.start?.blockId,
-      textSelection.from?.blockId,
-      textSelection.end?.blockId,
-      textSelection.to?.blockId,
-    ].filter((blockId: string | undefined): blockId is string => Boolean(blockId));
-  }
-
-  private getBlockSelectionBlockIds() {
-    const selection = this.editor.host?.selection as
-      | {
-          find(type: string): unknown;
-          filter?(type: string): unknown[];
-        }
-      | undefined;
-    if (!selection) {
-      return [];
-    }
-
-    const blockSelections = typeof selection.filter === 'function'
-      ? selection.filter('block')
-      : [selection.find('block')];
-
-    return blockSelections.flatMap(getBlockSelectionId);
-  }
-
-  private getTextSelectionImageCandidateBlockIds() {
-    const textSelection = this.getTextSelection();
-    return textSelection ? this.getTextSelectionBlockIds(textSelection) : [];
-  }
-
-  private getImageBlocksInDocument() {
-    if (!this.currentDoc) {
-      return [];
-    }
-
-    return this.currentDoc
-      .getBlocks()
-      .map(block => (block as { model?: unknown }).model ?? block)
-      .filter(isImageBlockModel);
-  }
-
-  private createSelectedImageBlockFromModel(value: unknown): SelectedImageBlock | null {
-    return createSelectedImageBlock(value, this.currentCollectionRoot);
   }
 
   public async createLinkedNoteFromSlashMenu(
@@ -1716,6 +2081,41 @@ export class MarkdownBlockSuiteEditor {
       },
       context
     );
+  }
+
+  public async insertImageFromSlashMenu(context: AffineSlashMenuContext) {
+    if (this.isEditorInputLocked()) {
+      this.showLockedInputStatus();
+      return;
+    }
+
+    if (!this.currentDoc || !this.currentPath) {
+      this.showStatus('Open a note before adding images.');
+      return;
+    }
+
+    const files = await pickImageFiles();
+    if (files.length === 0) {
+      return;
+    }
+
+    await this.attachFiles(
+      files,
+      file =>
+        this.insertImageAttachmentFromSlashContext(
+          context,
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64),
+      file =>
+        this.insertImageAttachmentFromSlashContext(
+          context,
+          file.result,
+          file.fallbackName,
+          file.sourceFile,
+          file.contentBase64,
+          false));
   }
 
 }
@@ -1776,6 +2176,101 @@ async function hydrateAttachmentImageBlocks(
   }
 }
 
+function getEventBlockModel(event: Event) {
+  for (const target of event.composedPath()) {
+    const candidate = target as { model?: unknown; focusModel?: unknown } | null;
+    const model = candidate?.model ?? candidate?.focusModel;
+    if (isTextBlockModel(model)) {
+      return model;
+    }
+  }
+
+  return null;
+}
+
+function isTextBlockModel(value: unknown): value is BlockModel {
+  return typeof value === 'object'
+    && value !== null
+    && Boolean((value as { text?: unknown }).text);
+}
+
+function isEmptyTextBlockModel(value: unknown) {
+  if (!isTextBlockModel(value)) {
+    return false;
+  }
+
+  const candidate = value as {
+    text?: { length?: number };
+    children?: unknown[];
+  };
+
+  return (candidate.text?.length ?? 0) === 0
+    && Array.isArray(candidate.children)
+    && candidate.children.length === 0;
+}
+
+function getBlockSelectionId(value: unknown) {
+  const blockId = typeof (value as { blockId?: unknown } | null)?.blockId === 'string'
+    ? (value as { blockId: string }).blockId.trim()
+    : '';
+
+  return blockId.length > 0 ? [blockId] : [];
+}
+
+function uniqueBlockIds(values: string[]) {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const blockId = value.trim();
+    if (!blockId || seen.has(blockId)) {
+      continue;
+    }
+
+    seen.add(blockId);
+    ids.push(blockId);
+  }
+
+  return ids;
+}
+
+function getBlockPlainText(value: unknown) {
+  const text = (value as { text?: unknown } | null)?.text;
+  if (typeof text === 'string') {
+    return normalizeSelectionText(text);
+  }
+
+  if (text && typeof (text as { toString?: unknown }).toString === 'function') {
+    const result = (text as { toString(): string }).toString();
+    if (result && result !== '[object Object]') {
+      return normalizeSelectionText(result);
+    }
+  }
+
+  return '';
+}
+
+function createSelectedImageBlock(
+  value: unknown,
+  collectionRoot?: string | null
+): SelectedImageBlock | null {
+  if (!isImageBlockModel(value)) {
+    return null;
+  }
+
+  const sourceId = getImageSourceId(value);
+  const imageRelPath = sourceId
+    ? normalizeImageSourceForHost(sourceId, collectionRoot)
+    : null;
+  if (!imageRelPath) {
+    return null;
+  }
+
+  return {
+    imageBlockId: value.id,
+    imageRelPath,
+  };
+}
+
 function isImageBlockModel(value: unknown): value is BlockModel & {
   id: string;
   sourceId?: unknown;
@@ -1804,50 +2299,6 @@ function getImageSourceId(value: {
   return candidate.replace(/\\/g, '/').trim() || null;
 }
 
-function setImageSourceId(
-  value: {
-    sourceId?: unknown;
-    props?: {
-      sourceId?: unknown;
-    };
-  },
-  sourceId: string
-) {
-  if (typeof value.sourceId === 'string') {
-    value.sourceId = sourceId;
-    return;
-  }
-
-  if (value.props) {
-    value.props.sourceId = sourceId;
-    return;
-  }
-
-  value.sourceId = sourceId;
-}
-
-function createSelectedImageBlock(
-  value: unknown,
-  collectionRoot?: string | null
-): SelectedImageBlock | null {
-  if (!isImageBlockModel(value)) {
-    return null;
-  }
-
-  const sourceId = getImageSourceId(value);
-  const imageRelPath = sourceId
-    ? normalizeImageSourceForHost(sourceId, collectionRoot)
-    : null;
-  if (!imageRelPath) {
-    return null;
-  }
-
-  return {
-    imageBlockId: value.id,
-    imageRelPath,
-  };
-}
-
 function normalizeImageSourceForHost(sourceId: string, collectionRoot?: string | null) {
   const normalizedSource = sourceId.replace(/\\/g, '/').trim();
   if (normalizedSource.length === 0) {
@@ -1873,6 +2324,84 @@ function normalizeImageSourceForHost(sourceId: string, collectionRoot?: string |
   return isCollectionImageReference(normalizedSource)
     ? normalizedSource.replace(/^\/+/, '')
     : null;
+}
+
+function setImageSourceId(
+  value: {
+    sourceId?: unknown;
+    props?: {
+      sourceId?: unknown;
+    };
+  },
+  sourceId: string
+) {
+  if (typeof value.sourceId === 'string') {
+    value.sourceId = sourceId;
+    return;
+  }
+
+  if (value.props) {
+    value.props.sourceId = sourceId;
+    return;
+  }
+
+  value.sourceId = sourceId;
+}
+
+function isImageAttachmentResult(
+  result: AttachFileResult
+): result is AttachFileResult & { relativePath: string } {
+  return result.kind?.toLowerCase() === 'image'
+    && typeof result.relativePath === 'string'
+    && result.relativePath.trim().length > 0;
+}
+
+async function createLocalImageAttachmentPayload(
+  sourceFile: File,
+  fallbackName: string,
+  contentBase64: string
+): Promise<(AttachedFilePayload & {
+  result: AttachFileResult & { relativePath: string };
+}) | null> {
+  const bytes = base64ToUint8Array(contentBase64);
+  const contentType = sniffImageContentType(bytes)
+    ?? normalizeSupportedImageContentType(sourceFile.type)
+    ?? inferImageContentType(fallbackName);
+  if (!contentType) {
+    return null;
+  }
+
+  const extension = inferImageFileExtension(fallbackName)
+    ?? inferFileExtension(contentType);
+  if (!isSupportedImageExtension(extension)) {
+    return null;
+  }
+
+  const relativePath = await createPreviewImageRelativePath(bytes, extension);
+  return {
+    result: {
+      ok: true,
+      displayName: sanitizeAttachmentLabel(fallbackName),
+      relativePath,
+      kind: 'Image',
+    },
+    fallbackName,
+    sourceFile,
+    contentBase64,
+  };
+}
+
+async function registerImageAttachmentBlob(
+  doc: Doc,
+  result: AttachFileResult & { relativePath: string },
+  fallbackName: string,
+  sourceFile: File,
+  contentBase64: string
+) {
+  const relativePath = sanitizeAttachmentTarget(result.relativePath ?? fallbackName);
+  const blob = createBlobForImageAttachment(contentBase64, sourceFile, result, fallbackName);
+  await doc.blobSync.set(relativePath, blob);
+  return relativePath;
 }
 
 function tryGetFileUriPath(source: string) {
@@ -1928,51 +2457,6 @@ function normalizeLocalPath(path: string) {
   return path.replace(/\\/g, '/').trim().replace(/\/+$/, '');
 }
 
-function getBlockSelectionId(value: unknown) {
-  const blockId = typeof (value as { blockId?: unknown } | null)?.blockId === 'string'
-    ? (value as { blockId: string }).blockId.trim()
-    : '';
-
-  return blockId.length > 0 ? [blockId] : [];
-}
-
-function uniqueBlockIds(values: string[]) {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const value of values) {
-    const blockId = value.trim();
-    if (!blockId || seen.has(blockId)) {
-      continue;
-    }
-
-    seen.add(blockId);
-    ids.push(blockId);
-  }
-
-  return ids;
-}
-
-function isImageAttachmentResult(
-  result: AttachFileResult
-): result is AttachFileResult & { relativePath: string } {
-  return result.kind?.toLowerCase() === 'image'
-    && typeof result.relativePath === 'string'
-    && result.relativePath.trim().length > 0;
-}
-
-async function registerImageAttachmentBlob(
-  doc: Doc,
-  result: AttachFileResult & { relativePath: string },
-  fallbackName: string,
-  sourceFile: File,
-  contentBase64: string
-) {
-  const relativePath = sanitizeAttachmentTarget(result.relativePath ?? fallbackName);
-  const blob = createBlobForImageAttachment(contentBase64, sourceFile, result, fallbackName);
-  await doc.blobSync.set(relativePath, blob);
-  return relativePath;
-}
-
 function createAttachmentReferenceText(result: AttachFileResult, fallbackName: string) {
   const displayName = sanitizeAttachmentLabel(result.displayName ?? fallbackName);
   const relativePath = sanitizeAttachmentTarget(result.relativePath ?? fallbackName);
@@ -1992,7 +2476,8 @@ function createBlobForImageAttachment(
   fallbackName: string
 ) {
   const bytes = base64ToUint8Array(contentBase64);
-  const contentType = normalizeSupportedImageContentType(sourceFile.type)
+  const contentType = sniffImageContentType(bytes)
+    ?? normalizeSupportedImageContentType(sourceFile.type)
     ?? inferImageContentType(result.relativePath ?? result.displayName ?? fallbackName)
     ?? inferImageContentType(fallbackName)
     ?? 'application/octet-stream';
@@ -2061,12 +2546,102 @@ function inferImageContentType(value: string) {
           : null;
 }
 
+function inferImageFileExtension(value: string) {
+  const extension = value
+    .split(/[?#]/, 1)[0]
+    .split('.')
+    .pop()
+    ?.trim()
+    .toLowerCase();
+
+  if (!extension) {
+    return null;
+  }
+
+  const normalizedExtension = `.${extension}`;
+  return isSupportedImageExtension(normalizedExtension)
+    ? normalizedExtension
+    : null;
+}
+
 function isSupportedImageExtension(value: string | null | undefined) {
   return value === '.png'
     || value === '.jpg'
     || value === '.jpeg'
     || value === '.webp'
     || value === '.gif';
+}
+
+async function createPreviewImageRelativePath(bytes: Uint8Array, extension: string) {
+  const sha256 = await computeSha256Hex(bytes);
+  const fileName = sha256
+    ? `${sha256}${extension}`
+    : `pending-${createPreviewToken()}${extension}`;
+
+  return `attachments/images/${fileName}`;
+}
+
+async function computeSha256Hex(bytes: Uint8Array) {
+  if (!globalThis.crypto?.subtle) {
+    return null;
+  }
+
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', copy.buffer);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function createPreviewToken() {
+  return globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function sniffImageContentType(bytes: Uint8Array) {
+  if (bytes.length >= 8
+    && bytes[0] === 0x89
+    && bytes[1] === 0x50
+    && bytes[2] === 0x4e
+    && bytes[3] === 0x47
+    && bytes[4] === 0x0d
+    && bytes[5] === 0x0a
+    && bytes[6] === 0x1a
+    && bytes[7] === 0x0a) {
+    return 'image/png';
+  }
+
+  if (bytes.length >= 3
+    && bytes[0] === 0xff
+    && bytes[1] === 0xd8
+    && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  if (bytes.length >= 6
+    && bytes[0] === 0x47
+    && bytes[1] === 0x49
+    && bytes[2] === 0x46
+    && bytes[3] === 0x38
+    && (bytes[4] === 0x37 || bytes[4] === 0x39)
+    && bytes[5] === 0x61) {
+    return 'image/gif';
+  }
+
+  if (bytes.length >= 12
+    && bytes[0] === 0x52
+    && bytes[1] === 0x49
+    && bytes[2] === 0x46
+    && bytes[3] === 0x46
+    && bytes[8] === 0x57
+    && bytes[9] === 0x45
+    && bytes[10] === 0x42
+    && bytes[11] === 0x50) {
+    return 'image/webp';
+  }
+
+  return null;
 }
 
 function sanitizeAttachmentLabel(value: string) {
@@ -2086,13 +2661,34 @@ function sanitizeAttachmentTarget(value: string) {
 function readFileAsBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read.'));
+    reader.onerror = () => reject(reader.error ?? new Error('The dropped file could not be read.'));
     reader.onload = () => {
       const result = typeof reader.result === 'string' ? reader.result : '';
       const separatorIndex = result.indexOf(',');
       resolve(separatorIndex >= 0 ? result.slice(separatorIndex + 1) : result);
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function pickImageFiles() {
+  return new Promise<File[]>(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    input.multiple = true;
+    input.style.display = 'none';
+
+    const complete = () => {
+      const files = Array.from(input.files ?? []).filter(file => file.size > 0);
+      input.remove();
+      resolve(files);
+    };
+
+    input.addEventListener('change', complete, { once: true });
+    input.addEventListener('cancel', complete, { once: true });
+    document.body.append(input);
+    input.click();
   });
 }
 
@@ -2139,17 +2735,4 @@ function inferFileExtension(contentType: string) {
         : normalized === 'image/gif'
           ? '.gif'
           : '.bin';
-}
-
-function isTextBlockModel(value: unknown): value is BlockModel {
-  return isBlockModel(value)
-    && typeof (value as { text?: unknown }).text === 'object'
-    && (value as { text?: unknown }).text !== null;
-}
-
-function isBlockModel(value: unknown): value is BlockModel {
-  return typeof value === 'object'
-    && value !== null
-    && typeof (value as { id?: unknown }).id === 'string'
-    && typeof (value as { flavour?: unknown }).flavour === 'string';
 }
