@@ -37,7 +37,6 @@ export type NativeMentionMenuControllerOptions = {
   scheduleContentChanged(): void;
   showStatus(message: string): void;
   onSearchTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
-  requestPreview(relativePath: string, anchor: HTMLElement): void;
   refreshHighlights(): void;
 };
 

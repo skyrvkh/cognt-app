@@ -1,5 +1,10 @@
-import { escapeHtml } from './mentions';
 import { getReferencePopoverContainers } from './mention-controller-anchors';
+
+function escapeHtml(value: string) {
+  const element = document.createElement('div');
+  element.textContent = value;
+  return element.innerHTML;
+}
 
 export const nativeReferencePreviewId = 'cognt-reference-preview';
 export const nativeMentionSearchPreviewId = 'cognt-linked-doc-search-preview';

@@ -9,7 +9,6 @@
     <EditorWebDirectory>$(MSBuildProjectDirectory)\EditorWeb</EditorWebDirectory>
     <EditorWebBuildDirectory>$(MSBuildProjectDirectory)\obj\EditorWebBuild</EditorWebBuildDirectory>
     <EditorWebNodeModulesDirectory>$(MSBuildProjectDirectory)\..\..\..\.npm-cache\editorweb-node_modules</EditorWebNodeModulesDirectory>
-    <EditorWebBuildEnabled>false</EditorWebBuildEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -79,14 +78,14 @@
           DependsOnTargets="EnsureEditorWebNodeModules"
           Inputs="@(EditorWebSource)"
           Outputs="$(EditorWebBuildDirectory)\dist\assets\blazor-blocksuite.js"
-          Condition="'$(EditorWebBuildEnabled)' == 'true' and Exists('$(EditorWebDirectory)\package.json')">
+          Condition="Exists('$(EditorWebDirectory)\package.json')">
     <Exec WorkingDirectory="$(EditorWebBuildDirectory)" Command="npm run build" />
   </Target>
 
   <Target Name="CopyEditorWebOutput"
           AfterTargets="Build"
           DependsOnTargets="BuildEditorWeb"
-          Condition="'$(EditorWebBuildEnabled)' == 'true' and Exists('$(EditorWebBuildDirectory)\dist\assets\blazor-blocksuite.js')">
+          Condition="Exists('$(EditorWebBuildDirectory)\dist\assets\blazor-blocksuite.js')">
     <ItemGroup>
       <EditorWebOutput Include="$(EditorWebBuildDirectory)\dist\**\*" />
     </ItemGroup>
