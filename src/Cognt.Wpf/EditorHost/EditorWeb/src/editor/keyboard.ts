@@ -1,18 +1,22 @@
-export type ShortcutKey = 'i' | 'x' | 'z';
+export type ShortcutKey = 'c' | 'i' | 'x';
 
-export type ShortcutOptions = {
+export type ShortcutModifiers = {
   shift?: boolean;
+  alt?: boolean;
 };
 
 export function isEditorShortcut(
   event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>,
   key: ShortcutKey,
-  options: ShortcutOptions = {}
+  modifiers: ShortcutModifiers = {}
 ) {
+  const requiresShift = modifiers.shift ?? false;
+  const requiresAlt = modifiers.alt ?? false;
+
   return (
     (event.ctrlKey || event.metaKey) &&
-    event.shiftKey === Boolean(options.shift) &&
-    !event.altKey &&
+    event.shiftKey === requiresShift &&
+    event.altKey === requiresAlt &&
     event.key.toLowerCase() === key
   );
 }

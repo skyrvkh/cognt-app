@@ -55,6 +55,28 @@ export async function forceEditableRichText(editor: PageEditor) {
   }
 }
 
+export async function forceReadonlyRichText(editor: PageEditor) {
+  for (const richText of findElementsDeep(editor, 'rich-text')) {
+    const editable = richText as HTMLElement & {
+      readonly?: boolean;
+      inlineEditor?: { setReadonly?: (readonly: boolean) => void };
+      requestUpdate?: (name?: string, oldValue?: unknown) => void;
+      updateComplete?: Promise<unknown>;
+    };
+
+    editable.readonly = true;
+    editable.inlineEditor?.setReadonly?.(true);
+    editable.requestUpdate?.('readonly', false);
+    await editable.updateComplete;
+
+    const inlineEditor = findEditableElement(editable.shadowRoot) ??
+      editable.shadowRoot?.querySelector<HTMLElement>('.inline-editor');
+
+    inlineEditor?.classList.add('readonly');
+    inlineEditor?.setAttribute('contenteditable', 'false');
+  }
+}
+
 export async function flushEditorHost(editor: PageEditor) {
   await editor.updateComplete;
 

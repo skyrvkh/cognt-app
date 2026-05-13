@@ -4,15 +4,13 @@ import {
   createDefaultPropertiesRows,
   insertCogntPropertiesBlock,
 } from '../blocks/properties';
+import type { CogntSlashMenuRootComponent } from '../blocksuite-compat';
+import { persistMutation, type MutationPersistenceHost } from '../editor/host-operations';
 import { reportDiagnostic } from '../host';
 
-export type PropertiesCommandHost = {
+export type PropertiesCommandHost = MutationPersistenceHost & {
   isInputLocked(): boolean;
   getCurrentDoc(): Doc | null;
-  flushHost(): Promise<void>;
-  cancelPendingContentChanged(): void;
-  recordUserEdit(): void;
-  notifyContentChanged(): Promise<void>;
   showStatus(message: string): void;
 };
 
@@ -31,14 +29,12 @@ export async function runInsertPropertiesBlockCommand(
   }
 
   try {
+    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
     insertCogntPropertiesBlock(
       context,
-      createDefaultPropertiesRows(context.rootComponent.doc)
+      createDefaultPropertiesRows(rootComponent.doc)
     );
-    await host.flushHost();
-    host.cancelPendingContentChanged();
-    host.recordUserEdit();
-    await host.notifyContentChanged();
+    await persistMutation(host);
     host.showStatus('Properties block added.');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -5,6 +5,7 @@ import {
   type LinkedPageReference,
 } from './linked-note-types';
 import { parseNoteMentionTarget } from '../mentions';
+import { isPlainRecord } from '../documents/block-suite-document';
 import {
   getNotePathFileName,
   normalizeNotePathKey,
@@ -192,26 +193,22 @@ export function createCogntLinkedNoteParams(relativePath: string) {
 
 export function mergeCogntLinkedNoteParams(params: unknown, relativePath: string) {
   return {
-    ...(isRecord(params) ? params : {}),
+    ...(isPlainRecord(params) ? params : {}),
     [cogntLinkedNotePathProp]: relativePath,
   };
 }
 
 export function hasCogntLinkedNotePath(params: unknown, relativePath: string) {
-  return isRecord(params)
+  return isPlainRecord(params)
     && getTrimmedString(params[cogntLinkedNotePathProp]) === relativePath;
 }
 
 export function getRecordProperty(record: Record<string, unknown>, key: string) {
   const value = record[key];
-  return isRecord(value) ? value : null;
+  return isPlainRecord(value) ? value : null;
 }
 
 export function getCogntLinkedNoteTitle(props: Record<string, unknown>) {
   const value = props.title;
   return typeof value === 'string' ? normalizeLinkedNoteTitle(value) : null;
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

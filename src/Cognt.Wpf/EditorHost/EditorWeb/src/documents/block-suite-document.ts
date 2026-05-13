@@ -8,7 +8,6 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
   title: string
 ) {
   const pageId = createBlockId();
-  const surfaceId = createBlockId();
   const noteId = createBlockId();
 
   return `${JSON.stringify(
@@ -34,21 +33,14 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
           children: [
             {
               type: 'block',
-              id: surfaceId,
-              flavour: 'affine:surface',
-              version: 5,
-              props: {},
-              children: [],
-            },
-            {
-              type: 'block',
               id: noteId,
               flavour: 'affine:note',
               version: 1,
               props: {
-                xywh: '[0,0,800,95]',
-                background: '--affine-note-background-blue',
+                xywh: '[0,0,498,92]',
+                background: '--affine-note-background-white',
                 index: 'a0',
+                lockedBySelf: false,
                 hidden: false,
                 displayMode: 'both',
                 edgeless: {

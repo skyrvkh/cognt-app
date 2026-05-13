@@ -1,7 +1,5 @@
 import type { Doc } from '@blocksuite/store';
 
-const clozeHighlightName = 'cognt-cloze';
-
 type TextSelectionPoint = {
   blockId: string;
   index: number;
@@ -54,45 +52,6 @@ export function getNextClozeIndex(root: Node) {
   }
 
   return maxIndex + 1;
-}
-
-export function updateClozeHighlights(root: Node) {
-  const cssWithHighlights = CSS as typeof CSS & {
-    highlights?: {
-      set(name: string, highlight: unknown): void;
-      delete(name: string): void;
-    };
-  };
-  const highlightConstructor = (globalThis as typeof globalThis & {
-    Highlight?: new (...ranges: Range[]) => unknown;
-  }).Highlight;
-
-  if (!cssWithHighlights.highlights || !highlightConstructor) {
-    return;
-  }
-
-  const ranges: Range[] = [];
-  const expression = /\{\{(?:c\d+::?)?[^{}\n]+\}\}/g;
-
-  for (const current of collectClozeTextNodes(root)) {
-    const text = current.textContent ?? '';
-    let match: RegExpExecArray | null;
-
-    while ((match = expression.exec(text)) !== null) {
-      const range = document.createRange();
-      range.setStart(current, match.index);
-      range.setEnd(current, match.index + match[0].length);
-
-      ranges.push(range);
-    }
-  }
-
-  if (ranges.length === 0) {
-    cssWithHighlights.highlights.delete(clozeHighlightName);
-    return;
-  }
-
-  cssWithHighlights.highlights.set(clozeHighlightName, new highlightConstructor(...ranges));
 }
 
 function replaceTextSelectionWithCloze(context: ClozeContext, clozeText: string) {

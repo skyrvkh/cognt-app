@@ -31,11 +31,10 @@ export type ClozeCommandHost = {
   isInputLocked(): boolean;
   getCurrentDoc(): Doc | null;
   getCurrentPath(): string;
-  getEditorRoot?(): Node;
+  getEditorRoot(): Node;
   getTextSelection(): TextSelection | null | undefined;
   clearTextSelection(): void;
   flushHost(): Promise<void>;
-  refreshClozeHighlights(): void;
   cancelPendingContentChanged(): void;
   exportContent(): Promise<string>;
   saveCloze(message: SaveClozeCommandMessage): void;
@@ -64,7 +63,6 @@ export async function runClozeCommand(
   }
 
   let clozeText: string;
-  let clozeIndex = 1;
   const textSelection = host.getTextSelection();
   const blockId = getSelectionBlockId(textSelection);
   if (!blockId) {
@@ -73,13 +71,10 @@ export async function runClozeCommand(
   }
 
   try {
-    const requestedIndex =
+    const clozeIndex =
       typeof options.displayClozeIndex === 'number' && Number.isFinite(options.displayClozeIndex)
         ? Math.max(1, Math.trunc(options.displayClozeIndex))
-        : null;
-    clozeIndex = requestedIndex ?? (
-      host.getEditorRoot ? getNextClozeIndex(host.getEditorRoot()) : 1
-    );
+        : getNextClozeIndex(host.getEditorRoot());
     clozeText = replaceSelectionWithCloze(
       {
         doc: host.getCurrentDoc(),
@@ -98,7 +93,6 @@ export async function runClozeCommand(
   host.clearTextSelection();
   await host.flushHost();
   await new Promise(resolve => window.requestAnimationFrame(resolve));
-  host.refreshClozeHighlights();
   host.cancelPendingContentChanged();
   host.saveCloze({
     type: 'saveCloze',
@@ -109,7 +103,10 @@ export async function runClozeCommand(
     content: await host.exportContent(),
     cardContextId: options.cardContextId ?? null,
     slotId: options.slotId ?? null,
-    displayClozeIndex: clozeIndex,
+    displayClozeIndex:
+      typeof options.displayClozeIndex === 'number' && Number.isFinite(options.displayClozeIndex)
+        ? Math.max(1, Math.trunc(options.displayClozeIndex))
+        : null,
   });
   host.showStatus('Selection hidden in place with cloze.');
 }

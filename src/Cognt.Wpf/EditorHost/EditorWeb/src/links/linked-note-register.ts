@@ -5,9 +5,7 @@ import {
   type Doc,
 } from '@blocksuite/store';
 import { createBlockId } from '../documents/block-suite-document';
-import { parseNoteMentionTarget } from '../mentions';
 import {
-  cogntLinkedNotePathProp,
   defaultCogntEmbedStyle,
   type CogntLinkedDoc,
   type LinkedNoteTitleResolver,
@@ -15,11 +13,11 @@ import {
 import {
   createCogntLinkedNoteParams,
   extractCogntEmbedTarget,
+  findRawCogntInlineMentionMatches,
   getLinkedNoteTitle,
   getLinkedPageReferencePath,
   getTrimmedString,
   hasCogntLinkedNotePath,
-  isCogntNoteRelativePath,
   mergeCogntLinkedNoteParams,
   getRecordProperty,
 } from './linked-note-paths';
@@ -35,7 +33,10 @@ import {
   getDeltaReference,
   walkBlockModels,
 } from './linked-note-block-text';
-import { createLinkedPageReference } from './linked-note-reference';
+import {
+  createLinkedPageReference,
+  updateLinkedPageReference,
+} from './linked-note-reference';
 
 export function hydrateCogntEmbedLinkedNotes(
   doc: Doc,
@@ -79,7 +80,8 @@ export function hydrateCogntEmbedLinkedNotes(
         caption: null,
         title,
         description: target.relativePath,
-        [cogntLinkedNotePathProp]: target.relativePath,
+        relativePath: target.relativePath,
+        cogntLinkedNotePath: target.relativePath,
       } as never,
       parent,
       index
@@ -129,7 +131,8 @@ export function registerSerializedCogntEmbedLinkedNotes(
         params: mergedParams,
         title,
         description: relativePath,
-        [cogntLinkedNotePathProp]: relativePath,
+        relativePath,
+        cogntLinkedNotePath: relativePath,
       });
       changed = true;
     }
@@ -169,15 +172,12 @@ export function registerSerializedCogntInlineLinkedNotes(
 
         if (needsUpdate) {
           text.format(index, Math.max(length, REFERENCE_NODE.length), {
-            reference: {
-              ...reference,
-              type: 'LinkedPage',
-              pageId: linkedPage.pageId,
-              params: mergeCogntLinkedNoteParams(reference.params, relativePath),
-              title: linkedPage.title,
-              description: relativePath,
-              [cogntLinkedNotePathProp]: relativePath,
-            },
+            reference: updateLinkedPageReference(
+              reference,
+              linkedPage.pageId,
+              relativePath,
+              linkedPage.title
+            ),
           });
           changed = true;
         }
@@ -212,19 +212,11 @@ export function upgradeRuntimeRawCogntInlineMentions(
       const length = inserted.length;
 
       if (inserted.includes('[[')) {
-        const expression = /\[\[([^\]\[\n]+)\]\]/g;
-        let match: RegExpExecArray | null;
-
-        while ((match = expression.exec(inserted)) !== null) {
-          const target = parseNoteMentionTarget(match[1]);
-          if (!target || !isCogntNoteRelativePath(target.relativePath)) {
-            continue;
-          }
-
+        for (const match of findRawCogntInlineMentionMatches(inserted)) {
           replacements.push({
             index: index + match.index,
-            length: match[0].length,
-            relativePath: target.relativePath,
+            length: match.length,
+            relativePath: match.relativePath,
           });
         }
       }

@@ -3,6 +3,9 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   base: './',
+  resolve: {
+    preserveSymlinks: true,
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

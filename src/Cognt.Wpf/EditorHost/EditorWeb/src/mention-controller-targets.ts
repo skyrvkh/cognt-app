@@ -1,12 +1,16 @@
 import type { MentionTarget } from './mentions';
+import {
+  getNotePathFileName,
+  normalizeNotePathKey,
+} from './links/note-path-utils';
 
 export function normalizeMentionPathKey(relativePath: string) {
-  return relativePath.replace(/\\/g, '/').trim().toLowerCase();
+  return normalizeNotePathKey(relativePath);
 }
 
 export function getMentionDisplayTitle(target: MentionTarget) {
   const title = target.title.trim()
-    || target.fileName.replace(/\.(json|md|markdown)$/i, '').trim();
+    || getNotePathFileName(target.relativePath).replace(/\.(json|md|markdown)$/i, '').trim();
   return title.length > 0 ? title : target.relativePath;
 }
 

@@ -28,14 +28,14 @@ page-editor {
   min-height: 0;
 }
 
+.cognt-blocksuite-host {
+  overflow: auto;
+}
+
 #editor-host {
   position: relative;
   min-height: 70%;
   overflow: visible;
-}
-
-.cognt-blocksuite-host {
-  overflow: auto;
 }
 
 page-editor {

@@ -7,12 +7,11 @@ import {
   createBlockId,
   getSnapshotTextDelta,
   getSnapshotTextValue,
+  isPlainRecord,
 } from '../documents/block-suite-document';
-import { parseNoteMentionTarget } from '../mentions';
 import {
+  findRawCogntInlineMentionMatches,
   getLinkedNoteTitle,
-  isCogntNoteRelativePath,
-  isRecord,
 } from './linked-note-paths';
 import { createLinkedPageReference } from './linked-note-reference';
 
@@ -43,7 +42,7 @@ function upgradeRawCogntInlineMentionDelta(delta: unknown[]) {
   const upgraded: unknown[] = [];
 
   for (const entry of delta) {
-    if (!isRecord(entry) || typeof entry.insert !== 'string' || !entry.insert.includes('[[')) {
+    if (!isPlainRecord(entry) || typeof entry.insert !== 'string' || !entry.insert.includes('[[')) {
       upgraded.push(entry);
       continue;
     }
@@ -67,18 +66,15 @@ function splitRawCogntInlineMentionEntry(entry: Record<string, unknown>) {
     return null;
   }
 
-  const expression = /\[\[([^\]\[\n]+)\]\]/g;
+  const matches = findRawCogntInlineMentionMatches(insert);
+  if (matches.length === 0) {
+    return null;
+  }
+
   const segments: unknown[] = [];
-  let changed = false;
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = expression.exec(insert)) !== null) {
-    const target = parseNoteMentionTarget(match[1]);
-    if (!target || !isCogntNoteRelativePath(target.relativePath)) {
-      continue;
-    }
-
+  for (const match of matches) {
     if (match.index > lastIndex) {
       segments.push(createTextDeltaSegment(entry, insert.slice(lastIndex, match.index)));
     }
@@ -88,18 +84,13 @@ function splitRawCogntInlineMentionEntry(entry: Record<string, unknown>) {
       attributes: {
         reference: createLinkedPageReference(
           createBlockId(),
-          target.relativePath,
-          getLinkedNoteTitle(target.relativePath)
+          match.relativePath,
+          getLinkedNoteTitle(match.relativePath)
         ),
       },
     });
 
-    changed = true;
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (!changed) {
-    return null;
+    lastIndex = match.index + match.length;
   }
 
   if (lastIndex < insert.length) {
@@ -111,7 +102,7 @@ function splitRawCogntInlineMentionEntry(entry: Record<string, unknown>) {
 
 function createTextDeltaSegment(source: Record<string, unknown>, insert: string) {
   const segment: Record<string, unknown> = { insert };
-  if (isRecord(source.attributes)) {
+  if (isPlainRecord(source.attributes)) {
     segment.attributes = source.attributes;
   }
 

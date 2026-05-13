@@ -55,13 +55,9 @@ export type NativeLinkedMenuGroup = {
 
 export type MentionControllerOptions = {
   editor: PageEditor;
-  previewElement: HTMLElement;
   getCurrentPath(): string;
-  exportContent(): Promise<string>;
   flushHost(): Promise<void>;
   scheduleContentChanged(): void;
   showStatus(message: string): void;
   onSearchTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
-  onRequestPreview(message: RequestMentionPreviewMessage): void;
-  onOpenMention(message: OpenMentionMessage): void;
 };

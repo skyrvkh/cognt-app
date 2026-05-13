@@ -1,5 +1,8 @@
 import type { Doc } from '@blocksuite/store';
-import { createBlockId } from '../documents/block-suite-document';
+import {
+  createBlockId,
+  isPlainRecord,
+} from '../documents/block-suite-document';
 import type { CogntPropertyRow } from './properties-schema';
 
 export function createDefaultPropertiesRows(doc: Doc): CogntPropertyRow[] {
@@ -20,7 +23,7 @@ export function normalizeCogntProperties(value: unknown): CogntPropertyRow[] {
 
   return value
     .map(row => {
-      if (!isRecord(row)) {
+      if (!isPlainRecord(row)) {
         return null;
       }
 
@@ -41,8 +44,4 @@ export function normalizeCogntProperties(value: unknown): CogntPropertyRow[] {
       };
     })
     .filter((row): row is CogntPropertyRow => row !== null);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
