@@ -1,8 +1,8 @@
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
-public static class CardContextCardExpansion
+internal static class CardContextCardExpansion
 {
-    public static IReadOnlyList<ExpandedCardContextCard> Expand(CardContextSnapshot snapshot)
+    internal static IReadOnlyList<ExpandedCardContextCard> Expand(CardContextSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -66,7 +66,7 @@ public static class CardContextCardExpansion
     }
 }
 
-public sealed record ExpandedCardContextCard(
+internal sealed record ExpandedCardContextCard(
     string SourceRelPath,
     string ContextId,
     string ContextContent,

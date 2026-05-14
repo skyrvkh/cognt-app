@@ -1,6 +1,5 @@
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
-using CogntApp.Shell.Workspace;
 
 namespace CogntApp;
 
@@ -45,50 +44,37 @@ public partial class MainWindow
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        await CloseActiveNoteDocumentAsync();
+        await editorRequests.HandleClearEditorRequestedAsync();
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        overlayNavigation.HideOverlay();
-        await OpenOrActivateNoteDocumentAsync(e.NotePath, e.SelectInTree);
+        await editorRequests.HandleOpenNoteRequestedAsync(e);
     }
 
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
     {
-        RefreshOpenDocumentMentionTargets();
+        editorRequests.HandleMentionTargetsChanged();
     }
 
     private void ViewModel_UserMessageRequested(object? sender, UserMessageRequestedEventArgs e)
     {
-        shellDialogs.ShowWarning(e.Title, e.Message);
+        editorRequests.HandleUserMessageRequested(e);
     }
 
     private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
     {
-        GetActiveNoteDocument()?.UpdateTitle(title);
+        editorRequests.HandleCurrentNoteTitleChanged(title);
     }
 
     private async void ViewModel_EditorReadOnlyChanged(object? sender, bool isReadOnly)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is not null)
-        {
-            await session.SetReadOnlyAsync(isReadOnly);
-        }
+        await editorRequests.HandleEditorReadOnlyChangedAsync(isReadOnly);
     }
 
     private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
     {
-        try
-        {
-            overlayNavigation.HideOverlay();
-            viewModel.OpenNoteByRelativePath(e.RelativePath);
-        }
-        catch (Exception ex)
-        {
-            shellDialogs.ShowWarning("Open Note Failed", $"The note could not be opened: {ex.Message}");
-        }
+        await overlayNavigation.HandleAllNotesOpenRequestedAsync(e);
     }
 
     private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)

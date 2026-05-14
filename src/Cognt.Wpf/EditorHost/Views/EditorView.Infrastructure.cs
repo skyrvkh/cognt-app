@@ -39,7 +39,7 @@ public partial class EditorView
         blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
     }
 
-    private static async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
+    private async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
     {
         Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
 
@@ -52,7 +52,7 @@ public partial class EditorView
         await task;
     }
 
-    private static async Task<T> WaitWithTimeoutAsync<T>(Task<T> task, TimeSpan timeout, string timeoutMessage)
+    private async Task<T> WaitWithTimeoutAsync<T>(Task<T> task, TimeSpan timeout, string timeoutMessage)
     {
         Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
 
@@ -76,8 +76,13 @@ public partial class EditorView
             (int)MaximumDocumentLoadTimeout.TotalSeconds));
     }
 
-    private static void RunBlockSuiteCommand(Task task, string operation)
+    private void RunBlockSuiteCommand(Task task, string operation)
     {
+        if (suppressBridgeCommands)
+        {
+            return;
+        }
+
         _ = ObserveBlockSuiteCommandAsync(task, operation);
     }
 

@@ -15,11 +15,13 @@ public sealed partial class MainViewModel
     private TextClozeFrontModeOptionViewModel? selectedNoteToCardTextFrontMode;
     private ImageOcclusionFrontModeOptionViewModel? selectedNoteToCardImageFrontMode;
     private CardBackRevealModeOptionViewModel? selectedNoteToCardBackRevealMode;
-    private string noteToCardDeckName = "Default";
+    private string noteToCardDeckName = string.Empty;
     private string noteToCardPendingTagText = string.Empty;
     private bool isSynchronizingNoteToCardPresentationPreset;
 
     public ObservableCollection<string> NoteToCardDeckNames { get; } = [];
+
+    public ObservableCollection<string> FilteredNoteToCardDeckNames { get; } = [];
 
     public ObservableCollection<CardPresentationPresetOptionViewModel> NoteToCardPresentationPresets { get; } = [];
 
@@ -40,6 +42,8 @@ public sealed partial class MainViewModel
             {
                 OnPropertyChanged(nameof(HasNoteCardCandidates));
                 OnPropertyChanged(nameof(NoteCardCandidates));
+                OnPropertyChanged(nameof(HasVisibleNoteCardCandidates));
+                OnPropertyChanged(nameof(VisibleNoteCardCandidates));
             }
         }
     }
@@ -48,6 +52,13 @@ public sealed partial class MainViewModel
 
     public IReadOnlyList<CardCandidateReadModel> NoteCardCandidates =>
         CurrentNoteToCardQueue?.Items ?? Array.Empty<CardCandidateReadModel>();
+
+    public bool HasVisibleNoteCardCandidates => VisibleNoteCardCandidates.Count > 0;
+
+    public IReadOnlyList<CardCandidateReadModel> VisibleNoteCardCandidates =>
+        NoteCardCandidates
+            .Where(candidate => candidate.Status != CardCandidateStatus.Disabled)
+            .ToArray();
 
     public bool HasSelectedCardCandidate => SelectedCardCandidate is not null;
 
@@ -61,6 +72,7 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(HasSelectedCardCandidate));
                 OnPropertyChanged(nameof(CanDisableSelectedCardCandidate));
                 OnPropertyChanged(nameof(CanEditNoteToCardPresentation));
+                RefreshNoteToCardPresentationAvailability();
                 SynchronizeSelectedNoteToCardPresentationPreset();
             }
         }
@@ -70,7 +82,7 @@ public sealed partial class MainViewModel
         SelectedCardCandidate is not null
         && SelectedCardCandidate.Status != CardCandidateStatus.Disabled;
 
-    public bool CanEditNoteToCardPresentation => SelectedCardCandidate is not null;
+    public bool CanEditNoteToCardPresentation => HasVisibleNoteCardCandidates;
 
     public CardPresentationPresetOptionViewModel? SelectedNoteToCardPresentationPreset
     {
@@ -139,8 +151,16 @@ public sealed partial class MainViewModel
     public string NoteToCardDeckName
     {
         get => noteToCardDeckName;
-        set => SetProperty(ref noteToCardDeckName, string.IsNullOrWhiteSpace(value) ? "Default" : value.Trim());
+        set
+        {
+            if (SetProperty(ref noteToCardDeckName, value?.Trim() ?? string.Empty))
+            {
+                RefreshNoteToCardDeckSearchResults();
+            }
+        }
     }
+
+    public bool HasFilteredNoteToCardDeckNames => FilteredNoteToCardDeckNames.Count > 0;
 
     public string NoteToCardPendingTagText
     {

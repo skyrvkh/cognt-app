@@ -15,6 +15,14 @@ public sealed partial class MainViewModel
         return CanModifyNode(node);
     }
 
+    public bool CanDuplicateNode(NoteTreeNodeViewModel? node)
+    {
+        return node is not null
+            && !node.IsPlaceholder
+            && node.Kind == KnowledgeItemKind.Note
+            && !string.IsNullOrWhiteSpace(openCollectionPath);
+    }
+
     public string GetEditableName(NoteTreeNodeViewModel node)
     {
         return node.Title;

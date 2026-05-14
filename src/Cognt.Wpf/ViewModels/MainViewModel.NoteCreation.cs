@@ -231,7 +231,10 @@ public sealed partial class MainViewModel
         OpenNoteByRelativePath(createdNote.RelativePath, selectInTree: true);
     }
 
-    private void ApplyCreatedNoteState(KnowledgeCreatedNoteReadModel createdNote)
+    private void ApplyCreatedNoteState(
+        KnowledgeCreatedNoteReadModel createdNote,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null)
     {
         string notePath = ResolveCollectionFilePath(openCollectionPath, createdNote.RelativePath);
         KnowledgeTreeItemReadModel item = new(
@@ -241,7 +244,7 @@ public sealed partial class MainViewModel
             createdNote.Title,
             createdNote.RelativePath,
             0);
-        AddLoadedTreeNode(item);
+        AddLoadedTreeNode(item, previousSiblingId, nextSiblingId);
         AddOrUpdateRecentNote(item, notePath);
     }
 }

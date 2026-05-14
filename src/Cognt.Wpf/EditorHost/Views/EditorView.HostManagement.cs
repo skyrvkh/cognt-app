@@ -140,6 +140,27 @@ public partial class EditorView
         RemoveBlockSuiteHostFromParent();
     }
 
+    public void DisposeEditorHost()
+    {
+        suppressBridgeCommands = true;
+        Loaded -= EditorView_Loaded;
+        Unloaded -= EditorView_Unloaded;
+        ClearTransientEditorState();
+        RemoveBlockSuiteHostFromParent();
+
+        try
+        {
+            if (BlockSuiteHostView is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        {
+            System.Diagnostics.Debug.WriteLine($"Editor host disposal skipped: {ex.Message}");
+        }
+    }
+
     private void RemoveBlockSuiteHostFromParent()
     {
         switch (BlockSuiteHostView.Parent)

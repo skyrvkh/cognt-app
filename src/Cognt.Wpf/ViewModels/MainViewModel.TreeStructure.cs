@@ -5,7 +5,10 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
-    private void AddLoadedTreeNode(KnowledgeTreeItemReadModel? item)
+    private void AddLoadedTreeNode(
+        KnowledgeTreeItemReadModel? item,
+        long? previousSiblingId = null,
+        long? nextSiblingId = null)
     {
         if (item is null)
         {
@@ -18,7 +21,7 @@ public sealed partial class MainViewModel
 
         if (siblings is not null)
         {
-            InsertNodeBySiblings(siblings, node, previousSiblingId: null, nextSiblingId: null);
+            InsertNodeBySiblings(siblings, node, previousSiblingId, nextSiblingId);
         }
 
         UpdateParentChildCount(item.ParentId, delta: 1);

@@ -22,7 +22,7 @@ public static partial class CardContextSnapshotFactory
             context.Targets,
             context.Images,
             defaultPresentationPolicy,
-            ResolveStatusFromSnapshotHash(context, snapshotHash),
+            CardContextAuthoring.UpdateStatusFromSnapshotHash(context, snapshotHash).Status,
             snapshotHash);
     }
 
@@ -61,24 +61,5 @@ public static partial class CardContextSnapshotFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(slotId);
 
         return ComputeSlotSnapshotHash(snapshot, slotId);
-    }
-
-    private static CardContextStatus ResolveStatusFromSnapshotHash(CardContext context, string snapshotHash)
-    {
-        if (context.Status == CardContextStatus.Disabled)
-        {
-            return CardContextStatus.Disabled;
-        }
-
-        if (string.IsNullOrWhiteSpace(context.LastGeneratedSnapshotHash))
-        {
-            return context.Status == CardContextStatus.Generated
-                ? CardContextStatus.Ready
-                : context.Status;
-        }
-
-        return string.Equals(context.LastGeneratedSnapshotHash, snapshotHash, StringComparison.Ordinal)
-            ? context.Status
-            : CardContextStatus.Outdated;
     }
 }

@@ -10,7 +10,8 @@ public static class EditorHostServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddWpfBlazorWebView();
-        services.AddSingleton<EditorView>();
+        services.AddTransient<EditorView>();
+        services.AddSingleton<IEditorViewFactory, EditorViewFactory>();
 
         return services;
     }

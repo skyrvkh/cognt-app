@@ -6,7 +6,7 @@ public partial class EditorView
 {
     private async Task FlushMentionTargetsAsync()
     {
-        if (mentionTargets.Count == 0)
+        if (mentionTargets.Count == 0 || suppressBridgeCommands || !blockSuiteBridge.HasActiveHost)
         {
             return;
         }
@@ -23,6 +23,11 @@ public partial class EditorView
 
     private bool TryHandleCurrentSourcePath(string? path, Action onMismatch)
     {
+        if (suppressBridgeCommands)
+        {
+            return false;
+        }
+
         if (IsCurrentSourcePath(path))
         {
             return true;

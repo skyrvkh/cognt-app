@@ -50,6 +50,8 @@ public sealed partial class MainViewModel
 
     public ICommand RemoveNoteToCardTagCommand { get; private set; } = null!;
 
+    public ICommand SelectNoteToCardDeckCommand { get; private set; } = null!;
+
     private void InitializeCommands()
     {
         LoadCollectionCommand = CreateUserActionCommand(
@@ -76,18 +78,19 @@ public sealed partial class MainViewModel
         DisableSelectedCardCandidateCommand = new RelayCommand(DisableCurrentlySelectedCardCandidate);
         AddNoteToCardTagCommand = new RelayCommand(CommitPendingNoteToCardTags);
         RemoveNoteToCardTagCommand = new RelayCommand(RemoveNoteToCardTag);
+        SelectNoteToCardDeckCommand = new RelayCommand(SelectNoteToCardDeck);
     }
 
     private void InitializeNoteToCardPresentationOptions()
     {
-        NoteToCardDeckNames.Add(noteToCardDeckName);
-
         foreach (CardPresentationPreset preset in CardPresentationPolicies.UserSelectablePresets)
         {
             NoteToCardPresentationPresets.Add(new CardPresentationPresetOptionViewModel(
                 preset,
                 CardPresentationPolicies.GetDisplayLabel(preset)));
         }
+
+        RefreshNoteToCardPresentationAvailability();
 
         foreach (TextClozeFrontMode mode in Enum.GetValues<TextClozeFrontMode>())
         {

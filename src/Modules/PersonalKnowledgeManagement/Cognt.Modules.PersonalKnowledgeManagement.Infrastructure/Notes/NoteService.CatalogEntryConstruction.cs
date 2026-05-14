@@ -1,8 +1,5 @@
 using System.IO;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using Cognt.Modules.PersonalKnowledgeManagement.Application.Attachments;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
@@ -86,109 +83,5 @@ internal sealed partial class NoteService
         {
             return null;
         }
-    }
-
-    private static IReadOnlyList<string> ExtractNoteTags(string notePath, string content)
-    {
-        if (!string.Equals(Path.GetExtension(notePath), BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrWhiteSpace(content))
-        {
-            return [];
-        }
-
-        try
-        {
-            JsonNode? root = JsonNode.Parse(content);
-            HashSet<string> tags = new(StringComparer.OrdinalIgnoreCase);
-            CollectSnapshotMetaTags(root?["snapshot"]?["meta"]?["tags"], tags);
-            CollectPropertyTagValuesRecursively(root, tags);
-            return tags
-                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
-
-    private static void CollectSnapshotMetaTags(JsonNode? node, ISet<string> tags)
-    {
-        if (node is not JsonArray array)
-        {
-            return;
-        }
-
-        foreach (JsonNode? item in array)
-        {
-            AddNormalizedTagValues(item?.GetValue<string>(), tags);
-        }
-    }
-
-    private static void CollectPropertyTagValuesRecursively(JsonNode? node, ISet<string> tags)
-    {
-        switch (node)
-        {
-            case JsonObject obj:
-                if (obj.TryGetPropertyValue("name", out JsonNode? nameNode)
-                    && obj.TryGetPropertyValue("value", out JsonNode? valueNode)
-                    && string.Equals(nameNode?.GetValue<string>()?.Trim(), "tags", StringComparison.OrdinalIgnoreCase))
-                {
-                    AddNormalizedTagValues(valueNode?.GetValue<string>(), tags);
-                }
-
-                foreach (KeyValuePair<string, JsonNode?> property in obj)
-                {
-                    CollectPropertyTagValuesRecursively(property.Value, tags);
-                }
-
-                break;
-
-            case JsonArray array:
-                foreach (JsonNode? item in array)
-                {
-                    CollectPropertyTagValuesRecursively(item, tags);
-                }
-
-                break;
-        }
-    }
-
-    private static void AddNormalizedTagValues(string? value, ISet<string> tags)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
-
-        foreach (string tag in value.Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            string normalized = SearchableDocumentText.NormalizeWhitespace(tag);
-            if (normalized.Length > 0)
-            {
-                tags.Add(normalized);
-            }
-        }
-    }
-
-    private static KnowledgeNoteListItemType ClassifyNoteListItemType(
-        string notePath,
-        IReadOnlyList<AttachmentRow> attachments)
-    {
-        if (attachments.Any(attachment => InferAttachmentKind(attachment.FileExtension, attachment.ContentType) == KnowledgeAttachmentKind.Pdf))
-        {
-            return KnowledgeNoteListItemType.PdfLinkedNote;
-        }
-
-        if (attachments.Count > 0)
-        {
-            return KnowledgeNoteListItemType.AttachmentBackedNote;
-        }
-
-        string extension = Path.GetExtension(notePath);
-        return string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(extension, MarkdownImportExtension, StringComparison.OrdinalIgnoreCase)
-                ? KnowledgeNoteListItemType.Markdown
-                : KnowledgeNoteListItemType.Note;
     }
 }

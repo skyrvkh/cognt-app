@@ -141,4 +141,24 @@ internal sealed class NoteTreeCommandController
             "Delete Failed",
             $"The {itemKind} could not be deleted:{Environment.NewLine}");
     }
+
+    internal void DuplicateNode(NoteTreeNodeViewModel? node)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        if (!viewModel.CanDuplicateNode(node))
+        {
+            dialogs.ShowInfo("Duplicate", "Only notes can be duplicated.");
+            return;
+        }
+
+        NavigationShellOperationGuard.RunWithWarning(
+            () => viewModel.DuplicateNote(node),
+            dialogs,
+            "Duplicate Failed",
+            $"The note could not be duplicated:{Environment.NewLine}");
+    }
 }

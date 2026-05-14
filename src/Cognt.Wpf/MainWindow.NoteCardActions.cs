@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using CogntApp.Features.NoteToCard;
-using CogntApp.Shell.Workspace;
 
 namespace CogntApp;
 
@@ -21,92 +20,59 @@ public partial class MainWindow
 
     private async void ViewModel_AddSelectedTextToSelectedCardSlotRequested(object? sender, EventArgs e)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
-        {
-            return;
-        }
-
-        await session.AddSelectedTextToSelectedCardSlotAsync();
+        await editorWorkflow.AddSelectedTextToSelectedCardSlotAsync();
     }
 
     private async void ViewModel_CreateCardContextFromSelectionRequested(object? sender, EventArgs e)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
-        {
-            return;
-        }
+        await editorWorkflow.CreateCardContextFromSelectionAsync();
+    }
 
-        await session.CreateCardContextFromSelectionAsync();
+    private async void CreateCardContextFromSelectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        await editorWorkflow.CreateCardContextFromSelectionAsync();
+    }
+
+    private async void OpenImageOcclusionEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+        await editorWorkflow.OpenImageOcclusionForSelectedImageAsync();
+    }
+
+    private async void CreateClozeFromSelectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        await editorWorkflow.CreateClozeFromSelectionAsync();
     }
 
     private async void NoteCardQueueView_CreateClozeRequested(object? sender, EventArgs e)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
-        {
-            return;
-        }
-
-        await session.CreateClozeFromSelectionAsync();
+        await editorWorkflow.CreateClozeFromSelectionAsync();
     }
 
     private async void NoteCardQueueView_OpenImageOcclusionRequested(object? sender, EventArgs e)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
-        {
-            return;
-        }
-
-        await session.OpenImageOcclusionForSelectedImageAsync();
+        await editorWorkflow.OpenImageOcclusionForSelectedImageAsync();
     }
 
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (IsTextInputFocused() || e.Handled)
-        {
-            return;
-        }
-
-        Key key = e.Key == Key.System
-            ? e.SystemKey
-            : e.Key;
-
-        if (Keyboard.Modifiers == ModifierKeys.Alt && key == Key.Z)
-        {
-            e.Handled = true;
-            if (GetActiveNoteDocument() is { } altClozeSession)
-            {
-                await altClozeSession.CreateClozeFromSelectionAsync();
-            }
-
-            return;
-        }
-
-        if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+        if (IsTextInputFocused()
+            || e.Handled
+            || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
             || !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
             || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
         {
             return;
         }
 
-        switch (key)
+        switch (e.Key)
         {
             case Key.C:
                 e.Handled = true;
-                if (GetActiveNoteDocument() is { } clozeSession)
-                {
-                    await clozeSession.CreateClozeFromSelectionAsync();
-                }
+                await editorWorkflow.CreateClozeFromSelectionAsync();
                 return;
             case Key.I:
                 e.Handled = true;
-                if (GetActiveNoteDocument() is { } imageSession)
-                {
-                    await imageSession.OpenImageOcclusionForSelectedImageAsync();
-                }
+                await editorWorkflow.OpenImageOcclusionForSelectedImageAsync();
                 return;
         }
     }

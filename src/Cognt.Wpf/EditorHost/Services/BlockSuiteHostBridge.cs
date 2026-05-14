@@ -7,8 +7,9 @@ public sealed partial class BlockSuiteHostBridge
 {
     private const string DiagnosticMessageType = "diagnostic";
 
-    private readonly TaskCompletionSource readyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource readyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IBlockSuiteHostClient? host;
+    private bool startupFailed;
 
     internal BlockSuiteHostBridge()
     {
@@ -17,11 +18,13 @@ public sealed partial class BlockSuiteHostBridge
     internal void Register(IBlockSuiteHostClient blockSuiteHost)
     {
         host = blockSuiteHost;
+        startupFailed = false;
         readyCompletion.TrySetResult();
     }
 
     internal void RegisterStartupFailure(Exception exception)
     {
+        startupFailed = true;
         readyCompletion.TrySetException(new InvalidOperationException(
             "The BlockSuite host failed to start.",
             exception));
@@ -34,6 +37,19 @@ public sealed partial class BlockSuiteHostBridge
         {
             host = null;
         }
+    }
+
+    internal bool IsReady => readyCompletion.Task.IsCompletedSuccessfully && host is not null;
+
+    internal bool HasActiveHost => host is not null;
+
+    internal bool HasStartupFailure => startupFailed;
+
+    internal void ResetForHostReload()
+    {
+        host = null;
+        startupFailed = false;
+        readyCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     internal Task WaitUntilReadyAsync()

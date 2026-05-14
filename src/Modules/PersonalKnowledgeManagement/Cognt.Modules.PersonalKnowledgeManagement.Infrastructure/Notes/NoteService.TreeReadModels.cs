@@ -1,3 +1,4 @@
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Attachments;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
@@ -37,4 +38,24 @@ internal sealed partial class NoteService
         };
     }
 
+    private static KnowledgeNoteListItemType ClassifyNoteListItemType(
+        string notePath,
+        IReadOnlyList<AttachmentRow> attachments)
+    {
+        if (attachments.Any(attachment => InferAttachmentKind(attachment.FileExtension, attachment.ContentType) == KnowledgeAttachmentKind.Pdf))
+        {
+            return KnowledgeNoteListItemType.PdfLinkedNote;
+        }
+
+        if (attachments.Count > 0)
+        {
+            return KnowledgeNoteListItemType.AttachmentBackedNote;
+        }
+
+        string extension = Path.GetExtension(notePath);
+        return string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, MarkdownImportExtension, StringComparison.OrdinalIgnoreCase)
+                ? KnowledgeNoteListItemType.Markdown
+                : KnowledgeNoteListItemType.Note;
+    }
 }
