@@ -8,21 +8,9 @@ internal interface ITreeRepository : IDisposable
 
     IReadOnlyList<KnowledgeTreeItemRow> LoadChildren(long parentId);
 
-    bool HasAnyItems();
-
-    KnowledgeTreeItemRow? GetItem(long itemId);
-
     IReadOnlyList<KnowledgeTreeItemRow> LoadNoteItems();
 
     IReadOnlyList<KnowledgeTreeItemRow> SearchNoteItems(string query, int limit);
-
-    KnowledgeTreeItemRow? FindNoteByFileRelPath(string fileRelPath);
-
-    KnowledgeTreeItemRow? FindItemByFileRelPath(
-        string fileRelPath,
-        long? parentId,
-        KnowledgeTreeItemKind kind,
-        bool includeDeleted);
 
     long CreateFolder(long? parentId, string title, long? previousSiblingId = null, long? nextSiblingId = null);
 
@@ -30,21 +18,31 @@ internal interface ITreeRepository : IDisposable
 
     long CreatePdfDocument(long? parentId, string title, string fileRelPath, long? previousSiblingId = null, long? nextSiblingId = null);
 
-    void RenameItem(long itemId, string title);
-
     void MoveItem(long itemId, long? newParentId, long? previousSiblingId, long? nextSiblingId);
 
     void ReorderItem(long itemId, long? previousSiblingId, long? nextSiblingId);
 
-    void DeleteItem(long itemId);
+    bool HasAnyItems();
 
     void RewriteFileRelPathPrefix(string oldPrefix, string newPrefix);
+
+    KnowledgeTreeItemRow? GetItem(long itemId);
+
+    KnowledgeTreeItemRow? FindNoteByFileRelPath(string fileRelPath);
+
+    KnowledgeTreeItemRow? FindItemByFileRelPath(
+        string fileRelPath,
+        long? parentId,
+        KnowledgeTreeItemKind kind,
+        bool includeDeleted = false);
 
     bool HasDocumentMentions();
 
     IReadOnlyList<DocumentMentionRow> LoadDocumentMentionsBySource(string sourceDocumentId);
 
     IReadOnlyList<DocumentMentionRow> LoadDocumentMentionsByTarget(string targetDocumentId);
+
+    IReadOnlyList<DocumentMentionRow> LoadResolvedDocumentMentionsByDocument(string documentId);
 
     void ReplaceDocumentMentions(
         string sourceDocumentId,
@@ -61,4 +59,8 @@ internal interface ITreeRepository : IDisposable
     void UpsertAttachment(AttachmentRow attachment);
 
     void UpsertNoteAttachment(NoteAttachmentRow attachment);
+
+    void RenameItem(long itemId, string title);
+
+    void DeleteItem(long itemId);
 }

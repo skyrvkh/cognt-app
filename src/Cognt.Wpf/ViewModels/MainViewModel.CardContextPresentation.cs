@@ -1,4 +1,5 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Features.NoteToCard;
 
 namespace CogntApp.ViewModels;
 
@@ -9,7 +10,7 @@ public sealed partial class MainViewModel
         isSynchronizingNoteToCardPresentationPreset = true;
         try
         {
-            CardPresentationPolicy? policy = TryResolveSelectedPresentationPolicy();
+            CardPresentationPolicy? policy = TryResolveCurrentPresentationPolicy();
             SelectedNoteToCardPresentationPreset = policy is null
                 ? null
                 : NoteToCardPresentationPresets.FirstOrDefault(option => option.Preset == policy.Preset);
@@ -30,9 +31,46 @@ public sealed partial class MainViewModel
         }
     }
 
-    private CardPresentationPolicy? TryResolveSelectedPresentationPolicy()
+    private void RefreshNoteToCardPresentationAvailability()
     {
-        if (SelectedCardCandidate is null || string.IsNullOrWhiteSpace(currentNotePath))
+        IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
+        bool hasTargets = targets.Count > 0;
+
+        foreach (CardPresentationPresetOptionViewModel option in NoteToCardPresentationPresets)
+        {
+            if (!hasTargets)
+            {
+                option.SetAvailability(enabled: false, "Create or select a card candidate.");
+                continue;
+            }
+
+            if (option.Preset == CardPresentationPreset.Custom)
+            {
+                option.SetAvailability(enabled: true);
+                continue;
+            }
+
+            CardPresentationPolicy policy = CardPresentationPolicies.ForPreset(option.Preset);
+            bool needsImage = policy.ImageFrontMode != ImageOcclusionFrontMode.None;
+            bool canUse = targets.All(candidate =>
+                needsImage
+                    ? candidate.ImageAnchors.Count > 0
+                    : candidate.TextAnchors.Count > 0);
+            option.SetAvailability(
+                canUse,
+                needsImage
+                    ? SelectedCardCandidate is null
+                        ? "All cards in the queue must have image masks."
+                        : "Requires an image mask candidate."
+                    : SelectedCardCandidate is null
+                        ? "All cards in the queue must have text clozes."
+                        : "Requires a text cloze candidate.");
+        }
+    }
+
+    private CardPresentationPolicy? TryResolveCurrentPresentationPolicy()
+    {
+        if (string.IsNullOrWhiteSpace(currentNotePath))
         {
             return null;
         }
@@ -41,13 +79,40 @@ public sealed partial class MainViewModel
         {
             string relativePath = GetRequiredCurrentNoteRelativePath();
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-            CardContext? context = document.Contexts.FirstOrDefault(item =>
-                string.Equals(item.Id, SelectedCardCandidate.ContextId, StringComparison.Ordinal));
-            CardSlot? slot = context?.Slots.FirstOrDefault(item =>
-                string.Equals(item.Id, SelectedCardCandidate.SlotId, StringComparison.Ordinal));
-            return context is null
-                ? null
-                : CardPresentationPolicies.Resolve(context, slot);
+            IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
+            if (targets.Count == 0)
+            {
+                return null;
+            }
+
+            CardPresentationPolicy? sharedPolicy = null;
+            foreach (CardCandidateReadModel candidate in targets)
+            {
+                CardContext? context = document.Contexts.FirstOrDefault(item =>
+                    string.Equals(item.Id, candidate.ContextId, StringComparison.Ordinal));
+                CardSlot? slot = context?.Slots.FirstOrDefault(item =>
+                    string.Equals(item.Id, candidate.SlotId, StringComparison.Ordinal));
+                CardPresentationPolicy? policy = context is null
+                    ? null
+                    : CardPresentationPolicies.Resolve(context, slot);
+                if (policy is null)
+                {
+                    return null;
+                }
+
+                if (sharedPolicy is null)
+                {
+                    sharedPolicy = policy;
+                    continue;
+                }
+
+                if (!Equals(sharedPolicy, policy))
+                {
+                    return null;
+                }
+            }
+
+            return sharedPolicy;
         }
         catch
         {
@@ -57,8 +122,16 @@ public sealed partial class MainViewModel
 
     private void ApplySelectedNoteToCardPresentationPreset(CardPresentationPreset? preset)
     {
-        if (preset is null || SelectedCardCandidate is null || string.IsNullOrWhiteSpace(currentNotePath))
+        if (preset is null || string.IsNullOrWhiteSpace(currentNotePath))
         {
+            return;
+        }
+
+        CardPresentationPresetOptionViewModel? selectedOption = NoteToCardPresentationPresets.FirstOrDefault(option =>
+            option.Preset == preset.Value);
+        if (selectedOption is { IsEnabled: false })
+        {
+            SynchronizeSelectedNoteToCardPresentationPreset();
             return;
         }
 
@@ -91,56 +164,117 @@ public sealed partial class MainViewModel
 
     private void ApplySelectedNoteToCardPresentationPolicy(CardPresentationPolicy policy)
     {
-        if (SelectedCardCandidate is null || string.IsNullOrWhiteSpace(currentNotePath))
+        if (string.IsNullOrWhiteSpace(currentNotePath))
         {
             return;
         }
 
         try
         {
-            CardCandidateReadModel selected = SelectedCardCandidate;
+            CardCandidateReadModel? selected = SelectedCardCandidate;
+            IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
             string relativePath = GetRequiredCurrentNoteRelativePath();
             string noteContent = GetCurrentEditorContent?.Invoke() ?? lastSavedContent;
             SaveNoteIfChanged(noteContent);
 
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-            CardContext context = document.Contexts.FirstOrDefault(item =>
-                    string.Equals(item.Id, selected.ContextId, StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("The selected card context no longer exists.");
-            CardSlot? selectedSlot = context.Slots.FirstOrDefault(slot =>
-                string.Equals(slot.Id, selected.SlotId, StringComparison.Ordinal));
-            if (selectedSlot is not null
-                && Equals(CardPresentationPolicies.Resolve(context, selectedSlot), policy)
-                && Equals(selectedSlot.PresentationOverride ?? context.DefaultPresentationPolicy, policy))
+            HashSet<string> targetContextIds = targets
+                .Select(candidate => candidate.ContextId)
+                .ToHashSet(StringComparer.Ordinal);
+
+            CardContext[] updatedContexts = document.Contexts
+                .Select(context =>
+                {
+                    if (!targetContextIds.Contains(context.Id))
+                    {
+                        return context;
+                    }
+
+                    if (selected is not null)
+                    {
+                        if (!string.Equals(context.Id, selected.ContextId, StringComparison.Ordinal))
+                        {
+                            return context;
+                        }
+
+                        bool changedSelectedSlot = false;
+                        CardSlot[] selectedSlots = context.Slots
+                            .Select(slot =>
+                            {
+                                if (!string.Equals(slot.Id, selected.SlotId, StringComparison.Ordinal))
+                                {
+                                    return slot;
+                                }
+
+                                changedSelectedSlot = !Equals(slot.PresentationOverride ?? context.DefaultPresentationPolicy, policy)
+                                    || !Equals(slot.PresentationOverride, policy);
+                                return slot with { PresentationOverride = policy };
+                            })
+                            .ToArray();
+
+                        return changedSelectedSlot
+                            ? context with { Slots = selectedSlots }
+                            : context;
+                    }
+
+                    bool alreadyApplied = Equals(context.DefaultPresentationPolicy, policy)
+                        && context.TextCueMode is null
+                        && context.ImageCueMode is null
+                        && context.Slots.All(slot => slot.PresentationOverride is null);
+                    if (alreadyApplied)
+                    {
+                        return context;
+                    }
+
+                    CardSlot[] updatedSlots = context.Slots
+                        .Select(slot => slot with { PresentationOverride = null })
+                        .ToArray();
+                    return context with
+                    {
+                        DefaultPresentationPolicy = policy,
+                        Slots = updatedSlots,
+                        TextCueMode = null,
+                        ImageCueMode = null,
+                    };
+                })
+                .ToArray();
+
+            if (document.Contexts.SequenceEqual(updatedContexts))
             {
                 return;
             }
 
-            CardSlot[] updatedSlots = context.Slots
-                .Select(slot => string.Equals(slot.Id, selected.SlotId, StringComparison.Ordinal)
-                    && slot.PresentationOverride is not null
-                        ? slot with { PresentationOverride = policy }
-                        : slot)
-                .ToArray();
-            context = context with
-            {
-                DefaultPresentationPolicy = policy,
-                Slots = updatedSlots,
-                TextCueMode = null,
-                ImageCueMode = null,
-            };
-
-            PersistCardContextDraftDocument(relativePath, noteContent, ReplaceDraftContext(document, context));
+            PersistCardContextDraftDocument(relativePath, noteContent, document with { Contexts = updatedContexts });
             ReloadCurrentNoteToCardQueue(relativePath, noteContent);
-            SelectedCardCandidate = CurrentNoteToCardQueue?.Items.FirstOrDefault(item =>
-                string.Equals(item.ContextId, selected.ContextId, StringComparison.Ordinal)
-                && string.Equals(item.SlotId, selected.SlotId, StringComparison.Ordinal));
+            if (selected is not null)
+            {
+                SelectedCardCandidate = CurrentNoteToCardQueue?.Items.FirstOrDefault(item =>
+                    string.Equals(item.ContextId, selected.ContextId, StringComparison.Ordinal)
+                    && string.Equals(item.SlotId, selected.SlotId, StringComparison.Ordinal));
+            }
+            else
+            {
+                SelectedCardCandidate = null;
+                SynchronizeSelectedNoteToCardPresentationPreset();
+            }
         }
         catch (Exception ex)
         {
             RaiseMessage("Card Presentation", ex.Message);
             SynchronizeSelectedNoteToCardPresentationPreset();
         }
+    }
+
+    private IReadOnlyList<CardCandidateReadModel> GetPresentationTargets()
+    {
+        return SelectedCardCandidate is not null
+            ? [SelectedCardCandidate]
+            : VisibleNoteCardCandidates;
     }
 
     private static string FormatTextFrontMode(TextClozeFrontMode mode)

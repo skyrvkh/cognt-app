@@ -5,6 +5,7 @@ public partial class MainWindow
     private void BindViewDataContexts()
     {
         DataContext = viewModel;
+        dashboardView.DataContext = viewModel;
         settingsView.DataContext = viewModel;
         allNotesView.DataContext = allNotesViewModel;
         noteCardQueueView.DataContext = viewModel;

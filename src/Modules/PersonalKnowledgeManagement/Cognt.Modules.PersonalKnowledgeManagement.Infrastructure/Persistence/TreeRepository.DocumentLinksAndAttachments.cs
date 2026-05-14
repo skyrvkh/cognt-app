@@ -66,4 +66,31 @@ internal sealed partial class SqliteTreeRepository
         });
     }
 
+    IReadOnlyList<DocumentMentionRow> ITreeRepository.LoadResolvedDocumentMentionsByDocument(string documentId)
+    {
+        return UseConnection(connection =>
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id, collection_id, source_document_id, source_block_id,
+                       target_document_id, mention_type, mention_text, normalized_mention_text,
+                       start_offset, end_offset, preview_text, context_before, context_after,
+                       status, created_at, updated_at
+                FROM document_mentions
+                WHERE collection_id = $collectionId
+                  AND status = 'resolved'
+                  AND target_document_id IS NOT NULL
+                  AND (
+                    source_document_id = $documentId
+                    OR target_document_id = $documentId
+                  )
+                ORDER BY updated_at DESC, source_document_id, target_document_id, source_block_id, start_offset, id;
+                """;
+            command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
+            command.Parameters.AddWithValue("$documentId", NormalizeDocumentId(documentId));
+
+            return ReadDocumentMentionRows(command);
+        });
+    }
+
 }

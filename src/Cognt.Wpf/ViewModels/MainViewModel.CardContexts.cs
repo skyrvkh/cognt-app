@@ -231,14 +231,56 @@ public sealed partial class MainViewModel
             }
         }
 
-        if (NoteToCardDeckNames.Count == 0)
+        if (!string.IsNullOrWhiteSpace(previousSelection))
         {
-            NoteToCardDeckNames.Add("Default");
+            NoteToCardDeckName = previousSelection;
+        }
+        else if (NoteToCardDeckNames.Count > 0)
+        {
+            NoteToCardDeckName = NoteToCardDeckNames[0];
         }
 
-        NoteToCardDeckName = NoteToCardDeckNames.Contains(previousSelection, StringComparer.OrdinalIgnoreCase)
-            ? previousSelection
-            : NoteToCardDeckNames[0];
+        RefreshNoteToCardDeckSearchResults();
+    }
+
+    private void RefreshNoteToCardDeckSearchResults()
+    {
+        FilteredNoteToCardDeckNames.Clear();
+
+        string query = NoteToCardDeckName.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            OnPropertyChanged(nameof(HasFilteredNoteToCardDeckNames));
+            return;
+        }
+
+        bool exactMatch = NoteToCardDeckNames.Any(deckName =>
+            string.Equals(deckName, query, StringComparison.OrdinalIgnoreCase));
+        if (exactMatch)
+        {
+            OnPropertyChanged(nameof(HasFilteredNoteToCardDeckNames));
+            return;
+        }
+
+        foreach (string deckName in NoteToCardDeckNames
+            .Where(deckName => deckName.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(deckName => deckName, StringComparer.OrdinalIgnoreCase)
+            .Take(6))
+        {
+            FilteredNoteToCardDeckNames.Add(deckName);
+        }
+
+        OnPropertyChanged(nameof(HasFilteredNoteToCardDeckNames));
+    }
+
+    private void SelectNoteToCardDeck(object? parameter)
+    {
+        if (parameter is not string deckName || string.IsNullOrWhiteSpace(deckName))
+        {
+            return;
+        }
+
+        NoteToCardDeckName = deckName;
     }
 
     private void CommitPendingNoteToCardTags()

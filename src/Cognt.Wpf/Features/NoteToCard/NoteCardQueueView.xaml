@@ -18,6 +18,46 @@
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
+
+        <Style x:Key="DeckSearchTextBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="BorderBrush" Value="#D8DEEC" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="DeckSuggestionButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF2FF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="#F7F9FC">
@@ -30,59 +70,13 @@
                 Background="#FFFFFF"
                 BorderBrush="#DCE3F0"
                 BorderThickness="0,0,0,1"
-                Padding="14">
+                Padding="12">
             <StackPanel>
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Text="Cards from note"
-                                   Style="{StaticResource PanelTitleStyle}" />
-                        <TextBlock Margin="0,4,0,0"
-                                   Style="{StaticResource SmallMutedTextStyle}">
-                            <Run Text="{Binding NoteCardCandidates.Count, Mode=OneWay}" />
-                            <Run Text=" candidates" />
-                        </TextBlock>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
-                        <Button ToolTip="Create card context from selected blocks"
-                                Command="{Binding CreateCardContextFromSelectionCommand}"
-                                Style="{StaticResource ToolButtonStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <Grid Width="14"
-                                      Height="14"
-                                      Margin="0,0,6,0"
-                                      VerticalAlignment="Center">
-                                    <Rectangle Width="11"
-                                               Height="12"
-                                               Margin="2,1,0,0"
-                                               HorizontalAlignment="Left"
-                                               VerticalAlignment="Top"
-                                               RadiusX="2"
-                                               RadiusY="2"
-                                               Fill="#EEF2FF"
-                                               Stroke="#3156D4"
-                                               StrokeThickness="1.3" />
-                                    <Path Data="M4,5 L10,5 M4,8 L11,8 M4,11 L9,11"
-                                          Stretch="Uniform"
-                                          Stroke="#3156D4"
-                                          StrokeThickness="1.3"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round" />
-                                </Grid>
-                                <TextBlock Text="Context"
-                                           FontSize="12"
-                                           Foreground="{StaticResource InkBrush}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Margin="8,0,0,0"
-                                ToolTip="Create cloze deletion"
+                        <Button ToolTip="Create cloze deletion"
                                 Click="CreateClozeButton_Click"
                                 Style="{StaticResource ToolButtonStyle}">
                             <StackPanel Orientation="Horizontal">
@@ -137,28 +131,42 @@
                     </StackPanel>
                 </Grid>
 
-                <Grid Margin="0,16,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="145" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
                     <StackPanel>
                         <TextBlock Text="Deck"
                                    Style="{StaticResource SmallMutedTextStyle}"
                                    FontWeight="SemiBold" />
-                        <ComboBox Margin="0,6,0,0"
-                                  IsEditable="True"
-                                  IsTextSearchEnabled="True"
-                                  StaysOpenOnEdit="True"
-                                  ItemsSource="{Binding NoteToCardDeckNames}"
-                                  SelectedItem="{Binding NoteToCardDeckName, Mode=TwoWay}"
-                                  Text="{Binding NoteToCardDeckName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                  Style="{StaticResource FilterComboBoxStyle}" />
+                        <TextBox Margin="0,6,0,0"
+                                 Text="{Binding NoteToCardDeckName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Search decks or type a new deck name"
+                                 Style="{StaticResource DeckSearchTextBoxStyle}" />
+                        <Border Margin="0,4,0,0"
+                                Padding="4"
+                                Background="#FFFFFF"
+                                BorderBrush="#D8DEEC"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding HasFilteredNoteToCardDeckNames, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ItemsControl ItemsSource="{Binding FilteredNoteToCardDeckNames}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding}"
+                                                Command="{Binding DataContext.SelectNoteToCardDeckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource DeckSuggestionButtonStyle}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Grid.Row="2">
                         <TextBlock Text="Tags"
                                    Style="{StaticResource SmallMutedTextStyle}"
                                    FontWeight="SemiBold" />
@@ -200,7 +208,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBox MinWidth="92"
+                                <TextBox MinWidth="140"
                                          Margin="0,0,0,4"
                                          Padding="3,1"
                                          BorderThickness="0"
@@ -212,17 +220,6 @@
                                                     Command="{Binding AddNoteToCardTagCommand}" />
                                     </TextBox.InputBindings>
                                 </TextBox>
-                                <Button Width="26"
-                                        Height="24"
-                                        Margin="3,0,0,4"
-                                        Padding="0"
-                                        ToolTip="Add tag"
-                                        Command="{Binding AddNoteToCardTagCommand}"
-                                        Style="{StaticResource SecondaryButtonStyle}">
-                                    <TextBlock Text="+"
-                                               FontSize="14"
-                                               FontWeight="SemiBold" />
-                                </Button>
                             </WrapPanel>
                         </Border>
                     </StackPanel>
@@ -235,9 +232,37 @@
                     <ComboBox Margin="0,6,0,0"
                               ItemsSource="{Binding NoteToCardPresentationPresets}"
                               SelectedItem="{Binding SelectedNoteToCardPresentationPreset, Mode=TwoWay}"
-                              DisplayMemberPath="Label"
-                              IsEnabled="{Binding CanEditNoteToCardPresentation}"
-                              Style="{StaticResource FilterComboBoxStyle}" />
+                              Style="{StaticResource FilterComboBoxStyle}">
+                        <ComboBox.ItemContainerStyle>
+                            <Style TargetType="{x:Type ComboBoxItem}">
+                                <Setter Property="IsEnabled"
+                                        Value="{Binding IsEnabled}" />
+                                <Setter Property="ToolTip"
+                                        Value="{Binding DisabledReason}" />
+                            </Style>
+                        </ComboBox.ItemContainerStyle>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Label}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="{x:Type TextBlock}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource InkBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsEnabled}"
+                                                             Value="False">
+                                                    <Setter Property="Foreground"
+                                                            Value="{StaticResource MutedBrush}" />
+                                                    <Setter Property="Opacity"
+                                                            Value="0.55" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <Grid Margin="0,10,0,0"
                           Visibility="{Binding IsCustomNoteToCardPresentationPreset, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid.ColumnDefinitions>
@@ -302,23 +327,11 @@
                             IsEnabled="{Binding HasSelectedCardCandidate}" />
                 </Grid>
 
-                <UniformGrid Margin="0,8,0,0"
-                             Columns="3">
-                    <Button Content="Add selection"
-                            Margin="0,0,6,0"
-                            Command="{Binding AddSelectedTextToSelectedCardSlotCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            IsEnabled="{Binding HasSelectedCardCandidate}" />
-                    <Button Content="Disable"
-                            Margin="3,0,3,0"
-                            Command="{Binding DisableSelectedCardCandidateCommand}"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            IsEnabled="{Binding CanDisableSelectedCardCandidate}" />
+                <Grid Margin="0,8,0,0">
                     <Button Content="Generate ready"
-                            Margin="6,0,0,0"
                             Command="{Binding GenerateReadyNoteCardsCommand}"
                             Style="{StaticResource SecondaryButtonStyle}" />
-                </UniformGrid>
+                </Grid>
             </StackPanel>
         </Border>
 
@@ -330,13 +343,13 @@
                         BorderBrush="#DCE3F0"
                         BorderThickness="1"
                         CornerRadius="8">
-                    <TextBlock Text="No card candidates yet. Create clozes or image masks in this note."
+                    <TextBlock Text="No ready card candidates. Create clozes or image masks in this note."
                                TextWrapping="Wrap">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasNoteCardCandidates}" Value="False">
+                                    <DataTrigger Binding="{Binding HasVisibleNoteCardCandidates}" Value="False">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -345,15 +358,16 @@
                     </TextBlock>
                 </Border>
 
-                <ListBox ItemsSource="{Binding NoteCardCandidates}"
+                <ListBox ItemsSource="{Binding VisibleNoteCardCandidates}"
                          SelectedItem="{Binding SelectedCardCandidate, Mode=TwoWay}"
                          BorderThickness="0"
-                         Background="Transparent">
+                         Background="Transparent"
+                         PreviewMouseLeftButtonDown="CardCandidatesListBox_PreviewMouseLeftButtonDown">
                     <ListBox.Style>
                         <Style TargetType="ListBox">
                             <Setter Property="Visibility" Value="Visible" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding HasNoteCardCandidates}" Value="False">
+                                <DataTrigger Binding="{Binding HasVisibleNoteCardCandidates}" Value="False">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                             </Style.Triggers>

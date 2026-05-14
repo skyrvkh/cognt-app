@@ -84,6 +84,35 @@ public sealed partial class MainViewModel
         }
     }
 
+    public string DuplicateNote(NoteTreeNodeViewModel node)
+    {
+        if (!CanDuplicateNode(node))
+        {
+            throw new InvalidOperationException("Only notes can be duplicated.");
+        }
+
+        SaveCurrentNoteFromEditor();
+
+        string sourceRelativePath = !string.IsNullOrWhiteSpace(node.FileRelPath)
+            ? NormalizeRelativePath(node.FileRelPath)
+            : GetRequiredRelativeNotePath(node.NotePath);
+        KnowledgeOpenedNoteReadModel sourceNote = noteService.ReadNoteForOpen(openCollectionPath, sourceRelativePath);
+        string duplicateTitle = CreateDuplicateNoteTitle(sourceNote.Title);
+        KnowledgeCreatedNoteReadModel createdNote = noteService.CreateNote(
+            openCollectionPath,
+            node.ParentId,
+            duplicateTitle,
+            sourceNote.Content,
+            previousSiblingId: node.Id);
+
+        ApplyCreatedNoteState(createdNote, previousSiblingId: node.Id);
+        RefreshDashboardData();
+        RefreshAvailableCollections();
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+        OpenNoteByRelativePath(createdNote.RelativePath, selectInTree: true);
+        return createdNote.RelativePath;
+    }
+
     public string CreateFolder(NoteTreeNodeViewModel? node, string folderName)
     {
         if (string.IsNullOrWhiteSpace(openCollectionPath))
@@ -147,5 +176,13 @@ public sealed partial class MainViewModel
         SaveCurrentNoteFromEditor();
         RefreshReviewSettings();
         OverlayRequested?.Invoke(this, new Navigation.OverlayRequestedEventArgs(Navigation.OverlayViewKind.Settings));
+    }
+
+    private static string CreateDuplicateNoteTitle(string title)
+    {
+        string trimmedTitle = string.IsNullOrWhiteSpace(title)
+            ? "Untitled"
+            : title.Trim();
+        return $"{trimmedTitle} Copy";
     }
 }
