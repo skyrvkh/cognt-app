@@ -36,7 +36,9 @@ public sealed partial class MainViewModel
         ClearNoteToCardTags();
         EditorBreadcrumbItems.Clear();
         OnPropertyChanged(nameof(CurrentNotePath));
+        OnPropertyChanged(nameof(CurrentNoteRelativePath));
         OnPropertyChanged(nameof(ShouldShowNoNotesState));
+        CurrentNoteContentChanged?.Invoke(this, string.Empty);
     }
 
     private void ClearOpenCollectionState()
