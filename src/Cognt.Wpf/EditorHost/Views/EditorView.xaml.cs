@@ -11,6 +11,15 @@ namespace Cognt.Wpf.EditorHost.Views;
 
 public partial class EditorView : UserControl
 {
+    private enum EditorHostState
+    {
+        Unloaded,
+        Loading,
+        Ready,
+        Suspended,
+        Faulted,
+    }
+
     private readonly BlockSuiteHostBridge blockSuiteBridge = new();
     private readonly IServiceProvider serviceProvider;
     private IReadOnlyList<KnowledgeMentionTargetReadModel> mentionTargets = [];
@@ -21,6 +30,11 @@ public partial class EditorView : UserControl
     private Action<string>? transientContentChanged;
     private int loadRequestId;
     private bool isShowingTransientEditor;
+    private EditorHostState hostState = EditorHostState.Unloaded;
+    private bool needsHostRestore;
+    private bool isRestoringHost;
+    private bool suppressBridgeCommands;
+    private bool currentReadOnlyState;
 
     public event EventHandler<string>? ContentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
@@ -42,11 +56,15 @@ public partial class EditorView : UserControl
         InitializeComponent();
         ConfigureBlockSuiteHost();
         BindBlockSuiteBridge();
+        Loaded += EditorView_Loaded;
+        Unloaded += EditorView_Unloaded;
         ShowNoNoteState();
     }
 
     public async Task WarmUpAsync()
     {
+        await EnsureViewLoadedAsync();
+        UpdateLayout();
         BlockSuiteHostView.UpdateLayout();
         await Dispatcher.Yield(DispatcherPriority.Loaded);
 
@@ -54,6 +72,41 @@ public partial class EditorView : UserControl
             blockSuiteBridge.WaitUntilReadyAsync(),
             HostStartupTimeout,
             "The BlockSuite host did not finish starting.");
+        hostState = EditorHostState.Ready;
+    }
+
+    private async Task EnsureViewLoadedAsync()
+    {
+        if (IsLoaded)
+        {
+            return;
+        }
+
+        TaskCompletionSource loadedCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnLoaded(object? sender, RoutedEventArgs e)
+        {
+            loadedCompletion.TrySetResult();
+        }
+
+        Loaded += OnLoaded;
+
+        try
+        {
+            if (IsLoaded)
+            {
+                return;
+            }
+
+            await WaitWithTimeoutAsync(
+                loadedCompletion.Task,
+                HostStartupTimeout,
+                "The editor view did not finish loading.");
+        }
+        finally
+        {
+            Loaded -= OnLoaded;
+        }
     }
 
     public async Task LoadNoteAsync(
@@ -105,6 +158,7 @@ public partial class EditorView : UserControl
         }
 
         currentContent = content;
+        needsHostRestore = false;
         SetBlockSuiteHostVisible(true);
         ShowReadyState();
         await FlushMentionTargetsAsync();
@@ -112,6 +166,7 @@ public partial class EditorView : UserControl
 
     public async Task SetReadOnlyAsync(bool isReadOnly)
     {
+        currentReadOnlyState = isReadOnly;
         if (string.IsNullOrWhiteSpace(currentSourcePath))
         {
             return;
@@ -192,5 +247,75 @@ public partial class EditorView : UserControl
         int? displayClozeIndex = null)
     {
         return blockSuiteBridge.CreateClozeFromSelectionAsync(cardContextId, slotId, displayClozeIndex);
+    }
+
+    public bool IsHostReady => hostState == EditorHostState.Ready && blockSuiteBridge.IsReady;
+
+    public bool NeedsHostRestore => needsHostRestore;
+
+    private async void EditorView_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (isRestoringHost || !needsHostRestore)
+        {
+            hostState = blockSuiteBridge.IsReady ? EditorHostState.Ready : EditorHostState.Loading;
+            return;
+        }
+
+        await RestoreHostAfterSuspensionAsync();
+    }
+
+    private void EditorView_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded && hostState == EditorHostState.Unloaded)
+        {
+            return;
+        }
+
+        hostState = blockSuiteBridge.IsReady ? EditorHostState.Ready : EditorHostState.Unloaded;
+    }
+
+    private async Task RestoreHostAfterSuspensionAsync()
+    {
+        if (isRestoringHost)
+        {
+            return;
+        }
+
+        isRestoringHost = true;
+        hostState = EditorHostState.Loading;
+        ShowLoadingState("Restoring editor", "Reattaching the note editor...");
+
+        try
+        {
+            await WarmUpAsync();
+
+            if (!string.IsNullOrWhiteSpace(currentSourcePath))
+            {
+                await WaitWithTimeoutAsync(
+                    blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent, currentCollectionRoot),
+                    GetDocumentLoadTimeout(currentContent),
+                    "The editor did not restore the floating note.");
+                await FlushMentionTargetsAsync();
+                await blockSuiteBridge.SetDocumentLinksAsync(new KnowledgeDocumentLinksReadModel([], []));
+                if (currentReadOnlyState)
+                {
+                    await blockSuiteBridge.SetReadOnlyModeAsync(true);
+                }
+            }
+
+            suppressBridgeCommands = false;
+            needsHostRestore = false;
+            hostState = EditorHostState.Ready;
+            ShowReadyState();
+        }
+        catch (Exception ex)
+        {
+            hostState = EditorHostState.Faulted;
+            ShowFailedState(ex.Message, canRetry: true);
+        }
+        finally
+        {
+            isRestoringHost = false;
+        }
     }
 }
