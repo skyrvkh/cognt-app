@@ -118,6 +118,7 @@ public partial class MainWindow
         }
 
         session.Activate(selectInTree);
+        noteInspectorViewModel.UpdateCurrentContent(session.GetContent());
 
         if (selectInTree)
         {
@@ -364,6 +365,17 @@ public partial class MainWindow
             EnsureToolAutoHidden(CardsAnchorable);
             EnsureToolAutoHidden(PdfAnchorable);
             EnsureToolAutoHidden(BrowserAnchorable);
+
+            if (!InspectorAnchorable.IsAutoHidden)
+            {
+                InspectorAnchorable.Show();
+                InspectorAnchorable.IsSelected = true;
+            }
+
+            if (!GraphAnchorable.IsAutoHidden)
+            {
+                GraphAnchorable.Show();
+            }
         }, DispatcherPriority.Loaded);
     }
 
@@ -482,6 +494,8 @@ public partial class MainWindow
 
     private IEnumerable<LayoutAnchorable> EnumerateRightPaneTabs()
     {
+        yield return InspectorAnchorable;
+        yield return GraphAnchorable;
         yield return CardsAnchorable;
         yield return PdfAnchorable;
         yield return BrowserAnchorable;
@@ -489,7 +503,9 @@ public partial class MainWindow
 
     private bool IsWorkspaceTool(LayoutAnchorable anchorable)
     {
-        return ReferenceEquals(anchorable, CardsAnchorable)
+        return ReferenceEquals(anchorable, InspectorAnchorable)
+            || ReferenceEquals(anchorable, GraphAnchorable)
+            || ReferenceEquals(anchorable, CardsAnchorable)
             || ReferenceEquals(anchorable, PdfAnchorable)
             || ReferenceEquals(anchorable, BrowserAnchorable);
     }

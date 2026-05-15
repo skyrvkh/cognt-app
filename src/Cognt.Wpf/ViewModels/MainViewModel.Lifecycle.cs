@@ -1,4 +1,5 @@
 using System.IO;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Navigation = CogntApp.ViewModels.Navigation;
 
@@ -51,7 +52,9 @@ public sealed partial class MainViewModel
         DashboardStudyHeatmapCells.Clear();
         NoteToCardDeckNames.Clear();
         ApplyReviewSettings(FlashcardReviewSettingsReadModel.Default);
+        ApplyGraphSettings(KnowledgeGraphSettingsReadModel.Default);
         ReviewSettingsStatusMessage = string.Empty;
+        GraphSettingsStatusMessage = string.Empty;
         ClearCurrentNoteState();
         OnPropertyChanged(nameof(OpenCollectionPath));
         OnPropertyChanged(nameof(CurrentCollectionPath));
