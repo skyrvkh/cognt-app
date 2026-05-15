@@ -100,6 +100,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler<string>? CurrentNoteTitleChanged;
 
+    internal event EventHandler<string>? CurrentNoteContentChanged;
+
     internal event EventHandler<bool>? EditorReadOnlyChanged;
 
     public Func<string>? GetCurrentEditorContent { get; set; }
@@ -150,6 +152,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool ShouldShowSettingsEmptyState => !HasOpenCollection;
 
     public string? CurrentNotePath => currentNotePath;
+
+    public string? CurrentNoteRelativePath => TryGetCurrentNoteRelativePath();
 
     public bool HasAvailableCollections => AvailableCollections.Count > 0;
 

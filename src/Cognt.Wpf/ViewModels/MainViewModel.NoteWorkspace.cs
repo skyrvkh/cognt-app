@@ -7,6 +7,30 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    internal void SetActiveWorkspaceNote(
+        string notePath,
+        string title,
+        string content,
+        long? itemId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(notePath);
+        ArgumentNullException.ThrowIfNull(content);
+
+        currentPdfDocument = null;
+        currentNotePath = Path.GetFullPath(notePath);
+        currentNoteItemId = itemId;
+        currentNoteTitle = string.IsNullOrWhiteSpace(title)
+            ? Path.GetFileNameWithoutExtension(notePath)
+            : title.Trim();
+        lastSavedContent = content;
+        ClearNoteToCardTags();
+        OnPropertyChanged(nameof(CurrentNotePath));
+        OnPropertyChanged(nameof(CurrentNoteRelativePath));
+        RefreshEditorBreadcrumb();
+        ReloadCurrentNoteToCardQueue(GetRequiredRelativeNotePath(currentNotePath), content);
+        CurrentNoteContentChanged?.Invoke(this, content);
+    }
+
     public FlashcardSourceContext GetFlashcardSourceContext()
     {
         if (currentPdfDocument is not null)
