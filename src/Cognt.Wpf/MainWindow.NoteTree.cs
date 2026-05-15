@@ -60,6 +60,17 @@ public partial class MainWindow
         DeleteTreeNode(noteTreeContextNode ?? (NotesTree.SelectedItem as NoteTreeNodeViewModel));
     }
 
+    private void DuplicateTreeItem_Click(object sender, RoutedEventArgs e)
+    {
+        noteTreeCommands.DuplicateNode(noteTreeContextNode ?? (NotesTree.SelectedItem as NoteTreeNodeViewModel));
+    }
+
+    private void NotesTreeContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        NoteTreeNodeViewModel? node = noteTreeContextNode ?? (NotesTree.SelectedItem as NoteTreeNodeViewModel);
+        DuplicateTreeMenuItem.IsEnabled = viewModel.CanDuplicateNode(node);
+    }
+
     private void RenameSelectedTreeNode()
     {
         noteTreeCommands.BeginInlineRename(NotesTree.SelectedItem as NoteTreeNodeViewModel);

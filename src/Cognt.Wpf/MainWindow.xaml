@@ -6,6 +6,9 @@
         xmlns:local="clr-namespace:CogntApp"
         xmlns:views="clr-namespace:CogntApp.Views"
         xmlns:viewModels="clr-namespace:CogntApp.ViewModels"
+        xmlns:xcad="clr-namespace:AvalonDock;assembly=AvalonDock"
+        xmlns:xcadLayout="clr-namespace:AvalonDock.Layout;assembly=AvalonDock"
+        xmlns:xcadThemes="clr-namespace:AvalonDock.Themes;assembly=AvalonDock.Themes.Arc"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="Cognt App" Height="860" Width="1320" MinHeight="720" MinWidth="980"
@@ -21,13 +24,13 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="#78809A" />
-            <Setter Property="Margin" Value="0,18,0,8" />
+            <Setter Property="Margin" Value="0,12,0,6" />
         </Style>
 
         <Style x:Key="SidebarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="36" />
-            <Setter Property="Padding" Value="12,0" />
-            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="Margin" Value="0,1" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -59,7 +62,7 @@
         <Style x:Key="PrimarySidebarButtonStyle"
                BasedOn="{StaticResource SidebarButtonStyle}"
                TargetType="Button">
-            <Setter Property="Height" Value="36" />
+            <Setter Property="Height" Value="32" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Foreground" Value="#3156D4" />
@@ -220,7 +223,7 @@
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#D8DEEC" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Padding" Value="7,6" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -247,7 +250,7 @@
         <Style x:Key="SidebarCollectionSelectorButtonStyle"
                BasedOn="{StaticResource SidebarButtonStyle}"
                TargetType="Button">
-            <Setter Property="Height" Value="38" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#D8DEEC" />
             <Setter Property="Foreground" Value="#1F2433" />
@@ -298,8 +301,8 @@
         </Style>
 
         <Style x:Key="CollectionPopoverButtonStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="9,6" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="8,4" />
             <Setter Property="Margin" Value="0,1" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
@@ -332,7 +335,7 @@
         </Style>
 
         <Style x:Key="EditorBreadcrumbButtonStyle" TargetType="Button">
-            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Padding" Value="5,2" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -367,8 +370,8 @@
 
         <Style x:Key="EditorBreadcrumbTextBoxStyle" TargetType="TextBox">
             <Setter Property="MinWidth" Value="80" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="5,1" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#CBD6FF" />
@@ -385,7 +388,6 @@
                               Width="264"
                               MinWidth="240"
                               MaxWidth="320" />
-            <ColumnDefinition x:Name="SidebarSplitterColumn" Width="6" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -396,7 +398,7 @@
                 Background="#FBFCFF"
                 BorderBrush="#E1E6F0"
                 BorderThickness="0,0,1,0"
-                Padding="14,16"
+                Padding="10,12"
                 Panel.ZIndex="20">
             <Border.Effect>
                 <DropShadowEffect x:Name="SidebarShadowEffect"
@@ -415,11 +417,10 @@
 
                 <Grid x:Name="SidebarHeader"
                       Grid.Row="0"
-                      Margin="0,0,0,12">
+                      Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Border Width="44"
@@ -439,33 +440,17 @@
                     <TextBlock x:Name="SidebarBrandText"
                                Grid.Column="1"
                                Text="Cognt"
-                               Margin="10,0,0,0"
+                               Margin="8,0,0,0"
                                VerticalAlignment="Center"
                                FontSize="15"
                                FontWeight="SemiBold"
                                Foreground="#1F2433"
                                TextTrimming="CharacterEllipsis" />
-                    <Button x:Name="SidebarToggleButton"
-                            Grid.Column="2"
-                            Width="36"
-                            Height="36"
-                            Style="{StaticResource SidebarIconButtonStyle}"
-                            Click="SidebarToggleButton_Click">
-                        <Path x:Name="SidebarToggleIcon"
-                              Width="14"
-                              Height="14"
-                              Data="M11.5,4 L5.5,10 L11.5,16"
-                              Stroke="#586078"
-                              StrokeThickness="1.8"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round"
-                              Stretch="Uniform" />
-                    </Button>
                 </Grid>
 
                 <StackPanel x:Name="SidebarTopNavigationSection"
                             Grid.Row="1">
-                        <Grid Margin="0,0,0,8">
+                        <Grid Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="8" />
@@ -479,14 +464,14 @@
                                     <Path Data="M4,12 L12,5 L20,12 M6.5,10.5 L6.5,19 L17.5,19 L17.5,10.5"
                                           Style="{StaticResource SidebarNavigationPathStyle}" />
                                     <TextBlock Text="Dashboard"
-                                               Margin="10,0,0,0"
+                                               Margin="8,0,0,0"
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </Button>
                             <Button Grid.Column="2"
-                                    Width="38"
-                                    Height="38"
+                                    Width="34"
+                                    Height="34"
                                     ToolTip="Flashcards"
                                     AutomationProperties.Name="Flashcards"
                                     Style="{StaticResource SidebarIconButtonStyle}"
@@ -502,23 +487,9 @@
                                       StrokeLineJoin="Round" />
                             </Button>
                         </Grid>
-                        <Button Margin="0,0,0,10"
-                                Style="{StaticResource PrimarySidebarButtonStyle}"
-                                AutomationProperties.Name="All Notes"
-                                Command="{Binding ShowAllNotesCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="M6,5.5 L18,5.5 M6,10.5 L18,10.5 M6,15.5 L14,15.5"
-                                      Style="{StaticResource SidebarNavigationPathStyle}" />
-                                <TextBlock Text="All Notes"
-                                           Margin="10,0,0,0"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Button>
-
-                        <Grid Margin="0,10,0,0">
+                        <Grid Margin="0,8,0,0">
                             <Border x:Name="SidebarSearchBox"
-                                    MinHeight="38"
+                                    MinHeight="34"
                                     Background="#FFFFFF"
                                     BorderBrush="#D9E1F0"
                                     BorderThickness="1"
@@ -526,7 +497,7 @@
                                 <Grid>
                                     <Path Width="16"
                                           Height="16"
-                                          Margin="14,0,0,0"
+                                          Margin="12,0,0,0"
                                           HorizontalAlignment="Left"
                                           VerticalAlignment="Center"
                                           Stretch="Uniform"
@@ -534,7 +505,7 @@
                                           StrokeThickness="1.8"
                                           Data="M10.5,10.5 L15,15 M12,6.5 A5.5,5.5 0 1 1 1,6.5 A5.5,5.5 0 1 1 12,6.5 Z" />
                                     <TextBox x:Name="SidebarSearchTextBox"
-                                             Margin="40,0,10,0"
+                                             Margin="36,0,8,0"
                                              Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
                                              Tag="Search notes"
                                              ToolTip="Search notes"
@@ -553,8 +524,8 @@
                                    IsOpen="{Binding IsGlobalSearchPopupOpen, Mode=TwoWay}">
                                 <Border Width="{Binding ActualWidth, ElementName=SidebarSearchBox}"
                                         MaxHeight="310"
-                                        Margin="0,6,0,0"
-                                        Padding="8"
+                                        Margin="0,4,0,0"
+                                        Padding="6"
                                         Background="#FFFFFF"
                                         BorderBrush="#DDE5F3"
                                         BorderThickness="1"
@@ -567,7 +538,7 @@
                                                           Color="#000000" />
                                     </Border.Effect>
                                     <Grid>
-                                        <Border Padding="10"
+                                        <Border Padding="8"
                                                 Background="#F8FAFF"
                                                 BorderBrush="#E1E6F0"
                                                 BorderThickness="1"
@@ -587,7 +558,7 @@
                                                        Foreground="#667085" />
                                         </Border>
 
-                                        <Border Padding="10"
+                                        <Border Padding="8"
                                                 Background="#FFF7F7"
                                                 BorderBrush="#F1C9C9"
                                                 BorderThickness="1"
@@ -613,13 +584,13 @@
                                                            Foreground="#9C2F2F" />
                                                 <Button Grid.Column="1"
                                                         Content="Retry"
-                                                        Margin="8,0,0,0"
-                                                        Padding="8,3"
+                                                        Margin="6,0,0,0"
+                                                        Padding="6,2"
                                                         Command="{Binding RetryGlobalSearchCommand}" />
                                             </Grid>
                                         </Border>
 
-                                        <Border Padding="10"
+                                        <Border Padding="8"
                                                 Background="#F8FAFF"
                                                 BorderBrush="#E1E6F0"
                                                 BorderThickness="1"
@@ -691,7 +662,7 @@
 
                         <Border Height="1"
                                 Background="#E1E6F0"
-                                Margin="8,14,8,12" />
+                                Margin="6,10,6,10" />
                 </StackPanel>
 
                 <ScrollViewer x:Name="SidebarScrollContent"
@@ -718,9 +689,12 @@
                                       Drop="NotesTree_Drop"
                                       SelectedItemChanged="NotesTree_SelectedItemChanged">
                                 <TreeView.ContextMenu>
-                                    <ContextMenu>
+                                    <ContextMenu Opened="NotesTreeContextMenu_Opened">
                                         <MenuItem Header="New Folder"
                                                   Click="NewFolderTreeItem_Click" />
+                                        <MenuItem x:Name="DuplicateTreeMenuItem"
+                                                  Header="Duplicate"
+                                                  Click="DuplicateTreeItem_Click" />
                                         <Separator />
                                         <MenuItem Header="Delete"
                                                   Click="DeleteTreeItem_Click" />
@@ -797,7 +771,7 @@
                                     </Style>
                                 </TreeView.ItemContainerStyle>
                             </TreeView>
-                            <Border Padding="14"
+                            <Border Padding="10"
                                     Background="#F8FAFF"
                                     BorderBrush="#E1E6F0"
                                     BorderThickness="1"
@@ -831,7 +805,7 @@
 
                 <Grid x:Name="SidebarFooterSection"
                       Grid.Row="3"
-                      Margin="0,14,0,0">
+                      Margin="0,10,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -851,7 +825,7 @@
                                 <Path Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M9,13 L15,13 M12,10 L12,16"
                                       Style="{StaticResource SidebarNavigationPathStyle}" />
                                 <TextBlock Text="New note"
-                                           Margin="10,0,0,0"
+                                           Margin="8,0,0,0"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
@@ -865,7 +839,7 @@
                                 <Path Data="M12,4 L12,15 M7.5,10.5 L12,15 L16.5,10.5 M5,18.5 L19,18.5"
                                       Style="{StaticResource SidebarNavigationPathStyle}" />
                                 <TextBlock Text="Import"
-                                           Margin="10,0,0,0"
+                                           Margin="8,0,0,0"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
@@ -873,7 +847,7 @@
                         </Grid>
 
                     <Grid Grid.Row="1"
-                          Margin="0,8,0,0">
+                          Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />
@@ -905,7 +879,7 @@
                                       StrokeLineJoin="Round" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding CurrentCollectionName}"
-                                           Margin="9,0,8,0"
+                                           Margin="8,0,6,0"
                                            VerticalAlignment="Center"
                                            FontSize="{Binding GlobalTextFontSize}"
                                            TextTrimming="CharacterEllipsis"
@@ -932,8 +906,8 @@
                                PopupAnimation="Fade"
                                DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                             <Border Width="{Binding ActualWidth, ElementName=SidebarFooterSection}"
-                                    MaxHeight="320"
-                                    Margin="0,0,0,8"
+                                    MaxHeight="360"
+                                    Margin="0,0,0,6"
                                     Padding="10"
                                     Background="#FFFFFF"
                                     BorderBrush="#D8DEEC"
@@ -946,9 +920,37 @@
                                                       Opacity="0.4" />
                                 </Border.Effect>
                                 <StackPanel>
-                                    <TextBlock Text="COLLECTIONS"
-                                               Style="{StaticResource SectionHeaderStyle}"
-                                               Margin="2,0,0,8" />
+                                    <TextBlock Text="Open collection"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2433" />
+
+                                    <Border Margin="0,8,0,10"
+                                            Padding="10"
+                                            Background="#F8FAFF"
+                                            BorderBrush="#E1E6F0"
+                                            BorderThickness="1"
+                                            CornerRadius="9">
+                                        <StackPanel>
+                                            <TextBlock Text="Current"
+                                                       FontSize="10"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#78809A" />
+                                            <TextBlock Text="{Binding CurrentCollectionName}"
+                                                       Margin="0,3,0,0"
+                                                       FontSize="{Binding GlobalTextFontSize}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#1F2433"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding CurrentCollectionName}" />
+                                            <TextBlock Text="{Binding OpenCollectionPath}"
+                                                       Margin="0,2,0,0"
+                                                       FontSize="11"
+                                                       Foreground="#78809A"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding OpenCollectionPath}" />
+                                        </StackPanel>
+                                    </Border>
 
                                     <ScrollViewer MaxHeight="150"
                                                   VerticalScrollBarVisibility="Auto"
@@ -966,16 +968,38 @@
                                         <ItemsControl ItemsSource="{Binding AvailableCollections}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="0,1">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="6" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Button Style="{StaticResource CollectionPopoverButtonStyle}"
-                                                                AutomationProperties.Name="{Binding Name}"
-                                                                Click="CollectionOptionButton_Click">
-                                                            <StackPanel>
+                                                    <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                                            AutomationProperties.Name="{Binding Name}"
+                                                            Click="CollectionOptionButton_Click">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Border Width="30"
+                                                                    Height="30"
+                                                                    VerticalAlignment="Top"
+                                                                    Background="#EEF4FF"
+                                                                    BorderBrush="#DCE5FF"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="8">
+                                                                <Path Data="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z"
+                                                                      Width="16"
+                                                                      Height="16"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Stretch="Uniform"
+                                                                      Stroke="#3156D4"
+                                                                      StrokeThickness="1.5"
+                                                                      StrokeStartLineCap="Round"
+                                                                      StrokeEndLineCap="Round"
+                                                                      StrokeLineJoin="Round" />
+                                                            </Border>
+
+                                                            <StackPanel Grid.Column="1"
+                                                                        Margin="9,0,8,0">
                                                                 <TextBlock Text="{Binding Name}"
                                                                            FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                            FontWeight="SemiBold"
@@ -985,7 +1009,6 @@
                                                                 <TextBlock Text="{Binding CountsSummary}"
                                                                            Margin="0,2,0,0"
                                                                            FontSize="11"
-                                                                           FontWeight="SemiBold"
                                                                            Foreground="#586078"
                                                                            TextTrimming="CharacterEllipsis" />
                                                                 <TextBlock Text="{Binding Path}"
@@ -995,56 +1018,27 @@
                                                                            TextTrimming="CharacterEllipsis"
                                                                            ToolTip="{Binding Path}" />
                                                             </StackPanel>
-                                                        </Button>
-                                                        <Button Grid.Column="2"
-                                                                Width="30"
-                                                                Height="30"
-                                                                VerticalAlignment="Top"
-                                                                ToolTip="Remove collection"
-                                                                AutomationProperties.Name="Remove collection"
-                                                                Click="RemoveCollectionButton_Click"
-                                                                Background="#FFF7F7"
-                                                                BorderBrush="#F0C2C2"
-                                                                BorderThickness="1"
-                                                                Foreground="#A23B3B">
-                                                            <Button.Style>
-                                                                <Style TargetType="{x:Type Button}">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                    <Setter Property="Cursor" Value="Hand" />
-                                                                    <Setter Property="Template">
-                                                                        <Setter.Value>
-                                                                            <ControlTemplate TargetType="Button">
-                                                                                <Border Background="{TemplateBinding Background}"
-                                                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                                                                        CornerRadius="8">
-                                                                                    <ContentPresenter HorizontalAlignment="Center"
-                                                                                                      VerticalAlignment="Center" />
-                                                                                </Border>
-                                                                            </ControlTemplate>
-                                                                        </Setter.Value>
-                                                                    </Setter>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                            <Setter Property="Visibility" Value="Visible" />
-                                                                        </DataTrigger>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter Property="Background" Value="#FFECEC" />
-                                                                            <Setter Property="BorderBrush" Value="#E9A8A8" />
-                                                                        </Trigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                            <Path Data="M5,5 L13,13 M13,5 L5,13"
-                                                                  Width="12"
-                                                                  Height="12"
-                                                                  Stretch="Uniform"
-                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                                  StrokeThickness="1.8"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round" />
-                                                        </Button>
-                                                    </Grid>
+
+                                                            <Border Grid.Column="2"
+                                                                    Width="8"
+                                                                    Height="8"
+                                                                    VerticalAlignment="Top"
+                                                                    Margin="0,5,0,0"
+                                                                    Background="#3156D4"
+                                                                    CornerRadius="4">
+                                                                <Border.Style>
+                                                                    <Style TargetType="{x:Type Border}">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Button>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
@@ -1075,13 +1069,64 @@
                                             Background="#E1E6F0"
                                             Margin="0,9,0,8" />
 
-                                    <Button Style="{StaticResource CollectionPopoverButtonStyle}"
-                                            Click="AddCollectionButton_Click">
-                                        <TextBlock Text="Add Collection"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#3156D4" />
-                                    </Button>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                                AutomationProperties.Name="Add collection"
+                                                Click="AddCollectionButton_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Data="M12,5 L12,19 M5,12 L19,12"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Stretch="Uniform"
+                                                      Stroke="#3156D4"
+                                                      StrokeThickness="1.8"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round" />
+                                                <TextBlock Text="Add collection"
+                                                           Margin="7,0,0,0"
+                                                           FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#3156D4" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2"
+                                                Width="34"
+                                                Height="30"
+                                                ToolTip="Remove current collection"
+                                                AutomationProperties.Name="Remove current collection"
+                                                Click="RemoveCollectionButton_Click"
+                                                Background="#FFF7F7"
+                                                BorderBrush="#F0C2C2"
+                                                BorderThickness="1"
+                                                Foreground="#A23B3B"
+                                                Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="8">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                            <Path Data="M5,5 L13,13 M13,5 L5,13"
+                                                  Width="12"
+                                                  Height="12"
+                                                  Stretch="Uniform"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.8"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Button>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </Popup>
@@ -1112,434 +1157,184 @@
             </Grid>
         </Border>
 
-        <GridSplitter x:Name="SidebarSplitter"
-                      Grid.Column="1"
-                      Width="6"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch"
-                      Background="#E9EDF6"
-                      Cursor="SizeWE"
-                      ResizeBehavior="PreviousAndNext"
-                      ResizeDirection="Columns"
-                      ShowsPreview="False"
-                      DragDelta="SidebarSplitter_DragDelta"
-                      DragCompleted="SidebarSplitter_DragCompleted"
-                      Panel.ZIndex="25" />
-
         <Grid x:Name="MainContentSplitRoot"
-              Grid.Column="2"
+              Grid.Column="1"
               ClipToBounds="True">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="PrimaryContentColumn"
-                                  Width="*"
-                                  MinWidth="0" />
-                <ColumnDefinition x:Name="RightViewerSplitterColumn"
-                                  Width="0" />
-                <ColumnDefinition x:Name="RightViewerColumn"
-                                  Width="0"
-                                  MinWidth="0" />
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <Grid Grid.Column="0"
-                  ClipToBounds="True">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <Border Grid.Row="0"
-                        Background="#FFFFFF"
-                        BorderBrush="#E1E6F0"
-                        BorderThickness="0,0,0,1"
-                        Padding="18,8">
-                    <Border.Style>
-                        <Style TargetType="{x:Type Border}">
-                            <Setter Property="Visibility" Value="Visible" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding EditorBreadcrumbItems.Count, Mode=OneWay}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding EditorBreadcrumbItems}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal"
-                                                    VerticalAlignment="Center">
-                                            <Grid VerticalAlignment="Center">
-                                                <Button AutomationProperties.Name="{Binding Title}"
-                                                        ToolTip="{Binding Title}"
-                                                        Click="EditorBreadcrumbButton_Click"
-                                                        PreviewKeyDown="EditorBreadcrumbButton_PreviewKeyDown"
-                                                        PreviewMouseDoubleClick="EditorBreadcrumbButton_PreviewMouseDoubleClick">
-                                                    <Button.Style>
-                                                        <Style TargetType="{x:Type Button}"
-                                                               BasedOn="{StaticResource EditorBreadcrumbButtonStyle}">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                                    <Setter Property="Foreground" Value="#1F2433" />
-                                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Button.Style>
-                                                    <TextBlock Text="{Binding DisplayTitle}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                                </Button>
-
-                                                <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
-                                                         IsVisibleChanged="EditorBreadcrumbTextBox_IsVisibleChanged"
-                                                         LostKeyboardFocus="EditorBreadcrumbTextBox_LostKeyboardFocus"
-                                                         PreviewKeyDown="EditorBreadcrumbTextBox_PreviewKeyDown">
-                                                    <TextBox.Style>
-                                                        <Style TargetType="{x:Type TextBox}"
-                                                               BasedOn="{StaticResource EditorBreadcrumbTextBoxStyle}">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBox.Style>
-                                                </TextBox>
-                                            </Grid>
-
-                                            <TextBlock Text="{Binding Separator}"
-                                                       Margin="5,0"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="#9AA3B8"
-                                                       FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-
-                <ContentControl x:Name="EditorViewHost"
-                                Grid.Row="1"
-                                AllowDrop="True"
-                                DragOver="EditorViewHost_DragOver"
-                                Drop="EditorViewHost_Drop" />
-
-                <ContentControl x:Name="OverlayHost"
-                                Grid.RowSpan="2"
-                                Panel.ZIndex="10" />
-            </Grid>
-
-            <GridSplitter x:Name="RightViewerSplitter"
-                          Grid.Column="1"
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
-                          Background="#E9EDF6"
-                          Cursor="SizeWE"
-                          ResizeBehavior="PreviousAndNext"
-                          ResizeDirection="Columns"
-                          ShowsPreview="False"
-                          Visibility="Collapsed"
-                          DragDelta="RightViewerSplitter_DragDelta"
-                          DragCompleted="RightViewerSplitter_DragCompleted"
-                          Panel.ZIndex="12" />
-
-            <Border x:Name="RightViewerPane"
-                    Grid.Column="2"
-                    Background="#FBFCFF"
-                    BorderBrush="#DCE3F0"
-                    BorderThickness="1,0,0,0"
-                    Visibility="Collapsed"
-                    AllowDrop="True"
-                    DragEnter="RightViewerPane_DragEnter"
-                    DragLeave="RightViewerPane_DragLeave"
-                    DragOver="RightViewerPane_DragOver"
-                    Drop="RightViewerPane_Drop">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Border Grid.Row="0"
-                            Background="#FFFFFF"
-                            BorderBrush="#E1E6F0"
-                            BorderThickness="0,0,0,1"
-                            Padding="12,9">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="RightViewerTitleText"
-                                       Text="Viewer"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2433"
-                                       TextTrimming="CharacterEllipsis" />
-                            <Button Grid.Column="1"
-                                    Width="28"
-                                    Height="28"
-                                    Padding="0"
-                                    ToolTip="Close viewer"
-                                    AutomationProperties.Name="Close viewer"
-                                    Style="{StaticResource SidebarIconButtonStyle}"
-                                    Click="RightViewerCloseButton_Click">
-                                <Path Width="11"
-                                      Height="11"
-                                      Data="M3,3 L13,13 M13,3 L3,13"
-                                      Stretch="Uniform"
-                                      Stroke="#586078"
-                                      StrokeThickness="1.8"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" />
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <ContentControl x:Name="RightViewerContentHost"
-                                    Grid.Row="1" />
-
-                    <Border x:Name="RightViewerDropOverlay"
-                            Grid.RowSpan="2"
-                            Margin="14"
-                            Background="#EAF0FF"
-                            BorderBrush="#6A83FF"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Visibility="Collapsed"
-                            IsHitTestVisible="False"
-                            Panel.ZIndex="20">
-                        <Grid>
-                            <StackPanel HorizontalAlignment="Center"
-                                        VerticalAlignment="Center">
-                                <Path Width="34"
-                                      Height="34"
-                                      HorizontalAlignment="Center"
-                                      Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2"
-                                      Fill="#FFF1F2"
-                                      Stretch="Uniform"
-                                      Stroke="#EF4444"
-                                      StrokeThickness="1.6"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round" />
-                                <TextBlock Text="Drop PDF to open"
-                                           Margin="0,12,0,0"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="#1F2433"
-                                           HorizontalAlignment="Center" />
-                                <TextBlock Text="The current note will stay open."
-                                           Margin="0,4,0,0"
-                                           FontSize="12"
-                                           Foreground="#586078"
-                                           HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <StackPanel x:Name="RightViewerHangingButtons"
-                        Grid.Column="0"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center"
-                        Margin="0,0,8,0"
-                        Panel.ZIndex="11">
-                <StackPanel.Style>
-                    <Style TargetType="{x:Type StackPanel}">
+            <Border Grid.Row="0"
+                    Background="#FFFFFF"
+                    BorderBrush="#E1E6F0"
+                    BorderThickness="0,0,0,1"
+                    Padding="14,6">
+                <Border.Style>
+                    <Style TargetType="{x:Type Border}">
                         <Setter Property="Visibility" Value="Visible" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Visibility, ElementName=OverlayHost}" Value="Visible">
+                            <DataTrigger Binding="{Binding EditorBreadcrumbItems.Count, Mode=OneWay}" Value="0">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </StackPanel.Style>
-                <Button Width="38"
-                        Height="38"
-                        Margin="0,0,0,8"
-                        Padding="0"
-                        ToolTip="Cards from this note"
-                        AutomationProperties.Name="Cards from this note"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="RightViewerNoteCardsButton_Click">
-                    <Grid Width="19"
-                          Height="19">
-                        <Path Data="M5,4 L15,4 L18,7 L18,18 L5,18 Z M15,4 L15,7 L18,7 M8,10 L15,10 M8,13 L15,13"
-                              Stretch="Uniform"
-                              Stroke="#3156D4"
-                              StrokeThickness="1.6"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round"
-                              StrokeLineJoin="Round" />
-                    </Grid>
-                </Button>
-                <Button Width="38"
-                        Height="38"
-                        Margin="0,0,0,8"
-                        Padding="0"
-                        ToolTip="Create card context from selected blocks"
-                        AutomationProperties.Name="Create card context from selected blocks"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="CreateCardContextFromSelectionButton_Click">
-                    <Grid Width="19"
-                          Height="19">
-                        <Rectangle Width="13"
-                                   Height="15"
-                                   Margin="3,2,0,0"
-                                   HorizontalAlignment="Left"
-                                   VerticalAlignment="Top"
-                                   RadiusX="2"
-                                   RadiusY="2"
-                                   Fill="#EEF2FF"
-                                   Stroke="#3156D4"
-                                   StrokeThickness="1.4" />
-                        <Path Data="M6,6 L13,6 M6,9.5 L14,9.5 M6,13 L11,13"
-                              Stretch="Uniform"
-                              Stroke="#3156D4"
-                              StrokeThickness="1.4"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round" />
-                    </Grid>
-                </Button>
-                <Button Width="38"
-                        Height="38"
-                        Margin="0,0,0,8"
-                        Padding="0"
-                        ToolTip="Create cloze deletion from selection (Ctrl+Shift+C)"
-                        AutomationProperties.Name="Create cloze deletion from selection"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="CreateClozeFromSelectionButton_Click">
-                    <Grid Width="20"
-                          Height="20">
-                        <Path Data="M3.5,6.5 L16.5,6.5 M3.5,13.5 L16.5,13.5 M6.5,3.5 C4.8,5.5 4.8,14.5 6.5,16.5 M13.5,3.5 C15.2,5.5 15.2,14.5 13.5,16.5"
-                              Stretch="Uniform"
-                              Stroke="#3156D4"
-                              StrokeThickness="1.6"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round"
-                              StrokeLineJoin="Round" />
-                        <Border Width="8"
-                                Height="8"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Background="#FEE2E2"
-                                BorderBrush="#DC2626"
-                                BorderThickness="1"
-                                CornerRadius="4" />
-                    </Grid>
-                </Button>
-                <Button Width="38"
-                        Height="38"
-                        Margin="0,0,0,8"
-                        Padding="0"
-                        ToolTip="Mask selected image (Ctrl+Shift+I)"
-                        AutomationProperties.Name="Mask selected image"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="OpenImageOcclusionEditorButton_Click">
-                    <Grid Width="19"
-                          Height="19">
-                        <Rectangle Width="14"
-                                   Height="11"
-                                   Margin="2,5,0,0"
-                                   HorizontalAlignment="Left"
-                                   VerticalAlignment="Top"
-                                   RadiusX="2"
-                                   RadiusY="2"
-                                   Fill="#EEF2FF"
-                                   Stroke="#3156D4"
-                                   StrokeThickness="1.4" />
-                        <Ellipse Width="7"
-                                 Height="7"
-                                 Margin="9,2,0,0"
-                                 HorizontalAlignment="Left"
-                                 VerticalAlignment="Top"
-                                 Fill="#FEE2E2"
-                                 Stroke="#DC2626"
-                                 StrokeThickness="1.4" />
-                    </Grid>
-                </Button>
-                <Button Width="38"
-                        Height="38"
-                        Margin="0,0,0,8"
-                        Padding="0"
-                        ToolTip="PDF viewer"
-                        AutomationProperties.Name="PDF viewer"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="RightViewerPdfButton_Click">
-                    <Path Width="18"
-                          Height="18"
-                          Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2"
-                          Fill="#FFF1F2"
-                          Stretch="Uniform"
-                          Stroke="#EF4444"
-                          StrokeThickness="1.6"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round" />
-                </Button>
-                <Button Width="38"
-                        Height="38"
-                        Padding="0"
-                        ToolTip="Browser view"
-                        AutomationProperties.Name="Browser view"
-                        Style="{StaticResource SidebarIconButtonStyle}"
-                        Click="RightViewerBrowserButton_Click">
-                    <Grid Width="18"
-                          Height="18">
-                        <Ellipse Stroke="#3156D4"
-                                 StrokeThickness="1.6" />
-                        <Path Data="M2,9 L16,9 M9,2 C6.6,4.2 6.6,13.8 9,16 M9,2 C11.4,4.2 11.4,13.8 9,16"
-                              Stretch="Uniform"
-                              Stroke="#3156D4"
-                              StrokeThickness="1.4"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round" />
-                    </Grid>
-                </Button>
-            </StackPanel>
+                </Border.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding EditorBreadcrumbItems}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <Grid VerticalAlignment="Center">
+                                            <Button AutomationProperties.Name="{Binding Title}"
+                                                    ToolTip="{Binding Title}"
+                                                    Click="EditorBreadcrumbButton_Click"
+                                                    PreviewKeyDown="EditorBreadcrumbButton_PreviewKeyDown"
+                                                    PreviewMouseDoubleClick="EditorBreadcrumbButton_PreviewMouseDoubleClick">
+                                                <Button.Style>
+                                                    <Style TargetType="{x:Type Button}"
+                                                           BasedOn="{StaticResource EditorBreadcrumbButtonStyle}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                <Setter Property="Foreground" Value="#1F2433" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <TextBlock Text="{Binding DisplayTitle}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            </Button>
+
+                                            <TextBox Text="{Binding EditingTitle, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsVisibleChanged="EditorBreadcrumbTextBox_IsVisibleChanged"
+                                                     LostKeyboardFocus="EditorBreadcrumbTextBox_LostKeyboardFocus"
+                                                     PreviewKeyDown="EditorBreadcrumbTextBox_PreviewKeyDown">
+                                                <TextBox.Style>
+                                                    <Style TargetType="{x:Type TextBox}"
+                                                           BasedOn="{StaticResource EditorBreadcrumbTextBoxStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding Separator}"
+                                                   Margin="5,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#9AA3B8"
+                                                   FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1"
+                  AllowDrop="True"
+                  DragOver="EditorViewHost_DragOver"
+                  Drop="EditorViewHost_Drop">
+                <xcad:DockingManager x:Name="WorkspaceDockingManager"
+                                     ActiveContentChanged="WorkspaceDockingManager_ActiveContentChanged">
+                    <xcad:DockingManager.Theme>
+                        <xcadThemes:ArcLightTheme />
+                    </xcad:DockingManager.Theme>
+                    <xcad:DockingManager.DocumentHeaderTemplate>
+                        <DataTemplate>
+                            <Border x:Name="DocumentDockTab"
+                                    Padding="2,0"
+                                    Background="Transparent"
+                                    Cursor="SizeAll"
+                                    ToolTip="{Binding Title}"
+                                    PreviewMouseLeftButtonDown="NoteDocumentHeader_PreviewMouseLeftButtonDown"
+                                    PreviewMouseMove="NoteDocumentHeader_PreviewMouseMove"
+                                    PreviewMouseLeftButtonUp="NoteDocumentHeader_PreviewMouseLeftButtonUp">
+                                <Border.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="Open in New Window"
+                                                  Click="OpenNoteInNewWindowMenuItem_Click" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <TextBlock x:Name="DocumentDockTabTitle"
+                                           Text="{Binding Title}"
+                                           FontSize="12.5"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Border>
+                        </DataTemplate>
+                    </xcad:DockingManager.DocumentHeaderTemplate>
+                    <xcad:DockingManager.Layout>
+                        <xcadLayout:LayoutRoot>
+                            <xcadLayout:LayoutPanel Orientation="Horizontal">
+                                <xcadLayout:LayoutDocumentPaneGroup>
+                                    <xcadLayout:LayoutDocumentPane x:Name="WorkspaceDocumentPane" />
+                                </xcadLayout:LayoutDocumentPaneGroup>
+                                <xcadLayout:LayoutAnchorablePaneGroup x:Name="RightToolPaneGroup"
+                                                                      DockWidth="420"
+                                                                      DockMinWidth="320"
+                                                                      FloatingWidth="420"
+                                                                      Orientation="Vertical">
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.36*">
+                                        <xcadLayout:LayoutAnchorable x:Name="CardsAnchorable"
+                                                               Title="Cards from note"
+                                                               CanClose="False"
+                                                               CanHide="False"
+                                                               AutoHideWidth="420"
+                                                               FloatingWidth="420">
+                                            <ContentControl x:Name="CardsToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                        <xcadLayout:LayoutAnchorable x:Name="PdfAnchorable"
+                                                               Title="PDF Viewer"
+                                                               CanClose="False"
+                                                               CanHide="False"
+                                                               AutoHideWidth="420"
+                                                               FloatingWidth="420">
+                                            <ContentControl x:Name="PdfToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                        <xcadLayout:LayoutAnchorable x:Name="BrowserAnchorable"
+                                                               Title="Browser"
+                                                               CanClose="False"
+                                                               CanHide="False"
+                                                               AutoHideWidth="420"
+                                                               FloatingWidth="420">
+                                            <ContentControl x:Name="BrowserToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                    </xcadLayout:LayoutAnchorablePane>
+                                </xcadLayout:LayoutAnchorablePaneGroup>
+                            </xcadLayout:LayoutPanel>
+                        </xcadLayout:LayoutRoot>
+                    </xcad:DockingManager.Layout>
+                </xcad:DockingManager>
+
+                <ContentControl x:Name="OverlayHost"
+                                Panel.ZIndex="10" />
+
+            </Grid>
         </Grid>
 
-        <Button x:Name="FloatingNavigationButton"
-                Grid.Column="2"
-                Width="54"
-                Height="54"
-                Margin="18"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Visibility="Collapsed"
-                ToolTip="Show navigation"
-                AutomationProperties.Name="Show navigation"
-                Style="{StaticResource SidebarIconButtonStyle}"
-                Panel.ZIndex="30"
-                Click="FloatingNavigationButton_Click">
-            <Image Source="pack://application:,,,/Assets/icon.png"
-                   Width="42"
-                   Height="42"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Stretch="Uniform" />
-        </Button>
     </Grid>
 </Window>
