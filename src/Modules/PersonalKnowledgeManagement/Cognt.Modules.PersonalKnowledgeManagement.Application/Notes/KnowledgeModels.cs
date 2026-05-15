@@ -63,3 +63,66 @@ public sealed record KnowledgeDocumentLinkReadModel(
     string Snippet,
     string MatchedText,
     long? UpdatedAt);
+
+public sealed record KnowledgeGraphSettingsReadModel(
+    int NeighborDepth,
+    int MaxNodes)
+{
+    public const int DefaultNeighborDepth = 1;
+    public const int MinimumNeighborDepth = 1;
+    public const int MaximumNeighborDepth = 4;
+    public const int DefaultMaxNodes = 75;
+    public const int MinimumMaxNodes = 10;
+    public const int MaximumMaxNodes = 300;
+
+    public static KnowledgeGraphSettingsReadModel Default { get; } = new(
+        DefaultNeighborDepth,
+        DefaultMaxNodes);
+
+    public KnowledgeGraphSettingsReadModel Normalize()
+    {
+        return this with
+        {
+            NeighborDepth = Math.Clamp(NeighborDepth, MinimumNeighborDepth, MaximumNeighborDepth),
+            MaxNodes = Math.Clamp(MaxNodes, MinimumMaxNodes, MaximumMaxNodes),
+        };
+    }
+}
+
+public sealed record KnowledgeGraphReadModel(
+    string? CurrentDocumentId,
+    string? CurrentRelativePath,
+    KnowledgeGraphSettingsReadModel Settings,
+    IReadOnlyList<KnowledgeGraphNodeReadModel> Nodes,
+    IReadOnlyList<KnowledgeGraphEdgeReadModel> Edges,
+    int TotalReachableNodeCount,
+    bool IsTruncated)
+{
+    public static KnowledgeGraphReadModel Empty(KnowledgeGraphSettingsReadModel settings)
+    {
+        return new KnowledgeGraphReadModel(
+            CurrentDocumentId: null,
+            CurrentRelativePath: null,
+            settings.Normalize(),
+            Nodes: [],
+            Edges: [],
+            TotalReachableNodeCount: 0,
+            IsTruncated: false);
+    }
+}
+
+public sealed record KnowledgeGraphNodeReadModel(
+    string DocumentId,
+    string RelativePath,
+    string Title,
+    int Depth,
+    bool IsCurrent,
+    long? UpdatedAt,
+    int IncomingEdgeCount,
+    int OutgoingEdgeCount);
+
+public sealed record KnowledgeGraphEdgeReadModel(
+    string SourceDocumentId,
+    string TargetDocumentId,
+    int MentionCount,
+    long? UpdatedAt);

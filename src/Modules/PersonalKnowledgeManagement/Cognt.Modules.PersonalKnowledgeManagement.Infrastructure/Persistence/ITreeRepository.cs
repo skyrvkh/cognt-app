@@ -1,4 +1,5 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -47,6 +48,10 @@ internal interface ITreeRepository : IDisposable
     void ReplaceDocumentMentions(
         string sourceDocumentId,
         IReadOnlyList<DocumentMentionRow> mentions);
+
+    KnowledgeGraphSettingsReadModel LoadGraphViewSettings();
+
+    void SaveGraphViewSettings(KnowledgeGraphSettingsReadModel settings);
 
     IReadOnlyList<AttachmentRow> LoadAttachments();
 

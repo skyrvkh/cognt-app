@@ -124,4 +124,17 @@ public interface INoteService : IDisposable
         string collectionId,
         string currentRelativePath,
         string currentContent);
+
+    KnowledgeGraphReadModel ReadDocumentGraph(
+        string collectionId,
+        string currentRelativePath,
+        string currentContent,
+        KnowledgeGraphSettingsReadModel settings);
+
+    KnowledgeGraphSettingsReadModel LoadGraphViewSettings(
+        string collectionId);
+
+    void SaveGraphViewSettings(
+        string collectionId,
+        KnowledgeGraphSettingsReadModel settings);
 }

@@ -1298,6 +1298,26 @@
                                                                       DockMinWidth="320"
                                                                       FloatingWidth="420"
                                                                       Orientation="Vertical">
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.32*">
+                                        <xcadLayout:LayoutAnchorable x:Name="InspectorAnchorable"
+                                                               Title="Outline"
+                                                               CanClose="False"
+                                                               CanHide="False"
+                                                               AutoHideWidth="420"
+                                                               FloatingWidth="420">
+                                            <ContentControl x:Name="InspectorToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                    </xcadLayout:LayoutAnchorablePane>
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.32*">
+                                        <xcadLayout:LayoutAnchorable x:Name="GraphAnchorable"
+                                                               Title="Graph"
+                                                               CanClose="False"
+                                                               CanHide="False"
+                                                               AutoHideWidth="420"
+                                                               FloatingWidth="420">
+                                            <ContentControl x:Name="GraphToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                    </xcadLayout:LayoutAnchorablePane>
                                     <xcadLayout:LayoutAnchorablePane DockHeight="0.36*">
                                         <xcadLayout:LayoutAnchorable x:Name="CardsAnchorable"
                                                                Title="Cards from note"

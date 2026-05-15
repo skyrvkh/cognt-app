@@ -69,6 +69,11 @@ public partial class MainWindow
         GetActiveNoteDocument()?.UpdateTitle(title);
     }
 
+    private void ViewModel_CurrentNoteContentChanged(object? sender, string content)
+    {
+        noteInspectorViewModel.UpdateCurrentContent(content);
+    }
+
     private async void ViewModel_EditorReadOnlyChanged(object? sender, bool isReadOnly)
     {
         NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();

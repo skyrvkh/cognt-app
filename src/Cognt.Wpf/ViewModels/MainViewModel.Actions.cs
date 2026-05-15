@@ -165,6 +165,12 @@ public sealed partial class MainViewModel
         OverlayRequested?.Invoke(this, new Navigation.OverlayRequestedEventArgs(Navigation.OverlayViewKind.AllNotes));
     }
 
+    private void ShowGraph()
+    {
+        SaveCurrentNoteFromEditor();
+        OverlayRequested?.Invoke(this, new Navigation.OverlayRequestedEventArgs(Navigation.OverlayViewKind.Graph));
+    }
+
     private void ShowDecks()
     {
         SaveCurrentNoteFromEditor();
@@ -175,6 +181,7 @@ public sealed partial class MainViewModel
     {
         SaveCurrentNoteFromEditor();
         RefreshReviewSettings();
+        RefreshGraphSettings();
         OverlayRequested?.Invoke(this, new Navigation.OverlayRequestedEventArgs(Navigation.OverlayViewKind.Settings));
     }
 

@@ -12,6 +12,8 @@ public sealed partial class MainViewModel
 
     public ICommand ShowAllNotesCommand { get; private set; } = null!;
 
+    public ICommand ShowGraphCommand { get; private set; } = null!;
+
     public ICommand ShowDecksCommand { get; private set; } = null!;
 
     public ICommand ShowSettingsCommand { get; private set; } = null!;
@@ -33,6 +35,10 @@ public sealed partial class MainViewModel
     public ICommand SaveReviewSettingsCommand { get; private set; } = null!;
 
     public ICommand ResetReviewSettingsCommand { get; private set; } = null!;
+
+    public ICommand SaveGraphSettingsCommand { get; private set; } = null!;
+
+    public ICommand ResetGraphSettingsCommand { get; private set; } = null!;
 
     public ICommand GenerateReadyNoteCardsCommand { get; private set; } = null!;
 
@@ -59,6 +65,7 @@ public sealed partial class MainViewModel
             () => LoadCollection(CollectionPath));
         ShowDashboardCommand = CreateUserActionCommand("Navigation Failed", ShowDashboard);
         ShowAllNotesCommand = CreateUserActionCommand("Navigation Failed", ShowAllNotes);
+        ShowGraphCommand = CreateUserActionCommand("Navigation Failed", ShowGraph);
         ShowDecksCommand = CreateUserActionCommand("Navigation Failed", ShowDecks);
         ShowSettingsCommand = CreateUserActionCommand("Navigation Failed", ShowSettings);
         SelectCollectionCommand = CreateUserActionCommand("Switch Collection Failed", SelectCollection);
@@ -70,6 +77,8 @@ public sealed partial class MainViewModel
         RetryGlobalSearchCommand = new RelayCommand(() => QueueGlobalSearch(immediate: true));
         SaveReviewSettingsCommand = new RelayCommand(SaveReviewSettings);
         ResetReviewSettingsCommand = new RelayCommand(ResetReviewSettings);
+        SaveGraphSettingsCommand = new RelayCommand(SaveGraphSettings);
+        ResetGraphSettingsCommand = new RelayCommand(ResetGraphSettings);
         GenerateReadyNoteCardsCommand = new RelayCommand(() => _ = GenerateReadyCardCandidatesAsync());
         GenerateSelectedNoteCardCommand = new RelayCommand(() => _ = GenerateSelectedCardCandidateAsync());
         PreviewSelectedCardCandidateCommand = new RelayCommand(PreviewSelectedCardCandidate);

@@ -51,6 +51,7 @@ public sealed partial class MainViewModel
         ClearCurrentNoteState();
         RefreshNotesTree(preserveExpansion: true);
         RefreshReviewSettings();
+        RefreshGraphSettings();
         RefreshDashboardData();
         ReloadNoteToCardDeckNames();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);

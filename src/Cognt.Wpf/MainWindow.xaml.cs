@@ -32,6 +32,11 @@ public partial class MainWindow : Window
     private readonly DashboardView dashboardView = new();
     private readonly AllNotesView allNotesView;
     private readonly AllNotesViewModel allNotesViewModel;
+    private readonly GraphView graphView;
+    private readonly GraphViewModel graphViewModel;
+    private readonly NoteInspectorView noteInspectorView;
+    private readonly NoteGraphToolView noteGraphToolView;
+    private readonly NoteInspectorViewModel noteInspectorViewModel;
     private readonly AttachmentWorkflowController attachmentWorkflow;
     private readonly CollectionWorkflowController collectionWorkflow;
     private readonly DecksView decksView;
@@ -59,6 +64,11 @@ public partial class MainWindow : Window
         MainViewModel viewModel,
         AllNotesViewModel allNotesViewModel,
         AllNotesView allNotesView,
+        GraphViewModel graphViewModel,
+        GraphView graphView,
+        NoteInspectorViewModel noteInspectorViewModel,
+        NoteInspectorView noteInspectorView,
+        NoteGraphToolView noteGraphToolView,
         IFlashcardReviewQueueQuery reviewQueueQuery,
         IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
         DecksView decksView,
@@ -69,6 +79,11 @@ public partial class MainWindow : Window
         this.viewModel = viewModel;
         this.allNotesViewModel = allNotesViewModel;
         this.allNotesView = allNotesView;
+        this.graphViewModel = graphViewModel;
+        this.graphView = graphView;
+        this.noteInspectorViewModel = noteInspectorViewModel;
+        this.noteInspectorView = noteInspectorView;
+        this.noteGraphToolView = noteGraphToolView;
         this.decksView = decksView;
         this.imageMaskEditorDialogs = imageMaskEditorDialogs;
         this.editorViewFactory = editorViewFactory;
@@ -78,13 +93,19 @@ public partial class MainWindow : Window
         shellDialogs = new WindowShellDialogService(this);
         attachmentWorkflow = new AttachmentWorkflowController(viewModel, shellDialogs);
         collectionWorkflow = new CollectionWorkflowController(viewModel, shellDialogs);
+        InspectorToolHost.Content = noteInspectorView;
+        GraphToolHost.Content = noteGraphToolView;
         CardsToolHost.Content = noteCardQueueView;
         PdfToolHost.Content = GetOrCreatePdfToolView();
         rightPaneBrowserView ??= new BrowserPaneView();
         BrowserToolHost.Content = rightPaneBrowserView;
+        InspectorAnchorable.Show();
+        InspectorAnchorable.IsSelected = true;
+        GraphAnchorable.Show();
         CardsAnchorable.Show();
         PdfAnchorable.Show();
         BrowserAnchorable.Show();
+        noteInspectorViewModel.Activate();
         overlayHost = new OverlayHostController(OverlayHost, EditorViewControl);
         reviewOverlay = new ReviewOverlayCoordinator(
             overlayHost,
@@ -96,8 +117,10 @@ public partial class MainWindow : Window
             shellDialogs,
             this.viewModel,
             this.allNotesViewModel,
+            this.graphViewModel,
             dashboardView,
             this.allNotesView,
+            this.graphView,
             this.decksView,
             settingsView,
             overlayHost,

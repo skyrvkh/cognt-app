@@ -67,6 +67,13 @@ internal sealed partial class SqliteTreeRepository
         CREATE INDEX IF NOT EXISTS idx_document_mentions_text_status
         ON document_mentions(collection_id, normalized_mention_text, status);
 
+        CREATE TABLE IF NOT EXISTS graph_view_settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          neighbor_depth INTEGER NOT NULL DEFAULT 1,
+          max_nodes INTEGER NOT NULL DEFAULT 75,
+          updated_at INTEGER NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS attachments (
           id TEXT PRIMARY KEY,
           collection_id TEXT NOT NULL,

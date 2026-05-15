@@ -30,6 +30,11 @@ internal static class WpfServiceCollectionExtensions
         services.AddSingleton<AllNotesViewModel>();
         services.AddSingleton<AllNotesView>();
         services.AddSingleton<MainViewModel>();
+        services.AddSingleton<GraphViewModel>();
+        services.AddSingleton<GraphView>();
+        services.AddSingleton<NoteInspectorViewModel>();
+        services.AddSingleton<NoteInspectorView>();
+        services.AddSingleton<NoteGraphToolView>();
         services.AddSingleton<StatisticsSubviewViewModel>();
         services.AddSingleton(provider =>
             new DecksViewModel(

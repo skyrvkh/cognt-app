@@ -115,6 +115,7 @@ internal enum OverlayViewKind
 {
     Dashboard,
     AllNotes,
+    Graph,
     Decks,
     Review,
     Settings,

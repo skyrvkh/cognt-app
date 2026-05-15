@@ -15,8 +15,10 @@ internal sealed partial class OverlayNavigationCoordinator
     private readonly IShellDialogService dialogs;
     private readonly MainViewModel viewModel;
     private readonly AllNotesViewModel allNotesViewModel;
+    private readonly GraphViewModel graphViewModel;
     private readonly DashboardView dashboardView;
     private readonly AllNotesView allNotesView;
+    private readonly GraphView graphView;
     private readonly DecksView decksView;
     private readonly SettingsView settingsView;
     private readonly OverlayHostController overlayHost;
@@ -29,8 +31,10 @@ internal sealed partial class OverlayNavigationCoordinator
         IShellDialogService dialogs,
         MainViewModel viewModel,
         AllNotesViewModel allNotesViewModel,
+        GraphViewModel graphViewModel,
         DashboardView dashboardView,
         AllNotesView allNotesView,
+        GraphView graphView,
         DecksView decksView,
         SettingsView settingsView,
         OverlayHostController overlayHost,
@@ -40,8 +44,10 @@ internal sealed partial class OverlayNavigationCoordinator
         ArgumentNullException.ThrowIfNull(dialogs);
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(allNotesViewModel);
+        ArgumentNullException.ThrowIfNull(graphViewModel);
         ArgumentNullException.ThrowIfNull(dashboardView);
         ArgumentNullException.ThrowIfNull(allNotesView);
+        ArgumentNullException.ThrowIfNull(graphView);
         ArgumentNullException.ThrowIfNull(decksView);
         ArgumentNullException.ThrowIfNull(settingsView);
         ArgumentNullException.ThrowIfNull(overlayHost);
@@ -51,8 +57,10 @@ internal sealed partial class OverlayNavigationCoordinator
         this.dialogs = dialogs;
         this.viewModel = viewModel;
         this.allNotesViewModel = allNotesViewModel;
+        this.graphViewModel = graphViewModel;
         this.dashboardView = dashboardView;
         this.allNotesView = allNotesView;
+        this.graphView = graphView;
         this.decksView = decksView;
         this.settingsView = settingsView;
         this.overlayHost = overlayHost;
@@ -72,6 +80,12 @@ internal sealed partial class OverlayNavigationCoordinator
                     await CloseOverlayWorkflowsAsync();
                     await allNotesViewModel.LoadAsync(viewModel.OpenCollectionPath);
                     ShowOverlay(allNotesView);
+                    return;
+
+                case OverlayViewKind.Graph:
+                    await CloseOverlayWorkflowsAsync();
+                    await graphViewModel.LoadAsync();
+                    ShowOverlay(graphView);
                     return;
 
                 case OverlayViewKind.Decks:

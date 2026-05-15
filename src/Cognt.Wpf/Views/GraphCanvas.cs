@@ -25,6 +25,12 @@ public sealed class GraphCanvas : FrameworkElement
         typeof(GraphCanvas),
         new PropertyMetadata(string.Empty));
 
+    public static readonly DependencyProperty IsMiniViewProperty = DependencyProperty.Register(
+        nameof(IsMiniView),
+        typeof(bool),
+        typeof(GraphCanvas),
+        new PropertyMetadata(false));
+
     public event EventHandler<GraphNodePreviewRequestedEventArgs>? NodePreviewRequested;
 
     public KnowledgeGraphReadModel? Graph
@@ -43,6 +49,12 @@ public sealed class GraphCanvas : FrameworkElement
     {
         get => (string)GetValue(FocusedDocumentIdProperty);
         set => SetValue(FocusedDocumentIdProperty, value);
+    }
+
+    public bool IsMiniView
+    {
+        get => (bool)GetValue(IsMiniViewProperty);
+        set => SetValue(IsMiniViewProperty, value);
     }
 
     public void FitToGraph()
