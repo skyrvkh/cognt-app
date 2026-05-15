@@ -8,6 +8,9 @@ public partial class MainWindow
         dashboardView.DataContext = viewModel;
         settingsView.DataContext = viewModel;
         allNotesView.DataContext = allNotesViewModel;
+        graphView.DataContext = graphViewModel;
+        noteInspectorView.DataContext = noteInspectorViewModel;
+        noteGraphToolView.DataContext = graphViewModel;
         noteCardQueueView.DataContext = viewModel;
     }
 
@@ -35,6 +38,7 @@ public partial class MainWindow
         viewModel.CreateCardContextFromSelectionRequested += ViewModel_CreateCardContextFromSelectionRequested;
         viewModel.AddSelectedTextToSelectedCardSlotRequested += ViewModel_AddSelectedTextToSelectedCardSlotRequested;
         viewModel.CurrentNoteTitleChanged += ViewModel_CurrentNoteTitleChanged;
+        viewModel.CurrentNoteContentChanged += ViewModel_CurrentNoteContentChanged;
         viewModel.EditorReadOnlyChanged += ViewModel_EditorReadOnlyChanged;
         viewModel.OpenPdfRequested += ViewModel_OpenPdfRequested;
 
