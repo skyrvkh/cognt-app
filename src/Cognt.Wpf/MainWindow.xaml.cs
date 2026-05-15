@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Cognt.Wpf.EditorHost;
 using Cognt.Wpf.EditorHost.Views;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
@@ -15,6 +16,7 @@ using CogntApp.Shell.Editor;
 using CogntApp.Shell.Navigation;
 using CogntApp.Shell.Overlay;
 using CogntApp.Shell.Review;
+using CogntApp.Shell.Workspace;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
@@ -22,6 +24,9 @@ using CogntApp.Views;
 
 namespace CogntApp;
 
+/// <summary>
+/// Interaction logic for MainWindow.xaml
+/// </summary>
 public partial class MainWindow : Window
 {
     private readonly DashboardView dashboardView = new();
@@ -34,8 +39,8 @@ public partial class MainWindow : Window
     private readonly SettingsView settingsView = new();
     private readonly MainViewModel viewModel;
     private readonly EditorView EditorViewControl;
-    private readonly EditorWorkflowCoordinator editorWorkflow;
-    private readonly EditorRequestController editorRequests;
+    private readonly IEditorViewFactory editorViewFactory;
+    private readonly IImageMaskEditorDialogService imageMaskEditorDialogs;
     private readonly StartupWorkflowController startupWorkflow;
     private readonly BreadcrumbCommandController breadcrumbCommands;
     private readonly NoteTreeInteractionController noteTreeInteractions;
@@ -44,7 +49,11 @@ public partial class MainWindow : Window
     private readonly OverlayHostController overlayHost;
     private readonly OverlayNavigationCoordinator overlayNavigation;
     private readonly ReviewOverlayCoordinator reviewOverlay;
+    private readonly Dictionary<string, NoteWorkspaceDocumentSession> openNoteDocuments = new(StringComparer.OrdinalIgnoreCase);
+    private readonly NoteDocumentDragController noteDocumentDragController = new();
+    private NoteWorkspaceDocumentSession? activeNoteDocument;
     private bool isStartupInitialized;
+    private bool lowerRightToolsAutoHideApplied;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -54,19 +63,28 @@ public partial class MainWindow : Window
         IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
         DecksView decksView,
         IImageMaskEditorDialogService imageMaskEditorDialogs,
+        IEditorViewFactory editorViewFactory,
         EditorView editorViewControl)
     {
         this.viewModel = viewModel;
         this.allNotesViewModel = allNotesViewModel;
         this.allNotesView = allNotesView;
         this.decksView = decksView;
+        this.imageMaskEditorDialogs = imageMaskEditorDialogs;
+        this.editorViewFactory = editorViewFactory;
         EditorViewControl = editorViewControl;
 
         InitializeComponent();
         shellDialogs = new WindowShellDialogService(this);
         attachmentWorkflow = new AttachmentWorkflowController(viewModel, shellDialogs);
         collectionWorkflow = new CollectionWorkflowController(viewModel, shellDialogs);
-        EditorViewHost.Content = EditorViewControl;
+        CardsToolHost.Content = noteCardQueueView;
+        PdfToolHost.Content = GetOrCreatePdfToolView();
+        rightPaneBrowserView ??= new BrowserPaneView();
+        BrowserToolHost.Content = rightPaneBrowserView;
+        CardsAnchorable.Show();
+        PdfAnchorable.Show();
+        BrowserAnchorable.Show();
         overlayHost = new OverlayHostController(OverlayHost, EditorViewControl);
         reviewOverlay = new ReviewOverlayCoordinator(
             overlayHost,
@@ -85,26 +103,23 @@ public partial class MainWindow : Window
             overlayHost,
             EditorViewControl,
             reviewOverlay);
-        editorWorkflow = new EditorWorkflowCoordinator(
-            viewModel,
-            EditorViewControl,
-            shellDialogs,
-            imageMaskEditorDialogs,
-            overlayNavigation.CloseReviewIfActiveAsync,
-            overlayNavigation.HideOverlay,
-            SelectNote);
-        editorRequests = new EditorRequestController(editorWorkflow, shellDialogs);
-        startupWorkflow = new StartupWorkflowController(viewModel, editorWorkflow, shellDialogs);
+        startupWorkflow = new StartupWorkflowController(viewModel, shellDialogs);
         breadcrumbCommands = new BreadcrumbCommandController(viewModel, shellDialogs);
         noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
         noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
         BindViewDataContexts();
         RegisterViewEvents();
         RegisterViewModelEvents();
+        RegisterWorkspaceDockingEvents();
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values)
+        {
+            session.Dispose();
+        }
+
         viewModel.Dispose();
         base.OnClosed(e);
     }
@@ -112,6 +127,7 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyDesktopNavigation();
+        ApplyDefaultLowerRightToolAutoHide();
 
         if (isStartupInitialized)
         {
