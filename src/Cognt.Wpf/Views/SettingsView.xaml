@@ -133,6 +133,223 @@
                                        Foreground="#3156D4" />
                         </Grid>
 
+                        <TextBlock Text="Graph"
+                                   Style="{StaticResource PanelTitleStyle}" />
+                        <TextBlock Text="{Binding CurrentCollectionName}"
+                                   Margin="0,6,0,0"
+                                   Style="{StaticResource MetaTextStyle}" />
+
+                        <TextBlock Text="Loading graph settings..."
+                                   Margin="0,14,0,0"
+                                   FontSize="12"
+                                   Foreground="#586078">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsGraphSettingsLoading}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <Grid Margin="0,22,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.Style>
+                                <Style TargetType="{x:Type Grid}">
+                                    <Setter Property="IsEnabled" Value="True" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CanEditGraphSettings}" Value="False">
+                                            <Setter Property="IsEnabled" Value="False" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+
+                            <StackPanel Grid.Column="0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Neighbor depth"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2433" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding GraphSettingsNeighborDepthDisplay}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="#3156D4" />
+                                </Grid>
+                                <TextBlock Text="Number of inbound/outgoing link hops to include from the current note."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                                <TextBox Style="{StaticResource ValueInputStyle}"
+                                         Text="{Binding GraphSettingsNeighborDepthText, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Maximum nodes"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1F2433" />
+                                <TextBlock Text="Caps dense neighborhoods so the graph stays readable."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                                <TextBox Style="{StaticResource ValueInputStyle}"
+                                         Text="{Binding GraphSettingsMaxNodesText, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Margin="0,18,0,0"
+                                Padding="14"
+                                Background="#FFF4F4"
+                                BorderBrush="#F1C9C9"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Border.Style>
+                                <Style TargetType="{x:Type Border}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasGraphSettingsValidationMessage}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding GraphSettingsValidationMessage}"
+                                       FontSize="12"
+                                       Foreground="#A23B3B"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border Margin="0,12,0,0"
+                                Padding="14"
+                                Background="#FFF7E8"
+                                BorderBrush="#F0D599"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Border.Style>
+                                <Style TargetType="{x:Type Border}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasGraphSettingsErrorMessage}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding GraphSettingsErrorMessage}"
+                                       FontSize="12"
+                                       Foreground="#8A5A0A"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Grid Margin="0,24,0,30">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="{Binding GraphSettingsStatusMessage}"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="#2F6F4F"
+                                       TextWrapping="Wrap" />
+
+                            <Button Grid.Column="1"
+                                    Height="38"
+                                    Padding="18,0"
+                                    Margin="16,0,0,0"
+                                    Background="#FFFFFF"
+                                    BorderBrush="#D5DCEE"
+                                    Foreground="#3156D4"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Command="{Binding ResetGraphSettingsCommand}"
+                                    IsEnabled="{Binding CanEditGraphSettings}">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Cursor" Value="Hand" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="8">
+                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#EEF2FF" />
+                                                <Setter Property="BorderBrush" Value="#CBD6FF" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock Text="Reset" />
+                            </Button>
+
+                            <Button Grid.Column="2"
+                                    Height="38"
+                                    Padding="18,0"
+                                    Margin="16,0,0,0"
+                                    Background="#3156D4"
+                                    BorderBrush="#3156D4"
+                                    Foreground="#FFFFFF"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Command="{Binding SaveGraphSettingsCommand}"
+                                    IsEnabled="{Binding CanSaveGraphSettings}">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Cursor" Value="Hand" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="8">
+                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#274BC2" />
+                                                <Setter Property="BorderBrush" Value="#274BC2" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Background" Value="#AEB7D1" />
+                                                <Setter Property="BorderBrush" Value="#AEB7D1" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock Text="Save graph settings" />
+                            </Button>
+                        </Grid>
+
                         <TextBlock Text="Review Limits"
                                    Style="{StaticResource PanelTitleStyle}" />
                         <TextBlock Text="{Binding CurrentCollectionName}"
