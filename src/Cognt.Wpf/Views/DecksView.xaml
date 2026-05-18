@@ -17,9 +17,6 @@
         <DataTemplate DataType="{x:Type deckViewModels:DecksSubviewViewModel}">
             <subviews:DecksSubview />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type deckViewModels:CardsSubviewViewModel}">
-            <subviews:CardsSubview />
-        </DataTemplate>
         <DataTemplate DataType="{x:Type deckViewModels:StatisticsSubviewViewModel}">
             <subviews:StatisticsSubview />
         </DataTemplate>

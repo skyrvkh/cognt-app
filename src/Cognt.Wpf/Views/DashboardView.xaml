@@ -17,7 +17,7 @@
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="16" />
+            <Setter Property="Padding" Value="12" />
         </Style>
 
         <Style x:Key="PanelTitleStyle" TargetType="TextBlock">
@@ -32,35 +32,115 @@
         </Style>
 
         <Style x:Key="SmallButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="10,0" />
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="#DCE2EF" />
             <Setter Property="Foreground" Value="#5967FF" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <Style x:Key="DashboardActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#DCE2EF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#3156D4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF2FF" />
+                    <Setter Property="BorderBrush" Value="#CBD6FF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
         <Grid MaxWidth="1080"
-              Margin="32,52,32,40"
+              Margin="24,32,24,28"
               HorizontalAlignment="Center">
             <StackPanel>
-                <StackPanel>
-                    <TextBlock Text="Dashboard"
-                               FontSize="26"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource InkBrush}" />
-                    <TextBlock Text="Current collection activity."
-                               Margin="0,10,0,0"
-                               FontSize="12"
-                               Foreground="{StaticResource MutedBrush}" />
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Dashboard"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Current collection activity."
+                                   Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Command="{Binding ShowAllNotesCommand}"
+                                AutomationProperties.Name="All Notes"
+                                Style="{StaticResource DashboardActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M6,5.5 L18,5.5 M6,10.5 L18,10.5 M6,15.5 L14,15.5"
+                                      Stretch="Uniform"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                                <TextBlock Text="All Notes"
+                                           Margin="7,0,0,0"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ShowGraphCommand}"
+                                AutomationProperties.Name="Graph"
+                                Style="{StaticResource DashboardActionButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M4,12 L12,5 L18,17 L4,12 M12,5 L18,17 M4,10 L4,14 M2,12 L6,12 M12,3 L12,7 M10,5 L14,5 M18,15 L18,19 M16,17 L20,17"
+                                      Stretch="Uniform"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                                <TextBlock Text="Graph"
+                                           Margin="7,0,0,0"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock Text="Study Overview"
-                           Margin="0,38,0,12"
+                           Margin="0,26,0,10"
                            Style="{StaticResource PanelTitleStyle}" />
 
                 <ItemsControl ItemsSource="{Binding DashboardMetrics}">
@@ -71,11 +151,11 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
-                                <StackPanel MinHeight="108">
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,10,0">
+                                <StackPanel MinHeight="92">
                                     <TextBlock Text="{Binding Label}" FontSize="10" Foreground="#26304D" />
-                                    <TextBlock Text="{Binding Value}" Margin="0,14,0,0" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" />
-                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource MetaTextStyle}" Margin="0,10,0,0" />
+                                    <TextBlock Text="{Binding Value}" Margin="0,10,0,0" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" />
+                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource MetaTextStyle}" Margin="0,7,0,0" />
                                     <TextBlock Text="{Binding AccentDetail}" Foreground="#5967FF" FontSize="10" />
                                 </StackPanel>
                             </Border>
@@ -83,17 +163,17 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <ItemsControl ItemsSource="{Binding DashboardEmptyStates}" Margin="0,18,0,0">
+                <ItemsControl ItemsSource="{Binding DashboardEmptyStates}" Margin="0,14,0,0">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource CardStyle}"
-                                    Margin="0,0,0,10"
+                                    Margin="0,0,0,8"
                                     Background="#F8FAFC">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Title}"
                                                Style="{StaticResource PanelTitleStyle}" />
                                     <TextBlock Text="{Binding Message}"
-                                               Margin="0,8,0,0"
+                                               Margin="0,6,0,0"
                                                Style="{StaticResource MetaTextStyle}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -102,9 +182,9 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <Border Margin="0,22,0,0" Style="{StaticResource CardStyle}">
+                <Border Margin="0,16,0,0" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <Grid Margin="0,0,0,18">
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -112,7 +192,7 @@
                             <StackPanel>
                                 <TextBlock Text="Study Activity" Style="{StaticResource PanelTitleStyle}" />
                                 <TextBlock Text="Reviews per day from the current collection"
-                                           Margin="0,7,0,0"
+                                           Margin="0,5,0,0"
                                            Style="{StaticResource MetaTextStyle}" />
                             </StackPanel>
                         </Grid>
@@ -135,7 +215,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <Grid Margin="32,14,0,0">
+                        <Grid Margin="24,10,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -153,8 +233,8 @@
                     </StackPanel>
                 </Border>
 
-                <Border Margin="0,22,0,0"
-                        Padding="16"
+                <Border Margin="0,16,0,0"
+                        Padding="12"
                         Background="#F3F4FF"
                         BorderBrush="#DDE0FF"
                         BorderThickness="1"
@@ -166,22 +246,22 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Continue Learning" Style="{StaticResource PanelTitleStyle}" />
-                            <TextBlock Text="Review due cards from the current collection" Margin="0,7,0,0" Style="{StaticResource MetaTextStyle}" />
+                            <TextBlock Text="Review due cards from the current collection" Margin="0,5,0,0" Style="{StaticResource MetaTextStyle}" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <Grid Margin="0,22,0,0">
+                <Grid Margin="0,16,0,0">
                     <Border Style="{StaticResource CardStyle}">
                         <StackPanel>
-                            <TextBlock Text="Recent Notes" Style="{StaticResource PanelTitleStyle}" Margin="0,0,0,18" />
+                            <TextBlock Text="Recent Notes" Style="{StaticResource PanelTitleStyle}" Margin="0,0,0,12" />
                             <ItemsControl ItemsSource="{Binding RecentNotes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Button Command="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding NotePath}"
                                                 HorizontalContentAlignment="Left"
-                                                Margin="0,0,0,8"
+                                                Margin="0,0,0,6"
                                                 Style="{StaticResource SmallButtonStyle}">
                                             <TextBlock Text="{Binding DisplayName}"
                                                        TextTrimming="CharacterEllipsis" />

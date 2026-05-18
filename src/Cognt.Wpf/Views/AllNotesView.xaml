@@ -27,8 +27,8 @@
         </Style>
 
         <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
@@ -66,8 +66,8 @@
         </Style>
 
         <Style x:Key="SecondaryActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
@@ -105,10 +105,10 @@
         </Style>
 
         <Style x:Key="FilterComboStyle" TargetType="ComboBox">
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="MinWidth" Value="148" />
-            <Setter Property="Padding" Value="12,0,34,0" />
-            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="MinWidth" Value="140" />
+            <Setter Property="Padding" Value="10,0,28,0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
@@ -151,7 +151,7 @@
                                                            TextTrimming="CharacterEllipsis" />
                                                 <Path Width="12"
                                                       Height="12"
-                                                      Margin="0,0,12,0"
+                                                      Margin="0,0,10,0"
                                                       HorizontalAlignment="Right"
                                                       VerticalAlignment="Center"
                                                       Stretch="Uniform"
@@ -183,7 +183,7 @@
                                    AllowsTransparency="True"
                                    PopupAnimation="Fade">
                                 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                        Margin="0,6,0,0"
+                                        Margin="0,4,0,0"
                                         Padding="4"
                                         Background="{StaticResource SurfaceBrush}"
                                         BorderBrush="{StaticResource LineBrush}"
@@ -201,8 +201,8 @@
         </Style>
 
         <Style x:Key="FilterActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="36" />
-            <Setter Property="Padding" Value="13,0" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="10,0" />
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
@@ -405,7 +405,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="32,28,32,28">
+    <Grid Margin="24,22,24,22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -420,7 +420,7 @@
 
             <StackPanel>
                 <TextBlock Text="All Notes"
-                           FontSize="28"
+                           FontSize="24"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource InkBrush}" />
                 <TextBlock Text="{Binding PageSubtitle}"
@@ -432,7 +432,7 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
-                <Button Margin="0,0,10,0"
+                <Button Margin="0,0,8,0"
                         Command="{Binding ImportDocumentsCommand}"
                         AutomationProperties.Name="Import"
                         Style="{StaticResource SecondaryActionButtonStyle}">
@@ -446,7 +446,7 @@
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round" />
                         <TextBlock Text="Import"
-                                   Margin="8,0,0,0" />
+                                   Margin="7,0,0,0" />
                     </StackPanel>
                 </Button>
                 <Button Command="{Binding CreateNoteCommand}"
@@ -463,15 +463,15 @@
                               StrokeEndLineCap="Round"
                               StrokeLineJoin="Round" />
                         <TextBlock Text="New note"
-                                   Margin="8,0,0,0" />
+                                   Margin="7,0,0,0" />
                     </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
 
         <Border Grid.Row="1"
-                Margin="0,24,0,16"
-                Padding="16"
+                Margin="0,18,0,12"
+                Padding="12"
                 Style="{StaticResource CardStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -480,11 +480,11 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid MinWidth="260"
-                      Margin="0,0,14,0">
+                      Margin="0,0,10,0">
                     <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Search notes"
-                             MinHeight="38"
-                             Padding="40,8,74,8"
+                             MinHeight="34"
+                             Padding="36,6,68,6"
                              BorderBrush="{StaticResource LineBrush}"
                              Background="{StaticResource SurfaceBrush}"
                              Foreground="{StaticResource InkBrush}"
@@ -492,7 +492,7 @@
                              VerticalContentAlignment="Center" />
                     <Path Width="16"
                           Height="16"
-                          Margin="14,0,0,0"
+                          Margin="12,0,0,0"
                           HorizontalAlignment="Left"
                           VerticalAlignment="Center"
                           Stretch="Uniform"
@@ -500,7 +500,7 @@
                           StrokeThickness="1.8"
                           Data="M10.5,10.5 L15,15 M12,6.5 A5.5,5.5 0 1 1 1,6.5 A5.5,5.5 0 1 1 12,6.5 Z" />
                     <TextBlock Text="Search notes"
-                               Margin="40,0,0,0"
+                               Margin="36,0,0,0"
                                VerticalAlignment="Center"
                                Foreground="{StaticResource SubtleBrush}"
                                FontSize="13"
@@ -518,8 +518,8 @@
                     </TextBlock>
                     <Border HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Margin="0,0,10,0"
-                            Padding="7,3"
+                            Margin="0,0,8,0"
+                            Padding="6,2"
                             Background="#F4F6FA"
                             BorderBrush="#E1E7F2"
                             BorderThickness="1"
@@ -566,7 +566,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Margin="18,16,18,14">
+                    <Grid Margin="14,12,14,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -606,8 +606,8 @@
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <Border Margin="18,0,18,18"
-                            Padding="16"
+                    <Border Margin="14,0,14,14"
+                            Padding="12"
                             Background="#FFF7F7"
                             BorderBrush="#F1C9C9"
                             BorderThickness="1"
@@ -627,8 +627,8 @@
                                    TextWrapping="Wrap" />
                     </Border>
 
-                    <Border Margin="18,0,18,18"
-                            Padding="24"
+                    <Border Margin="14,0,14,14"
+                            Padding="18"
                             Background="{StaticResource SoftSurfaceBrush}"
                             BorderBrush="{StaticResource SoftLineBrush}"
                             BorderThickness="1"
@@ -652,14 +652,14 @@
                                        Foreground="{StaticResource InkBrush}"
                                        HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding EmptyStateMessage}"
-                                       Margin="0,8,0,18"
+                                       Margin="0,6,0,14"
                                        FontSize="13"
                                        Foreground="{StaticResource MutedBrush}"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap" />
                             <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
-                                <Button Margin="0,0,10,0"
+                                <Button Margin="0,0,8,0"
                                         Command="{Binding CreateNoteCommand}"
                                         AutomationProperties.Name="New note"
                                         Style="{StaticResource PrimaryActionButtonStyle}">
@@ -674,7 +674,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid Margin="18,0,18,0"
+                    <Grid Margin="14,0,14,0"
                           Grid.IsSharedSizeScope="True">
                         <Grid.Style>
                             <Style TargetType="{x:Type Grid}">
@@ -691,8 +691,8 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Border Padding="12,0"
-                                Height="38"
+                        <Border Padding="10,0"
+                                Height="34"
                                 Background="#FBFCFF"
                                 BorderBrush="{StaticResource SoftLineBrush}"
                                 BorderThickness="0,1,0,1">
@@ -708,19 +708,19 @@
                                            Style="{StaticResource TableHeaderTextStyle}" />
                                 <TextBlock Grid.Column="1"
                                            Text="Type"
-                                           Margin="14,0,0,0"
+                                           Margin="10,0,0,0"
                                            Style="{StaticResource TableHeaderTextStyle}" />
                                 <TextBlock Grid.Column="2"
                                            Text="Location"
-                                           Margin="14,0,0,0"
+                                           Margin="10,0,0,0"
                                            Style="{StaticResource TableHeaderTextStyle}" />
                                 <TextBlock Grid.Column="3"
                                            Text="Last modified"
-                                           Margin="14,0,0,0"
+                                           Margin="10,0,0,0"
                                            Style="{StaticResource TableHeaderTextStyle}" />
                                 <TextBlock Grid.Column="4"
                                            Text="Created"
-                                           Margin="14,0,0,0"
+                                           Margin="10,0,0,0"
                                            Style="{StaticResource TableHeaderTextStyle}" />
                             </Grid>
                         </Border>
@@ -737,7 +737,7 @@
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type viewModels:AllNotesTreeItemViewModel}"
                                                           ItemsSource="{Binding Children}">
-                                    <Grid MinHeight="48">
+                                    <Grid MinHeight="42">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" SharedSizeGroup="NameColumn" />
                                             <ColumnDefinition Width="130" SharedSizeGroup="TypeColumn" />
@@ -768,20 +768,20 @@
                                             </Grid>
                                         </Button>
                                         <TextBlock Grid.Column="1"
-                                                   Margin="14,0,0,0"
+                                                   Margin="10,0,0,0"
                                                    Text="{Binding TypeLabel}"
                                                    Style="{StaticResource TableCellTextStyle}" />
                                         <TextBlock Grid.Column="2"
-                                                   Margin="14,0,0,0"
+                                                   Margin="10,0,0,0"
                                                    Text="{Binding LocationLabel}"
                                                    ToolTip="{Binding LocationLabel}"
                                                    Style="{StaticResource TableCellTextStyle}" />
                                         <TextBlock Grid.Column="3"
-                                                   Margin="14,0,0,0"
+                                                   Margin="10,0,0,0"
                                                    Text="{Binding ModifiedAtLabel}"
                                                    Style="{StaticResource TableCellTextStyle}" />
                                         <TextBlock Grid.Column="4"
-                                                   Margin="14,0,0,0"
+                                                   Margin="10,0,0,0"
                                                    Text="{Binding CreatedAtLabel}"
                                                    Style="{StaticResource TableCellTextStyle}" />
                                     </Grid>
