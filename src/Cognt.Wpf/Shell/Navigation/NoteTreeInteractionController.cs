@@ -3,8 +3,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Navigation;
 
@@ -15,30 +17,49 @@ internal sealed partial class NoteTreeInteractionController
     private readonly TreeView notesTree;
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<NoteTreeInteractionController> logger;
     private Point? dragStartPoint;
-    private bool suppressSelectionHandling;
+    private int selectionSuppressionDepth;
 
     internal NoteTreeInteractionController(
         TreeView notesTree,
         MainViewModel viewModel,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<NoteTreeInteractionController> logger)
     {
         ArgumentNullException.ThrowIfNull(notesTree);
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(logger);
 
         this.notesTree = notesTree;
         this.viewModel = viewModel;
         this.dialogs = dialogs;
+        this.logger = logger;
     }
 
-    internal bool IsSelectionHandlingSuppressed => suppressSelectionHandling;
+    internal bool IsSelectionHandlingSuppressed => selectionSuppressionDepth > 0;
 
     internal void HandleSelectedItemChanged(object? selectedItem)
     {
-        if (viewModel.IsLoadingCollection || suppressSelectionHandling)
+        logger.LogDebug(
+            "Note tree selection changed. SelectedType={SelectedType} IsLoadingCollection={IsLoadingCollection} Suppressed={Suppressed}",
+            selectedItem?.GetType().Name,
+            viewModel.IsLoadingCollection,
+            IsSelectionHandlingSuppressed);
+        if (viewModel.IsLoadingCollection || IsSelectionHandlingSuppressed)
         {
             return;
+        }
+
+        if (selectedItem is NoteTreeNodeViewModel node)
+        {
+            logger.LogInformation(
+                "Handling note tree selection. NodeTitle={Title} NodeKind={Kind} NotePath={NotePath} IsPlaceholder={IsPlaceholder}",
+                node.Title,
+                node.Kind,
+                node.NotePath,
+                node.IsPlaceholder);
         }
 
         NavigationShellOperationGuard.RunWithWarning(
@@ -103,7 +124,31 @@ internal sealed partial class NoteTreeInteractionController
             return;
         }
 
+        if (FindTreeViewItem(e.OriginalSource) is TreeViewItem selectedItem
+            && selectedItem.IsSelected
+            && selectedItem.DataContext is NoteTreeNodeViewModel selectedNode
+            && IsOpenableNode(selectedNode)
+            && !viewModel.IsLoadingCollection
+            && !IsSelectionHandlingSuppressed)
+        {
+            logger.LogDebug(
+                "Retrying open for already-selected tree item. NodeTitle={Title} NodeKind={Kind} NotePath={NotePath}",
+                selectedNode.Title,
+                selectedNode.Kind,
+                selectedNode.NotePath);
+            notesTree.Dispatcher.BeginInvoke(
+                () => HandleSelectedItemChanged(selectedNode),
+                DispatcherPriority.Background);
+        }
+
         dragStartPoint = e.GetPosition(notesTree);
+    }
+
+    private static bool IsOpenableNode(NoteTreeNodeViewModel node)
+    {
+        return !node.IsPlaceholder
+            && (node.Kind == KnowledgeItemKind.Note
+                || node.Kind == KnowledgeItemKind.PdfDocument);
     }
 
     internal void PreviewMouseMove(MouseEventArgs e)
@@ -134,8 +179,7 @@ internal sealed partial class NoteTreeInteractionController
 
     internal void RunWithSuppressedTreeSelection(Action action, bool deferRestore = false)
     {
-        bool wasSuppressed = suppressSelectionHandling;
-        suppressSelectionHandling = true;
+        selectionSuppressionDepth++;
 
         try
         {
@@ -146,13 +190,21 @@ internal sealed partial class NoteTreeInteractionController
             if (deferRestore)
             {
                 notesTree.Dispatcher.BeginInvoke(
-                    () => suppressSelectionHandling = wasSuppressed,
+                    ReleaseSelectionSuppression,
                     DispatcherPriority.Background);
             }
             else
             {
-                suppressSelectionHandling = wasSuppressed;
+                ReleaseSelectionSuppression();
             }
+        }
+    }
+
+    private void ReleaseSelectionSuppression()
+    {
+        if (selectionSuppressionDepth > 0)
+        {
+            selectionSuppressionDepth--;
         }
     }
 }

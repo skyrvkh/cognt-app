@@ -3,6 +3,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using CogntApp.Design;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Shell.Collections;
 using CogntApp.ViewModels;
@@ -20,6 +21,8 @@ internal static class WpfServiceCollectionExtensions
 
         services.AddCogntWpfEditorHost();
 
+        services.AddSingleton<IThemeService, WpfThemeService>();
+        services.AddSingleton<IEditorSettingsService, WpfEditorSettingsService>();
         services.AddSingleton<IKnowledgeCollectionPathResolver>(_ => new FileSystemKnowledgeCollectionPathResolver());
         services.AddSingleton<IImageMaskEditorDialogService, ImageMaskEditorDialogService>();
         services.AddSingleton<IDecksWorkspaceDataProvider>(provider =>
