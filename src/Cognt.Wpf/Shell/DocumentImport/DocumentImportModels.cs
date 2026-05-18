@@ -27,7 +27,7 @@ internal sealed record DocumentImportOptions(bool OpenImportedDocumentAfterImpor
 
 internal static class DocumentImportPolicy
 {
-    private static readonly string[] SupportedExtensions = [".docx", ".pdf", ".md", ".markdown"];
+    private static readonly string[] SupportedExtensions = [".docx", ".pdf", ".md"];
 
     internal static bool IsSupportedPath(string path)
     {
@@ -40,9 +40,9 @@ internal static class DocumentImportPolicy
         {
             ".docx" => DocumentImportType.Docx,
             ".pdf" => DocumentImportType.Pdf,
-            ".md" or ".markdown" => DocumentImportType.Markdown,
+            ".md" => DocumentImportType.Markdown,
             string extension => throw new InvalidOperationException(
-                $"Unsupported file type \"{extension}\". Add a DOCX, PDF, or Markdown file.")
+                $"Unsupported file type \"{extension}\". Add a DOCX, PDF, or MD file.")
         };
     }
 
@@ -71,7 +71,7 @@ internal static class DocumentImportPolicy
         return mode switch
         {
             DocumentImportMode.ImportAsPdf => "Import as PDF",
-            _ => "Convert to native document"
+            _ => "Convert to editable note"
         };
     }
 

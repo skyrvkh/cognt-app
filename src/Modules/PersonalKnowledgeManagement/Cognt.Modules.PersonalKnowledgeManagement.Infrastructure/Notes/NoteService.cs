@@ -1,6 +1,7 @@
 using System.IO;
-using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ internal sealed partial class NoteService : INoteService
     private const string JpegExtension = ".jpeg";
     private const string WebpExtension = ".webp";
     private const string GifExtension = ".gif";
+    private static readonly Regex HeadingRegex = new(@"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions BlockSuiteJsonOptions = new()
     {
         WriteIndented = true
@@ -38,10 +40,10 @@ internal sealed partial class NoteService : INoteService
         PdfExtension,
         DocExtension,
         DocxExtension,
-        RtfExtension,
-        TextExtension,
         MarkdownNoteExtension,
-        MarkdownImportExtension
+        MarkdownImportExtension,
+        RtfExtension,
+        TextExtension
     };
     private static readonly HashSet<string> ImageAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -55,6 +57,8 @@ internal sealed partial class NoteService : INoteService
     private readonly object repositoryLock = new();
     private ITreeRepository? treeRepository;
     private string? treeRepositoryRoot;
+    private string? cachedNoteCatalogRoot;
+    private IReadOnlyList<NoteCatalogEntry>? cachedNoteCatalogEntries;
     private bool disposed;
 
     private static string GetExistingCollectionRoot(string collectionId)
@@ -62,14 +66,14 @@ internal sealed partial class NoteService : INoteService
         return ResolveExistingCollectionRoot(collectionId);
     }
 
-    public string ReadNoteFile(string collectionId, string relativePath)
+    string INoteService.ReadNoteFile(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string fullPath = ResolveExistingRelativeNotePathInRoot(root, relativePath);
         return File.ReadAllText(fullPath, Encoding.UTF8);
     }
 
-    public KnowledgeOpenedNoteReadModel ReadNoteForOpen(string collectionId, string relativePath)
+    KnowledgeOpenedNoteReadModel INoteService.ReadNoteForOpen(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
@@ -85,7 +89,7 @@ internal sealed partial class NoteService : INoteService
             note?.Id);
     }
 
-    public void CloseCurrentCollection()
+    void INoteService.CloseCurrentCollection()
     {
         lock (repositoryLock)
         {

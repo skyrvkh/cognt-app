@@ -56,6 +56,7 @@ internal sealed partial class GlobalSearchService
         string query,
         IReadOnlyList<string> terms)
     {
+        // TODO: Add highlighted result spans when the WPF result template supports rich text.
         string source = string.IsNullOrWhiteSpace(bodyText) ? title : bodyText;
         if (string.IsNullOrWhiteSpace(source))
         {

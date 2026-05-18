@@ -81,7 +81,7 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
     public bool CanImport => !IsImporting
         && Files.Any(file => file.Status is DocumentImportStatus.Ready or DocumentImportStatus.Failed);
 
-    public string ImportButtonText => Files.Count == 0 ? "Add files to import" : "Import";
+    public string ImportButtonText => IsImporting ? "Importing..." : "Import";
 
     internal void AddFiles(IEnumerable<string> paths)
     {

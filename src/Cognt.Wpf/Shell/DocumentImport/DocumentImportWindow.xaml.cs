@@ -18,17 +18,16 @@ public partial class DocumentImportWindow : Window
 
     private void AddFilesButton_Click(object sender, RoutedEventArgs e)
     {
+        e.Handled = true;
         OpenFilePicker();
-    }
-
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
     }
 
     private void DropZone_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        OpenFilePicker();
+        if (ViewModel.HasNoFiles)
+        {
+            OpenFilePicker();
+        }
     }
 
     private void DropZone_KeyDown(object sender, KeyEventArgs e)
@@ -69,8 +68,8 @@ public partial class DocumentImportWindow : Window
     {
         OpenFileDialog dialog = new()
         {
-            Title = "Import Documents",
-            Filter = "Documents (*.docx;*.pdf;*.md;*.markdown)|*.docx;*.pdf;*.md;*.markdown",
+            Title = "Import files",
+            Filter = "Documents (*.docx;*.pdf;*.md)|*.docx;*.pdf;*.md",
             Multiselect = true,
             CheckFileExists = true
         };

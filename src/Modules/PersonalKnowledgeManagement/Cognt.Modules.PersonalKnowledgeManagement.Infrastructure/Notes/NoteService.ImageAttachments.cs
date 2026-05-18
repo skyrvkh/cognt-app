@@ -8,7 +8,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public string? ResolveImageAttachmentRelativePath(
+    string? INoteService.ResolveImageAttachmentRelativePath(
         string collectionId,
         string noteRelativePath,
         string imageSource)

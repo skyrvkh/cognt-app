@@ -7,7 +7,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public KnowledgeCreatedNoteReadModel CreateNote(
+    KnowledgeCreatedNoteReadModel INoteService.CreateNote(
         string collectionId,
         long? parentId,
         string title,
@@ -23,7 +23,7 @@ internal sealed partial class NoteService
             nextSiblingId);
     }
 
-    public KnowledgeCreatedNoteReadModel CreateExtractNote(
+    KnowledgeCreatedNoteReadModel INoteService.CreateExtractNote(
         string collectionId,
         long? parentId,
         string sourceRelativePath,

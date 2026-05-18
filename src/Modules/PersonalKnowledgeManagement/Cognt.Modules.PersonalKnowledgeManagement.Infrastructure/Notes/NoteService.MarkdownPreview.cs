@@ -6,8 +6,6 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static readonly Regex HeadingRegex = new(@"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     private static string ExtractTitle(string markdown, string fileName)
     {
         return TryExtractHeadingTitle(markdown) ?? Path.GetFileNameWithoutExtension(fileName);

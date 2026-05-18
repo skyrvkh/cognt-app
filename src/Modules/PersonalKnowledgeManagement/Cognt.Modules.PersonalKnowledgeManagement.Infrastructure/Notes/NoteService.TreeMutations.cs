@@ -1,4 +1,5 @@
 using System.Text;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -6,7 +7,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public long CreateFolder(
+    long INoteService.CreateFolder(
         string collectionId,
         long? parentId,
         string title,
@@ -17,7 +18,7 @@ internal sealed partial class NoteService
         return repository.CreateFolder(parentId, title, previousSiblingId, nextSiblingId);
     }
 
-    public void MoveItem(
+    void INoteService.MoveItem(
         string collectionId,
         long itemId,
         long? newParentId,
@@ -38,14 +39,14 @@ internal sealed partial class NoteService
         InvalidateNoteCatalogCache(GetExistingCollectionRoot(collectionId));
     }
 
-    public void RenameItem(string collectionId, long itemId, string title)
+    void INoteService.RenameItem(string collectionId, long itemId, string title)
     {
         ITreeRepository repository = OpenTreeRepositoryForCollectionId(collectionId);
         repository.RenameItem(itemId, title);
         InvalidateNoteCatalogCache(GetExistingCollectionRoot(collectionId));
     }
 
-    public IReadOnlyList<string> DeleteItem(string collectionId, long itemId)
+    IReadOnlyList<string> INoteService.DeleteItem(string collectionId, long itemId)
     {
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
@@ -69,7 +70,7 @@ internal sealed partial class NoteService
             .ToArray();
     }
 
-    public void SaveNote(string collectionId, string relativePath, string content)
+    void INoteService.SaveNote(string collectionId, string relativePath, string content)
     {
         if (string.IsNullOrWhiteSpace(collectionId) || string.IsNullOrWhiteSpace(relativePath))
         {

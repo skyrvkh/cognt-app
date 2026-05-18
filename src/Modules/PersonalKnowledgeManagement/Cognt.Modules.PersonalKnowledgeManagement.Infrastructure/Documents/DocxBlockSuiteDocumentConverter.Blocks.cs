@@ -25,6 +25,8 @@ internal static partial class DocxBlockSuiteDocumentConverter
             return;
         }
 
+        // TODO: Replace this with native BlockSuite table blocks when the server-side
+        // document factory has a stable table snapshot contract.
         blocks.Add(new BlockSuiteDocumentBlock("code", string.Join(Environment.NewLine, rows), Language: "table"));
     }
 

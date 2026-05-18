@@ -75,4 +75,5 @@ internal sealed partial class SqliteTreeRepository
         long? maxPosition = GetMaxSiblingPosition(parentId, connection, transaction, excludedItemId);
         return maxPosition.HasValue ? maxPosition.Value + PositionGap : PositionGap;
     }
+
 }

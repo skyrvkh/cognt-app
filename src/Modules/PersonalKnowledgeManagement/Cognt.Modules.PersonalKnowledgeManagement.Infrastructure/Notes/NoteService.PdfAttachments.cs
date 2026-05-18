@@ -30,5 +30,7 @@ internal sealed partial class NoteService
                 ?? throw new InvalidOperationException("The imported PDF could not be found in attachment storage.");
             EnsurePdfAttachmentTreeItem(repository, row, parentId, preserveDeletedTreeItems: false);
         }
+
+        InvalidateNoteCatalogCache(root);
     }
 }

@@ -8,7 +8,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public async Task<KnowledgePdfDocumentReadModel> ImportPdfDocumentAsync(
+    async Task<KnowledgePdfDocumentReadModel> INoteService.ImportPdfDocumentAsync(
         string collectionId,
         string sourceFileName,
         Stream sourceContent,
@@ -34,7 +34,7 @@ internal sealed partial class NoteService
         return ToPdfReadModel(imported.Attachment);
     }
 
-    public async Task<string> AttachFileToNoteAsync(
+    async Task<string> INoteService.AttachFileToNoteAsync(
         string collectionId,
         string noteRelativePath,
         string sourceFileName,
@@ -51,7 +51,7 @@ internal sealed partial class NoteService
         return reference.DisplayName;
     }
 
-    public async Task<KnowledgeAttachmentReadModel> AttachFileReferenceToNoteAsync(
+    async Task<KnowledgeAttachmentReadModel> INoteService.AttachFileReferenceToNoteAsync(
         string collectionId,
         string noteRelativePath,
         string sourceFileName,

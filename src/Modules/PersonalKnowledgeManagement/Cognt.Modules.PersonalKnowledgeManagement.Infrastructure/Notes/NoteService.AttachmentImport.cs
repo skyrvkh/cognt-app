@@ -8,7 +8,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public async Task<KnowledgeAttachmentReadModel> ImportAttachmentAsync(
+    async Task<KnowledgeAttachmentReadModel> INoteService.ImportAttachmentAsync(
         string collectionId,
         string sourceFileName,
         Stream sourceContent,

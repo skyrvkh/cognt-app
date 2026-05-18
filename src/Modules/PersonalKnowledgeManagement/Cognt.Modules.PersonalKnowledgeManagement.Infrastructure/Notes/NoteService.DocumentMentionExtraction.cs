@@ -39,6 +39,7 @@ internal sealed partial class NoteService
             }
             catch (JsonException)
             {
+                // Fall through to plain-text indexing for malformed document JSON.
             }
         }
 

@@ -7,7 +7,7 @@ internal sealed partial class NoteService
 {
     private const string CardContextsDirectoryName = ".cognt-card-contexts";
 
-    public string? ReadCardContextDrafts(string collectionId, string relativePath)
+    string? INoteService.ReadCardContextDrafts(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
@@ -19,7 +19,7 @@ internal sealed partial class NoteService
             : null;
     }
 
-    public void SaveCardContextDrafts(string collectionId, string relativePath, string? content)
+    void INoteService.SaveCardContextDrafts(string collectionId, string relativePath, string? content)
     {
         string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);

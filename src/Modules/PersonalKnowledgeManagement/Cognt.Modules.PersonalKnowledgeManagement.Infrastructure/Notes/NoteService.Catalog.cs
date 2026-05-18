@@ -5,10 +5,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private string? cachedNoteCatalogRoot;
-    private IReadOnlyList<NoteCatalogEntry>? cachedNoteCatalogEntries;
-
-    public IReadOnlyList<KnowledgeNoteListItemReadModel> LoadNoteCatalog(
+    IReadOnlyList<KnowledgeNoteListItemReadModel> INoteService.LoadNoteCatalog(
         string collectionId)
     {
         string root = GetExistingCollectionRoot(collectionId);
@@ -17,7 +14,7 @@ internal sealed partial class NoteService
             .ToArray();
     }
 
-    public IReadOnlySet<string> SearchNoteCatalog(
+    IReadOnlySet<string> INoteService.SearchNoteCatalog(
         string collectionId,
         string query)
     {

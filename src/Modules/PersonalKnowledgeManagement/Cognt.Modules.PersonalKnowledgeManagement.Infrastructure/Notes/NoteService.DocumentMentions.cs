@@ -20,7 +20,7 @@ internal sealed partial class NoteService
     private static readonly Regex RawNoteMentionRegex = new(@"!?\[\[([^\]\[\r\n]+)\]\]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex MarkdownLinkRegex = new(@"\[[^\]\r\n]+\]\(([^)\r\n]+)\)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public KnowledgeDocumentLinksReadModel ReadDocumentLinks(
+    KnowledgeDocumentLinksReadModel INoteService.ReadDocumentLinks(
         string collectionId,
         string currentRelativePath,
         string currentContent)

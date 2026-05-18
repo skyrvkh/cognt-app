@@ -21,6 +21,12 @@ internal sealed partial class NoteService
         NoteAttachmentRow noteAttachmentReference = BuildNoteAttachmentReference(importedAttachment, note);
         importedAttachment.Repository.UpsertNoteAttachment(noteAttachmentReference);
 
+        EnsureImportedAttachmentTreeState(
+            importedAttachment.Repository,
+            importedAttachment.Attachment,
+            note.Id,
+            importedAttachment.Root);
+
         return noteAttachmentReference;
     }
 

@@ -7,7 +7,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public IReadOnlyList<KnowledgeMentionTargetReadModel> ListMentionTargets(
+    IReadOnlyList<KnowledgeMentionTargetReadModel> INoteService.ListMentionTargets(
         string collectionId)
     {
         return LoadMentionTargets(
@@ -15,7 +15,7 @@ internal sealed partial class NoteService
             static repository => repository.LoadNoteItems());
     }
 
-    public IReadOnlyList<KnowledgeMentionTargetReadModel> SearchMentionTargets(
+    IReadOnlyList<KnowledgeMentionTargetReadModel> INoteService.SearchMentionTargets(
         string collectionId,
         string query,
         int limit)

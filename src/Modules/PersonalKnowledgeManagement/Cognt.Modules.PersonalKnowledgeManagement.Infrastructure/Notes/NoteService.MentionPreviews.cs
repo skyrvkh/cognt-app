@@ -7,7 +7,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    public string ReadMentionPreview(
+    string INoteService.ReadMentionPreview(
         string collectionId,
         string relativePath,
         int maxCharacters)
@@ -29,7 +29,7 @@ internal sealed partial class NoteService
                 previewTitle);
     }
 
-    public string ResolveMentionPath(
+    string INoteService.ResolveMentionPath(
         string collectionId,
         string relativePath)
     {

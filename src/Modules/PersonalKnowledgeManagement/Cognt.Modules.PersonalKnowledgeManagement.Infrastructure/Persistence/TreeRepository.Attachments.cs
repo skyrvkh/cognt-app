@@ -82,4 +82,5 @@ internal sealed partial class SqliteTreeRepository
             return ReadSingleAttachmentRow(command);
         });
     }
+
 }
