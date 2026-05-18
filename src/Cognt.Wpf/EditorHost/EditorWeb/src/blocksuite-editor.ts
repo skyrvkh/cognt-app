@@ -1,5 +1,6 @@
 import { MarkdownTransformer, type AffineSlashMenuContext } from '@blocksuite/blocks';
 import {
+  focusTextModel,
   getInlineEditorByModel,
   RefNodeSlotsProvider,
 } from '@blocksuite/affine-components/rich-text';
@@ -101,6 +102,7 @@ import { type MentionPreviewResult, type MentionTarget } from './mentions';
 import type { CogntSlashMenuRootComponent } from './blocksuite-compat';
 
 const saveDebounceMs = 500;
+const postExtractSaveDelayMs = 1500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
 const editorsByDoc = new WeakMap<Doc, MarkdownBlockSuiteEditor>();
@@ -246,6 +248,8 @@ export class MarkdownBlockSuiteEditor {
   private loadingDocument = false;
   private readOnlyMode = false;
   private saveTimer: number | undefined;
+  private postExtractSaveTimer: number | undefined;
+  private postExtractSaveIdleId: number | undefined;
   private statusTimer: number | undefined;
   private blockUpdatedDisposable: { dispose(): void } | null = null;
   private linkedDocOpenDisposable: { dispose(): void } | null = null;
@@ -264,6 +268,7 @@ export class MarkdownBlockSuiteEditor {
   private linkedDocPreviewRefreshTimer: number | undefined;
   private linkedDocOpenRetryTimer: number | undefined;
   private pendingExtract: PendingExtract | null = null;
+  private outlineHeadingBlockIds: string[] | null = null;
   private suppressNextNativeCut = false;
   private loadGeneration = 0;
   private userEditGeneration = 0;
@@ -318,7 +323,10 @@ export class MarkdownBlockSuiteEditor {
     this.loadingDocument = true;
     this.enableEditorMode();
     window.clearTimeout(this.saveTimer);
+    window.clearTimeout(this.postExtractSaveTimer);
+    this.cancelPostExtractIdleSave();
     this.mentions.cancelScheduledHighlightUpdate();
+    this.outlineHeadingBlockIds = null;
     this.currentPath = options.path ?? '';
     this.currentCollectionRoot = normalizeLocalPath(options.collectionRoot ?? '');
     this.clearLinkedDocState();
@@ -514,6 +522,34 @@ export class MarkdownBlockSuiteEditor {
     target?.focus({ preventScroll: true });
   }
 
+  public async focusBlock(blockId: string) {
+    const targetBlockId = this.resolveOutlineBlockId(blockId);
+    if (!targetBlockId || !this.currentDoc) {
+      this.showStatus('The selected heading is no longer available.');
+      return;
+    }
+
+    this.editor.focus();
+    const model = this.currentDoc.getBlock(targetBlockId)?.model;
+    if (!this.readOnlyMode && isTextBlockModel(model)) {
+      focusTextModel(this.editor.std, targetBlockId, 0);
+    } else {
+      this.editor.host?.selection.setGroup('note', [
+        this.editor.host.selection.create('block', { blockId: targetBlockId }),
+      ]);
+    }
+
+    await waitForNextAnimationFrame();
+    const blockElement = this.getRenderedBlockElement(targetBlockId);
+    blockElement?.scrollIntoView({
+      block: 'center',
+      inline: 'nearest',
+      behavior: 'auto',
+    });
+
+    this.showStatus('Moved to heading.');
+  }
+
   public getSelectedImageBlock(): SelectedImageBlock | null {
     const selectedBlockIds = uniqueBlockIds([
       ...this.getBlockSelectionBlockIds(),
@@ -646,11 +682,9 @@ export class MarkdownBlockSuiteEditor {
 
       this.editor.host?.selection.clear(['text']);
       window.getSelection()?.removeAllRanges();
-      await this.flushHost();
-      this.mentions.refreshHighlights();
       this.cancelPendingContentChanged();
       this.userEditGeneration++;
-      this.onContentChanged(await this.exportCurrentContent());
+      this.schedulePostExtractSourceSave();
       this.showStatus(`Extracted to ${title}.`);
     } catch (replacementError) {
       const message = replacementError instanceof Error
@@ -724,6 +758,8 @@ export class MarkdownBlockSuiteEditor {
 
   public dispose() {
     window.clearTimeout(this.saveTimer);
+    window.clearTimeout(this.postExtractSaveTimer);
+    this.cancelPostExtractIdleSave();
     window.clearTimeout(this.statusTimer);
     this.blockUpdatedDisposable?.dispose();
     this.blockUpdatedDisposable = null;
@@ -1760,6 +1796,46 @@ export class MarkdownBlockSuiteEditor {
     return createSelectedImageBlock(value, this.currentCollectionRoot);
   }
 
+  private resolveOutlineBlockId(blockId: string) {
+    const candidate = blockId.trim();
+    if (!candidate || !this.currentDoc) {
+      return null;
+    }
+
+    if (this.currentDoc.getBlock(candidate)) {
+      return candidate;
+    }
+
+    const markdownMatch = /^markdown-heading-(\d+)$/i.exec(candidate);
+    if (!markdownMatch) {
+      return null;
+    }
+
+    const headingIndex = Number.parseInt(markdownMatch[1], 10) - 1;
+    if (!Number.isInteger(headingIndex) || headingIndex < 0) {
+      return null;
+    }
+
+    return this.getOutlineHeadingBlockIds()[headingIndex] ?? null;
+  }
+
+  private getRenderedBlockElement(blockId: string) {
+    return (this.editor.std?.view?.getBlock(blockId) as HTMLElement | null | undefined) ?? null;
+  }
+
+  private getOutlineHeadingBlockIds() {
+    if (this.outlineHeadingBlockIds) {
+      return this.outlineHeadingBlockIds;
+    }
+
+    this.outlineHeadingBlockIds = this.currentDoc
+      ?.getBlocks()
+      .map(block => (block as { model?: unknown }).model ?? block)
+      .filter(isHeadingBlockModel)
+      .map(model => model.id) ?? [];
+    return this.outlineHeadingBlockIds;
+  }
+
   private createSelectedCardContextTitle(blockIds: string[]) {
     const selectedText = normalizeSelectionText(window.getSelection()?.toString() ?? '');
     if (selectedText.length > 0) {
@@ -1846,6 +1922,7 @@ export class MarkdownBlockSuiteEditor {
   private bindDocChangeEvents(doc: Doc) {
     this.blockUpdatedDisposable?.dispose();
     this.blockUpdatedDisposable = doc.slots.blockUpdated.on(() => {
+      this.outlineHeadingBlockIds = null;
       this.scheduleContentChanged();
       this.scheduleLinkedDocPreviewRefresh();
     });
@@ -1915,7 +1992,7 @@ export class MarkdownBlockSuiteEditor {
     return exportDocContent(this.currentDoc, this.currentPath, this.currentCollectionRoot);
   }
 
-  private scheduleContentChanged() {
+  private scheduleContentChanged(delayMs = saveDebounceMs, refreshMentions = true) {
     if (
       this.loadingDocument
       || this.isEditorInputLocked()
@@ -1928,33 +2005,78 @@ export class MarkdownBlockSuiteEditor {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(async () => {
       this.saveTimer = undefined;
-      this.mentions.refreshHighlights();
+      if (refreshMentions) {
+        this.mentions.refreshHighlights();
+      }
       const content = await this.exportCurrentContent();
       this.onContentChanged(content);
-    }, saveDebounceMs);
+    }, delayMs);
   }
 
   private cancelPendingContentChanged() {
     window.clearTimeout(this.saveTimer);
+    window.clearTimeout(this.postExtractSaveTimer);
+    this.cancelPostExtractIdleSave();
     this.saveTimer = undefined;
+    this.postExtractSaveTimer = undefined;
+  }
+
+  private schedulePostExtractSourceSave() {
+    window.clearTimeout(this.postExtractSaveTimer);
+    this.cancelPostExtractIdleSave();
+    this.postExtractSaveTimer = window.setTimeout(() => {
+      this.postExtractSaveTimer = undefined;
+      const queueSave = () => {
+        this.postExtractSaveIdleId = undefined;
+        if (this.loadingDocument || !this.currentDoc || !this.currentPath) {
+          return;
+        }
+
+        this.scheduleContentChanged(0, false);
+        reportDiagnostic('info', 'Queued source note save after extract replacement.');
+      };
+
+      if (window.requestIdleCallback) {
+        this.postExtractSaveIdleId = window.requestIdleCallback(queueSave, { timeout: 5000 });
+        return;
+      }
+
+      this.postExtractSaveTimer = window.setTimeout(queueSave, 0);
+    }, postExtractSaveDelayMs);
+  }
+
+  private cancelPostExtractIdleSave() {
+    if (this.postExtractSaveIdleId === undefined) {
+      return;
+    }
+
+    window.cancelIdleCallback?.(this.postExtractSaveIdleId);
+    this.postExtractSaveIdleId = undefined;
   }
 
   private async handleCreateExtractShortcut(event: KeyboardEvent) {
     this.suppressNextNativeCut = true;
-    this.pendingExtract = runCreateExtractCommand(
-      {
-        isInputLocked: () => this.isEditorInputLocked(),
-        getCurrentDoc: () => this.currentDoc,
-        getCurrentPath: () => this.currentPath,
-        getLoadGeneration: () => this.loadGeneration,
-        getEditor: () => this.editor,
-        getTextSelection: () => this.getTextSelection(),
-        getBlockSelectionBlockIds: () => this.getBlockSelectionBlockIds(),
-        createExtract: message => this.onCreateExtract(message),
-        showStatus: message => this.showStatus(message),
-      },
-      event
-    );
+    try {
+      this.pendingExtract = await runCreateExtractCommand(
+        {
+          isInputLocked: () => this.isEditorInputLocked(),
+          getCurrentDoc: () => this.currentDoc,
+          getCurrentPath: () => this.currentPath,
+          getLoadGeneration: () => this.loadGeneration,
+          getEditor: () => this.editor,
+          getTextSelection: () => this.getTextSelection(),
+          getBlockSelectionBlockIds: () => this.getBlockSelectionBlockIds(),
+          createExtract: message => this.onCreateExtract(message),
+          showStatus: message => this.showStatus(message),
+        },
+        event
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      reportDiagnostic('warn', `Extract preparation failed: ${message}`);
+      this.showStatus(`Extract failed: ${message}`);
+      this.pendingExtract = null;
+    }
 
     if (!this.pendingExtract) {
       this.suppressNextNativeCut = false;
@@ -2192,6 +2314,28 @@ function isTextBlockModel(value: unknown): value is BlockModel {
   return typeof value === 'object'
     && value !== null
     && Boolean((value as { text?: unknown }).text);
+}
+
+function isHeadingBlockModel(value: unknown): value is BlockModel & { id: string } {
+  const candidate = value as {
+    id?: unknown;
+    flavour?: unknown;
+    text?: unknown;
+    type?: unknown;
+    props?: {
+      type?: unknown;
+    };
+  } | null;
+  const headingType = typeof candidate?.type === 'string'
+    ? candidate.type
+    : typeof candidate?.props?.type === 'string'
+      ? candidate.props.type
+      : '';
+
+  return typeof candidate?.id === 'string'
+    && candidate.flavour === 'affine:paragraph'
+    && Boolean(candidate.text)
+    && /^h[1-6]$/i.test(headingType);
 }
 
 function isEmptyTextBlockModel(value: unknown) {

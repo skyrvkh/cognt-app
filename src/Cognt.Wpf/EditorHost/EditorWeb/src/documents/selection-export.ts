@@ -38,6 +38,17 @@ export type CurrentSelection = {
   plainText: string;
 };
 
+export type TextSelectionExtract = {
+  selectedPlainText: string;
+  selectedContent: string | null;
+  blockIds: string[];
+};
+
+export type BlockSelectionExtract = {
+  selectedPlainText: string;
+  selectedContent: string | null;
+};
+
 export function getCurrentSelection(): CurrentSelection | null {
   const selectedText = window.getSelection()?.toString() ?? '';
   const plainText = normalizeSelectionText(selectedText);
@@ -61,6 +72,35 @@ export function getPlainTextFromTextSelection(
     .map(getSnapshotPlainText)
     .filter(text => text.length > 0)
     .join(' ');
+}
+
+export function createTextSelectionExtract(
+  doc: Doc,
+  editor: PageEditor,
+  textSelection: TextSelection
+): TextSelectionExtract {
+  const models = getSelectedTextBlockModels(editor, doc, textSelection);
+  const snapshots = createSnapshotsFromTextBlockModels(doc, models, textSelection);
+  const selectedPlainText = snapshots
+    .map(getSnapshotPlainText)
+    .filter(text => text.length > 0)
+    .join(' ');
+  const contentSnapshots = prepareExtractSnapshots(snapshots);
+  const selectedContent = contentSnapshots.length > 0
+    && contentSnapshots.some(hasSnapshotBodyContent)
+    ? createBlockSuiteDocumentJsonFromBlockSnapshots(
+        contentSnapshots,
+        createTitleFromPlainText(selectedPlainText, 'Extract')
+      )
+    : null;
+
+  return {
+    selectedPlainText,
+    selectedContent,
+    blockIds: models
+      .map(model => model.id)
+      .filter((blockId): blockId is string => typeof blockId === 'string' && blockId.length > 0),
+  };
 }
 
 export function getBlockIdsFromTextSelection(
@@ -109,41 +149,35 @@ export function createBlockSuiteDocumentJsonFromBlockSelection(
   doc: Doc,
   blockIds: string[]
 ) {
-  const job = new Job({ collection: doc.collection });
-  const snapshots = uniqueBlockIds(blockIds)
-    .map(blockId => doc.getBlock(blockId)?.model)
-    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model))
-    .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
-    .filter(isBlockSnapshot)
-    .map(cloneBlockSnapshot);
-
-  const contentSnapshots = prepareExtractSnapshots(snapshots);
-  if (contentSnapshots.length === 0 || !contentSnapshots.some(hasSnapshotBodyContent)) {
-    return null;
-  }
-
-  const plainText = contentSnapshots
-    .map(getSnapshotPlainText)
-    .filter(text => text.length > 0)
-    .join(' ');
-
-  return createBlockSuiteDocumentJsonFromBlockSnapshots(
-    contentSnapshots,
-    createTitleFromPlainText(plainText, 'Extract')
-  );
+  return createBlockSelectionExtract(doc, blockIds).selectedContent;
 }
 
 export function getPlainTextFromBlockSelection(doc: Doc, blockIds: string[]) {
-  const job = new Job({ collection: doc.collection });
-  return uniqueBlockIds(blockIds)
-    .map(blockId => doc.getBlock(blockId)?.model)
-    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model))
-    .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
-    .filter(isBlockSnapshot)
-    .flatMap(snapshot => prepareExtractSnapshots([snapshot]))
+  return createBlockSelectionExtract(doc, blockIds).selectedPlainText;
+}
+
+export function createBlockSelectionExtract(
+  doc: Doc,
+  blockIds: string[]
+): BlockSelectionExtract {
+  const snapshots = createSnapshotsFromBlockSelection(doc, blockIds);
+  const contentSnapshots = prepareExtractSnapshots(snapshots);
+  const selectedPlainText = contentSnapshots
     .map(getSnapshotPlainText)
     .filter(text => text.length > 0)
     .join(' ');
+  const selectedContent = contentSnapshots.length > 0
+    && contentSnapshots.some(hasSnapshotBodyContent)
+    ? createBlockSuiteDocumentJsonFromBlockSnapshots(
+        contentSnapshots,
+        createTitleFromPlainText(selectedPlainText, 'Extract')
+      )
+    : null;
+
+  return {
+    selectedPlainText,
+    selectedContent,
+  };
 }
 
 export function cloneTextSelection(selection: TextSelection): TextSelectionSnapshot {
@@ -192,6 +226,11 @@ function getSelectedTextBlockModels(
   doc: Doc,
   textSelection: TextSelection
 ) {
+  const siblingModels = getSiblingTextSelectionBlockModels(doc, textSelection);
+  if (siblingModels) {
+    return siblingModels;
+  }
+
   const range = editor.std?.range.textSelectionToRange(textSelection as never);
   const components = range
     ? editor.std.range.getSelectedBlockComponentsByRange(range, {
@@ -209,6 +248,38 @@ function getSelectedTextBlockModels(
   }
 
   return getFallbackTextSelectionBlockModels(doc, textSelection);
+}
+
+function getSiblingTextSelectionBlockModels(
+  doc: Doc,
+  textSelection: TextSelection
+): BlockModel[] | null {
+  const start = getTextSelectionStart(textSelection);
+  const end = getTextSelectionEnd(textSelection);
+  const startModel = doc.getBlock(start.blockId)?.model;
+  const endModel = doc.getBlock(end.blockId)?.model;
+  if (!startModel || !endModel) {
+    return null;
+  }
+
+  if (startModel === endModel) {
+    return [startModel as BlockModel];
+  }
+
+  const startParent = doc.getParent(startModel as never) as { children?: unknown[] } | null;
+  const endParent = doc.getParent(endModel as never);
+  const siblings = Array.isArray(startParent?.children) ? startParent.children : [];
+  const startIndex = siblings.indexOf(startModel);
+  const endIndex = siblings.indexOf(endModel);
+  if (!startParent || startParent !== endParent || startIndex < 0 || endIndex < 0) {
+    return null;
+  }
+
+  const firstIndex = Math.min(startIndex, endIndex);
+  const lastIndex = Math.max(startIndex, endIndex);
+  return siblings
+    .slice(firstIndex, lastIndex + 1)
+    .filter((model): model is BlockModel => isSelectableTextBlockModel(model));
 }
 
 function expandTextSelectionBlockModels(
@@ -289,14 +360,136 @@ function createSnapshotsFromTextSelection(
     return [];
   }
 
+  return createSnapshotsFromTextBlockModels(doc, models, textSelection);
+}
+
+function createSnapshotsFromTextBlockModels(
+  doc: Doc,
+  models: BlockModel[],
+  textSelection: TextSelection
+) {
   const job = new Job({ collection: doc.collection });
   const start = getTextSelectionStart(textSelection);
   const end = getTextSelectionEnd(textSelection);
   return models
+    .map((model: BlockModel) => createTextSelectionSnapshot(job, model, start, end))
+    .filter(isBlockSnapshot);
+}
+
+function createSnapshotsFromBlockSelection(
+  doc: Doc,
+  blockIds: string[]
+) {
+  const job = new Job({ collection: doc.collection });
+  return uniqueBlockIds(blockIds)
+    .map(blockId => doc.getBlock(blockId)?.model)
+    .filter((model: BlockModel | undefined): model is BlockModel => Boolean(model))
     .map((model: BlockModel) => job.blockToSnapshot(model as DraftModel))
     .filter(isBlockSnapshot)
-    .map(cloneBlockSnapshot)
-    .map((snapshot: BlockSnapshot) => trimSnapshotForTextSelection(snapshot, start, end));
+    .map(cloneBlockSnapshot);
+}
+
+function createTextSelectionSnapshot(
+  job: Job,
+  model: BlockModel,
+  start: TextSelectionPointSnapshot,
+  end: TextSelectionPointSnapshot
+) {
+  const directSnapshot = createDirectParagraphSelectionSnapshot(model, start, end);
+  if (directSnapshot) {
+    return directSnapshot;
+  }
+
+  const snapshot = job.blockToSnapshot(model as DraftModel);
+  return isBlockSnapshot(snapshot)
+    ? trimSnapshotForTextSelection(snapshot, start, end)
+    : snapshot;
+}
+
+function createDirectParagraphSelectionSnapshot(
+  model: BlockModel,
+  start: TextSelectionPointSnapshot,
+  end: TextSelectionPointSnapshot
+): BlockSnapshot | null {
+  const candidate = model as BlockModel & {
+    children?: unknown[];
+    collapsed?: unknown;
+    type?: unknown;
+    version?: unknown;
+    text?: {
+      toDelta?: () => unknown[];
+      length?: number;
+    };
+  };
+
+  if (candidate.flavour !== 'affine:paragraph'
+      || !candidate.text
+      || typeof candidate.id !== 'string'
+      || !Array.isArray(candidate.children)
+      || candidate.children.length > 0) {
+    return null;
+  }
+
+  const delta = candidate.text.toDelta?.();
+  if (!Array.isArray(delta)) {
+    return null;
+  }
+
+  const textLength: number = typeof candidate.text.length === 'number'
+    ? candidate.text.length
+    : getDeltaTextLength(delta);
+  const range = getModelSelectionRange(candidate.id, textLength, start, end);
+
+  return {
+    type: 'block',
+    id: candidate.id,
+    flavour: candidate.flavour,
+    version: typeof candidate.version === 'number' ? candidate.version : 1,
+    props: {
+      type: typeof candidate.type === 'string' ? candidate.type : 'text',
+      text: {
+        '$blocksuite:internal:text$': true,
+        delta: sliceTextDelta(delta, range.index, range.length),
+      },
+      collapsed: candidate.collapsed === true,
+    },
+    children: [],
+  };
+}
+
+function getModelSelectionRange(
+  blockId: string,
+  textLength: number,
+  start: TextSelectionPointSnapshot,
+  end: TextSelectionPointSnapshot
+) {
+  if (start.blockId === end.blockId && blockId === start.blockId) {
+    return getSameBlockSelectionRange(start, end);
+  }
+
+  if (blockId === start.blockId) {
+    const index = clampTextIndex(start.index, textLength);
+    return {
+      index,
+      length: Math.max(0, textLength - index),
+    };
+  }
+
+  if (blockId === end.blockId) {
+    return {
+      index: 0,
+      length: clampTextIndex(getSelectionPointEndOffset(end), textLength),
+    };
+  }
+
+  return {
+    index: 0,
+    length: textLength,
+  };
+}
+
+function clampTextIndex(index: number, textLength: number) {
+  return Math.max(0, Math.min(Math.max(0, index), Math.max(0, textLength)));
 }
 
 function getTextSelectionStart(textSelection: TextSelection) {
@@ -368,6 +561,14 @@ function getSnapshotTextLength(snapshot: BlockSnapshot) {
     ), 0);
 }
 
+function getDeltaTextLength(delta: unknown[]) {
+  return delta.reduce<number>((length, entry) => (
+    isPlainRecord(entry) && typeof entry.insert === 'string'
+      ? length + entry.insert.length
+      : length
+  ), 0);
+}
+
 function hasSnapshotBodyContent(snapshot: BlockSnapshot): boolean {
   const hasText = getSnapshotTextDelta(getSnapshotTextValue(snapshot) ?? {})
     .some(entry => isPlainRecord(entry) && typeof entry.insert === 'string' && entry.insert.trim().length > 0);
@@ -400,28 +601,29 @@ function prepareExtractSnapshots(snapshots: BlockSnapshot[]): BlockSnapshot[] {
 function removeSnapshotsNestedInOtherSelectedSnapshots(snapshots: BlockSnapshot[]): BlockSnapshot[] {
   const filtered: BlockSnapshot[] = [];
   const seenTopLevelIds = new Set<string>();
+  const descendantIds = new Set<string>();
 
   for (const snapshot of snapshots) {
-    if (seenTopLevelIds.has(snapshot.id)) {
+    collectDescendantBlockIds(snapshot, descendantIds);
+  }
+
+  for (const snapshot of snapshots) {
+    if (seenTopLevelIds.has(snapshot.id) || descendantIds.has(snapshot.id)) {
       continue;
     }
 
-    const isNestedInAnotherSelectedSnapshot = snapshots.some(other =>
-      other !== snapshot && containsDescendantBlockId(other, snapshot.id)
-    );
-    if (!isNestedInAnotherSelectedSnapshot) {
-      filtered.push(snapshot);
-      seenTopLevelIds.add(snapshot.id);
-    }
+    filtered.push(snapshot);
+    seenTopLevelIds.add(snapshot.id);
   }
 
   return filtered;
 }
 
-function containsDescendantBlockId(snapshot: BlockSnapshot, blockId: string): boolean {
-  return snapshot.children
-    .filter(isBlockSnapshot)
-    .some(child => child.id === blockId || containsDescendantBlockId(child, blockId));
+function collectDescendantBlockIds(snapshot: BlockSnapshot, ids: Set<string>) {
+  for (const child of snapshot.children.filter(isBlockSnapshot)) {
+    ids.add(child.id);
+    collectDescendantBlockIds(child, ids);
+  }
 }
 
 function regenerateSnapshotIds(snapshots: BlockSnapshot[]): BlockSnapshot[] {

@@ -153,6 +153,11 @@ export async function focusEditor(instanceId: number) {
   await waitForAnimationFrames(1);
 }
 
+export async function focusBlock(instanceId: number, blockId: string) {
+  const instance = getInstance(instanceId);
+  await instance.editor.focusBlock(blockId);
+}
+
 export function getSelectedImageBlock(instanceId: number) {
   const instance = getInstance(instanceId);
   return instance.editor.getSelectedImageBlock();

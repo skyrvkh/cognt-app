@@ -7,12 +7,10 @@ import {
   normalizeSelectionText,
 } from '../documents/block-suite-document';
 import {
-  getBlockIdsFromTextSelection,
-  createBlockSuiteDocumentJsonFromBlockSelection,
-  createBlockSuiteDocumentJsonFromSelection,
+  createBlockSelectionExtract,
+  createTextSelectionExtract,
+  getCurrentSelection,
   getOrderedTextSelectionPoints,
-  getPlainTextFromBlockSelection,
-  getPlainTextFromTextSelection,
 } from '../documents/selection-export';
 import { reportDiagnostic } from '../host';
 
@@ -73,10 +71,10 @@ export type CreateExtractCommandHost = {
   showStatus(message: string): void;
 };
 
-export function runCreateExtractCommand(
+export async function runCreateExtractCommand(
   host: CreateExtractCommandHost,
   event: KeyboardEvent
-): PendingExtract | null {
+): Promise<PendingExtract | null> {
   event.preventDefault();
   event.stopPropagation();
 
@@ -91,24 +89,58 @@ export function runCreateExtractCommand(
     return null;
   }
 
+  const sourcePath = host.getCurrentPath();
+  const generation = host.getLoadGeneration();
+  const editor = host.getEditor();
   const textSelection = host.getTextSelection();
   if (textSelection && !textSelection.isCollapsed()) {
-    return runCreateTextExtractCommand(host, currentDoc, textSelection);
+    return runCreateTextExtractCommand(
+      host,
+      currentDoc,
+      editor,
+      sourcePath,
+      generation,
+      textSelection);
   }
 
-  return runCreateBlockExtractCommand(host, currentDoc);
+  return runCreateBlockExtractCommand(
+    host,
+    currentDoc,
+    sourcePath,
+    generation,
+    host.getBlockSelectionBlockIds());
 }
 
-function runCreateTextExtractCommand(
+async function runCreateTextExtractCommand(
   host: CreateExtractCommandHost,
   currentDoc: Doc,
+  editor: PageEditor,
+  sourcePath: string,
+  generation: number,
   textSelection: TextSelection
-): PendingExtract | null {
-  const selectedPlainText = getPlainTextFromTextSelection(
+): Promise<PendingExtract | null> {
+  const fastExtract = tryCreateSameBlockTextExtract(
+    host,
+    sourcePath,
+    generation,
+    textSelection);
+  if (fastExtract) {
+    return fastExtract;
+  }
+
+  host.showStatus('Preparing extract...');
+  await yieldExtractPreparation();
+  if (!isStillCurrentExtractSource(host, sourcePath, generation)) {
+    host.showStatus('Extract cancelled because the note changed.');
+    return null;
+  }
+
+  const extract = createTextSelectionExtract(
     currentDoc,
-    host.getEditor(),
+    editor,
     textSelection
   );
+  const selectedPlainText = extract.selectedPlainText;
   if (normalizeSelectionText(selectedPlainText).length === 0) {
     host.showStatus('The selected text is empty.');
     reportDiagnostic(
@@ -118,24 +150,49 @@ function runCreateTextExtractCommand(
     return null;
   }
 
-  const selectedContent = createBlockSuiteDocumentJsonFromSelection(
+  const selectedContent = extract.selectedContent ?? createPlainTextExtractContent(selectedPlainText);
+  const replacement = createTextSelectionReplacement(
+    host,
     currentDoc,
-    host.getEditor(),
-    selectedPlainText,
-    textSelection
-  ) ?? createPlainTextExtractContent(selectedPlainText);
-  const replacement = createTextSelectionReplacement(host, currentDoc, textSelection);
+    textSelection,
+    extract.blockIds);
   if (!replacement) {
     return null;
   }
 
-  return createPendingExtract(host, selectedPlainText, selectedContent, replacement);
+  return createPendingExtract(host, sourcePath, generation, selectedPlainText, selectedContent, replacement);
+}
+
+function tryCreateSameBlockTextExtract(
+  host: CreateExtractCommandHost,
+  sourcePath: string,
+  generation: number,
+  textSelection: TextSelection
+): PendingExtract | null {
+  const points = getOrderedTextSelectionPoints(textSelection);
+  if (points.start.blockId !== points.end.blockId) {
+    return null;
+  }
+
+  const replacement = getTextSelectionReplacement(points);
+  const selectedPlainText = getCurrentSelection()?.plainText ?? '';
+  if (!replacement || normalizeSelectionText(selectedPlainText).length === 0) {
+    return null;
+  }
+
+  const selectedContent = createPlainTextExtractContent(selectedPlainText);
+  reportDiagnostic(
+    'info',
+    `Extract using same-block text fast path (text=${selectedPlainText.length}, json=${selectedContent.length}).`
+  );
+  return createPendingExtract(host, sourcePath, generation, selectedPlainText, selectedContent, replacement);
 }
 
 function createTextSelectionReplacement(
   host: CreateExtractCommandHost,
   currentDoc: Doc,
-  textSelection: TextSelection
+  textSelection: TextSelection,
+  selectedBlockIds: string[]
 ): ExtractReplacement | null {
   const points = getOrderedTextSelectionPoints(textSelection);
 
@@ -153,7 +210,7 @@ function createTextSelectionReplacement(
     currentDoc,
     [
       points.start.blockId,
-      ...getBlockIdsFromTextSelection(currentDoc, host.getEditor(), textSelection),
+      ...selectedBlockIds,
       points.end.blockId,
     ]
   );
@@ -179,11 +236,14 @@ function createTextSelectionReplacement(
   };
 }
 
-function runCreateBlockExtractCommand(
+async function runCreateBlockExtractCommand(
   host: CreateExtractCommandHost,
-  currentDoc: Doc
-): PendingExtract | null {
-  const selection = getReplaceableBlockSelection(currentDoc, host.getBlockSelectionBlockIds());
+  currentDoc: Doc,
+  sourcePath: string,
+  generation: number,
+  selectedBlockIds: string[]
+): Promise<PendingExtract | null> {
+  const selection = getReplaceableBlockSelection(currentDoc, selectedBlockIds);
   if (selection.error) {
     host.showStatus(selection.error);
     reportDiagnostic('warn', `Extract cancelled: ${selection.error}`);
@@ -195,7 +255,15 @@ function runCreateBlockExtractCommand(
     return null;
   }
 
-  const selectedPlainText = getPlainTextFromBlockSelection(currentDoc, selection.blockIds);
+  host.showStatus('Preparing extract...');
+  await yieldExtractPreparation();
+  if (!isStillCurrentExtractSource(host, sourcePath, generation)) {
+    host.showStatus('Extract cancelled because the note changed.');
+    return null;
+  }
+
+  const extract = createBlockSelectionExtract(currentDoc, selection.blockIds);
+  const selectedPlainText = extract.selectedPlainText;
   if (normalizeSelectionText(selectedPlainText).length === 0) {
     host.showStatus('The selected block does not contain extractable text.');
     reportDiagnostic(
@@ -205,26 +273,31 @@ function runCreateBlockExtractCommand(
     return null;
   }
 
-  const selectedContent = createBlockSuiteDocumentJsonFromBlockSelection(
-    currentDoc,
-    selection.blockIds
-  ) ?? createPlainTextExtractContent(selectedPlainText);
+  const selectedContent = extract.selectedContent ?? createPlainTextExtractContent(selectedPlainText);
 
-  return createPendingExtract(host, selectedPlainText, selectedContent, {
-    kind: 'blocks',
-    blockIds: selection.blockIds,
-  });
+  return createPendingExtract(
+    host,
+    sourcePath,
+    generation,
+    selectedPlainText,
+    selectedContent,
+    {
+      kind: 'blocks',
+      blockIds: selection.blockIds,
+    });
 }
 
 function createPendingExtract(
   host: CreateExtractCommandHost,
+  sourcePath: string,
+  generation: number,
   selectedPlainText: string,
   selectedContent: string,
   replacement: ExtractReplacement
 ): PendingExtract {
   host.createExtract({
     type: 'createExtract',
-    sourcePath: host.getCurrentPath(),
+    sourcePath,
     selectedContent,
     selectedPlainText,
   });
@@ -235,10 +308,31 @@ function createPendingExtract(
   host.showStatus('Creating extract...');
 
   return {
-    generation: host.getLoadGeneration(),
-    sourcePath: host.getCurrentPath(),
+    generation,
+    sourcePath,
     replacement,
   };
+}
+
+function isStillCurrentExtractSource(
+  host: CreateExtractCommandHost,
+  sourcePath: string,
+  generation: number
+) {
+  return host.getCurrentPath() === sourcePath
+    && host.getLoadGeneration() === generation;
+}
+
+function yieldExtractPreparation() {
+  return new Promise<void>(resolve => {
+    const resolveAfterTimer = () => window.setTimeout(resolve, 0);
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => resolveAfterTimer());
+      return;
+    }
+
+    resolveAfterTimer();
+  });
 }
 
 function createPlainTextExtractContent(selectedPlainText: string) {
