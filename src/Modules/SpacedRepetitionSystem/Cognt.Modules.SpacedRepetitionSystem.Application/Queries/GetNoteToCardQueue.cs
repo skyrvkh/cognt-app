@@ -3,14 +3,14 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
-internal sealed class GetNoteToCardQueue(IFlashcardNoteGenerationReader flashcardPort) : INoteToCardQueueQuery
+internal sealed class GetNoteToCardQueue(IFlashcardNoteGenerationReader flashcardReader) : INoteToCardQueueQuery
 {
-    private readonly IFlashcardNoteGenerationReader port = flashcardPort ?? throw new ArgumentNullException(nameof(flashcardPort));
+    private readonly IFlashcardNoteGenerationReader reader = flashcardReader ?? throw new ArgumentNullException(nameof(flashcardReader));
 
     public NoteToCardQueueReadModel Execute(NoteToCardQueueQueryRequest request)
     {
         request = FlashcardRequestGuards.EnsureNoteToCardQueueQueryRequest(request);
-        IReadOnlyList<GeneratedCardContextCardReadModel> generatedCards = port.LoadGeneratedCardsForSourceNote(
+        IReadOnlyList<GeneratedCardContextCardReadModel> generatedCards = reader.LoadGeneratedCardsForSourceNote(
             request.CollectionId,
             request.SourceRelPath);
 

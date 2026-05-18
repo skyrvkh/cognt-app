@@ -32,7 +32,24 @@ internal static partial class FlashcardCollectionStorage
         string normalizedCollectionPath = Path.GetFullPath(collectionPath);
         MigrateLegacyFlashcardsDirectory(normalizedCollectionPath);
 
-        return new SqliteFlashcardRepository(GetDatabasePath(normalizedCollectionPath));
+        SqliteFlashcardRepository repository = new(GetDatabasePath(normalizedCollectionPath));
+        if (IsExactChildDirectory(normalizedCollectionPath, FlashcardsDirectoryName)
+            && !IsExactChildDirectory(normalizedCollectionPath, LegacyFlashcardsDirectoryName))
+        {
+            repository.RewriteCardFrontRelPathPrefix(
+                $"{LegacyFlashcardsDirectoryName}/",
+                $"{FlashcardsDirectoryName}/");
+        }
+
+        if (IsExactChildDirectory(normalizedCollectionPath, SourceNotesDirectoryName)
+            && !IsExactChildDirectory(normalizedCollectionPath, LegacySourceNotesDirectoryName))
+        {
+            repository.RewriteCardSourceRelPathPrefix(
+                $"{LegacySourceNotesDirectoryName}/",
+                $"{SourceNotesDirectoryName}/");
+        }
+
+        return repository;
     }
 
     internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionId(string collectionId)

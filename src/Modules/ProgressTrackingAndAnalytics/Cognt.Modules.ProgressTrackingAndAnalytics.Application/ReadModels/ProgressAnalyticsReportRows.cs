@@ -10,6 +10,10 @@ public sealed record ProgressAnalyticsSummaryReadModel(
     int DueTomorrowCards,
     int DueTomorrowDecks);
 
+public sealed record ProgressAnalyticsActivityDayReadModel(
+    DateOnly Date,
+    int CardsReviewed);
+
 public sealed record DeckPerformanceReadModel(
     string Deck,
     int CardsReviewed,
