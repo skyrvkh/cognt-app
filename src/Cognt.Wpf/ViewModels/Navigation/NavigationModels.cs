@@ -44,6 +44,18 @@ internal sealed class OpenNoteRequestedEventArgs
     internal bool SelectInTree { get; }
 }
 
+internal sealed class NoteDocumentsDeletedEventArgs
+{
+    internal NoteDocumentsDeletedEventArgs(IReadOnlyList<string> notePaths)
+    {
+        ArgumentNullException.ThrowIfNull(notePaths);
+
+        NotePaths = notePaths;
+    }
+
+    internal IReadOnlyList<string> NotePaths { get; }
+}
+
 internal sealed class OpenPdfRequestedEventArgs
 {
     internal OpenPdfRequestedEventArgs(KnowledgePdfDocumentReadModel document)

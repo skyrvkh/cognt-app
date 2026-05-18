@@ -86,6 +86,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler<Navigation.OpenNoteRequestedEventArgs>? OpenNoteRequested;
 
+    internal event EventHandler<Navigation.NoteDocumentsDeletedEventArgs>? NoteDocumentsDeleted;
+
     internal event EventHandler<Navigation.OpenPdfRequestedEventArgs>? OpenPdfRequested;
 
     internal event EventHandler? MentionTargetsChanged;

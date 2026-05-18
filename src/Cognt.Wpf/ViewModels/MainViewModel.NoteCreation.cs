@@ -15,6 +15,29 @@ public sealed partial class MainViewModel
 
     public string CreateExtractNote(string? sourcePath, string selectedContent, string selectedPlainText)
     {
+        ExtractNoteCreationRequest request = PrepareExtractNoteCreation(sourcePath);
+        KnowledgeCreatedNoteReadModel createdNote = CreateExtractNoteCore(
+            request,
+            selectedContent,
+            selectedPlainText);
+        return CompleteExtractNoteCreation(createdNote);
+    }
+
+    public async Task<string> CreateExtractNoteAsync(
+        string? sourcePath,
+        string selectedContent,
+        string selectedPlainText)
+    {
+        ExtractNoteCreationRequest request = PrepareExtractNoteCreation(sourcePath);
+        KnowledgeCreatedNoteReadModel createdNote = await Task.Run(() => CreateExtractNoteCore(
+            request,
+            selectedContent,
+            selectedPlainText));
+        return CompleteExtractNoteCreation(createdNote);
+    }
+
+    private ExtractNoteCreationRequest PrepareExtractNoteCreation(string? sourcePath)
+    {
         if (string.IsNullOrWhiteSpace(currentNotePath)
             || string.IsNullOrWhiteSpace(sourcePath)
             || !string.Equals(
@@ -36,14 +59,28 @@ public sealed partial class MainViewModel
             LoadChildren(parentNode);
         }
 
-        const string title = "Extract";
-        string content = CreateExtractContent(selectedContent, selectedPlainText, title);
-        KnowledgeCreatedNoteReadModel createdNote = noteService.CreateExtractNote(
+        return new ExtractNoteCreationRequest(
             openCollectionPath,
             parentId,
             GetRequiredRelativeNotePath(sourcePath),
-            content);
+            "Extract");
+    }
 
+    private KnowledgeCreatedNoteReadModel CreateExtractNoteCore(
+        ExtractNoteCreationRequest request,
+        string selectedContent,
+        string selectedPlainText)
+    {
+        string content = CreateExtractContent(selectedContent, selectedPlainText, request.Title);
+        return noteService.CreateExtractNote(
+            request.CollectionPath,
+            request.ParentId,
+            request.SourceRelativePath,
+            content);
+    }
+
+    private string CompleteExtractNoteCreation(KnowledgeCreatedNoteReadModel createdNote)
+    {
         ApplyCreatedNoteState(createdNote);
         RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
@@ -247,4 +284,10 @@ public sealed partial class MainViewModel
         AddLoadedTreeNode(item, previousSiblingId, nextSiblingId);
         AddOrUpdateRecentNote(item, notePath);
     }
+
+    private readonly record struct ExtractNoteCreationRequest(
+        string CollectionPath,
+        long? ParentId,
+        string SourceRelativePath,
+        string Title);
 }

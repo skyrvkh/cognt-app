@@ -23,6 +23,22 @@ public sealed partial class MainViewModel
             currentContent);
     }
 
+    internal KnowledgeDocumentLinksReadModel ReadDocumentLinks(
+        string collectionPath,
+        string relativePath,
+        string currentContent)
+    {
+        if (string.IsNullOrWhiteSpace(collectionPath) || string.IsNullOrWhiteSpace(relativePath))
+        {
+            return new KnowledgeDocumentLinksReadModel([], []);
+        }
+
+        return noteService.ReadDocumentLinks(
+            collectionPath,
+            relativePath,
+            currentContent);
+    }
+
     public void SaveMentionSource(string sourcePath, string content)
     {
         if (string.IsNullOrWhiteSpace(currentNotePath)

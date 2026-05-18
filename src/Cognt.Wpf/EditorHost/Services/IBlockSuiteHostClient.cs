@@ -13,6 +13,8 @@ internal interface IBlockSuiteHostClient
 
     Task FocusEditorAsync();
 
+    Task FocusBlockAsync(string blockId);
+
     Task CreateClozeFromSelectionAsync(
         string? cardContextId = null,
         string? slotId = null,

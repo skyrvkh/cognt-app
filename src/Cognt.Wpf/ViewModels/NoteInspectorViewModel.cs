@@ -1,12 +1,16 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Input;
 
 namespace CogntApp.ViewModels;
 
 public sealed class NoteInspectorViewModel : ObservableObject
 {
+    private const int AsyncOutlineParseThreshold = 200_000;
     private readonly MainViewModel mainViewModel;
+    private CancellationTokenSource? outlineParseCancellation;
+    private ObservableCollection<NoteOutlineItemViewModel> outlineItems = [];
     private bool isActive;
 
     public NoteInspectorViewModel(MainViewModel mainViewModel, GraphViewModel graphViewModel)
@@ -18,14 +22,25 @@ public sealed class NoteInspectorViewModel : ObservableObject
         GraphViewModel = graphViewModel;
 
         RefreshCommand = new RelayCommand(Refresh);
+        NavigateToOutlineItemCommand = new RelayCommand(NavigateToOutlineItem);
         mainViewModel.PropertyChanged += MainViewModel_PropertyChanged;
     }
 
-    public ObservableCollection<NoteOutlineItemViewModel> OutlineItems { get; } = [];
+    public ObservableCollection<NoteOutlineItemViewModel> OutlineItems
+    {
+        get => outlineItems;
+        private set
+        {
+            outlineItems = value;
+            OnPropertyChanged();
+        }
+    }
 
     public GraphViewModel GraphViewModel { get; }
 
     public ICommand RefreshCommand { get; }
+
+    public ICommand NavigateToOutlineItemCommand { get; }
 
     public bool HasOutline => OutlineItems.Count > 0;
 
@@ -76,10 +91,12 @@ public sealed class NoteInspectorViewModel : ObservableObject
         isActive = false;
     }
 
+    internal event EventHandler<NoteOutlineNavigationRequestedEventArgs>? OutlineNavigationRequested;
+
     internal void UpdateCurrentContent(string content)
     {
-        LoadOutline(content);
-        if (isActive)
+        QueueOutlineLoad(content);
+        if (isActive && content.Length < AsyncOutlineParseThreshold)
         {
             RefreshGraph();
         }
@@ -89,11 +106,11 @@ public sealed class NoteInspectorViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(mainViewModel.CurrentNoteRelativePath))
         {
-            LoadOutline(string.Empty);
+            QueueOutlineLoad(string.Empty);
         }
         else
         {
-            LoadOutline(mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty);
+            QueueOutlineLoad(mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty);
         }
 
         _ = GraphViewModel.LoadAsync();
@@ -107,14 +124,90 @@ public sealed class NoteInspectorViewModel : ObservableObject
         }
     }
 
-    private void LoadOutline(string content)
+    private void NavigateToOutlineItem(object? parameter)
     {
-        OutlineItems.Clear();
-        foreach (NoteOutlineItemViewModel item in NoteOutlineParser.Parse(content))
+        if (parameter is not NoteOutlineItemViewModel item
+            || string.IsNullOrWhiteSpace(item.BlockId))
         {
-            OutlineItems.Add(item);
+            return;
         }
 
+        OutlineNavigationRequested?.Invoke(this, new NoteOutlineNavigationRequestedEventArgs(item));
+    }
+
+    private void LoadOutline(string content)
+    {
+        SetOutlineItems(NoteOutlineParser.Parse(content));
+    }
+
+    private void QueueOutlineLoad(string content)
+    {
+        outlineParseCancellation?.Cancel();
+        outlineParseCancellation?.Dispose();
+        outlineParseCancellation = null;
+
+        if (content.Length < AsyncOutlineParseThreshold)
+        {
+            LoadOutline(content);
+            return;
+        }
+
+        CancellationTokenSource cancellation = new();
+        CancellationToken cancellationToken = cancellation.Token;
+        outlineParseCancellation = cancellation;
+        _ = Task.Run(
+            () => NoteOutlineParser.Parse(content),
+            cancellationToken)
+            .ContinueWith(
+                task =>
+                {
+                    if (task.IsCanceled
+                        || task.IsFaulted
+                        || cancellationToken.IsCancellationRequested
+                        || !ReferenceEquals(outlineParseCancellation, cancellation))
+                    {
+                        return;
+                    }
+
+                    ApplyOutlineItemsOnUiThread(task.Result, cancellation, cancellationToken);
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+    }
+
+    private void ApplyOutlineItemsOnUiThread(
+        IReadOnlyList<NoteOutlineItemViewModel> items,
+        CancellationTokenSource cancellation,
+        CancellationToken cancellationToken)
+    {
+        void ApplyIfCurrent()
+        {
+            if (!cancellationToken.IsCancellationRequested
+                && ReferenceEquals(outlineParseCancellation, cancellation))
+            {
+                ApplyOutlineItems(items);
+            }
+        }
+
+        if (Application.Current?.Dispatcher is { } dispatcher
+            && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ApplyIfCurrent);
+            return;
+        }
+
+        ApplyIfCurrent();
+    }
+
+    private void ApplyOutlineItems(IReadOnlyList<NoteOutlineItemViewModel> items)
+    {
+        SetOutlineItems(items);
+    }
+
+    private void SetOutlineItems(IEnumerable<NoteOutlineItemViewModel> items)
+    {
+        OutlineItems = new ObservableCollection<NoteOutlineItemViewModel>(items);
         NotifyOutlineChanged();
     }
 
@@ -136,4 +229,16 @@ public sealed class NoteInspectorViewModel : ObservableObject
         OnPropertyChanged(nameof(OutlineStateTitle));
         OnPropertyChanged(nameof(OutlineStateMessage));
     }
+}
+
+public sealed class NoteOutlineNavigationRequestedEventArgs : EventArgs
+{
+    public NoteOutlineNavigationRequestedEventArgs(NoteOutlineItemViewModel item)
+    {
+        Item = item ?? throw new ArgumentNullException(nameof(item));
+    }
+
+    public NoteOutlineItemViewModel Item { get; }
+
+    public string BlockId => Item.BlockId;
 }

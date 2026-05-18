@@ -74,6 +74,11 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         await RequireModule().InvokeVoidAsync("focusEditor", instanceId);
     }
 
+    async Task IBlockSuiteHostClient.FocusBlockAsync(string blockId)
+    {
+        await RequireModule().InvokeVoidAsync("focusBlock", instanceId, blockId);
+    }
+
     async Task IBlockSuiteHostClient.CreateClozeFromSelectionAsync(
         string? cardContextId,
         string? slotId,

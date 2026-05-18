@@ -5,6 +5,7 @@ using CogntApp.Shell.Workspace;
 using CogntApp.ViewModels.Navigation;
 using System.Collections;
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -110,6 +111,7 @@ public partial class MainWindow
 
     private void ActivateNoteDocument(NoteWorkspaceDocumentSession session, bool selectInTree)
     {
+        bool wasActiveDocument = ReferenceEquals(activeNoteDocument, session);
         activeNoteDocument = session;
         if (session.IsDocked)
         {
@@ -117,8 +119,11 @@ public partial class MainWindow
             session.LayoutDocument.IsActive = true;
         }
 
-        session.Activate(selectInTree);
-        noteInspectorViewModel.UpdateCurrentContent(session.GetContent());
+        bool activeNoteChanged = session.Activate(selectInTree);
+        if (activeNoteChanged || !wasActiveDocument)
+        {
+            noteInspectorViewModel.UpdateCurrentContent(session.GetContent());
+        }
 
         if (selectInTree)
         {
@@ -170,6 +175,35 @@ public partial class MainWindow
             return;
         }
 
+        await CloseNoteDocumentAsync(session);
+    }
+
+    private async Task CloseDeletedNoteDocumentsAsync(IReadOnlyList<string> notePaths)
+    {
+        if (notePaths.Count == 0)
+        {
+            return;
+        }
+
+        HashSet<string> deletedPaths = notePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (deletedPaths.Count == 0)
+        {
+            return;
+        }
+
+        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values
+            .Where(candidate => deletedPaths.Contains(Path.GetFullPath(candidate.NotePath)))
+            .ToArray())
+        {
+            await CloseNoteDocumentAsync(session);
+        }
+    }
+
+    private async Task CloseNoteDocumentAsync(NoteWorkspaceDocumentSession session)
+    {
         if (WorkspaceDocumentPane.Children.Contains(session.LayoutDocument))
         {
             WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);

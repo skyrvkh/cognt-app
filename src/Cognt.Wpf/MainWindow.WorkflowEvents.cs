@@ -1,4 +1,5 @@
 using CogntApp.ViewModels.Decks.PresentationModels;
+using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Shell.Workspace;
 
@@ -54,6 +55,11 @@ public partial class MainWindow
         await OpenOrActivateNoteDocumentAsync(e.NotePath, e.SelectInTree);
     }
 
+    private async void ViewModel_NoteDocumentsDeleted(object? sender, NoteDocumentsDeletedEventArgs e)
+    {
+        await CloseDeletedNoteDocumentsAsync(e.NotePaths);
+    }
+
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
     {
         RefreshOpenDocumentMentionTargets();
@@ -80,6 +86,26 @@ public partial class MainWindow
         if (session is not null)
         {
             await session.SetReadOnlyAsync(isReadOnly);
+        }
+    }
+
+    private async void NoteInspectorViewModel_OutlineNavigationRequested(
+        object? sender,
+        NoteOutlineNavigationRequestedEventArgs e)
+    {
+        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
+        if (session is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await session.FocusBlockAsync(e.BlockId);
+        }
+        catch (Exception ex)
+        {
+            shellDialogs.ShowWarning("Outline", $"The heading could not be opened: {ex.Message}");
         }
     }
 

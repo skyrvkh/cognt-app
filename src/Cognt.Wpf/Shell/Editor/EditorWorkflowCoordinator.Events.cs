@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Attachments;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Models.Editor;
@@ -8,14 +9,24 @@ namespace CogntApp.Shell.Editor;
 
 internal sealed partial class EditorWorkflowCoordinator
 {
-    private void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
+    private int documentLinksRefreshVersion;
+
+    private async void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
     {
         string? sourcePath = e.SourcePath;
 
-        PostEditorActionResult(
-            () => viewModel.CreateExtractNote(sourcePath, e.SelectedContent, e.SelectedPlainText),
-            createdPath => editorView.PostExtractResult(ok: true, createdPath),
-            ex => editorView.PostExtractResult(ok: false, error: ex.Message));
+        try
+        {
+            string createdPath = await viewModel.CreateExtractNoteAsync(
+                sourcePath,
+                e.SelectedContent,
+                e.SelectedPlainText);
+            editorView.PostExtractResult(ok: true, createdPath);
+        }
+        catch (Exception ex)
+        {
+            editorView.PostExtractResult(ok: false, error: ex.Message);
+        }
     }
 
     private void EditorView_SaveClozeRequested(object? sender, SaveClozeRequestedEventArgs e)
@@ -146,15 +157,51 @@ internal sealed partial class EditorWorkflowCoordinator
 
     private void RefreshDocumentLinks(string currentContent)
     {
-        try
+        string collectionPath = viewModel.OpenCollectionPath;
+        string relativePath = viewModel.CurrentNoteRelativePath ?? string.Empty;
+        int refreshVersion = ++documentLinksRefreshVersion;
+
+        _ = Task.Run(() => viewModel.ReadDocumentLinks(collectionPath, relativePath, currentContent))
+            .ContinueWith(
+                task => PostDocumentLinksResult(refreshVersion, task),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+    }
+
+    private void PostDocumentLinksResult(
+        int refreshVersion,
+        Task<KnowledgeDocumentLinksReadModel> task)
+    {
+        void PostIfCurrent()
         {
-            editorView.PostDocumentLinks(viewModel.ReadCurrentDocumentLinks(currentContent));
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {ex}");
+            if (refreshVersion != documentLinksRefreshVersion)
+            {
+                return;
+            }
+
+            if (task.IsCompletedSuccessfully)
+            {
+                editorView.PostDocumentLinks(task.Result);
+                return;
+            }
+
+            if (task.Exception is not null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {task.Exception}");
+            }
+
             editorView.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
         }
+
+        if (Application.Current?.Dispatcher is { } dispatcher
+            && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(PostIfCurrent);
+            return;
+        }
+
+        PostIfCurrent();
     }
 
     private static void PostEditorActionResult<TResult>(

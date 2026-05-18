@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
@@ -6,20 +7,24 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
-    private void RecomputeCardContextDraftStatuses(string relativePath, string content)
-    {
-        string? existingContent = noteService.ReadCardContextDrafts(openCollectionPath, relativePath);
-        if (string.IsNullOrWhiteSpace(existingContent))
-        {
-            return;
-        }
+    private int noteToCardQueueRefreshVersion;
 
-        CardContextDraftNoteDocument document = CardContextDraftDocumentCodec.Read(existingContent, relativePath);
-        PersistCardContextDraftDocument(relativePath, content, document);
+    private void ScheduleCurrentNoteToCardQueueRefresh(string relativePath, string content)
+    {
+        string collectionPath = openCollectionPath;
+        int refreshVersion = ++noteToCardQueueRefreshVersion;
+
+        _ = Task.Run(() => RefreshCardContextDraftState(collectionPath, relativePath, content))
+            .ContinueWith(
+                task => ApplyScheduledNoteToCardQueueRefresh(refreshVersion, relativePath, task),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
     }
 
     private void ReloadCurrentNoteToCardQueue(string relativePath, string content)
     {
+        noteToCardQueueRefreshVersion++;
         string? existingContent = noteService.ReadCardContextDrafts(openCollectionPath, relativePath);
         if (string.IsNullOrWhiteSpace(existingContent))
         {
@@ -40,6 +45,70 @@ public sealed partial class MainViewModel
                 relativePath,
                 content,
                 document));
+    }
+
+    private NoteToCardQueueReadModel? RefreshCardContextDraftState(
+        string collectionPath,
+        string relativePath,
+        string content)
+    {
+        string? existingContent = noteService.ReadCardContextDrafts(collectionPath, relativePath);
+        if (string.IsNullOrWhiteSpace(existingContent))
+        {
+            return null;
+        }
+
+        CardContextDraftNoteDocument document = CardContextDraftDocumentCodec.Read(existingContent, relativePath);
+        if (document.Contexts.Count == 0)
+        {
+            return null;
+        }
+
+        CardContextDraftNoteDocument refreshed = PersistCardContextDraftDocument(
+            collectionPath,
+            relativePath,
+            content,
+            document);
+
+        return noteToCardQueueQuery.Execute(
+            new NoteToCardQueueQueryRequest(
+                collectionPath,
+                relativePath,
+                content,
+                refreshed));
+    }
+
+    private void ApplyScheduledNoteToCardQueueRefresh(
+        int refreshVersion,
+        string relativePath,
+        Task<NoteToCardQueueReadModel?> task)
+    {
+        void ApplyIfCurrent()
+        {
+            if (refreshVersion != noteToCardQueueRefreshVersion
+                || !string.Equals(relativePath, CurrentNoteRelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (task.IsCompletedSuccessfully)
+            {
+                CurrentNoteToCardQueue = task.Result;
+            }
+            else if (task.Exception is not null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Note-to-card queue refresh failed: {task.Exception}");
+            }
+        }
+
+        if (Application.Current?.Dispatcher is { } dispatcher
+            && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ApplyIfCurrent);
+            return;
+        }
+
+        ApplyIfCurrent();
     }
 
     private string NormalizeCollectionImagePath(string imageRelPath)
@@ -96,17 +165,28 @@ public sealed partial class MainViewModel
         string noteContent,
         CardContextDraftNoteDocument document)
     {
+        _ = PersistCardContextDraftDocument(openCollectionPath, relativePath, noteContent, document);
+    }
+
+    private CardContextDraftNoteDocument PersistCardContextDraftDocument(
+        string collectionPath,
+        string relativePath,
+        string noteContent,
+        CardContextDraftNoteDocument document)
+    {
         CardContextDraftNoteDocument refreshed = CardContextSnapshotFactory.RefreshContextStatuses(
             relativePath,
             noteContent,
             document);
 
         noteService.SaveCardContextDrafts(
-            openCollectionPath,
+            collectionPath,
             relativePath,
             refreshed.Contexts.Count == 0
                 ? null
                 : CardContextDraftDocumentCodec.Write(refreshed));
+
+        return refreshed;
     }
 
     private static CardContextDraftNoteDocument ReplaceDraftContext(

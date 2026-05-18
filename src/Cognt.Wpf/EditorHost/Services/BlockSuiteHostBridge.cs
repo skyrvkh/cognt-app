@@ -81,6 +81,12 @@ public sealed partial class BlockSuiteHostBridge
         await blockSuiteHost.FocusEditorAsync();
     }
 
+    internal async Task FocusBlockAsync(string blockId)
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        await blockSuiteHost.FocusBlockAsync(blockId);
+    }
+
     internal async Task CreateClozeFromSelectionAsync(
         string? cardContextId = null,
         string? slotId = null,

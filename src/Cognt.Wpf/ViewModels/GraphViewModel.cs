@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using PkmNoteService = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.INoteService;
@@ -25,6 +26,7 @@ public sealed class GraphViewModel : ObservableObject
     private string lastGraphCollectionPath = string.Empty;
     private string lastGraphRelativePath = string.Empty;
     private bool isRefreshingForCurrentNote;
+    private int graphRefreshVersion;
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
     public GraphViewModel(PkmNoteService noteService, MainViewModel mainViewModel)
@@ -314,11 +316,13 @@ public sealed class GraphViewModel : ObservableObject
 
     private void RefreshGraph()
     {
+        int refreshVersion = ++graphRefreshVersion;
         ErrorMessage = string.Empty;
         StatusMessage = string.Empty;
 
         if (!TryCreateSettings(out KnowledgeGraphSettingsReadModel settings))
         {
+            IsLoading = false;
             return;
         }
 
@@ -327,6 +331,7 @@ public sealed class GraphViewModel : ObservableObject
             Graph = KnowledgeGraphReadModel.Empty(settings);
             lastGraphCollectionPath = mainViewModel.OpenCollectionPath ?? string.Empty;
             lastGraphRelativePath = string.Empty;
+            IsLoading = false;
             OnPropertyChanged(nameof(StateTitle));
             OnPropertyChanged(nameof(StateMessage));
             return;
@@ -338,6 +343,7 @@ public sealed class GraphViewModel : ObservableObject
             Graph = KnowledgeGraphReadModel.Empty(settings);
             lastGraphCollectionPath = mainViewModel.OpenCollectionPath;
             lastGraphRelativePath = string.Empty;
+            IsLoading = false;
             OnPropertyChanged(nameof(StateTitle));
             OnPropertyChanged(nameof(StateMessage));
             return;
@@ -348,25 +354,77 @@ public sealed class GraphViewModel : ObservableObject
             IsLoading = true;
             mainViewModel.SaveCurrentNoteFromEditor();
             string currentContent = mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty;
-            Graph = noteService.ReadDocumentGraph(
-                mainViewModel.OpenCollectionPath,
-                currentRelativePath,
-                currentContent,
-                settings);
-            lastGraphCollectionPath = mainViewModel.OpenCollectionPath;
-            lastGraphRelativePath = currentRelativePath;
+            string collectionPath = mainViewModel.OpenCollectionPath;
+            _ = Task.Run(() => noteService.ReadDocumentGraph(
+                    collectionPath,
+                    currentRelativePath,
+                    currentContent,
+                    settings))
+                .ContinueWith(
+                    task => ApplyGraphRefreshResult(
+                        refreshVersion,
+                        collectionPath,
+                        currentRelativePath,
+                        settings,
+                        task),
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
         }
         catch (Exception ex)
         {
             Graph = KnowledgeGraphReadModel.Empty(settings);
             ErrorMessage = ex.Message;
-        }
-        finally
-        {
             IsLoading = false;
             OnPropertyChanged(nameof(StateTitle));
             OnPropertyChanged(nameof(StateMessage));
         }
+    }
+
+    private void ApplyGraphRefreshResult(
+        int refreshVersion,
+        string collectionPath,
+        string relativePath,
+        KnowledgeGraphSettingsReadModel settings,
+        Task<KnowledgeGraphReadModel> task)
+    {
+        void ApplyIfCurrent()
+        {
+            if (refreshVersion != graphRefreshVersion)
+            {
+                return;
+            }
+
+            try
+            {
+                if (task.IsCompletedSuccessfully)
+                {
+                    Graph = task.Result;
+                    lastGraphCollectionPath = collectionPath;
+                    lastGraphRelativePath = relativePath;
+                }
+                else
+                {
+                    Graph = KnowledgeGraphReadModel.Empty(settings);
+                    ErrorMessage = task.Exception?.GetBaseException().Message ?? "The graph could not be loaded.";
+                }
+            }
+            finally
+            {
+                IsLoading = false;
+                OnPropertyChanged(nameof(StateTitle));
+                OnPropertyChanged(nameof(StateMessage));
+            }
+        }
+
+        if (Application.Current?.Dispatcher is { } dispatcher
+            && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ApplyIfCurrent);
+            return;
+        }
+
+        ApplyIfCurrent();
     }
 
     private void SaveSettingsAndRefresh()

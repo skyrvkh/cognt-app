@@ -59,6 +59,10 @@ public sealed partial class MainViewModel
         SaveCurrentNoteFromEditor();
 
         IReadOnlyList<string> deletedNotePaths = noteService.DeleteItem(openCollectionPath, node.Id);
+        string[] deletedFullNotePaths = deletedNotePaths
+            .Select(path => Path.GetFullPath(ResolveCollectionFilePath(openCollectionPath, path)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         string? currentNoteRelativePath = TryGetCurrentNoteRelativePath();
         bool deletesCurrentNote = currentNoteRelativePath is not null
             && deletedNotePaths.Any(path => string.Equals(
@@ -73,15 +77,19 @@ public sealed partial class MainViewModel
             RemoveRecentNote(ResolveCollectionFilePath(openCollectionPath, notePath));
         }
 
-        RefreshDashboardData();
-        RefreshAvailableCollections();
-        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
-
         if (deletesCurrentNote || deletesCurrentSelection)
         {
             ClearCurrentNoteState();
-            ClearEditorRequested?.Invoke(this, EventArgs.Empty);
         }
+
+        if (deletedFullNotePaths.Length > 0)
+        {
+            NoteDocumentsDeleted?.Invoke(this, new Navigation.NoteDocumentsDeletedEventArgs(deletedFullNotePaths));
+        }
+
+        RefreshDashboardData();
+        RefreshAvailableCollections();
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public string DuplicateNote(NoteTreeNodeViewModel node)

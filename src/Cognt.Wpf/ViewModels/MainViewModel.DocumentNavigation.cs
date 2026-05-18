@@ -63,10 +63,11 @@ public sealed partial class MainViewModel
             return;
         }
 
-        noteService.SaveNote(openCollectionPath, GetRequiredCurrentNoteRelativePath(), content);
+        string relativePath = GetRequiredCurrentNoteRelativePath();
+        noteService.SaveNote(openCollectionPath, relativePath, content);
         lastSavedContent = content;
-        RecomputeCardContextDraftStatuses(GetRequiredCurrentNoteRelativePath(), content);
-        ReloadCurrentNoteToCardQueue(GetRequiredCurrentNoteRelativePath(), content);
+        ScheduleCurrentNoteToCardQueueRefresh(relativePath, content);
+        CurrentNoteContentChanged?.Invoke(this, content);
     }
 
     public void SelectTreeNode(NoteTreeNodeViewModel? node)

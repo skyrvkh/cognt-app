@@ -249,6 +249,24 @@ public partial class EditorView : UserControl
         return blockSuiteBridge.CreateClozeFromSelectionAsync(cardContextId, slotId, displayClozeIndex);
     }
 
+    public async Task FocusBlockAsync(string blockId)
+    {
+        if (string.IsNullOrWhiteSpace(blockId))
+        {
+            return;
+        }
+
+        if (!IsHostReady)
+        {
+            await WarmUpAsync();
+        }
+
+        await WaitWithTimeoutAsync(
+            blockSuiteBridge.FocusBlockAsync(blockId),
+            EditorOperationTimeout,
+            "The editor did not navigate to the selected heading.");
+    }
+
     public bool IsHostReady => hostState == EditorHostState.Ready && blockSuiteBridge.IsReady;
 
     public bool NeedsHostRestore => needsHostRestore;

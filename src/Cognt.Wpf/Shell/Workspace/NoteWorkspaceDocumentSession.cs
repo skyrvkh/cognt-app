@@ -34,6 +34,7 @@ internal sealed class NoteWorkspaceDocumentSession
     private bool isMountingEditor;
     private bool isClosingDetachedWindowForRedock;
     private bool currentReadOnlyState;
+    private int documentLinksRefreshVersion;
 
     internal NoteWorkspaceDocumentSession(
         MainViewModel viewModel,
@@ -211,15 +212,22 @@ internal sealed class NoteWorkspaceDocumentSession
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    internal void Activate(bool selectInTree)
+    internal bool Activate(bool selectInTree)
     {
         viewModel.GetCurrentEditorContent = GetContent;
+        if (string.Equals(viewModel.CurrentNotePath, NotePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         viewModel.SetActiveWorkspaceNote(NotePath, Title, GetContent(), ItemId);
 
         if (selectInTree)
         {
             // tree selection is managed by the window on activation
         }
+
+        return true;
     }
 
     internal void Focus()
@@ -230,8 +238,15 @@ internal sealed class NoteWorkspaceDocumentSession
             return;
         }
 
-        LayoutDocument.IsSelected = true;
-        LayoutDocument.IsActive = true;
+        if (!LayoutDocument.IsSelected)
+        {
+            LayoutDocument.IsSelected = true;
+        }
+
+        if (!LayoutDocument.IsActive)
+        {
+            LayoutDocument.IsActive = true;
+        }
     }
 
     internal void UpdateTitle(string title)
@@ -255,20 +270,75 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal void RefreshDocumentLinks()
     {
-        if (editorView is null || !IsHostReady)
+        EditorView? activeEditor = editorView;
+        if (activeEditor is null || !IsHostReady)
         {
             return;
         }
 
+        string collectionPath;
+        string relativePath;
+        string content;
+
         try
         {
             Activate(selectInTree: false);
-            editorView.PostDocumentLinks(viewModel.ReadCurrentDocumentLinks(GetContent()));
+            collectionPath = viewModel.OpenCollectionPath;
+            relativePath = viewModel.CurrentNoteRelativePath ?? string.Empty;
+            content = GetContent();
         }
-        catch
+        catch (Exception ex)
         {
-            editorView.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
+            System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {ex}");
+            activeEditor.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
+            return;
         }
+
+        int refreshVersion = ++documentLinksRefreshVersion;
+        _ = Task.Run(() => viewModel.ReadDocumentLinks(collectionPath, relativePath, content))
+            .ContinueWith(
+                task => PostDocumentLinksResult(activeEditor, refreshVersion, task),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+    }
+
+    private void PostDocumentLinksResult(
+        EditorView targetEditor,
+        int refreshVersion,
+        Task<KnowledgeDocumentLinksReadModel> task)
+    {
+        void PostIfCurrent()
+        {
+            if (IsClosed
+                || refreshVersion != documentLinksRefreshVersion
+                || !ReferenceEquals(editorView, targetEditor))
+            {
+                return;
+            }
+
+            if (task.IsCompletedSuccessfully)
+            {
+                targetEditor.PostDocumentLinks(task.Result);
+                return;
+            }
+
+            if (task.Exception is not null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {task.Exception}");
+            }
+
+            targetEditor.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
+        }
+
+        if (Application.Current?.Dispatcher is { } dispatcher
+            && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(PostIfCurrent);
+            return;
+        }
+
+        PostIfCurrent();
     }
 
     internal async Task CreateClozeFromSelectionAsync()
@@ -326,6 +396,18 @@ internal sealed class NoteWorkspaceDocumentSession
             candidate.ContextId,
             candidate.SlotId,
             candidate.DisplayClozeIndex);
+    }
+
+    internal async Task FocusBlockAsync(string blockId)
+    {
+        EditorView? activeEditor = editorView;
+        if (activeEditor is null || string.IsNullOrWhiteSpace(blockId))
+        {
+            return;
+        }
+
+        Focus();
+        await activeEditor.FocusBlockAsync(blockId);
     }
 
     internal async Task OpenImageOcclusionForSelectedImageAsync()
@@ -541,12 +623,15 @@ internal sealed class NoteWorkspaceDocumentSession
         }
     }
 
-    private void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
+    private async void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
     {
         try
         {
             Activate(selectInTree: false);
-            string createdPath = viewModel.CreateExtractNote(e.SourcePath, e.SelectedContent, e.SelectedPlainText);
+            string createdPath = await viewModel.CreateExtractNoteAsync(
+                e.SourcePath,
+                e.SelectedContent,
+                e.SelectedPlainText);
             editorView?.PostExtractResult(ok: true, createdPath);
         }
         catch (Exception ex)
