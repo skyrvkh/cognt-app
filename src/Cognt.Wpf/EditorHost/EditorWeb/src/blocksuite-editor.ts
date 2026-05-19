@@ -46,6 +46,10 @@ import {
   waitForNextAnimationFrame,
 } from './editor/dom';
 import {
+  applyCogntEditorTheme,
+  type CogntEditorTheme,
+} from './editor-theme';
+import {
   flushEditorHost,
   focusFirstTextBlock,
   forceEditableRichText,
@@ -102,10 +106,28 @@ import { type MentionPreviewResult, type MentionTarget } from './mentions';
 import type { CogntSlashMenuRootComponent } from './blocksuite-compat';
 
 const saveDebounceMs = 500;
+const largeDocumentCharacterThreshold = 200_000;
+const largeDocumentSaveDebounceMs = 1600;
+const largeDocumentStructureChangeDebounceMs = 350;
+const largeDocumentDirtyNotifyDebounceMs = 900;
+const largeDocumentDirtyNotifyIdleTimeoutMs = 2500;
+const linkedDocPreviewRefreshDebounceMs = 450;
+const largeDocumentLinkedDocPreviewRefreshDebounceMs = 1800;
+const contentSaveIdleTimeoutMs = 5000;
+const linkedDocPreviewIdleTimeoutMs = 5000;
+const largeDocumentBlockUpdateLogThreshold = 1;
 const postExtractSaveDelayMs = 1500;
 const statusHideMs = 2600;
 const linkedDocPreviewMaxCharacters = 4000;
 const editorsByDoc = new WeakMap<Doc, MarkdownBlockSuiteEditor>();
+
+type BlockUpdatePayload = {
+  type?: 'add' | 'delete' | 'update';
+  flavour?: string;
+  props?: {
+    key?: string;
+  };
+};
 
 defineCogntPropertiesBlockElement();
 defineCogntReferencesBlockElement();
@@ -205,6 +227,7 @@ export type MarkdownEditorOptions = {
   hostElement: HTMLElement;
   documentLinksElement: HTMLElement;
   statusElement: HTMLElement;
+  onDocumentChanged(): void;
   onContentChanged(content: string): void;
   onCreateExtract(message: CreateExtractCommandMessage): void;
   onSaveCloze(message: SaveClozeCommandMessage): void;
@@ -228,9 +251,11 @@ export type LoadMarkdownOptions = {
 export class MarkdownBlockSuiteEditor {
   private readonly eventAbort = new AbortController();
   private readonly editor: PageEditor;
+  private readonly hostElement: HTMLElement;
   private readonly statusElement: HTMLElement;
   private readonly mentions: MentionController;
   private readonly documentLinks: DocumentLinksController;
+  private readonly onDocumentChanged: () => void;
   private readonly onContentChanged: (content: string) => void;
   private readonly onCreateExtract: (message: CreateExtractCommandMessage) => void;
   private readonly onSaveCloze: (message: SaveClozeCommandMessage) => void;
@@ -248,11 +273,20 @@ export class MarkdownBlockSuiteEditor {
   private loadingDocument = false;
   private readOnlyMode = false;
   private saveTimer: number | undefined;
+  private saveIdleId: number | undefined;
+  private dirtyNotifyTimer: number | undefined;
+  private dirtyNotifyIdleId: number | undefined;
   private postExtractSaveTimer: number | undefined;
   private postExtractSaveIdleId: number | undefined;
+  private documentChangeWorkTimer: number | undefined;
   private statusTimer: number | undefined;
   private blockUpdatedDisposable: { dispose(): void } | null = null;
   private linkedDocOpenDisposable: { dispose(): void } | null = null;
+  private pendingDocumentChangeShouldRefreshLinks = false;
+  private pendingDocumentChangeShouldRefreshMentions = false;
+  private pendingDocumentChangeCount = 0;
+  private pendingDocumentChangeStartedAt = 0;
+  private readonly pendingDocumentChangeKeys = new Map<string, number>();
   private readonly linkedDocPathsByPageId = new Map<string, string>();
   private readonly linkedNoteTitlesByPath = new Map<string, string>();
   private readonly linkedDocPreviewRequests = new Map<
@@ -266,9 +300,11 @@ export class MarkdownBlockSuiteEditor {
   private linkedDocPreviewRequestCounter = 0;
   private linkedDocPreviewedPageIds = new Set<string>();
   private linkedDocPreviewRefreshTimer: number | undefined;
+  private linkedDocPreviewRefreshIdleId: number | undefined;
   private linkedDocOpenRetryTimer: number | undefined;
   private pendingExtract: PendingExtract | null = null;
   private outlineHeadingBlockIds: string[] | null = null;
+  private lastKnownContentLength = 0;
   private suppressNextNativeCut = false;
   private loadGeneration = 0;
   private userEditGeneration = 0;
@@ -276,7 +312,9 @@ export class MarkdownBlockSuiteEditor {
   private pendingAttachmentPreviews = 0;
 
   public constructor(options: MarkdownEditorOptions) {
+    this.hostElement = options.hostElement;
     this.statusElement = options.statusElement;
+    this.onDocumentChanged = options.onDocumentChanged;
     this.onContentChanged = options.onContentChanged;
     this.onCreateExtract = options.onCreateExtract;
     this.onSaveCloze = options.onSaveCloze;
@@ -312,8 +350,13 @@ export class MarkdownBlockSuiteEditor {
       this.mentions.getNativeMentionMenus(query, abort, inlineEditor, abortSignal)
     );
     options.hostElement.append(this.editor);
+    applyCogntEditorTheme(this.hostElement, {});
     this.bindLinkedDocOpenEvents();
     this.bindEditorEvents();
+  }
+
+  public applyTheme(theme: CogntEditorTheme) {
+    applyCogntEditorTheme(this.hostElement, theme);
   }
 
   public async load(options: LoadMarkdownOptions) {
@@ -323,6 +366,7 @@ export class MarkdownBlockSuiteEditor {
     this.loadingDocument = true;
     this.enableEditorMode();
     window.clearTimeout(this.saveTimer);
+    this.cancelDocumentChangedNotification();
     window.clearTimeout(this.postExtractSaveTimer);
     this.cancelPostExtractIdleSave();
     this.mentions.cancelScheduledHighlightUpdate();
@@ -333,6 +377,8 @@ export class MarkdownBlockSuiteEditor {
 
     try {
       const content = options.content ?? '';
+      this.lastKnownContentLength = content.length;
+      this.updateLargeDocumentState();
       const isBlockSuiteJson = isBlockSuiteJsonPath(options.path);
       const loaded = isBlockSuiteJson
         ? await this.loadCompleteBlockSuiteJson(options, content, generation)
@@ -520,6 +566,19 @@ export class MarkdownBlockSuiteEditor {
 
     this.editor.focus();
     target?.focus({ preventScroll: true });
+  }
+
+  public async exportContentForHost() {
+    this.cancelPendingContentChanged();
+    const startedAt = performance.now();
+    const content = await this.exportCurrentContent();
+    this.lastKnownContentLength = content.length;
+    this.updateLargeDocumentState();
+    if (this.isLargeDocument()) {
+      logEditorTiming('large document content export on demand', startedAt, `${content.length} chars`);
+    }
+
+    return content;
   }
 
   public async focusBlock(blockId: string) {
@@ -758,6 +817,7 @@ export class MarkdownBlockSuiteEditor {
 
   public dispose() {
     window.clearTimeout(this.saveTimer);
+    this.cancelDocumentChangedNotification();
     window.clearTimeout(this.postExtractSaveTimer);
     this.cancelPostExtractIdleSave();
     window.clearTimeout(this.statusTimer);
@@ -997,10 +1057,7 @@ export class MarkdownBlockSuiteEditor {
     this.linkedDocPathsByPageId.clear();
     this.linkedDocPreviewRequests.clear();
     this.linkedDocPreviewedPageIds.clear();
-    if (this.linkedDocPreviewRefreshTimer !== undefined) {
-      window.cancelAnimationFrame(this.linkedDocPreviewRefreshTimer);
-      this.linkedDocPreviewRefreshTimer = undefined;
-    }
+    this.cancelLinkedDocPreviewRefresh();
   }
 
   private bindEditorEvents() {
@@ -1144,7 +1201,11 @@ export class MarkdownBlockSuiteEditor {
 
       this.userEditGeneration++;
       this.mentions.scheduleHighlightUpdate();
-      this.scheduleContentChanged();
+      if (this.isLargeDocument()) {
+        this.scheduleDocumentChangedNotification();
+      } else {
+        this.scheduleContentChanged();
+      }
     }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('keyup', () => {
       if (this.isEditorInputLocked()) {
@@ -1152,7 +1213,9 @@ export class MarkdownBlockSuiteEditor {
       }
 
       this.mentions.scheduleHighlightUpdate();
-      this.scheduleContentChanged();
+      if (!this.isLargeDocument()) {
+        this.scheduleContentChanged();
+      }
     }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('paste', event => {
       if (this.isEditorInputLocked()) {
@@ -1168,7 +1231,11 @@ export class MarkdownBlockSuiteEditor {
       }
 
       this.userEditGeneration++;
-      this.scheduleContentChanged();
+      if (this.isLargeDocument()) {
+        this.scheduleDocumentChangedNotification();
+      } else {
+        this.scheduleContentChanged();
+      }
     }, { signal: this.eventAbort.signal });
     this.editor.addEventListener('cut', event => {
       if (this.suppressNextNativeCut) {
@@ -1921,11 +1988,180 @@ export class MarkdownBlockSuiteEditor {
 
   private bindDocChangeEvents(doc: Doc) {
     this.blockUpdatedDisposable?.dispose();
-    this.blockUpdatedDisposable = doc.slots.blockUpdated.on(() => {
-      this.outlineHeadingBlockIds = null;
-      this.scheduleContentChanged();
-      this.scheduleLinkedDocPreviewRefresh();
+    this.blockUpdatedDisposable = doc.slots.blockUpdated.on(payload => {
+      this.queueDocumentChangeWork(payload);
     });
+  }
+
+  private queueDocumentChangeWork(payload?: BlockUpdatePayload) {
+    this.pendingDocumentChangeCount++;
+    this.scheduleDocumentChangedNotification();
+    this.trackPendingDocumentChange(payload);
+    this.pendingDocumentChangeShouldRefreshLinks =
+      this.pendingDocumentChangeShouldRefreshLinks
+      || this.shouldRefreshLinkedDocsForBlockChange(payload);
+    this.pendingDocumentChangeShouldRefreshMentions =
+      this.pendingDocumentChangeShouldRefreshMentions
+      || this.shouldRefreshMentionsForBlockChange(payload);
+
+    if (this.documentChangeWorkTimer !== undefined) {
+      return;
+    }
+
+    this.pendingDocumentChangeStartedAt = performance.now();
+    const delayMs = this.isLargeDocument()
+      ? largeDocumentStructureChangeDebounceMs
+      : 0;
+
+    this.documentChangeWorkTimer = window.setTimeout(() => {
+      const eventCount = this.pendingDocumentChangeCount;
+      const shouldRefreshLinks = this.pendingDocumentChangeShouldRefreshLinks;
+      const shouldRefreshMentions = this.pendingDocumentChangeShouldRefreshMentions;
+      const startedAt = this.pendingDocumentChangeStartedAt;
+      const updateSummary = this.formatPendingDocumentChangeSummary();
+      const isLargeDocument = this.isLargeDocument();
+
+      this.documentChangeWorkTimer = undefined;
+      this.pendingDocumentChangeCount = 0;
+      this.pendingDocumentChangeShouldRefreshLinks = false;
+      this.pendingDocumentChangeShouldRefreshMentions = false;
+      this.pendingDocumentChangeStartedAt = 0;
+      this.pendingDocumentChangeKeys.clear();
+
+      this.outlineHeadingBlockIds = null;
+      if (!isLargeDocument) {
+        this.scheduleContentChanged(saveDebounceMs, shouldRefreshMentions);
+      }
+
+      if (shouldRefreshLinks) {
+        this.scheduleLinkedDocPreviewRefresh();
+      }
+
+      if (isLargeDocument && eventCount >= largeDocumentBlockUpdateLogThreshold) {
+        reportDiagnostic(
+          'info',
+          `Processed large document block update batch: ${eventCount} update(s), ${updateSummary}, linkRefresh=${String(shouldRefreshLinks)}, contentExport=deferred, ${formatElapsed(startedAt)}.`
+        );
+      }
+    }, delayMs);
+  }
+
+  private cancelQueuedDocumentChangeWork() {
+    window.clearTimeout(this.documentChangeWorkTimer);
+    this.documentChangeWorkTimer = undefined;
+    this.pendingDocumentChangeCount = 0;
+    this.pendingDocumentChangeShouldRefreshLinks = false;
+    this.pendingDocumentChangeShouldRefreshMentions = false;
+    this.pendingDocumentChangeStartedAt = 0;
+    this.pendingDocumentChangeKeys.clear();
+  }
+
+  private scheduleDocumentChangedNotification() {
+    if (this.loadingDocument || !this.currentDoc) {
+      return;
+    }
+
+    if (this.dirtyNotifyTimer !== undefined) {
+      return;
+    }
+
+    const delayMs = this.isLargeDocument()
+      ? largeDocumentDirtyNotifyDebounceMs
+      : 0;
+
+    this.dirtyNotifyTimer = window.setTimeout(() => {
+      this.dirtyNotifyTimer = undefined;
+      const notify = () => {
+        this.dirtyNotifyIdleId = undefined;
+        if (!this.loadingDocument && this.currentDoc) {
+          this.onDocumentChanged();
+        }
+      };
+
+      if (this.isLargeDocument() && window.requestIdleCallback) {
+        this.dirtyNotifyIdleId = window.requestIdleCallback(
+          notify,
+          { timeout: largeDocumentDirtyNotifyIdleTimeoutMs }
+        );
+        return;
+      }
+
+      notify();
+    }, delayMs);
+  }
+
+  private cancelDocumentChangedNotification() {
+    window.clearTimeout(this.dirtyNotifyTimer);
+    this.dirtyNotifyTimer = undefined;
+
+    if (this.dirtyNotifyIdleId !== undefined) {
+      window.cancelIdleCallback?.(this.dirtyNotifyIdleId);
+      this.dirtyNotifyIdleId = undefined;
+    }
+  }
+
+  private trackPendingDocumentChange(payload?: BlockUpdatePayload) {
+    const type = payload?.type?.toLowerCase() ?? 'unknown';
+    const flavour = payload?.flavour?.toLowerCase() ?? 'unknown';
+    const key = payload?.props?.key?.trim().toLowerCase() ?? '';
+    const label = key ? `${type}:${flavour}:${key}` : `${type}:${flavour}`;
+    this.pendingDocumentChangeKeys.set(
+      label,
+      (this.pendingDocumentChangeKeys.get(label) ?? 0) + 1
+    );
+  }
+
+  private formatPendingDocumentChangeSummary() {
+    const entries = [...this.pendingDocumentChangeKeys.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 6);
+
+    if (entries.length === 0) {
+      return 'updates=none';
+    }
+
+    return `updates=${entries.map(([label, count]) => `${label}x${count}`).join(',')}`;
+  }
+
+  private shouldRefreshLinkedDocsForBlockChange(payload?: BlockUpdatePayload) {
+    if (!payload) {
+      return true;
+    }
+
+    const flavour = payload.flavour?.toLowerCase() ?? '';
+    if (flavour === 'affine:embed-linked-doc') {
+      return true;
+    }
+
+    if (payload.type !== 'update') {
+      return false;
+    }
+
+    const key = payload.props?.key?.trim().toLowerCase() ?? '';
+    if (!key) {
+      return true;
+    }
+
+    return key === 'text'
+      || key === 'pageid'
+      || key === 'params'
+      || key === 'title'
+      || key === 'description'
+      || key.includes('link')
+      || key.includes('reference');
+  }
+
+  private shouldRefreshMentionsForBlockChange(payload?: BlockUpdatePayload) {
+    if (!payload) {
+      return true;
+    }
+
+    if (payload.type !== 'update') {
+      return false;
+    }
+
+    const key = payload.props?.key?.trim().toLowerCase() ?? '';
+    return !key || key === 'text';
   }
 
   private getSelectedLinkedDocModelForOpenIntent(event: MouseEvent) {
@@ -1952,14 +2188,45 @@ export class MarkdownBlockSuiteEditor {
   }
 
   private scheduleLinkedDocPreviewRefresh() {
-    if (this.linkedDocPreviewRefreshTimer !== undefined) {
+    window.clearTimeout(this.linkedDocPreviewRefreshTimer);
+    this.cancelLinkedDocPreviewRefreshIdle();
+
+    const delayMs = this.isLargeDocument()
+      ? largeDocumentLinkedDocPreviewRefreshDebounceMs
+      : linkedDocPreviewRefreshDebounceMs;
+
+    this.linkedDocPreviewRefreshTimer = window.setTimeout(() => {
+      this.linkedDocPreviewRefreshTimer = undefined;
+      const refresh = () => {
+        this.linkedDocPreviewRefreshIdleId = undefined;
+        this.refreshLinkedDocPreviews();
+      };
+
+      if (window.requestIdleCallback) {
+        this.linkedDocPreviewRefreshIdleId = window.requestIdleCallback(
+          refresh,
+          { timeout: linkedDocPreviewIdleTimeoutMs }
+        );
+        return;
+      }
+
+      refresh();
+    }, delayMs);
+  }
+
+  private cancelLinkedDocPreviewRefresh() {
+    window.clearTimeout(this.linkedDocPreviewRefreshTimer);
+    this.linkedDocPreviewRefreshTimer = undefined;
+    this.cancelLinkedDocPreviewRefreshIdle();
+  }
+
+  private cancelLinkedDocPreviewRefreshIdle() {
+    if (this.linkedDocPreviewRefreshIdleId === undefined) {
       return;
     }
 
-    this.linkedDocPreviewRefreshTimer = window.requestAnimationFrame(() => {
-      this.linkedDocPreviewRefreshTimer = undefined;
-      this.refreshLinkedDocPreviews();
-    });
+    window.cancelIdleCallback?.(this.linkedDocPreviewRefreshIdleId);
+    this.linkedDocPreviewRefreshIdleId = undefined;
   }
 
   private refreshLinkedDocPreviews() {
@@ -1979,12 +2246,24 @@ export class MarkdownBlockSuiteEditor {
     );
 
     if (embedChanged || inlineChanged) {
-      this.scheduleContentChanged();
+      if (this.isLargeDocument()) {
+        this.scheduleDocumentChangedNotification();
+      } else {
+        this.scheduleContentChanged();
+      }
     }
   }
 
   private async flushHost() {
-    await flushEditorHost(this.editor);
+    await flushEditorHost(this.editor, {
+      patchLinkedDocBlocks: this.hasEmbeddedLinkedDocBlocks(),
+    });
+  }
+
+  private hasEmbeddedLinkedDocBlocks() {
+    return this.currentDoc
+      ?.getBlocks()
+      .some(block => isCogntLinkedDocModel((block as { model?: unknown }).model ?? block)) ?? false;
   }
 
   private async exportCurrentContent() {
@@ -2003,22 +2282,85 @@ export class MarkdownBlockSuiteEditor {
     }
 
     window.clearTimeout(this.saveTimer);
+    this.cancelPendingContentSaveIdle();
+    const effectiveDelayMs = delayMs <= 0
+      ? delayMs
+      : Math.max(delayMs, this.getContentSaveDebounceMs());
+    const isLargeDocumentSave = this.isLargeDocument();
+    if (isLargeDocumentSave) {
+      reportDiagnostic(
+        'info',
+        `Queued large document content export after ${effectiveDelayMs}ms idle debounce (${this.lastKnownContentLength} chars).`
+      );
+    }
+
     this.saveTimer = window.setTimeout(async () => {
       this.saveTimer = undefined;
-      if (refreshMentions) {
-        this.mentions.refreshHighlights();
+      const save = async () => {
+        this.saveIdleId = undefined;
+        const startedAt = performance.now();
+        try {
+          if (refreshMentions) {
+            this.mentions.refreshHighlights();
+          }
+
+          const content = await this.exportCurrentContent();
+          this.lastKnownContentLength = content.length;
+          if (isLargeDocumentSave) {
+            logEditorTiming('large document content export', startedAt, `${content.length} chars`);
+          }
+
+          this.onContentChanged(content);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          reportDiagnostic('error', `Could not export editor content after edit: ${message}`);
+        }
+      };
+
+      if (isLargeDocumentSave && window.requestIdleCallback) {
+        this.saveIdleId = window.requestIdleCallback(
+          () => void save(),
+          { timeout: contentSaveIdleTimeoutMs }
+        );
+        return;
       }
-      const content = await this.exportCurrentContent();
-      this.onContentChanged(content);
-    }, delayMs);
+
+      await save();
+    }, effectiveDelayMs);
   }
 
   private cancelPendingContentChanged() {
+    this.cancelQueuedDocumentChangeWork();
     window.clearTimeout(this.saveTimer);
+    this.cancelDocumentChangedNotification();
     window.clearTimeout(this.postExtractSaveTimer);
+    this.cancelPendingContentSaveIdle();
     this.cancelPostExtractIdleSave();
     this.saveTimer = undefined;
     this.postExtractSaveTimer = undefined;
+  }
+
+  private cancelPendingContentSaveIdle() {
+    if (this.saveIdleId === undefined) {
+      return;
+    }
+
+    window.cancelIdleCallback?.(this.saveIdleId);
+    this.saveIdleId = undefined;
+  }
+
+  private isLargeDocument() {
+    return this.lastKnownContentLength >= largeDocumentCharacterThreshold;
+  }
+
+  private updateLargeDocumentState() {
+    this.hostElement.dataset.cogntLargeDocument = String(this.isLargeDocument());
+  }
+
+  private getContentSaveDebounceMs() {
+    return this.isLargeDocument()
+      ? largeDocumentSaveDebounceMs
+      : saveDebounceMs;
   }
 
   private schedulePostExtractSourceSave() {
