@@ -13,7 +13,7 @@ public sealed record DashboardEmptyStateViewModel(
 public sealed record DashboardStudyHeatmapCellViewModel(
     DateOnly Date,
     int CardsReviewed,
-    string FillColor)
+    int Level)
 {
     public string Tooltip => $"{CardsReviewed:N0} cards studied on {Date:MMM d, yyyy}";
 }

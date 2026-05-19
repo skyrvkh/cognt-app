@@ -1,4 +1,5 @@
 using System.Globalization;
+using CogntApp.Design;
 using LiveChartsCore.Defaults;
 using LiveChartsCore.SkiaSharpView;
 
@@ -33,7 +34,7 @@ internal static partial class StatisticsPresentationFactory
         return new Axis
         {
             Labels = CreateHeatmapWeekLabels(today),
-            LabelsPaint = ChartPaint("#98A2B3"),
+            LabelsPaint = ChartPaint(ThemeResourceLookup.ColorHex("DimBrush", "#98A2B3")),
             SeparatorsPaint = null,
             MinLimit = -0.5,
             MaxLimit = HeatmapWeekCount - 0.5,
@@ -46,7 +47,7 @@ internal static partial class StatisticsPresentationFactory
         return new Axis
         {
             Labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-            LabelsPaint = ChartPaint("#98A2B3"),
+            LabelsPaint = ChartPaint(ThemeResourceLookup.ColorHex("DimBrush", "#98A2B3")),
             SeparatorsPaint = null,
             MinLimit = -0.5,
             MaxLimit = DaysPerWeek - 0.5,

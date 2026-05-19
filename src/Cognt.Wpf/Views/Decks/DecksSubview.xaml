@@ -46,20 +46,20 @@
                         <Border Margin="10,0,0,0"
                                 Padding="7,2"
                                 CornerRadius="6"
-                                Background="#EEF2FF">
+                                Background="{DynamicResource AccentSoftBrush}">
                             <TextBlock Text="{Binding DeckCountSummary}"
-                                       Foreground="#344054"
+                                       Foreground="{DynamicResource InkBrush}"
                                        FontSize="12"
                                        FontWeight="SemiBold" />
                         </Border>
                         <Border Margin="10,0,0,0"
                                 Padding="7,2"
                                 CornerRadius="6"
-                                Background="#F8FAFC"
-                                BorderBrush="{StaticResource LineBrush}"
+                                Background="{DynamicResource PanelAltBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1">
                             <TextBlock Text="{Binding SelectedDeckSummary}"
-                                       Foreground="{StaticResource MutedBrush}"
+                                       Foreground="{DynamicResource MutedBrush}"
                                        FontSize="12"
                                        FontWeight="SemiBold" />
                         </Border>
@@ -102,13 +102,13 @@
                           Style="{StaticResource FlashcardsDataGridStyle}">
                     <DataGrid.RowStyle>
                         <Style TargetType="DataGridRow">
-                            <Setter Property="Background" Value="#FFFFFF" />
+                            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="Background" Value="#EEF2FF" />
+                                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                                 </DataTrigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#F8FAFF" />
+                                    <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
                                 </Trigger>
                             </Style.Triggers>
                         </Style>
@@ -140,11 +140,11 @@
                                                 Margin="10,0,0,0"
                                                 Padding="7,3"
                                                 CornerRadius="4"
-                                                BorderBrush="{Binding BadgeBorderColor}"
+                                                BorderBrush="{DynamicResource ControlBorderHoverBrush}"
                                                 BorderThickness="1"
-                                                Background="{Binding BadgeBackgroundColor}">
+                                                Background="{DynamicResource BadgeSurfaceBrush}">
                                             <TextBlock Text="{Binding Category}"
-                                                       Foreground="{Binding BadgeForegroundColor}"
+                                                       Foreground="{DynamicResource AccentStrongBrush}"
                                                        Style="{StaticResource BadgeTextStyle}" />
                                         </Border>
                                     </Grid>
@@ -155,7 +155,7 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding LearningQueueCards}"
-                                               Foreground="{StaticResource BlueBrush}"
+                                               Foreground="{DynamicResource BlueBrush}"
                                                Style="{StaticResource GridCenterTextBlockStyle}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -164,7 +164,7 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DueCards}"
-                                               Foreground="{StaticResource RedBrush}"
+                                               Foreground="{DynamicResource RedBrush}"
                                                Style="{StaticResource GridCenterTextBlockStyle}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -185,8 +185,8 @@
                                         <ProgressBar Width="92"
                                                      Height="5"
                                                      BorderThickness="0"
-                                                     Background="#D8DEEA"
-                                                     Foreground="{StaticResource AccentBrush}"
+                                                     Background="{DynamicResource ProgressTrackBrush}"
+                                                     Foreground="{DynamicResource AccentBrush}"
                                                      Maximum="100"
                                                      Value="{Binding Progress, Mode=OneWay}" />
                                     </StackPanel>
@@ -199,8 +199,8 @@
                 <Border Grid.Row="1"
                         Margin="0,8,0,8"
                         Padding="18"
-                        Background="#F8FAFF"
-                        BorderBrush="#DDE4EF"
+                        Background="{DynamicResource PanelAltBrush}"
+                        BorderBrush="{DynamicResource LineBrush}"
                         BorderThickness="1"
                         CornerRadius="8">
                     <Border.Style>
@@ -217,12 +217,12 @@
                         <TextBlock Text="No decks yet"
                                    FontSize="14"
                                    FontWeight="SemiBold"
-                                   Foreground="#142033" />
+                                   Foreground="{DynamicResource InkBrush}" />
                         <TextBlock Text="Create cards to add the first deck for this collection."
                                    Margin="0,5,0,0"
                                    TextWrapping="Wrap"
                                    FontSize="13"
-                                   Foreground="#667085" />
+                                   Foreground="{DynamicResource MutedBrush}" />
                     </StackPanel>
                 </Border>
 

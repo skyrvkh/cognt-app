@@ -15,9 +15,6 @@ public sealed class DeckRow : ObservableObject
         int dueCards,
         int totalCards,
         int progress,
-        string badgeBackgroundColor,
-        string badgeBorderColor,
-        string badgeForegroundColor,
         bool isSelected)
     {
         Id = id;
@@ -27,9 +24,6 @@ public sealed class DeckRow : ObservableObject
         DueCards = dueCards;
         TotalCards = totalCards;
         Progress = progress;
-        BadgeBackgroundColor = badgeBackgroundColor;
-        BadgeBorderColor = badgeBorderColor;
-        BadgeForegroundColor = badgeForegroundColor;
         this.isSelected = isSelected;
     }
 
@@ -47,12 +41,6 @@ public sealed class DeckRow : ObservableObject
 
     public int Progress { get; }
 
-    public string BadgeBackgroundColor { get; }
-
-    public string BadgeBorderColor { get; }
-
-    public string BadgeForegroundColor { get; }
-
     public bool IsSelected
     {
         get => isSelected;
@@ -65,24 +53,21 @@ public sealed class DeckRow : ObservableObject
 public sealed record CardRow(
     string Question,
     string Status,
-    string LastReviewed,
-    string StatusBackgroundColor,
-    string StatusBorderColor,
-    string StatusForegroundColor)
+    string LastReviewed)
 {
     internal static CardRow Learning(string question, string lastReviewed)
     {
-        return new(question, "Learning", lastReviewed, "#EFF6FF", "#BFDBFE", "#2563EB");
+        return new(question, "Learning", lastReviewed);
     }
 
     internal static CardRow Relearning(string question, string lastReviewed)
     {
-        return new(question, "Relearning", lastReviewed, "#FFF7ED", "#FED7AA", "#D97706");
+        return new(question, "Relearning", lastReviewed);
     }
 
     internal static CardRow Review(string question, string lastReviewed)
     {
-        return new(question, "Review", lastReviewed, "#ECFDF3", "#A7F3D0", "#16A34A");
+        return new(question, "Review", lastReviewed);
     }
 }
 
@@ -93,13 +78,7 @@ public sealed record CardLibraryRow(
     string Due,
     string LastReviewed,
     string Recall,
-    string StatusBackgroundColor,
-    string StatusBorderColor,
-    string StatusForegroundColor,
-    string RecallBackgroundColor,
-    string RecallBorderColor,
-    string RecallForegroundColor,
-    string RowBackgroundColor)
+    bool IsSelected)
 {
     public long Id { get; init; }
 
@@ -113,17 +92,17 @@ public sealed record CardLibraryRow(
 
     internal static CardLibraryRow Learning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Learning", due, lastReviewed, recall, "#EFF6FF", "#BFDBFE", "#2563EB");
+        return Create(isSelected, question, deck, "Learning", due, lastReviewed, recall);
     }
 
     internal static CardLibraryRow Relearning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Relearning", due, lastReviewed, recall, "#FFF7ED", "#FED7AA", "#D97706");
+        return Create(isSelected, question, deck, "Relearning", due, lastReviewed, recall);
     }
 
     internal static CardLibraryRow Review(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Review", due, lastReviewed, recall, "#ECFDF3", "#A7F3D0", "#16A34A");
+        return Create(isSelected, question, deck, "Review", due, lastReviewed, recall);
     }
 
     private static CardLibraryRow Create(
@@ -133,19 +112,8 @@ public sealed record CardLibraryRow(
         string status,
         string due,
         string lastReviewed,
-        string recall,
-        string statusBackground,
-        string statusBorder,
-        string statusForeground)
+        string recall)
     {
-        var (recallBackground, recallBorder, recallForeground) = recall switch
-        {
-            "Easy" => ("#ECFDF3", "#A7F3D0", "#16A34A"),
-            "Good" => ("#EFF6FF", "#BFDBFE", "#2563EB"),
-            "Hard" => ("#FFF7ED", "#FED7AA", "#D97706"),
-            _ => ("#FFFFFF", "#D9E1EE", "#667085")
-        };
-
         return new(
             question,
             deck,
@@ -153,13 +121,7 @@ public sealed record CardLibraryRow(
             due,
             lastReviewed,
             recall,
-            statusBackground,
-            statusBorder,
-            statusForeground,
-            recallBackground,
-            recallBorder,
-            recallForeground,
-            isSelected ? "#EEF2FF" : "#FFFFFF");
+            isSelected);
     }
 }
 

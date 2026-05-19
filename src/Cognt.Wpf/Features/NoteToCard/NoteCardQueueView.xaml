@@ -15,17 +15,17 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
         <Style x:Key="DeckSearchTextBoxStyle" TargetType="TextBox">
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="10,5" />
-            <Setter Property="BorderBrush" Value="#D8DEEC" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
@@ -36,7 +36,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -54,21 +54,21 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EEF2FF" />
+                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <Grid Background="#F7F9FC">
+    <Grid Background="{DynamicResource PageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#FFFFFF"
-                BorderBrush="#DCE3F0"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="12">
             <StackPanel>
@@ -86,13 +86,13 @@
                                       VerticalAlignment="Center"
                                       Data="M3,3.5 C1.8,5.5 1.8,12.5 3,14.5 M11,3.5 C12.2,5.5 12.2,12.5 11,14.5 M5,9 L9,9"
                                       Stretch="Uniform"
-                                      Stroke="#3156D4"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
                                       StrokeThickness="1.7"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round" />
                                 <TextBlock Text="Cloze"
                                            FontSize="12"
-                                           Foreground="{StaticResource InkBrush}" />
+                                           Foreground="{DynamicResource InkBrush}" />
                             </StackPanel>
                         </Button>
                         <Button Margin="8,0,0,0"
@@ -111,21 +111,21 @@
                                                VerticalAlignment="Top"
                                                RadiusX="2"
                                                RadiusY="2"
-                                               Fill="#EEF2FF"
-                                               Stroke="#3156D4"
+                                               Fill="{DynamicResource AccentSoftBrush}"
+                                               Stroke="{DynamicResource AccentStrongBrush}"
                                                StrokeThickness="1.3" />
                                     <Ellipse Width="6"
                                              Height="6"
                                              Margin="7,1,0,0"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Top"
-                                             Fill="#FEE2E2"
-                                             Stroke="#DC2626"
+                                             Fill="{DynamicResource DangerSurfaceBrush}"
+                                             Stroke="{DynamicResource RedBrush}"
                                              StrokeThickness="1.3" />
                                 </Grid>
                                 <TextBlock Text="Image"
                                            FontSize="12"
-                                           Foreground="{StaticResource InkBrush}" />
+                                           Foreground="{DynamicResource InkBrush}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -148,8 +148,8 @@
                                  Style="{StaticResource DeckSearchTextBoxStyle}" />
                         <Border Margin="0,4,0,0"
                                 Padding="4"
-                                Background="#FFFFFF"
-                                BorderBrush="#D8DEEC"
+                                Background="{DynamicResource PanelBrush}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
                                 Visibility="{Binding HasFilteredNoteToCardDeckNames, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -172,10 +172,10 @@
                                    FontWeight="SemiBold" />
                         <Border Margin="0,6,0,0"
                                 MinHeight="36"
-                                BorderBrush="#D8DEEC"
+                                BorderBrush="{DynamicResource ControlBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
-                                Background="#FFFFFF">
+                                Background="{DynamicResource PanelBrush}">
                             <WrapPanel Margin="7,5"
                                        VerticalAlignment="Center">
                                 <ItemsControl ItemsSource="{Binding NoteToCardTags}">
@@ -188,12 +188,12 @@
                                         <DataTemplate>
                                             <Border Margin="0,0,6,4"
                                                     Padding="7,3"
-                                                    Background="#EEF2FF"
+                                                    Background="{DynamicResource AccentSoftBrush}"
                                                     CornerRadius="6">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding}"
                                                                FontSize="12"
-                                                               Foreground="#3156D4" />
+                                                               Foreground="{DynamicResource AccentStrongBrush}" />
                                                     <Button Margin="5,0,0,0"
                                                             ToolTip="Remove tag"
                                                             Command="{Binding DataContext.RemoveNoteToCardTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -213,7 +213,7 @@
                                          Padding="3,1"
                                          BorderThickness="0"
                                          Background="Transparent"
-                                         Foreground="{StaticResource InkBrush}"
+                                         Foreground="{DynamicResource InkBrush}"
                                          Text="{Binding NoteToCardPendingTagText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Enter"
@@ -247,12 +247,12 @@
                                     <TextBlock.Style>
                                         <Style TargetType="{x:Type TextBlock}">
                                             <Setter Property="Foreground"
-                                                    Value="{StaticResource InkBrush}" />
+                                                    Value="{DynamicResource InkBrush}" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsEnabled}"
                                                              Value="False">
                                                     <Setter Property="Foreground"
-                                                            Value="{StaticResource MutedBrush}" />
+                                                            Value="{DynamicResource MutedBrush}" />
                                                     <Setter Property="Opacity"
                                                             Value="0.55" />
                                                 </DataTrigger>
@@ -339,8 +339,8 @@
                       VerticalScrollBarVisibility="Auto">
             <Grid Margin="14">
                 <Border Padding="14"
-                        Background="#FFFFFF"
-                        BorderBrush="#DCE3F0"
+                        Background="{DynamicResource PanelBrush}"
+                        BorderBrush="{DynamicResource LineBrush}"
                         BorderThickness="1"
                         CornerRadius="8">
                     <TextBlock Text="No ready card candidates. Create clozes or image masks in this note."
@@ -383,8 +383,8 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border Padding="12"
-                                    Background="#FFFFFF"
-                                    BorderBrush="#DCE3F0"
+                                    Background="{DynamicResource PanelBrush}"
+                                    BorderBrush="{DynamicResource LineBrush}"
                                     BorderThickness="1"
                                     CornerRadius="8">
                                 <Grid>
@@ -400,35 +400,35 @@
 
                                     <StackPanel Orientation="Horizontal">
                                         <Border Padding="7,3"
-                                                Background="#EEF2FF"
+                                                Background="{DynamicResource AccentSoftBrush}"
                                                 CornerRadius="6">
                                             <TextBlock Text="{Binding DisplayClozeIndex, StringFormat=c{0}}"
                                                        FontSize="12"
                                                        FontWeight="SemiBold"
-                                                       Foreground="#3156D4" />
+                                                       Foreground="{DynamicResource AccentStrongBrush}" />
                                         </Border>
                                         <TextBlock Text="{Binding AnswerPreview}"
                                                    Margin="8,0,0,0"
                                                    VerticalAlignment="Center"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{StaticResource InkBrush}"
+                                                   Foreground="{DynamicResource InkBrush}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
 
                                     <Border Grid.Column="1"
                                             Padding="7,3"
-                                            Background="#F2F5FA"
+                                            Background="{DynamicResource PanelAltBrush}"
                                             CornerRadius="6">
                                         <TextBlock Text="{Binding Status}"
                                                    FontSize="11"
-                                                   Foreground="{StaticResource MutedBrush}" />
+                                                   Foreground="{DynamicResource MutedBrush}" />
                                     </Border>
 
                                     <TextBlock Grid.Row="1"
                                                Grid.ColumnSpan="2"
                                                Text="{Binding ValidationMessage}"
                                                Margin="0,9,0,0"
-                                               Foreground="{StaticResource RedBrush}"
+                                               Foreground="{DynamicResource RedBrush}"
                                                TextWrapping="Wrap">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -451,7 +451,7 @@
                                                  Margin="0,10,0,0">
                                         <Border Margin="0,0,5,0"
                                                 Padding="8,6"
-                                                Background="#F7F9FC"
+                                                Background="{DynamicResource PageBrush}"
                                                 CornerRadius="6">
                                             <TextBlock Style="{StaticResource SmallMutedTextStyle}">
                                                 <Run Text="Text anchors " />
@@ -460,7 +460,7 @@
                                         </Border>
                                         <Border Margin="5,0,0,0"
                                                 Padding="8,6"
-                                                Background="#F7F9FC"
+                                                Background="{DynamicResource PageBrush}"
                                                 CornerRadius="6">
                                             <TextBlock Style="{StaticResource SmallMutedTextStyle}">
                                                 <Run Text="Image masks " />

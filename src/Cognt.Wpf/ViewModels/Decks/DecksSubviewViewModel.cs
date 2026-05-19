@@ -176,9 +176,6 @@ public sealed class DecksSubviewViewModel : ObservableObject
             deck.DueCards,
             deck.TotalCards,
             deck.ProgressPercent,
-            "#EFF6FF",
-            "#B8D3FF",
-            "#2563EB",
             isSelected);
     }
 

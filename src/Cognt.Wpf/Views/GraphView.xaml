@@ -7,21 +7,17 @@
              mc:Ignorable="d"
              d:DesignHeight="860"
              d:DesignWidth="1120"
-             Background="#F8FAFF">
+             Background="{DynamicResource PanelAltBrush}">
     <UserControl.Resources>
-        <SolidColorBrush x:Key="InkBrush" Color="#15192C" />
-        <SolidColorBrush x:Key="MutedBrush" Color="#667085" />
-        <SolidColorBrush x:Key="LineBrush" Color="#DCE3F0" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#3156D4" />
-
         <Style x:Key="GraphToolbarButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="12,0" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -40,8 +36,8 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F2F5FF" />
-                    <Setter Property="BorderBrush" Value="#CBD6FF" />
+                    <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -49,13 +45,13 @@
         <Style x:Key="GraphPrimaryButtonStyle"
                BasedOn="{StaticResource GraphToolbarButtonStyle}"
                TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#274BC2" />
-                    <Setter Property="BorderBrush" Value="#274BC2" />
+                    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -64,11 +60,12 @@
             <Setter Property="Height" Value="34" />
             <Setter Property="Width" Value="70" />
             <Setter Property="Padding" Value="10,6" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
@@ -77,8 +74,9 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
@@ -105,7 +103,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F4F6FA" />
+                    <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -118,8 +116,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#FFFFFF"
-                BorderBrush="#E1E6F0"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="22,16">
             <Grid>
@@ -130,14 +128,11 @@
 
                 <StackPanel>
                     <TextBlock Text="{Binding CurrentNodeTitle}"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource InkBrush}"
+                               Style="{StaticResource SurfaceTitleTextStyle}"
                                TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding GraphSummary}"
                                Margin="0,4,0,0"
-                               FontSize="12"
-                               Foreground="{StaticResource MutedBrush}" />
+                               Style="{StaticResource MetaTextStyle}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -149,8 +144,8 @@
                           VerticalAlignment="Center">
                         <Border x:Name="GraphSearchBox"
                                 Height="34"
-                                Background="#FFFFFF"
-                                BorderBrush="{StaticResource LineBrush}"
+                                Background="{DynamicResource PanelBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1"
                                 CornerRadius="8">
                             <Grid>
@@ -160,7 +155,7 @@
                                       HorizontalAlignment="Left"
                                       VerticalAlignment="Center"
                                       Stretch="Uniform"
-                                      Stroke="#6F7890"
+                                      Stroke="{DynamicResource DimBrush}"
                                       StrokeThickness="1.8"
                                       Data="M10.5,10.5 L15,15 M12,6.5 A5.5,5.5 0 1 1 1,6.5 A5.5,5.5 0 1 1 12,6.5 Z" />
                                 <TextBox x:Name="GraphSearchTextBox"
@@ -173,7 +168,7 @@
                                 <TextBlock Text="Search graph"
                                            Margin="36,0,0,0"
                                            VerticalAlignment="Center"
-                                           Foreground="#8B93A8"
+                                           Foreground="{DynamicResource DimBrush}"
                                            FontSize="13"
                                            IsHitTestVisible="False">
                                     <TextBlock.Style>
@@ -191,13 +186,13 @@
                                         VerticalAlignment="Center"
                                         Margin="0,0,8,0"
                                         Padding="6,2"
-                                        Background="#F4F6FA"
-                                        BorderBrush="#E1E7F2"
+                                        Background="{DynamicResource PanelAltBrush}"
+                                        BorderBrush="{DynamicResource LineBrush}"
                                         BorderThickness="1"
                                         CornerRadius="5">
                                     <TextBlock Text="Enter"
                                                FontSize="10"
-                                               Foreground="{StaticResource MutedBrush}" />
+                                               Foreground="{DynamicResource MutedBrush}" />
                                 </Border>
                             </Grid>
                         </Border>
@@ -211,13 +206,13 @@
                             <Border Width="{Binding ActualWidth, ElementName=GraphSearchBox}"
                                     Margin="0,4,0,0"
                                     Padding="6"
-                                    Background="#FFFFFF"
-                                    BorderBrush="#DCE3F0"
+                                    Background="{DynamicResource PanelBrush}"
+                                    BorderBrush="{DynamicResource LineBrush}"
                                     BorderThickness="1"
                                     CornerRadius="9"
                                     SnapsToDevicePixels="True">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="#24304A"
+                                    <DropShadowEffect Color="{DynamicResource ShadowColor}"
                                                       Opacity="0.14"
                                                       BlurRadius="18"
                                                       ShadowDepth="6" />
@@ -231,12 +226,12 @@
                                                     <TextBlock Text="{Binding Title}"
                                                                FontSize="12"
                                                                FontWeight="SemiBold"
-                                                               Foreground="{StaticResource InkBrush}"
+                                                               Foreground="{DynamicResource InkBrush}"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Text="{Binding RelativePath}"
                                                                Margin="0,2,0,0"
                                                                FontSize="10"
-                                                               Foreground="{StaticResource MutedBrush}"
+                                                               Foreground="{DynamicResource MutedBrush}"
                                                                TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
                                             </Button>
@@ -255,7 +250,7 @@
                                   Height="13"
                                   Data="M13,5 A5,5 0 1 0 14,10 M14,5 L14,1 L18,1"
                                   Stretch="Uniform"
-                                  Stroke="#3156D4"
+                                  Stroke="{DynamicResource AccentStrongBrush}"
                                   StrokeThickness="1.7"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round"
@@ -273,7 +268,7 @@
                                   Height="13"
                                   Data="M3,7 L3,3 L7,3 M13,3 L17,3 L17,7 M17,13 L17,17 L13,17 M7,17 L3,17 L3,13"
                                   Stretch="Uniform"
-                                  Stroke="#3156D4"
+                                  Stroke="{DynamicResource AccentStrongBrush}"
                                   StrokeThickness="1.7"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round"
@@ -298,13 +293,13 @@
                         <Border Width="250"
                                 Margin="0,5,0,0"
                                 Padding="12"
-                                Background="#FFFFFF"
-                                BorderBrush="#DCE3F0"
+                                Background="{DynamicResource PanelBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1"
                                 CornerRadius="9"
                                 SnapsToDevicePixels="True">
                             <Border.Effect>
-                                <DropShadowEffect Color="#24304A"
+                                <DropShadowEffect Color="{DynamicResource ShadowColor}"
                                                   Opacity="0.14"
                                                   BlurRadius="18"
                                                   ShadowDepth="6" />
@@ -324,7 +319,7 @@
                                            VerticalAlignment="Center"
                                            FontSize="12"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource MutedBrush}" />
+                                           Foreground="{DynamicResource MutedBrush}" />
                                 <TextBox Grid.Column="1"
                                          HorizontalAlignment="Right"
                                          Style="{StaticResource GraphInputStyle}"
@@ -336,7 +331,7 @@
                                            VerticalAlignment="Center"
                                            FontSize="12"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource MutedBrush}" />
+                                           Foreground="{DynamicResource MutedBrush}" />
                                 <TextBox Grid.Row="2"
                                          Grid.Column="1"
                                          HorizontalAlignment="Right"
@@ -354,10 +349,11 @@
             <views:GraphCanvas x:Name="GraphSurface"
                                Graph="{Binding Graph}"
                                FocusedDocumentId="{Binding FocusedDocumentId}"
-                               OpenNodeCommand="{Binding OpenNodeCommand}" />
+                               OpenNodeCommand="{Binding OpenNodeCommand}"
+                               SurfaceBrush="{DynamicResource GraphCanvasBrush}" />
 
             <Border Margin="0"
-                    Background="#EAF0FF"
+                    Background="{DynamicResource StateOverlayBrush}"
                     Opacity="0.88">
                 <Border.Style>
                     <Style TargetType="{x:Type Border}">
@@ -388,14 +384,14 @@
                 <TextBlock Text="{Binding StateTitle}"
                            FontSize="19"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource InkBrush}"
+                           Foreground="{DynamicResource InkBrush}"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding StateMessage}"
                            Margin="0,8,0,18"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
                            FontSize="13"
-                           Foreground="{StaticResource MutedBrush}" />
+                           Foreground="{DynamicResource MutedBrush}" />
                 <Button Width="118"
                         HorizontalAlignment="Center"
                         Command="{Binding RefreshCommand}"
@@ -408,13 +404,23 @@
                     VerticalAlignment="Bottom"
                     Margin="18"
                     Padding="12,7"
-                    Background="#FFFFFF"
-                    BorderBrush="#DCE3F0"
+                    Background="{DynamicResource PanelBrush}"
+                    BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="1"
                     CornerRadius="7">
+                <Border.Style>
+                    <Style TargetType="{x:Type Border}">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <TextBlock Text="{Binding StatusMessage}"
                            FontSize="12"
-                           Foreground="#2F6F4F" />
+                           Foreground="{DynamicResource SuccessBrush}" />
             </Border>
         </Grid>
     </Grid>

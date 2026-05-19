@@ -6,7 +6,7 @@
              mc:Ignorable="d"
              d:DesignHeight="980"
              d:DesignWidth="1680"
-             Background="#F7F9FC"
+             Background="{DynamicResource PageBrush}"
              Loaded="ReviewView_Loaded"
              SizeChanged="ReviewView_SizeChanged"
              PreviewKeyDown="ReviewView_PreviewKeyDown"
@@ -20,8 +20,8 @@
                TargetType="Button">
             <Setter Property="Height" Value="108" />
             <Setter Property="Padding" Value="20,0" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
@@ -38,8 +38,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#3156D4" />
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#F8FAFF" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource PanelAltBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
@@ -57,22 +57,22 @@
             <Setter Property="Width" Value="22" />
             <Setter Property="Height" Value="22" />
             <Setter Property="CornerRadius" Value="5" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="#CFD8E6" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
     </UserControl.Resources>
 
-    <Grid Background="{StaticResource PageBrush}">
+    <Grid Background="{DynamicResource PageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="72" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                BorderBrush="{StaticResource LineSoftBrush}"
+                BorderBrush="{DynamicResource LineSoftBrush}"
                 BorderThickness="0,0,0,1"
-                Background="#FFFFFF">
+                Background="{DynamicResource PanelBrush}">
             <Grid Margin="16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -85,7 +85,7 @@
                 <TextBlock x:Name="HeaderTitle"
                            Text="Flashcards"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource InkBrush}"
+                           Foreground="{DynamicResource InkBrush}"
                            FontSize="22"
                            FontWeight="SemiBold" />
 
@@ -150,9 +150,9 @@
                             HorizontalAlignment="Stretch"
                             Padding="14,10"
                             CornerRadius="8"
-                            BorderBrush="{StaticResource LineBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
-                            Background="#FFFFFF">
+                            Background="{DynamicResource PanelBrush}">
                         <WrapPanel HorizontalAlignment="Center"
                                    VerticalAlignment="Center">
                             <TextBlock x:Name="QueueLearningText"
@@ -178,7 +178,7 @@
                                        Style="{StaticResource SmallMutedTextStyle}" />
                             <TextBlock x:Name="QueueTotalText"
                                        Margin="8,0"
-                                       Foreground="{StaticResource InkBrush}"
+                                       Foreground="{DynamicResource InkBrush}"
                                        FontSize="12"
                                        FontWeight="SemiBold" />
                         </WrapPanel>
@@ -188,8 +188,8 @@
                             Grid.Row="2"
                             Height="660"
                             HorizontalAlignment="Stretch"
-                            Background="#FFFFFF"
-                            BorderBrush="{StaticResource LineBrush}"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
                             CornerRadius="8">
                         <Border.Effect>
@@ -197,7 +197,7 @@
                                               Direction="270"
                                               Opacity="0.12"
                                               ShadowDepth="6"
-                                              Color="#475467" />
+                                              Color="{DynamicResource ShadowColor}" />
                         </Border.Effect>
 
                         <Grid>
@@ -211,7 +211,7 @@
                                        Text="FRONT"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Bottom"
-                                       Foreground="#667085"
+                                       Foreground="{DynamicResource MutedBrush}"
                                        FontSize="13"
                                        FontWeight="SemiBold" />
 
@@ -222,7 +222,7 @@
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            MaxWidth="1180"
-                                           Foreground="{StaticResource InkBrush}"
+                                           Foreground="{DynamicResource InkBrush}"
                                            FontSize="34"
                                            FontWeight="SemiBold"
                                            LineHeight="43"
@@ -247,8 +247,8 @@
                                     <Border x:Name="ReviewCardImageContainer"
                                             Margin="0,22,0,0"
                                             Padding="10"
-                                            Background="#F8FAFC"
-                                            BorderBrush="{StaticResource LineBrush}"
+                                            Background="{DynamicResource PanelAltBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}"
                                             BorderThickness="1"
                                             CornerRadius="10"
                                             Visibility="Collapsed"
@@ -266,7 +266,7 @@
                             </Grid>
 
                             <Border Grid.Row="2"
-                                    BorderBrush="{StaticResource LineSoftBrush}"
+                                    BorderBrush="{DynamicResource LineSoftBrush}"
                                     BorderThickness="0,1,0,0">
                                 <Grid>
                                     <StackPanel x:Name="RevealPromptPanel"
@@ -279,18 +279,18 @@
                                             <Border Width="30"
                                                     Height="30"
                                                     CornerRadius="15"
-                                                    Background="#EEF2FF">
+                                                    Background="{DynamicResource AccentSoftBrush}">
                                                 <TextBlock Text="?"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
-                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Foreground="{DynamicResource MutedBrush}"
                                                            FontSize="14"
                                                            FontWeight="SemiBold" />
                                             </Border>
                                             <TextBlock Text="Think before revealing the answer"
                                                       Margin="10,0,0,0"
                                                       VerticalAlignment="Center"
-                                                      Foreground="{StaticResource MutedBrush}"
+                                                      Foreground="{DynamicResource MutedBrush}"
                                                       FontSize="14"
                                                       TextAlignment="Center"
                                                       TextWrapping="Wrap" />
@@ -313,13 +313,13 @@
                                                 Visibility="Collapsed">
                                         <TextBlock Text="Answer revealed"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="{StaticResource InkBrush}"
+                                                   Foreground="{DynamicResource InkBrush}"
                                                    FontSize="18"
                                                    FontWeight="SemiBold" />
                                         <TextBlock Text="Choose a recall rating below"
                                                    Margin="0,6,0,0"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="{StaticResource MutedBrush}"
+                                                   Foreground="{DynamicResource MutedBrush}"
                                                    FontSize="14"
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap" />
@@ -332,7 +332,7 @@
                                         <TextBlock x:Name="WaitingStateTitleText"
                                                    Text="No cards are due right now"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="{StaticResource InkBrush}"
+                                                   Foreground="{DynamicResource InkBrush}"
                                                    FontSize="18"
                                                    FontWeight="SemiBold"
                                                    TextAlignment="Center"
@@ -340,7 +340,7 @@
                                         <TextBlock x:Name="WaitingStateDetailText"
                                                    Margin="0,6,0,0"
                                                    HorizontalAlignment="Center"
-                                                   Foreground="{StaticResource MutedBrush}"
+                                                   Foreground="{DynamicResource MutedBrush}"
                                                    FontSize="14"
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap" />
@@ -357,25 +357,25 @@
                             Padding="18,0"
                             Height="40"
                             CornerRadius="8"
-                            BorderBrush="{StaticResource LineBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
-                            Background="#FFFFFF">
+                            Background="{DynamicResource PanelBrush}">
                         <StackPanel Orientation="Horizontal"
                                     VerticalAlignment="Center">
                             <TextBlock Text="Key"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource MutedBrush}"
+                                       Foreground="{DynamicResource MutedBrush}"
                                        FontSize="12" />
                             <TextBlock Text="Use keyboard shortcuts"
                                        Margin="8,0,18,0"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource MutedBrush}"
+                                       Foreground="{DynamicResource MutedBrush}"
                                        FontSize="12" />
                             <Border Style="{StaticResource ShortcutKeyStyle}">
                                 <TextBlock Text="1"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Foreground="{StaticResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentBrush}"
                                            FontSize="11" />
                             </Border>
                             <TextBlock Text="Again"
@@ -385,7 +385,7 @@
                                 <TextBlock Text="2"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Foreground="{StaticResource OrangeBrush}"
+                                           Foreground="{DynamicResource OrangeBrush}"
                                            FontSize="11" />
                             </Border>
                             <TextBlock Text="Hard"
@@ -395,7 +395,7 @@
                                 <TextBlock Text="3"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Foreground="{StaticResource BlueBrush}"
+                                           Foreground="{DynamicResource BlueBrush}"
                                            FontSize="11" />
                             </Border>
                             <TextBlock Text="Good"
@@ -405,7 +405,7 @@
                                 <TextBlock Text="4"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           Foreground="{StaticResource GreenBrush}"
+                                           Foreground="{DynamicResource GreenBrush}"
                                            FontSize="11" />
                             </Border>
                             <TextBlock Text="Easy"
@@ -421,8 +421,8 @@
                                  VerticalAlignment="Center">
                         <Button Margin="6"
                                 Command="{Binding RateAgainCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Background="#FFF5F5"
-                                BorderBrush="#FCA5A5"
+                                Background="{DynamicResource ReviewAgainSurfaceBrush}"
+                                BorderBrush="{DynamicResource ReviewAgainLineBrush}"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal"
@@ -430,35 +430,35 @@
                                     <Border Width="32"
                                             Height="28"
                                             CornerRadius="6"
-                                            BorderBrush="#FCA5A5"
+                                            BorderBrush="{DynamicResource ReviewAgainLineBrush}"
                                             BorderThickness="1"
-                                            Background="#FFFFFF">
+                                            Background="{DynamicResource PanelBrush}">
                                         <TextBlock Text="1"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Foreground="{StaticResource RedBrush}"
+                                                   Foreground="{DynamicResource RedBrush}"
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
                                     <TextBlock Text="Again (1)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
-                                               Foreground="{StaticResource RedBrush}"
+                                               Foreground="{DynamicResource RedBrush}"
                                                FontSize="19"
                                                FontWeight="SemiBold" />
                                 </StackPanel>
                                 <TextBlock Text="Incorrect"
                                            Margin="0,10,0,0"
                                            HorizontalAlignment="Center"
-                                           Foreground="#475467"
+                                           Foreground="{DynamicResource MutedBrush}"
                                            FontSize="13" />
                             </StackPanel>
                         </Button>
 
                         <Button Margin="6"
                                 Command="{Binding RateHardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Background="#FFF8ED"
-                                BorderBrush="#FDBA74"
+                                Background="{DynamicResource ReviewHardSurfaceBrush}"
+                                BorderBrush="{DynamicResource ReviewHardLineBrush}"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal"
@@ -466,35 +466,35 @@
                                     <Border Width="32"
                                             Height="28"
                                             CornerRadius="6"
-                                            BorderBrush="#FDBA74"
+                                            BorderBrush="{DynamicResource ReviewHardLineBrush}"
                                             BorderThickness="1"
-                                            Background="#FFFFFF">
+                                            Background="{DynamicResource PanelBrush}">
                                         <TextBlock Text="2"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Foreground="{StaticResource OrangeBrush}"
+                                                   Foreground="{DynamicResource OrangeBrush}"
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
                                     <TextBlock Text="Hard (2)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
-                                               Foreground="{StaticResource OrangeBrush}"
+                                               Foreground="{DynamicResource OrangeBrush}"
                                                FontSize="19"
                                                FontWeight="SemiBold" />
                                 </StackPanel>
                                 <TextBlock Text="Difficult"
                                            Margin="0,10,0,0"
                                            HorizontalAlignment="Center"
-                                           Foreground="#475467"
+                                           Foreground="{DynamicResource MutedBrush}"
                                            FontSize="13" />
                             </StackPanel>
                         </Button>
 
                         <Button Margin="6"
                                 Command="{Binding RateGoodCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Background="#F5F8FF"
-                                BorderBrush="#93B4FF"
+                                Background="{DynamicResource ReviewGoodSurfaceBrush}"
+                                BorderBrush="{DynamicResource ReviewGoodLineBrush}"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal"
@@ -502,35 +502,35 @@
                                     <Border Width="32"
                                             Height="28"
                                             CornerRadius="6"
-                                            BorderBrush="#93B4FF"
+                                            BorderBrush="{DynamicResource ReviewGoodLineBrush}"
                                             BorderThickness="1"
-                                            Background="#FFFFFF">
+                                            Background="{DynamicResource PanelBrush}">
                                         <TextBlock Text="3"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Foreground="{StaticResource BlueBrush}"
+                                                   Foreground="{DynamicResource BlueBrush}"
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
                                     <TextBlock Text="Good (3)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
-                                               Foreground="{StaticResource BlueBrush}"
+                                               Foreground="{DynamicResource BlueBrush}"
                                                FontSize="19"
                                                FontWeight="SemiBold" />
                                 </StackPanel>
                                 <TextBlock Text="Correct"
                                            Margin="0,10,0,0"
                                            HorizontalAlignment="Center"
-                                           Foreground="#475467"
+                                           Foreground="{DynamicResource MutedBrush}"
                                            FontSize="13" />
                             </StackPanel>
                         </Button>
 
                         <Button Margin="6"
                                 Command="{Binding RateEasyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Background="#F0FDF4"
-                                BorderBrush="#86EFAC"
+                                Background="{DynamicResource ReviewEasySurfaceBrush}"
+                                BorderBrush="{DynamicResource ReviewEasyLineBrush}"
                                 Style="{StaticResource ReviewRatingButtonStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal"
@@ -538,27 +538,27 @@
                                     <Border Width="32"
                                             Height="28"
                                             CornerRadius="6"
-                                            BorderBrush="#86EFAC"
+                                            BorderBrush="{DynamicResource ReviewEasyLineBrush}"
                                             BorderThickness="1"
-                                            Background="#FFFFFF">
+                                            Background="{DynamicResource PanelBrush}">
                                         <TextBlock Text="4"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Foreground="{StaticResource GreenBrush}"
+                                                   Foreground="{DynamicResource GreenBrush}"
                                                    FontSize="13"
                                                    FontWeight="SemiBold" />
                                     </Border>
                                     <TextBlock Text="Easy (4)"
                                                Margin="12,0,0,0"
                                                VerticalAlignment="Center"
-                                               Foreground="{StaticResource GreenBrush}"
+                                               Foreground="{DynamicResource GreenBrush}"
                                                FontSize="19"
                                                FontWeight="SemiBold" />
                                 </StackPanel>
                                 <TextBlock Text="Very easy"
                                            Margin="0,10,0,0"
                                            HorizontalAlignment="Center"
-                                           Foreground="#475467"
+                                           Foreground="{DynamicResource MutedBrush}"
                                            FontSize="13" />
                             </StackPanel>
                         </Button>

@@ -10,26 +10,9 @@
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-
-        <SolidColorBrush x:Key="ImageMask.CurrentTarget.Fill" Color="#AAE07070" />
-        <SolidColorBrush x:Key="ImageMask.CurrentTarget.Stroke" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="ImageMask.SiblingTarget.Fill" Color="#88707070" />
-        <SolidColorBrush x:Key="ImageMask.SiblingTarget.Stroke" Color="#FFD0D5DD" />
-        <SolidColorBrush x:Key="ImageMask.HiddenTarget.Fill" Color="#88707070" />
-        <SolidColorBrush x:Key="ImageMask.HiddenTarget.Stroke" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="ImageMask.ResolvedTarget.Fill" Color="#66315FAD" />
-        <SolidColorBrush x:Key="ImageMask.ResolvedTarget.Stroke" Color="#FF9CC2FF" />
-        <SolidColorBrush x:Key="ImageMask.Draft.Fill" Color="#665867FF" />
-        <SolidColorBrush x:Key="ImageMask.Draft.Stroke" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="ImageMask.Selected.Fill" Color="#885867FF" />
-        <SolidColorBrush x:Key="ImageMask.Selected.Stroke" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="ImageMask.Invalid.Fill" Color="#55FF4444" />
-        <SolidColorBrush x:Key="ImageMask.Invalid.Stroke" Color="#FFFF4444" />
-        <SolidColorBrush x:Key="ImageMask.Disabled.Fill" Color="#335B6472" />
-        <SolidColorBrush x:Key="ImageMask.Disabled.Stroke" Color="#FF667085" />
     </Window.Resources>
 
-    <Grid Background="{StaticResource PageBrush}">
+    <Grid Background="{DynamicResource PageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -89,8 +72,8 @@
 
         <Grid Grid.Row="1"
               Margin="18,12,18,12">
-            <Border Background="#0F172A"
-                    BorderBrush="#202B3D"
+            <Border Background="{DynamicResource PreviewCanvasBrush}"
+                    BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="1"
                     CornerRadius="10"
                     ClipToBounds="True">
@@ -107,15 +90,15 @@
                             MaxHeight="220"
                             Margin="16"
                             Padding="12"
-                            Background="#F9FFFFFF"
-                            BorderBrush="#D9E1EE"
+                            Background="{DynamicResource FloatingPanelBrush}"
+                            BorderBrush="{DynamicResource ControlBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8">
                         <DockPanel LastChildFill="True">
                             <TextBlock DockPanel.Dock="Top"
                                        Text="{Binding Masks.Count, StringFormat={}{0} masks}"
                                        FontWeight="SemiBold"
-                                       Foreground="{StaticResource InkBrush}" />
+                                       Foreground="{DynamicResource InkBrush}" />
                             <ListBox ItemsSource="{Binding Masks}"
                                      SelectedValue="{Binding SelectedMaskId, Mode=TwoWay}"
                                      SelectedValuePath="Id"
@@ -131,7 +114,7 @@
                                             <StackPanel>
                                                 <TextBlock Text="{Binding Label, TargetNullValue=(unlabeled)}"
                                                            FontWeight="SemiBold"
-                                                           Foreground="{StaticResource InkBrush}"
+                                                           Foreground="{DynamicResource InkBrush}"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding TargetId, TargetNullValue=unlinked}"
                                                            Style="{StaticResource SmallMutedTextStyle}"
@@ -155,8 +138,8 @@
                             MaxHeight="520"
                             Margin="16"
                             Padding="14"
-                            Background="#FAFFFFFF"
-                            BorderBrush="#D9E1EE"
+                            Background="{DynamicResource FloatingPanelStrongBrush}"
+                            BorderBrush="{DynamicResource ControlBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -164,7 +147,7 @@
                             <StackPanel>
                                 <TextBlock Text="Selected mask"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource InkBrush}" />
+                                           Foreground="{DynamicResource InkBrush}" />
 
                                 <TextBlock Text="Target"
                                            Margin="0,12,0,0"

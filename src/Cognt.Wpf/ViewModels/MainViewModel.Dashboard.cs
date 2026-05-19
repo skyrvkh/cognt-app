@@ -102,7 +102,7 @@ public sealed partial class MainViewModel
             {
                 DateOnly date = firstDate.AddDays(offset);
                 reviewedByDate.TryGetValue(date, out int reviewed);
-                return new DashboardStudyHeatmapCellViewModel(date, reviewed, HeatmapColor(reviewed));
+                return new DashboardStudyHeatmapCellViewModel(date, reviewed, HeatmapLevel(reviewed));
             })
             .ToArray();
     }
@@ -113,15 +113,15 @@ public sealed partial class MainViewModel
         return date.AddDays(-dayOffset);
     }
 
-    private static string HeatmapColor(int reviews)
+    private static int HeatmapLevel(int reviews)
     {
         return reviews switch
         {
-            0 => "#EEF2FF",
-            < 3 => "#DDE5FF",
-            < 8 => "#AEBEFF",
-            < 15 => "#7E92FF",
-            _ => "#5967FF",
+            0 => 0,
+            < 3 => 1,
+            < 8 => 2,
+            < 15 => 3,
+            _ => 4,
         };
     }
 

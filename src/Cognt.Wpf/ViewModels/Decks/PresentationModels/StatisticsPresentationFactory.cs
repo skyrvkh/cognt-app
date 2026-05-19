@@ -1,6 +1,7 @@
 using System.Globalization;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Models;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.ReadModels;
+using CogntApp.Design;
 using LiveChartsCore.Defaults;
 using LiveChartsCore.SkiaSharpView;
 using SkiaSharp;
@@ -43,8 +44,8 @@ internal static partial class StatisticsPresentationFactory
                 .Select(row => new DeckPerformanceRow(row.Deck, row.CardsReviewed, row.Retention, row.Due, row.Progress))
                 .ToArray(),
             [
-                CreateColumnSeries("Cards Reviewed", dailyCardsReviewed, "#2563EB", 12),
-                CreateMovingAverageSeries("Cards Reviewed 7-day avg", dailyCardsReviewed, "#0F766E")
+                CreateColumnSeries("Cards Reviewed", dailyCardsReviewed, ThemeResourceLookup.ColorHex("AccentBrush", "#2563EB"), 12),
+                CreateMovingAverageSeries("Cards Reviewed 7-day avg", dailyCardsReviewed, ThemeResourceLookup.ColorHex("GreenBrush", "#0F766E"))
             ],
             [CreateCategoryAxis(dailyLabels)],
             [CreateValueAxis()],
@@ -56,21 +57,21 @@ internal static partial class StatisticsPresentationFactory
                     Values = CreateStudyHeatmapPoints(today, reviewedByDate),
                     HeatMap =
                     [
-                        SKColor.Parse("#F8FAFC").AsLvcColor(),
-                        SKColor.Parse("#E0E7FF").AsLvcColor(),
-                        SKColor.Parse("#C7D2FE").AsLvcColor(),
-                        SKColor.Parse("#A5B4FC").AsLvcColor(),
-                        SKColor.Parse("#5867FF").AsLvcColor()
+                        SKColor.Parse(ThemeResourceLookup.ColorHex("PanelAltBrush", "#F8FAFC")).AsLvcColor(),
+                        SKColor.Parse(ThemeResourceLookup.ColorHex("HeatmapLowBrush", "#DDE5FF")).AsLvcColor(),
+                        SKColor.Parse(ThemeResourceLookup.ColorHex("HeatmapMediumBrush", "#AEBEFF")).AsLvcColor(),
+                        SKColor.Parse(ThemeResourceLookup.ColorHex("HeatmapHighBrush", "#7E92FF")).AsLvcColor(),
+                        SKColor.Parse(ThemeResourceLookup.ColorHex("AccentBrush", "#5867FF")).AsLvcColor()
                     ]
                 }
             ],
             [CreateHeatmapXAxis(today)],
             [CreateHeatmapYAxis()],
             [
-                CreateStackedColumnSeries("Again", report.WeeklyReviewOutcomes.Select(row => row.Again), "#DC2626"),
-                CreateStackedColumnSeries("Hard", report.WeeklyReviewOutcomes.Select(row => row.Hard), "#D97706"),
-                CreateStackedColumnSeries("Good", report.WeeklyReviewOutcomes.Select(row => row.Good), "#2563EB"),
-                CreateStackedColumnSeries("Easy", report.WeeklyReviewOutcomes.Select(row => row.Easy), "#16A34A")
+                CreateStackedColumnSeries("Again", report.WeeklyReviewOutcomes.Select(row => row.Again), ThemeResourceLookup.ColorHex("RedBrush", "#DC2626")),
+                CreateStackedColumnSeries("Hard", report.WeeklyReviewOutcomes.Select(row => row.Hard), ThemeResourceLookup.ColorHex("OrangeBrush", "#D97706")),
+                CreateStackedColumnSeries("Good", report.WeeklyReviewOutcomes.Select(row => row.Good), ThemeResourceLookup.ColorHex("BlueBrush", "#2563EB")),
+                CreateStackedColumnSeries("Easy", report.WeeklyReviewOutcomes.Select(row => row.Easy), ThemeResourceLookup.ColorHex("GreenBrush", "#16A34A"))
             ],
             [CreateCategoryAxis(weeklyLabels)],
             [CreateValueAxis()]);
@@ -108,11 +109,11 @@ internal static partial class StatisticsPresentationFactory
     {
         return rating switch
         {
-            ProgressAnalyticsRecallRating.Again => "#DC2626",
-            ProgressAnalyticsRecallRating.Hard => "#D97706",
-            ProgressAnalyticsRecallRating.Good => "#2563EB",
-            ProgressAnalyticsRecallRating.Easy => "#16A34A",
-            _ => "#2563EB"
+            ProgressAnalyticsRecallRating.Again => ThemeResourceLookup.ColorHex("RedBrush", "#DC2626"),
+            ProgressAnalyticsRecallRating.Hard => ThemeResourceLookup.ColorHex("OrangeBrush", "#D97706"),
+            ProgressAnalyticsRecallRating.Good => ThemeResourceLookup.ColorHex("BlueBrush", "#2563EB"),
+            ProgressAnalyticsRecallRating.Easy => ThemeResourceLookup.ColorHex("GreenBrush", "#16A34A"),
+            _ => ThemeResourceLookup.ColorHex("BlueBrush", "#2563EB")
         };
     }
 }

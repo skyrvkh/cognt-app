@@ -1,5 +1,6 @@
 using System.Globalization;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.ReadModels;
+using CogntApp.Design;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
@@ -26,7 +27,7 @@ internal static partial class StatisticsPresentationFactory
         return new Axis
         {
             Labels = labels,
-            LabelsPaint = ChartPaint("#98A2B3"),
+            LabelsPaint = ChartPaint(ThemeResourceLookup.ColorHex("DimBrush", "#98A2B3")),
             SeparatorsPaint = null,
             TextSize = 11
         };
@@ -37,8 +38,8 @@ internal static partial class StatisticsPresentationFactory
         return new Axis
         {
             MinLimit = 0,
-            LabelsPaint = ChartPaint("#667085"),
-            SeparatorsPaint = ChartPaint("#ECF0F6"),
+            LabelsPaint = ChartPaint(ThemeResourceLookup.ColorHex("MutedBrush", "#667085")),
+            SeparatorsPaint = ChartPaint(ThemeResourceLookup.ColorHex("LineSoftBrush", "#ECF0F6")),
             TextSize = 11
         };
     }
@@ -78,7 +79,7 @@ internal static partial class StatisticsPresentationFactory
             Stroke = stroke,
             GeometryFill = ChartPaint(color),
             GeometrySize = 7,
-            GeometryStroke = ChartPaint("#FFFFFF"),
+            GeometryStroke = ChartPaint(ThemeResourceLookup.ColorHex("PanelBrush", "#FFFFFF")),
             LineSmoothness = 0.35
         };
     }

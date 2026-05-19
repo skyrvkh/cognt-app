@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows.Input;
+using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Models;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.Queries;
 using Cognt.Modules.ProgressTrackingAndAnalytics.Application.ReadModels;
+using CogntApp.Design;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
@@ -11,7 +13,9 @@ namespace CogntApp.ViewModels.Decks;
 public sealed partial class StatisticsSubviewViewModel : ObservableObject
 {
     private readonly ICollectionProgressAnalyticsReportQuery collectionProgressAnalyticsReportQuery;
+    private readonly IThemeService themeService;
 
+    private ProgressAnalyticsReport? currentReport;
     private IReadOnlyList<DeckPerformanceRow> deckPerformanceRows = [];
     private string cardsReviewedValue = "0";
     private string cardsReviewedDetail = "Previous 14 days";
@@ -34,11 +38,16 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
     private Axis[] weeklyOutcomeXAxes = [];
     private Axis[] weeklyOutcomeYAxes = [];
 
-    public StatisticsSubviewViewModel(ICollectionProgressAnalyticsReportQuery collectionProgressAnalyticsReportQuery)
+    public StatisticsSubviewViewModel(
+        ICollectionProgressAnalyticsReportQuery collectionProgressAnalyticsReportQuery,
+        IThemeService themeService)
     {
         ArgumentNullException.ThrowIfNull(collectionProgressAnalyticsReportQuery);
+        ArgumentNullException.ThrowIfNull(themeService);
 
         this.collectionProgressAnalyticsReportQuery = collectionProgressAnalyticsReportQuery;
+        this.themeService = themeService;
+        this.themeService.ThemeChanged += ThemeService_ThemeChanged;
         LoadEmptyState();
     }
 
@@ -215,5 +224,18 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
             1 => string.Concat("Deck: ", deckNames[0]),
             _ => string.Concat(deckNames.Count.ToString("N0"), " selected decks")
         };
+    }
+
+    private void ThemeService_ThemeChanged(object? sender, EventArgs e)
+    {
+        if (currentReport is null)
+        {
+            return;
+        }
+
+        ApplyPresentationState(
+            StatisticsPresentationFactory.Create(
+                currentReport,
+                DateOnly.FromDateTime(DateTime.Today)));
     }
 }

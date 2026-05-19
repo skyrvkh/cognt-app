@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DesignHeight="860"
              d:DesignWidth="1220"
-             Background="#F7F9FC"
+             Background="{DynamicResource PageBrush}"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
              TextOptions.TextFormattingMode="Display">
@@ -32,16 +32,16 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Background="{StaticResource PageBrush}">
+    <Grid Background="{DynamicResource PageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="72" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                BorderBrush="{StaticResource LineSoftBrush}"
+                BorderBrush="{DynamicResource LineSoftBrush}"
                 BorderThickness="0,0,0,1"
-                Background="#FFFFFF">
+                Background="{DynamicResource PanelBrush}">
             <Grid Margin="16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -51,7 +51,7 @@
 
                 <TextBlock Text="Decks / Cards"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource InkBrush}"
+                           Foreground="{DynamicResource InkBrush}"
                            FontSize="18"
                            FontWeight="SemiBold" />
 

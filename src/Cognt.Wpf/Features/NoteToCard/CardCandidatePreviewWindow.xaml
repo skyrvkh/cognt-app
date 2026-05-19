@@ -25,19 +25,19 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Border Padding="8,4"
-                        Background="#EEF2FF"
+                        Background="{DynamicResource AccentSoftBrush}"
                         CornerRadius="999">
                     <TextBlock Text="{Binding DisplayLabel}"
                                FontSize="12"
                                FontWeight="SemiBold"
-                               Foreground="#3156D4" />
+                               Foreground="{DynamicResource AccentStrongBrush}" />
                 </Border>
                 <TextBlock Grid.Column="1"
                            Text="{Binding AnswerPreview}"
                            Margin="10,0"
                            FontSize="16"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource InkBrush}"
+                           Foreground="{DynamicResource InkBrush}"
                            TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding Status}"
@@ -56,7 +56,7 @@
             <StackPanel>
                 <TextBlock Text="{Binding ValidationMessage}"
                            Margin="0,0,0,12"
-                           Foreground="{StaticResource RedBrush}"
+                           Foreground="{DynamicResource RedBrush}"
                            TextWrapping="Wrap">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -107,10 +107,10 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Margin="0,0,0,12"
-                                    BorderBrush="#D9E1EE"
+                                    BorderBrush="{DynamicResource ControlBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="8"
-                                    Background="#FFFFFF">
+                                    Background="{DynamicResource PanelBrush}">
                                 <StackPanel>
                                     <TextBlock Text="{Binding ImageRelPath}"
                                                Margin="12,10,12,8"
@@ -120,7 +120,7 @@
                                                                             Height="260" />
                                     <TextBlock Text="{Binding MissingMediaMessage}"
                                                Margin="12,8,12,12"
-                                               Foreground="{StaticResource RedBrush}"
+                                               Foreground="{DynamicResource RedBrush}"
                                                TextWrapping="Wrap">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">

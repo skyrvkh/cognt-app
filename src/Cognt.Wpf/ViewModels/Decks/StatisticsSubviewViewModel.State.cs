@@ -20,6 +20,7 @@ public sealed partial class StatisticsSubviewViewModel
 
     private void LoadReport(ProgressAnalyticsReport report)
     {
+        currentReport = report;
         ApplyPresentationState(
             StatisticsPresentationFactory.Create(
                 report,

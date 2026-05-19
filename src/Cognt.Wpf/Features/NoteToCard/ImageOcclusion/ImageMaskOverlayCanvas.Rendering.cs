@@ -80,11 +80,14 @@ public sealed partial class ImageMaskOverlayCanvas
             return;
         }
 
+        FontFamily fontFamily = TryFindResource("AppSansFontFamily") as FontFamily
+            ?? new FontFamily("Inter, Roboto, Noto Sans, Segoe UI");
+
         FormattedText text = new(
             item.Label,
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Segoe UI"),
+            new Typeface(fontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
             12d,
             Brushes.White,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);

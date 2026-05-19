@@ -8,6 +8,7 @@ namespace CogntApp.ViewModels;
 public sealed class NoteInspectorViewModel : ObservableObject
 {
     private const int AsyncOutlineParseThreshold = 200_000;
+    private const int OutlineParseDebounceMilliseconds = 200;
     private readonly MainViewModel mainViewModel;
     private CancellationTokenSource? outlineParseCancellation;
     private ObservableCollection<NoteOutlineItemViewModel> outlineItems = [];
@@ -135,28 +136,21 @@ public sealed class NoteInspectorViewModel : ObservableObject
         OutlineNavigationRequested?.Invoke(this, new NoteOutlineNavigationRequestedEventArgs(item));
     }
 
-    private void LoadOutline(string content)
-    {
-        SetOutlineItems(NoteOutlineParser.Parse(content));
-    }
-
     private void QueueOutlineLoad(string content)
     {
         outlineParseCancellation?.Cancel();
         outlineParseCancellation?.Dispose();
         outlineParseCancellation = null;
 
-        if (content.Length < AsyncOutlineParseThreshold)
-        {
-            LoadOutline(content);
-            return;
-        }
-
         CancellationTokenSource cancellation = new();
         CancellationToken cancellationToken = cancellation.Token;
         outlineParseCancellation = cancellation;
         _ = Task.Run(
-            () => NoteOutlineParser.Parse(content),
+            async () =>
+            {
+                await Task.Delay(OutlineParseDebounceMilliseconds, cancellationToken);
+                return NoteOutlineParser.Parse(content);
+            },
             cancellationToken)
             .ContinueWith(
                 task =>

@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Design;
 
 namespace CogntApp.Views;
 
@@ -88,19 +89,19 @@ public partial class ReviewView
     {
         element.Foreground = style switch
         {
-            FlashcardSemanticStyle.CurrentTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1D4ED8")),
-            FlashcardSemanticStyle.SiblingTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B45309")),
-            FlashcardSemanticStyle.HiddenTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#374151")),
-            FlashcardSemanticStyle.ResolvedTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1F2937")),
-            _ => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1F2937")),
+            FlashcardSemanticStyle.CurrentTarget => ThemeResourceLookup.SolidBrush("BlueBrush", "#1D4ED8"),
+            FlashcardSemanticStyle.SiblingTarget => ThemeResourceLookup.SolidBrush("WarningBrush", "#B45309"),
+            FlashcardSemanticStyle.HiddenTarget => ThemeResourceLookup.SolidBrush("DimBrush", "#374151"),
+            FlashcardSemanticStyle.ResolvedTarget => ThemeResourceLookup.SolidBrush("InkBrush", "#1F2937"),
+            _ => ThemeResourceLookup.SolidBrush("InkBrush", "#1F2937"),
         };
         element.Background = isHidden
             ? style switch
             {
-                FlashcardSemanticStyle.CurrentTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DBEAFE")),
-                FlashcardSemanticStyle.SiblingTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FEF3C7")),
-                FlashcardSemanticStyle.HiddenTarget => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E5E7EB")),
-                _ => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E5E7EB")),
+                FlashcardSemanticStyle.CurrentTarget => ThemeResourceLookup.SolidBrush("NoteFillBrush", "#DBEAFE"),
+                FlashcardSemanticStyle.SiblingTarget => ThemeResourceLookup.SolidBrush("WarningSurfaceBrush", "#FEF3C7"),
+                FlashcardSemanticStyle.HiddenTarget => ThemeResourceLookup.SolidBrush("DisabledSurfaceBrush", "#E5E7EB"),
+                _ => ThemeResourceLookup.SolidBrush("DisabledSurfaceBrush", "#E5E7EB"),
             }
             : Brushes.Transparent;
         element.FontWeight = style == FlashcardSemanticStyle.CurrentTarget
@@ -195,20 +196,28 @@ public partial class ReviewView
 
     private static void ApplyMaskStyle(Shape shape, FlashcardSemanticStyle style, bool isHidden)
     {
-        (string fill, string stroke) = style switch
+        (SolidColorBrush fill, SolidColorBrush stroke) = style switch
         {
-            FlashcardSemanticStyle.CurrentTarget => ("#BFD6FF", "#1D4ED8"),
-            FlashcardSemanticStyle.SiblingTarget => ("#FDE68A", "#B45309"),
-            FlashcardSemanticStyle.HiddenTarget => ("#D1D5DB", "#4B5563"),
-            FlashcardSemanticStyle.ResolvedTarget => ("#BBF7D0", "#15803D"),
-            _ => ("#D1D5DB", "#4B5563"),
+            FlashcardSemanticStyle.CurrentTarget => (
+                ThemeResourceLookup.SolidBrush("NoteFillBrush", "#BFD6FF"),
+                ThemeResourceLookup.SolidBrush("BlueBrush", "#1D4ED8")),
+            FlashcardSemanticStyle.SiblingTarget => (
+                ThemeResourceLookup.SolidBrush("WarningSurfaceBrush", "#FDE68A"),
+                ThemeResourceLookup.SolidBrush("WarningBrush", "#B45309")),
+            FlashcardSemanticStyle.HiddenTarget => (
+                ThemeResourceLookup.SolidBrush("DisabledSurfaceBrush", "#D1D5DB"),
+                ThemeResourceLookup.SolidBrush("DimBrush", "#4B5563")),
+            FlashcardSemanticStyle.ResolvedTarget => (
+                ThemeResourceLookup.SolidBrush("SuccessSurfaceBrush", "#BBF7D0"),
+                ThemeResourceLookup.SolidBrush("SuccessBrush", "#15803D")),
+            _ => (
+                ThemeResourceLookup.SolidBrush("DisabledSurfaceBrush", "#D1D5DB"),
+                ThemeResourceLookup.SolidBrush("DimBrush", "#4B5563")),
         };
 
-        shape.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fill))
-        {
-            Opacity = isHidden ? 0.8 : 0.35,
-        };
-        shape.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString(stroke));
+        fill.Opacity = isHidden ? 0.8 : 0.35;
+        shape.Fill = fill;
+        shape.Stroke = stroke;
         shape.StrokeThickness = style == FlashcardSemanticStyle.CurrentTarget ? 3 : 2;
     }
 
