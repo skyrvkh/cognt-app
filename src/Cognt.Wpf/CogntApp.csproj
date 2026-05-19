@@ -42,6 +42,7 @@
     <PackageReference Include="Dirkster.AvalonDock.Themes.Arc" Version="5.0.0-preview.86" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
