@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Models.Editor;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Services;
 
@@ -8,15 +9,18 @@ public sealed partial class BlockSuiteHostBridge
     private const string DiagnosticMessageType = "diagnostic";
 
     private TaskCompletionSource readyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly ILogger<BlockSuiteHostBridge>? logger;
     private IBlockSuiteHostClient? host;
     private bool startupFailed;
 
-    internal BlockSuiteHostBridge()
+    internal BlockSuiteHostBridge(ILogger<BlockSuiteHostBridge>? logger = null)
     {
+        this.logger = logger;
     }
 
     internal void Register(IBlockSuiteHostClient blockSuiteHost)
     {
+        logger?.LogInformation("BlockSuite host registered. ClientType={ClientType}", blockSuiteHost.GetType().Name);
         host = blockSuiteHost;
         startupFailed = false;
         readyCompletion.TrySetResult();
@@ -24,6 +28,7 @@ public sealed partial class BlockSuiteHostBridge
 
     internal void RegisterStartupFailure(Exception exception)
     {
+        logger?.LogError(exception, "BlockSuite host startup failed.");
         startupFailed = true;
         readyCompletion.TrySetException(new InvalidOperationException(
             "The BlockSuite host failed to start.",
@@ -35,6 +40,7 @@ public sealed partial class BlockSuiteHostBridge
     {
         if (ReferenceEquals(host, blockSuiteHost))
         {
+            logger?.LogInformation("BlockSuite host unregistered. ClientType={ClientType}", blockSuiteHost.GetType().Name);
             host = null;
         }
     }
@@ -47,6 +53,7 @@ public sealed partial class BlockSuiteHostBridge
 
     internal void ResetForHostReload()
     {
+        logger?.LogDebug("BlockSuite host bridge reset for host reload.");
         host = null;
         startupFailed = false;
         readyCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,8 +66,21 @@ public sealed partial class BlockSuiteHostBridge
 
     internal async Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot = null)
     {
+        logger?.LogInformation(
+            "BlockSuite bridge loading note. Path={Path} Title={Title} ContentLength={ContentLength} CollectionRoot={CollectionRoot}",
+            path,
+            title,
+            content.Length,
+            collectionRoot);
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.LoadNoteAsync(path, title, content, collectionRoot);
+        logger?.LogInformation("BlockSuite bridge loaded note. Path={Path}", path);
+    }
+
+    internal async Task<string> ExportContentAsync()
+    {
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        return await blockSuiteHost.ExportContentAsync();
     }
 
     internal async Task ActivateEditorAsync()
@@ -73,6 +93,15 @@ public sealed partial class BlockSuiteHostBridge
     {
         IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
         await blockSuiteHost.SetReadOnlyModeAsync(isReadOnly);
+    }
+
+    internal async Task ApplyThemeAsync(EditorTheme theme)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+
+        logger?.LogDebug("BlockSuite bridge applying theme. Theme={ThemeName}", theme.Name);
+        IBlockSuiteHostClient blockSuiteHost = await WaitForHostAsync();
+        await blockSuiteHost.ApplyThemeAsync(theme);
     }
 
     internal async Task FocusEditorAsync()
@@ -158,7 +187,18 @@ public sealed partial class BlockSuiteHostBridge
 
     private async Task<IBlockSuiteHostClient> WaitForHostAsync()
     {
+        if (!readyCompletion.Task.IsCompleted)
+        {
+            logger?.LogDebug("Waiting for BlockSuite host readiness.");
+        }
+
         await WaitUntilReadyAsync();
-        return host ?? throw new InvalidOperationException("The BlockSuite host is not ready.");
+        if (host is null)
+        {
+            logger?.LogError("BlockSuite host readiness completed without an active host.");
+            throw new InvalidOperationException("The BlockSuite host is not ready.");
+        }
+
+        return host;
     }
 }

@@ -1,8 +1,16 @@
 :root {
-  color-scheme: light;
-  font-family: var(--affine-font-family);
-  background: var(--affine-background-primary-color);
-  color: var(--affine-text-primary-color);
+  color-scheme: light dark;
+  --cognt-font-sans: "Inter", "Roboto", "Noto Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --cognt-font-display: "Inter", "Roboto", "Noto Sans", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --cognt-font-reading: "Source Sans Pro", "Inter", "Roboto", "Noto Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --cognt-font-mono: "Roboto Mono", "Cascadia Mono", "Cascadia Code", "Consolas", monospace;
+  --affine-font-family: var(--cognt-font-sans);
+  --affine-font-code-family: var(--cognt-font-mono);
+  font-family: var(--cognt-font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  background: var(--cognt-editor-page, var(--affine-background-primary-color));
+  color: var(--cognt-editor-ink, var(--affine-text-primary-color));
 }
 
 html,
@@ -12,11 +20,36 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  scrollbar-color: var(--cognt-editor-line, var(--affine-border-color)) var(--cognt-editor-page, var(--affine-background-primary-color));
+  scrollbar-width: thin;
+}
+
+* {
+  scrollbar-color: var(--cognt-editor-line, var(--affine-border-color)) var(--cognt-editor-page, var(--affine-background-primary-color));
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cognt-editor-page, var(--affine-background-primary-color));
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cognt-editor-line, var(--affine-border-color));
+  border: 3px solid var(--cognt-editor-page, var(--affine-background-primary-color));
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cognt-editor-accent, var(--affine-primary-color));
 }
 
 #app {
   display: block;
-  background: var(--affine-background-primary-color);
+  background: var(--cognt-editor-page, var(--affine-background-primary-color));
 }
 
 #editor-host,
@@ -30,6 +63,11 @@ page-editor {
 
 .cognt-blocksuite-host {
   overflow: auto;
+  background: var(--cognt-editor-page, var(--affine-background-primary-color));
+  color: var(--cognt-editor-ink, var(--affine-text-primary-color));
+  font-family: var(--cognt-font-reading);
+  font-size: 15px;
+  line-height: 1.62;
 }
 
 #editor-host {
@@ -43,27 +81,68 @@ page-editor {
   min-height: calc(100vh - 260px);
   height: auto;
   overflow: visible;
-  background: var(--affine-background-primary-color);
+  background: var(--cognt-editor-page, var(--affine-background-primary-color));
+  color: var(--cognt-editor-ink, var(--affine-text-primary-color));
   --affine-editor-width: none;
   --affine-editor-side-padding: clamp(24px, 5vw, 96px);
+  --affine-font-family: var(--cognt-font-reading);
+  --affine-font-code-family: var(--cognt-font-mono);
+}
+
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-paragraph,
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-list,
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-code,
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-image,
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-divider,
+.cognt-blocksuite-host[data-cognt-large-document='true'] affine-bookmark {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
+.cognt-blocksuite-host[data-cognt-theme-mode="dark"] page-editor {
+  --affine-shadow-1: 0 8px 24px rgba(0, 0, 0, 0.34);
+  --affine-shadow-2: 0 14px 36px rgba(0, 0, 0, 0.42);
 }
 
 .affine-page-root-block-container,
 .doc-title-container,
 rich-text,
 .inline-editor {
+  color: var(--cognt-editor-ink, var(--affine-text-primary-color));
+  font-family: var(--cognt-font-reading);
   overflow-wrap: anywhere;
   word-break: normal;
 }
 
+.doc-title-container,
+.doc-title-container *,
+.affine-doc-title-container,
+.affine-doc-title-container * {
+  font-family: var(--cognt-font-display);
+  letter-spacing: 0;
+}
+
+.cognt-blocksuite-host code,
+.cognt-blocksuite-host pre,
+.cognt-blocksuite-host .affine-code-block-container,
+.cognt-blocksuite-host .affine-code-block-container * {
+  font-family: var(--cognt-font-mono);
+}
+
+.cognt-blocksuite-host [contenteditable='true'],
+.cognt-blocksuite-host .inline-editor *,
+.cognt-blocksuite-host rich-text * {
+  caret-color: var(--cognt-editor-accent, var(--affine-primary-color));
+}
+
 ::selection {
-  color: var(--affine-text-primary-color);
-  background: var(--affine-blue-100);
+  color: var(--cognt-editor-ink, var(--affine-text-primary-color));
+  background: var(--cognt-editor-selection, var(--affine-blue-100));
 }
 
 ::highlight(cognt-cloze) {
   color: transparent;
-  background: #dbe4ee;
+  background: var(--cognt-editor-cloze, #dbe4ee);
   text-shadow: none;
   text-decoration: none;
 }

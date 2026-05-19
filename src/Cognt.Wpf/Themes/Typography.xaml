@@ -1,0 +1,98 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <FontFamily x:Key="AppSansFontFamily">Inter, Roboto, Noto Sans, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="AppDisplayFontFamily">Inter, Roboto, Noto Sans, Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="AppReadingFontFamily">Source Sans Pro, Inter, Roboto, Noto Sans, Segoe UI</FontFamily>
+    <FontFamily x:Key="AppMonoFontFamily">Roboto Mono, Cascadia Mono, Cascadia Code, Consolas</FontFamily>
+
+    <sys:Double x:Key="FontSizeMicro">10</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">11</sys:Double>
+    <sys:Double x:Key="FontSizeSmall">12</sys:Double>
+    <sys:Double x:Key="FontSizeBody">13</sys:Double>
+    <sys:Double x:Key="FontSizeBodyLarge">14</sys:Double>
+    <sys:Double x:Key="FontSizePanelTitle">17</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">20</sys:Double>
+    <sys:Double x:Key="FontSizePageTitle">28</sys:Double>
+    <sys:Double x:Key="FontSizeHero">34</sys:Double>
+
+    <sys:Double x:Key="LineHeightTight">17</sys:Double>
+    <sys:Double x:Key="LineHeightBody">20</sys:Double>
+    <sys:Double x:Key="LineHeightLarge">23</sys:Double>
+    <sys:Double x:Key="LineHeightTitle">30</sys:Double>
+    <sys:Double x:Key="LineHeightHero">42</sys:Double>
+
+    <Style TargetType="{x:Type Window}">
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+    </Style>
+
+    <Style TargetType="{x:Type UserControl}">
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+    </Style>
+
+    <Style TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightBody}" />
+    </Style>
+
+    <Style x:Key="AppDisplayTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppDisplayFontFamily}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightTitle}" />
+    </Style>
+
+    <Style x:Key="AppPageTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AppDisplayTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource FontSizePageTitle}" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightHero}" />
+    </Style>
+
+    <Style x:Key="AppTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AppDisplayTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightTitle}" />
+    </Style>
+
+    <Style x:Key="AppBodyTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightBody}" />
+    </Style>
+
+    <Style x:Key="AppReadingTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AppBodyTextStyle}">
+        <Setter Property="FontFamily" Value="{StaticResource AppReadingFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBodyLarge}" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightLarge}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="AppCaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightTight}" />
+    </Style>
+
+    <Style x:Key="AppMonoTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppMonoFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="{StaticResource LineHeightBody}" />
+    </Style>
+</ResourceDictionary>
