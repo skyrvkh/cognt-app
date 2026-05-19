@@ -10,6 +10,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Design;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Shell.Collections;
@@ -30,6 +31,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ICreateCardsFromCardContextCommand createCardsFromCardContextCommand;
     private readonly IFlashcardReviewSettingsQuery flashcardReviewSettingsQuery;
     private readonly IUpdateFlashcardReviewSettingsCommand updateFlashcardReviewSettingsCommand;
+    private readonly IThemeService themeService;
+    private readonly IEditorSettingsService editorSettingsService;
+    private readonly SemaphoreSlim noteSaveSemaphore = new(1, 1);
     private string collectionPath = string.Empty;
     private string openCollectionPath = string.Empty;
     private string? currentNotePath;
@@ -42,6 +46,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private int currentCollectionCardCount;
     private bool isEditorReadOnly;
     private double globalTextFontSize = 11;
+    private ThemeOptionViewModel selectedThemeOption = null!;
     public MainViewModel(
         PkmNoteService noteService,
         IKnowledgeDocumentContentFactory documentContentFactory,
@@ -52,7 +57,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IFlashcardDeckSummariesQuery flashcardDeckSummariesQuery,
         ICreateCardsFromCardContextCommand createCardsFromCardContextCommand,
         IFlashcardReviewSettingsQuery flashcardReviewSettingsQuery,
-        IUpdateFlashcardReviewSettingsCommand updateFlashcardReviewSettingsCommand)
+        IUpdateFlashcardReviewSettingsCommand updateFlashcardReviewSettingsCommand,
+        IThemeService themeService,
+        IEditorSettingsService editorSettingsService)
     {
         ArgumentNullException.ThrowIfNull(noteService);
         ArgumentNullException.ThrowIfNull(documentContentFactory);
@@ -64,6 +71,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(createCardsFromCardContextCommand);
         ArgumentNullException.ThrowIfNull(flashcardReviewSettingsQuery);
         ArgumentNullException.ThrowIfNull(updateFlashcardReviewSettingsCommand);
+        ArgumentNullException.ThrowIfNull(themeService);
+        ArgumentNullException.ThrowIfNull(editorSettingsService);
 
         this.noteService = noteService;
         this.documentContentFactory = documentContentFactory;
@@ -75,7 +84,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         this.createCardsFromCardContextCommand = createCardsFromCardContextCommand;
         this.flashcardReviewSettingsQuery = flashcardReviewSettingsQuery;
         this.updateFlashcardReviewSettingsCommand = updateFlashcardReviewSettingsCommand;
+        this.themeService = themeService;
+        this.editorSettingsService = editorSettingsService;
 
+        InitializeThemeOptions();
+        InitializeEditorSettings();
         InitializeCommands();
         InitializeNoteToCardPresentationOptions();
     }
@@ -106,6 +119,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler<bool>? EditorReadOnlyChanged;
 
+    internal event EventHandler? AutoSaveSettingsChanged;
+
     public Func<string>? GetCurrentEditorContent { get; set; }
 
     public ObservableCollection<NoteTreeNodeViewModel> NoteRoots { get; } = [];
@@ -123,6 +138,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<Navigation.CollectionOptionViewModel> AvailableCollections { get; } = [];
 
     public ObservableCollection<GlobalSearchResultReadModel> GlobalSearchResults { get; } = [];
+
+    public ObservableCollection<ThemeOptionViewModel> ThemeOptions { get; } = [];
 
     public string CollectionPath
     {
@@ -197,6 +214,41 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             double normalized = Math.Clamp(Math.Round(value, 0), 9, 18);
             SetProperty(ref globalTextFontSize, normalized);
+        }
+    }
+
+    public ThemeOptionViewModel SelectedThemeOption
+    {
+        get => selectedThemeOption;
+        set
+        {
+            if (value is null || ReferenceEquals(selectedThemeOption, value))
+            {
+                return;
+            }
+
+            selectedThemeOption = value;
+            themeService.ApplyTheme(value.Theme);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CurrentThemeDescription));
+            OnPropertyChanged(nameof(CurrentThemeName));
+            OnPropertyChanged(nameof(IsGraphiteTheme));
+        }
+    }
+
+    public string CurrentThemeDescription => SelectedThemeOption.Description;
+
+    public string CurrentThemeName => SelectedThemeOption.Name;
+
+    public bool IsGraphiteTheme
+    {
+        get => SelectedThemeOption.Theme == ApplicationTheme.Graphite;
+        set
+        {
+            ApplicationTheme theme = value ? ApplicationTheme.Graphite : ApplicationTheme.Light;
+            ThemeOptionViewModel option = ThemeOptions.First(option => option.Theme == theme);
+            SelectedThemeOption = option;
+            OnPropertyChanged();
         }
     }
 }

@@ -11,7 +11,8 @@ public sealed partial class MainViewModel
         string notePath,
         string title,
         string content,
-        long? itemId = null)
+        long? itemId = null,
+        string? savedContent = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(notePath);
         ArgumentNullException.ThrowIfNull(content);
@@ -22,7 +23,7 @@ public sealed partial class MainViewModel
         currentNoteTitle = string.IsNullOrWhiteSpace(title)
             ? Path.GetFileNameWithoutExtension(notePath)
             : title.Trim();
-        lastSavedContent = content;
+        lastSavedContent = savedContent ?? content;
         ClearNoteToCardTags();
         OnPropertyChanged(nameof(CurrentNotePath));
         OnPropertyChanged(nameof(CurrentNoteRelativePath));

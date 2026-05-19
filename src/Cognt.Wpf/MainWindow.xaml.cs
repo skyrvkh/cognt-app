@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -21,6 +22,7 @@ using CogntApp.ViewModels;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -46,6 +48,8 @@ public partial class MainWindow : Window
     private readonly EditorView EditorViewControl;
     private readonly IEditorViewFactory editorViewFactory;
     private readonly IImageMaskEditorDialogService imageMaskEditorDialogs;
+    private readonly ILogger<MainWindow> logger;
+    private readonly ILoggerFactory loggerFactory;
     private readonly StartupWorkflowController startupWorkflow;
     private readonly BreadcrumbCommandController breadcrumbCommands;
     private readonly NoteTreeInteractionController noteTreeInteractions;
@@ -56,9 +60,12 @@ public partial class MainWindow : Window
     private readonly ReviewOverlayCoordinator reviewOverlay;
     private readonly Dictionary<string, NoteWorkspaceDocumentSession> openNoteDocuments = new(StringComparer.OrdinalIgnoreCase);
     private readonly NoteDocumentDragController noteDocumentDragController = new();
+    private readonly SemaphoreSlim openNoteDocumentGate = new(1, 1);
     private NoteWorkspaceDocumentSession? activeNoteDocument;
     private bool isStartupInitialized;
     private bool lowerRightToolsAutoHideApplied;
+    private bool hasSavedOpenDocumentsForClose;
+    private bool isSavingOpenDocumentsForClose;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -74,7 +81,9 @@ public partial class MainWindow : Window
         DecksView decksView,
         IImageMaskEditorDialogService imageMaskEditorDialogs,
         IEditorViewFactory editorViewFactory,
-        EditorView editorViewControl)
+        EditorView editorViewControl,
+        ILogger<MainWindow> logger,
+        ILoggerFactory loggerFactory)
     {
         this.viewModel = viewModel;
         this.allNotesViewModel = allNotesViewModel;
@@ -88,8 +97,12 @@ public partial class MainWindow : Window
         this.imageMaskEditorDialogs = imageMaskEditorDialogs;
         this.editorViewFactory = editorViewFactory;
         EditorViewControl = editorViewControl;
+        this.logger = logger;
+        this.loggerFactory = loggerFactory;
 
+        this.logger.LogInformation("Constructing MainWindow.");
         InitializeComponent();
+        ApplyShellTheme();
         shellDialogs = new WindowShellDialogService(this);
         attachmentWorkflow = new AttachmentWorkflowController(viewModel, shellDialogs);
         collectionWorkflow = new CollectionWorkflowController(viewModel, shellDialogs);
@@ -128,27 +141,81 @@ public partial class MainWindow : Window
             reviewOverlay);
         startupWorkflow = new StartupWorkflowController(viewModel, shellDialogs);
         breadcrumbCommands = new BreadcrumbCommandController(viewModel, shellDialogs);
-        noteTreeInteractions = new NoteTreeInteractionController(NotesTree, viewModel, shellDialogs);
+        noteTreeInteractions = new NoteTreeInteractionController(
+            NotesTree,
+            viewModel,
+            shellDialogs,
+            loggerFactory.CreateLogger<NoteTreeInteractionController>());
         noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
         BindViewDataContexts();
         RegisterViewEvents();
         RegisterViewModelEvents();
         RegisterWorkspaceDockingEvents();
+        this.logger.LogInformation("MainWindow constructed.");
+    }
+
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel || hasSavedOpenDocumentsForClose || isSavingOpenDocumentsForClose)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        isSavingOpenDocumentsForClose = true;
+
+        try
+        {
+            await SaveOpenDocumentsForCloseAsync();
+            hasSavedOpenDocumentsForClose = true;
+            Close();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to save open notes before closing.");
+            shellDialogs.ShowWarning("Close Failed", $"Open notes could not be saved before closing: {ex.Message}");
+        }
+        finally
+        {
+            isSavingOpenDocumentsForClose = false;
+        }
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        logger.LogInformation("MainWindow closing. OpenDocumentCount={OpenDocumentCount}", openNoteDocuments.Count);
         foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values)
         {
+            try
+            {
+                session.SavePendingChanges();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to save note while closing application. NotePath={NotePath}", session.NotePath);
+            }
+
             session.Dispose();
         }
 
+        openNoteDocumentGate.Dispose();
+        viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         viewModel.Dispose();
         base.OnClosed(e);
     }
 
+    private async Task SaveOpenDocumentsForCloseAsync()
+    {
+        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values.ToArray())
+        {
+            await session.SavePendingChangesAsync();
+        }
+    }
+
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        logger.LogInformation("MainWindow loaded.");
         ApplyDesktopNavigation();
         ApplyDefaultLowerRightToolAutoHide();
 
