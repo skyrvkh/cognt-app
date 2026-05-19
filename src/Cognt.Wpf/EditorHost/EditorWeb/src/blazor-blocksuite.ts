@@ -8,6 +8,7 @@ import {
   type ReadAttachmentResult,
 } from './blocksuite-editor';
 import type { DocumentLinksPayload } from './document-links';
+import type { CogntEditorTheme } from './editor-theme';
 import { installHostDiagnostics, waitForAnimationFrames } from './host';
 
 installHostDiagnostics();
@@ -39,6 +40,9 @@ export function mountBlockSuite(
     hostElement,
     documentLinksElement,
     statusElement,
+    onDocumentChanged: () => {
+      void dotNet.invokeMethodAsync('HandleDocumentChanged');
+    },
     onContentChanged: content => {
       void dotNet.invokeMethodAsync('HandleContentChanged', content);
     },
@@ -153,6 +157,11 @@ export async function focusEditor(instanceId: number) {
   await waitForAnimationFrames(1);
 }
 
+export async function exportContent(instanceId: number) {
+  const instance = getInstance(instanceId);
+  return await instance.editor.exportContentForHost();
+}
+
 export async function focusBlock(instanceId: number, blockId: string) {
   const instance = getInstance(instanceId);
   await instance.editor.focusBlock(blockId);
@@ -189,6 +198,11 @@ export async function setReadOnlyMode(instanceId: number, isReadOnly: boolean) {
   const instance = getInstance(instanceId);
   await instance.editor.setReadOnlyMode(isReadOnly);
   await waitForAnimationFrames(1);
+}
+
+export function applyTheme(instanceId: number, theme: CogntEditorTheme) {
+  const instance = getInstance(instanceId);
+  instance.editor.applyTheme(theme);
 }
 
 export function showSaveResult(instanceId: number, ok: boolean, error?: string) {

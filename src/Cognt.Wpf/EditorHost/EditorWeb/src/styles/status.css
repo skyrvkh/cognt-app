@@ -5,10 +5,10 @@
   bottom: 14px;
   max-width: min(420px, calc(100vw - 28px));
   padding: 8px 10px;
-  border: 1px solid var(--affine-border-color);
+  border: 1px solid var(--cognt-editor-line, var(--affine-border-color));
   border-radius: 6px;
-  background: var(--affine-background-overlay-panel-color);
-  color: var(--affine-text-secondary-color);
+  background: var(--cognt-editor-surface, var(--affine-background-overlay-panel-color));
+  color: var(--cognt-editor-muted, var(--affine-text-secondary-color));
   box-shadow: var(--affine-shadow-2);
   font-size: 12px;
   line-height: 1.35;

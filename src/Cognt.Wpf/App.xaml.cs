@@ -3,16 +3,20 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Cognt.Composition;
+using CogntApp.Diagnostics;
 using CogntApp.DependencyInjection;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
 public partial class App : Application
 {
     private IServiceProvider? serviceProvider;
+    private ILogger<App>? logger;
+    private AppDiagnosticLogFile? diagnosticLogFile;
     private bool isShowingExceptionDialog;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -21,15 +25,20 @@ public partial class App : Application
         RegisterExceptionHandlers();
         LiveCharts.Configure(settings => settings.UseDefaults());
         serviceProvider = CreateServiceProvider();
+        logger = serviceProvider.GetRequiredService<ILogger<App>>();
+        diagnosticLogFile = serviceProvider.GetRequiredService<AppDiagnosticLogFile>();
+        logger.LogInformation("Application startup began. LogFile={LogFile}", diagnosticLogFile.Path);
         base.OnStartup(e);
 
         try
         {
             MainWindow = serviceProvider.GetRequiredService<MainWindow>();
             MainWindow.Show();
+            logger.LogInformation("MainWindow shown.");
         }
         catch (Exception ex)
         {
+            logger.LogCritical(ex, "MainWindow startup failed.");
             ShowException(
                 "Startup Failed",
                 "The app could not start.",
@@ -40,6 +49,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        logger?.LogInformation("Application exiting. ExitCode={ExitCode}", e.ApplicationExitCode);
         UnregisterExceptionHandlers();
 
         if (serviceProvider is IDisposable disposable)
@@ -53,6 +63,15 @@ public partial class App : Application
     private static IServiceProvider CreateServiceProvider()
     {
         ServiceCollection services = new();
+        string logFilePath = AppDiagnosticPaths.CreateSessionLogFilePath();
+        services.AddSingleton(new AppDiagnosticLogFile(logFilePath));
+        services.AddLogging(builder =>
+        {
+            builder.ClearProviders();
+            builder.SetMinimumLevel(LogLevel.Debug);
+            builder.AddCogntFile(logFilePath);
+        });
+
         services
             .AddCogntModules()
             .AddCogntWpfShell();
@@ -82,6 +101,7 @@ public partial class App : Application
         object sender,
         DispatcherUnhandledExceptionEventArgs e)
     {
+        logger?.LogError(e.Exception, "Unhandled dispatcher exception.");
         e.Handled = true;
         ShowException(
             "Unexpected Error",
@@ -93,9 +113,11 @@ public partial class App : Application
     {
         if (e.ExceptionObject is not Exception ex)
         {
+            logger?.LogCritical("Unhandled non-Exception domain failure. Object={ExceptionObject}", e.ExceptionObject);
             return;
         }
 
+        logger?.LogCritical(ex, "Unhandled application domain exception.");
         ShowException(
             "Unexpected Error",
             "The app hit an unrecoverable error.",
@@ -107,6 +129,7 @@ public partial class App : Application
         UnobservedTaskExceptionEventArgs e)
     {
         e.SetObserved();
+        logger?.LogError(e.Exception.GetBaseException(), "Unobserved task exception.");
         ShowException(
             "Background Error",
             "A background operation failed.",
@@ -120,6 +143,7 @@ public partial class App : Application
         ArgumentNullException.ThrowIfNull(exception);
 
         Debug.WriteLine(exception);
+        logger?.LogError(exception, "{Title}: {Message}", title, message);
 
         try
         {
@@ -154,6 +178,11 @@ public partial class App : Application
         try
         {
             string text = $"{message}{Environment.NewLine}{exception.Message}";
+            if (diagnosticLogFile is not null)
+            {
+                text = $"{text}{Environment.NewLine}{Environment.NewLine}Log: {diagnosticLogFile.Path}";
+            }
+
             Window? owner = MainWindow?.IsLoaded == true ? MainWindow : null;
 
             if (owner is null)

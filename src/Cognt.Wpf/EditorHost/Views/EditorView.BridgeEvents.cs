@@ -1,10 +1,16 @@
 using System.IO;
 using Cognt.Wpf.EditorHost.Models.Editor;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
 public partial class EditorView
 {
+    private void BlockSuiteBridge_DocumentChanged(object? sender, EventArgs e)
+    {
+        DocumentChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private void BlockSuiteBridge_ContentChanged(object? sender, string content)
     {
         try
@@ -198,10 +204,11 @@ public partial class EditorView
         }
     }
 
-    private static void BlockSuiteBridge_DiagnosticReceived(object? sender, string message)
+    private void BlockSuiteBridge_DiagnosticReceived(object? sender, string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
         {
+            logger.LogDebug("BlockSuite host diagnostic: {Message}", message);
             System.Diagnostics.Debug.WriteLine($"BlockSuite host: {message}");
         }
     }

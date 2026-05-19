@@ -29,6 +29,7 @@ public partial class MainWindow
 
     private void RegisterViewModelEvents()
     {
+        viewModel.PropertyChanged += ViewModel_PropertyChanged;
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
         viewModel.ClearEditorRequested += ViewModel_ClearEditorRequested;
         viewModel.OpenNoteRequested += ViewModel_OpenNoteRequested;

@@ -93,6 +93,7 @@ public sealed partial class MainViewModel
     {
         globalSearchCancellation?.Cancel();
         globalSearchCancellation?.Dispose();
+        noteSaveSemaphore.Dispose();
         noteService.Dispose();
     }
 }

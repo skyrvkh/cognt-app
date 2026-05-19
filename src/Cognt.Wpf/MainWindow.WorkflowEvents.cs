@@ -2,6 +2,7 @@ using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Shell.Workspace;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -51,8 +52,12 @@ public partial class MainWindow
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
+        logger.LogInformation(
+            "Open note requested. NotePath={NotePath} SelectInTree={SelectInTree}",
+            e.NotePath,
+            e.SelectInTree);
         overlayNavigation.HideOverlay();
-        await OpenOrActivateNoteDocumentAsync(e.NotePath, e.SelectInTree);
+        await QueueOpenNoteDocumentAsync(e.NotePath, e.SelectInTree);
     }
 
     private async void ViewModel_NoteDocumentsDeleted(object? sender, NoteDocumentsDeletedEventArgs e)

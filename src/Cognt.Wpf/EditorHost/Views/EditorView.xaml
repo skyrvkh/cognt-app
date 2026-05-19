@@ -9,17 +9,17 @@
              d:DesignWidth="650">
     <Grid>
         <Border x:Name="EditorWebViewFrame"
-                BorderBrush="#D7DEE8"
+                BorderBrush="{DynamicResource EditorLineBrush}"
                 BorderThickness="1"
-                Background="#FFFFFF">
+                Background="{DynamicResource EditorSurfaceBrush}">
             <blazor:BlazorWebView x:Name="BlockSuiteHostView"
                                   Focusable="True"
                                   HostPage="wwwroot\index.html" />
         </Border>
 
         <Border x:Name="EditorStateOverlay"
-                Background="#FFFFFF"
-                BorderBrush="#D7DEE8"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="1"
                 Visibility="Collapsed">
             <Grid>
@@ -32,14 +32,14 @@
                                TextAlignment="Center"
                                FontSize="18"
                                FontWeight="SemiBold"
-                               Foreground="#142033" />
+                               Foreground="{DynamicResource InkBrush}" />
                     <TextBlock x:Name="EditorStateMessageText"
                                Text="Select a note to view it here."
                                Margin="0,8,0,0"
                                TextAlignment="Center"
                                TextWrapping="Wrap"
                                FontSize="13"
-                               Foreground="#667085" />
+                               Foreground="{DynamicResource MutedBrush}" />
                     <Button x:Name="EditorRetryButton"
                             Content="Retry"
                             Width="88"

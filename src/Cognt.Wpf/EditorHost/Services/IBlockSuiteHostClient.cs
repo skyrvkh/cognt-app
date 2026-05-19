@@ -7,9 +7,13 @@ internal interface IBlockSuiteHostClient
 {
     Task LoadNoteAsync(string? path, string title, string content, string? collectionRoot);
 
+    Task<string> ExportContentAsync();
+
     Task ActivateEditorAsync();
 
     Task SetReadOnlyModeAsync(bool isReadOnly);
+
+    Task ApplyThemeAsync(EditorTheme theme);
 
     Task FocusEditorAsync();
 

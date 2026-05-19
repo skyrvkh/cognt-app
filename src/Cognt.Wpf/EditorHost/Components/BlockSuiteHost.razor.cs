@@ -3,6 +3,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Models.Editor;
 using Cognt.Wpf.EditorHost.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace Cognt.Wpf.EditorHost.Components;
@@ -17,6 +18,9 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = default!;
+
+    [Inject]
+    private ILogger<BlockSuiteHost> Logger { get; set; } = default!;
 
     [Parameter]
     public BlockSuiteHostBridge Bridge { get; set; } = default!;
@@ -36,7 +40,9 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
         try
         {
+            Logger.LogInformation("BlockSuiteHost first render started.");
             dotNetReference = DotNetObjectReference.Create(this);
+            Logger.LogDebug("Importing BlockSuite module. ModulePath={ModulePath}", EditorModulePath);
             module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", EditorModulePath);
             instanceId = await module.InvokeAsync<int>(
                 "mountBlockSuite",
@@ -45,10 +51,12 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
                 StatusElement,
                 dotNetReference);
 
+            Logger.LogInformation("BlockSuiteHost mounted. InstanceId={InstanceId}", instanceId);
             Bridge.Register(this);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "BlockSuiteHost startup failed.");
             Bridge.RegisterStartupFailure(ex);
             System.Diagnostics.Debug.WriteLine($"BlockSuite host startup failed: {ex}");
         }
@@ -56,7 +64,19 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
     async Task IBlockSuiteHostClient.LoadNoteAsync(string? path, string title, string content, string? collectionRoot)
     {
+        Logger.LogInformation(
+            "BlockSuiteHost loading note. InstanceId={InstanceId} Path={Path} Title={Title} ContentLength={ContentLength}",
+            instanceId,
+            path,
+            title,
+            content.Length);
         await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content, collectionRoot);
+        Logger.LogInformation("BlockSuiteHost loaded note. InstanceId={InstanceId} Path={Path}", instanceId, path);
+    }
+
+    async Task<string> IBlockSuiteHostClient.ExportContentAsync()
+    {
+        return await RequireModule().InvokeAsync<string>("exportContent", instanceId);
     }
 
     async Task IBlockSuiteHostClient.ActivateEditorAsync()
@@ -67,6 +87,12 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
     async Task IBlockSuiteHostClient.SetReadOnlyModeAsync(bool isReadOnly)
     {
         await RequireModule().InvokeVoidAsync("setReadOnlyMode", instanceId, isReadOnly);
+    }
+
+    async Task IBlockSuiteHostClient.ApplyThemeAsync(EditorTheme theme)
+    {
+        Logger.LogDebug("BlockSuiteHost applying theme. InstanceId={InstanceId} Theme={ThemeName}", instanceId, theme.Name);
+        await RequireModule().InvokeVoidAsync("applyTheme", instanceId, theme);
     }
 
     async Task IBlockSuiteHostClient.FocusEditorAsync()
@@ -162,6 +188,7 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
     {
         try
         {
+            Logger.LogInformation("BlockSuiteHost disposing. InstanceId={InstanceId}", instanceId);
             if (module is not null && instanceId != 0)
             {
                 await module.InvokeVoidAsync("disposeBlockSuite", instanceId);
@@ -174,10 +201,12 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         }
         catch (Exception ex) when (ex is JSException or InvalidOperationException or ObjectDisposedException)
         {
+            Logger.LogWarning(ex, "BlockSuiteHost disposal skipped. InstanceId={InstanceId}", instanceId);
             System.Diagnostics.Debug.WriteLine($"BlockSuite host disposal skipped: {ex.Message}");
         }
         finally
         {
+            Logger.LogDebug("BlockSuiteHost unregistering. InstanceId={InstanceId}", instanceId);
             Bridge.Unregister(this);
             dotNetReference?.Dispose();
         }

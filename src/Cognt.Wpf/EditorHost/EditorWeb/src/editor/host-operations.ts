@@ -15,6 +15,10 @@ export type MutationPersistenceHost = {
   notifyContentChanged(): Promise<void>;
 };
 
+export type FlushEditorHostOptions = {
+  patchLinkedDocBlocks?: boolean;
+};
+
 export function setDocReadonly(doc: Doc | null, readonly: boolean) {
   doc?.awarenessStore.setReadonly(doc.blockCollection, readonly);
 }
@@ -77,7 +81,10 @@ export async function forceReadonlyRichText(editor: PageEditor) {
   }
 }
 
-export async function flushEditorHost(editor: PageEditor) {
+export async function flushEditorHost(
+  editor: PageEditor,
+  options: FlushEditorHostOptions = {}
+) {
   await editor.updateComplete;
 
   const host = editor.host as (EditorHost & {
@@ -93,6 +100,10 @@ export async function flushEditorHost(editor: PageEditor) {
   host.doc = editor.doc;
   host.requestUpdate?.();
   await host.updateComplete;
+  if (options.patchLinkedDocBlocks === false) {
+    return;
+  }
+
   patchRenderedEmbedLinkedDocBlocks(editor);
   window.requestAnimationFrame(() => patchRenderedEmbedLinkedDocBlocks(editor));
   window.setTimeout(() => patchRenderedEmbedLinkedDocBlocks(editor), 80);

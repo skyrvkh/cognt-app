@@ -26,6 +26,20 @@ public partial class EditorView
         return currentContent;
     }
 
+    public async Task<string> GetContentAsync()
+    {
+        if (!IsHostReady || string.IsNullOrWhiteSpace(currentSourcePath))
+        {
+            return currentContent;
+        }
+
+        currentContent = await WaitWithTimeoutAsync(
+            blockSuiteBridge.ExportContentAsync(),
+            GetDocumentLoadTimeout(currentContent),
+            "The editor did not export the current note.");
+        return currentContent;
+    }
+
     public void ShowLoadingState(string title, string message)
     {
         ShowEditorState(title, message, canRetry: false, showEditor: false);

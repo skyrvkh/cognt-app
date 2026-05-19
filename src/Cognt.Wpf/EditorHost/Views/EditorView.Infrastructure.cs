@@ -1,5 +1,6 @@
 using Cognt.Wpf.EditorHost.Components;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
@@ -26,6 +27,7 @@ public partial class EditorView
 
     private void BindBlockSuiteBridge()
     {
+        blockSuiteBridge.DocumentChanged += BlockSuiteBridge_DocumentChanged;
         blockSuiteBridge.ContentChanged += BlockSuiteBridge_ContentChanged;
         blockSuiteBridge.CreateExtractRequested += BlockSuiteBridge_CreateExtractRequested;
         blockSuiteBridge.SaveClozeRequested += BlockSuiteBridge_SaveClozeRequested;
@@ -45,6 +47,10 @@ public partial class EditorView
 
         if (completedTask != task)
         {
+            logger.LogError(
+                "Editor operation timed out. Operation={Operation} Timeout={Timeout}",
+                timeoutMessage,
+                timeout);
             RunBlockSuiteCommand(task, "timed-out operation");
             throw new TimeoutException(timeoutMessage);
         }
@@ -58,6 +64,10 @@ public partial class EditorView
 
         if (completedTask != task)
         {
+            logger.LogError(
+                "Editor operation timed out. Operation={Operation} Timeout={Timeout}",
+                timeoutMessage,
+                timeout);
             RunBlockSuiteCommand(task, "timed-out operation");
             throw new TimeoutException(timeoutMessage);
         }
@@ -86,7 +96,7 @@ public partial class EditorView
         _ = ObserveBlockSuiteCommandAsync(task, operation);
     }
 
-    private static async Task ObserveBlockSuiteCommandAsync(Task task, string operation)
+    private async Task ObserveBlockSuiteCommandAsync(Task task, string operation)
     {
         try
         {
@@ -94,6 +104,7 @@ public partial class EditorView
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "BlockSuite command failed. Operation={Operation}", operation);
             System.Diagnostics.Debug.WriteLine($"BlockSuite {operation} failed: {ex}");
         }
     }

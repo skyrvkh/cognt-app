@@ -22,6 +22,12 @@ public partial class BlockSuiteHost
     }
 
     [JSInvokable]
+    public void HandleDocumentChanged()
+    {
+        Bridge.RaiseDocumentChanged();
+    }
+
+    [JSInvokable]
     public void HandleCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)
     {
         Bridge.RaiseCreateExtract(sourcePath, selectedContent, selectedPlainText);

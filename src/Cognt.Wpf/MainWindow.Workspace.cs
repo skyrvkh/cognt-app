@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -18,21 +19,65 @@ public partial class MainWindow
     private const double RightPaneDockWidth = 420.0d;
     private readonly Dictionary<LayoutFloatingWindowControl, CancelEventHandler> protectedToolWindowHandlers = new();
 
+    private Task QueueOpenNoteDocumentAsync(string notePath, bool selectInTree)
+    {
+        logger.LogDebug(
+            "Queueing note open. NotePath={NotePath} SelectInTree={SelectInTree}",
+            notePath,
+            selectInTree);
+        return OpenSerializedNoteDocumentAsync(notePath, selectInTree);
+    }
+
+    private async Task OpenSerializedNoteDocumentAsync(string notePath, bool selectInTree)
+    {
+        logger.LogDebug("Waiting for note open gate. NotePath={NotePath}", notePath);
+        await openNoteDocumentGate.WaitAsync();
+
+        try
+        {
+            logger.LogDebug("Entered note open gate. NotePath={NotePath}", notePath);
+            await OpenOrActivateNoteDocumentAsync(notePath, selectInTree);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Serialized note open failed. NotePath={NotePath}", notePath);
+            shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
+        }
+        finally
+        {
+            logger.LogDebug("Leaving note open gate. NotePath={NotePath}", notePath);
+            openNoteDocumentGate.Release();
+        }
+    }
+
     private async Task OpenOrActivateNoteDocumentAsync(string notePath, bool selectInTree)
     {
         if (openNoteDocuments.TryGetValue(notePath, out NoteWorkspaceDocumentSession? existingSession))
         {
-            if (existingSession.IsClosed)
+            logger.LogDebug(
+                "Found existing note session. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor} IsDetached={IsDetached}",
+                notePath,
+                existingSession.IsClosed,
+                existingSession.HasMountedEditor,
+                existingSession.IsDetached);
+            if (existingSession.IsClosed || !existingSession.HasMountedEditor)
             {
-                RemoveNoteDocument(existingSession);
+                logger.LogWarning(
+                    "Discarding stale note session before reopening. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor}",
+                    notePath,
+                    existingSession.IsClosed,
+                    existingSession.HasMountedEditor);
+                DiscardNoteDocumentSession(existingSession);
             }
             else
             {
                 if (existingSession.IsDetached)
                 {
+                    logger.LogInformation("Redocking existing note session. NotePath={NotePath}", notePath);
                     await existingSession.RedockAsync(WorkspaceDocumentPane);
                 }
 
+                logger.LogInformation("Activating existing note session. NotePath={NotePath}", notePath);
                 ActivateMainWorkspaceWindow();
                 ActivateNoteDocument(existingSession, selectInTree);
                 existingSession.Focus();
@@ -43,31 +88,49 @@ public partial class MainWindow
         PreparedNote? note;
         try
         {
-            note = viewModel.PrepareNoteForOpen(notePath);
+            logger.LogDebug("Preparing note for open. NotePath={NotePath}", notePath);
+            note = viewModel.PrepareNoteForOpen(notePath, forceRead: true);
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Prepare note for open failed. NotePath={NotePath}", notePath);
             shellDialogs.ShowWarning("Open Note Failed", $"The note could not be opened: {ex.Message}");
             return;
         }
 
         if (note is null)
         {
+            logger.LogWarning("PrepareNoteForOpen returned null. NotePath={NotePath}", notePath);
             if (openNoteDocuments.TryGetValue(notePath, out NoteWorkspaceDocumentSession? currentSession))
             {
+                if (currentSession.IsClosed || !currentSession.HasMountedEditor)
+                {
+                    logger.LogWarning("Discarding null-prepare stale note session. NotePath={NotePath}", notePath);
+                    DiscardNoteDocumentSession(currentSession);
+                    return;
+                }
+
+                logger.LogInformation("Activating current note session after null prepare. NotePath={NotePath}", notePath);
                 ActivateNoteDocument(currentSession, selectInTree);
             }
 
             return;
         }
 
+        logger.LogInformation(
+            "Creating note document session. NotePath={NotePath} Title={Title} ContentLength={ContentLength}",
+            note.NotePath,
+            note.Title,
+            note.Content.Length);
         NoteWorkspaceDocumentSession session = new(
             viewModel,
             editorViewFactory,
             shellDialogs,
             imageMaskEditorDialogs,
-            OpenOrActivateNoteDocumentAsync,
+            QueueOpenNoteDocumentAsync,
             RefreshOpenDocumentMentionTargets,
+            CreateEditorTheme,
+            loggerFactory.CreateLogger<NoteWorkspaceDocumentSession>(),
             note);
         session.Closed += NoteDocumentSession_Closed;
         session.Activated += NoteDocumentSession_Activated;
@@ -83,18 +146,45 @@ public partial class MainWindow
         try
         {
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+            logger.LogDebug("Initializing note document session. NotePath={NotePath}", note.NotePath);
             await session.InitializeAsync();
+            logger.LogInformation("Note document session initialized. NotePath={NotePath}", note.NotePath);
         }
         catch (Exception ex)
         {
-            WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);
-            openNoteDocuments.Remove(note.NotePath);
-            session.Dispose();
+            logger.LogError(ex, "Note document session initialization failed. NotePath={NotePath}", note.NotePath);
+            DiscardNoteDocumentSession(session);
             shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
             return;
         }
 
         ActivateNoteDocument(session, selectInTree);
+    }
+
+    private void DiscardNoteDocumentSession(NoteWorkspaceDocumentSession session)
+    {
+        logger.LogWarning(
+            "Discarding note document session. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor}",
+            session.NotePath,
+            session.IsClosed,
+            session.HasMountedEditor);
+        bool wasActive = ReferenceEquals(activeNoteDocument, session);
+
+        session.Closed -= NoteDocumentSession_Closed;
+        session.Activated -= NoteDocumentSession_Activated;
+        openNoteDocuments.Remove(session.NotePath);
+
+        if (WorkspaceDocumentPane.Children.Contains(session.LayoutDocument))
+        {
+            WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);
+        }
+
+        session.Dispose();
+
+        if (wasActive)
+        {
+            activeNoteDocument = null;
+        }
     }
 
     private void ActivateMainWorkspaceWindow()
@@ -111,6 +201,11 @@ public partial class MainWindow
 
     private void ActivateNoteDocument(NoteWorkspaceDocumentSession session, bool selectInTree)
     {
+        logger.LogDebug(
+            "Activating note document. NotePath={NotePath} HasMountedEditor={HasMountedEditor} SelectInTree={SelectInTree}",
+            session.NotePath,
+            session.HasMountedEditor,
+            selectInTree);
         bool wasActiveDocument = ReferenceEquals(activeNoteDocument, session);
         activeNoteDocument = session;
         if (session.IsDocked)
@@ -136,7 +231,8 @@ public partial class MainWindow
     private void WorkspaceDockingManager_ActiveContentChanged(object? sender, EventArgs e)
     {
         NoteWorkspaceDocumentSession? session = openNoteDocuments.Values.FirstOrDefault(candidate =>
-            candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent));
+            candidate.HasMountedEditor
+            && candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent));
         if (session is not null)
         {
             ActivateNoteDocument(session, selectInTree: true);
@@ -198,18 +294,23 @@ public partial class MainWindow
             .Where(candidate => deletedPaths.Contains(Path.GetFullPath(candidate.NotePath)))
             .ToArray())
         {
-            await CloseNoteDocumentAsync(session);
+            await CloseNoteDocumentAsync(session, savePendingChanges: false);
         }
     }
 
-    private async Task CloseNoteDocumentAsync(NoteWorkspaceDocumentSession session)
+    private async Task CloseNoteDocumentAsync(NoteWorkspaceDocumentSession session, bool savePendingChanges = true)
     {
+        if (savePendingChanges)
+        {
+            await session.SavePendingChangesAsync();
+        }
+
         if (WorkspaceDocumentPane.Children.Contains(session.LayoutDocument))
         {
             WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);
         }
 
-        await session.CloseAsync();
+        await session.CloseAsync(savePendingChanges: false);
     }
 
     private void RefreshOpenDocumentMentionTargets()
@@ -244,9 +345,10 @@ public partial class MainWindow
         }
 
         return openNoteDocuments.Values.FirstOrDefault(candidate =>
-            candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent)
-            || candidate.LayoutDocument.IsActive
-            || candidate.LayoutDocument.IsSelected);
+            candidate.HasMountedEditor
+            && (candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent)
+                || candidate.LayoutDocument.IsActive
+                || candidate.LayoutDocument.IsSelected));
     }
 
     private static void ShowDockTool(LayoutAnchorable anchorable)
