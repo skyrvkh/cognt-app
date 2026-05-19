@@ -32,7 +32,12 @@ public sealed class GraphCanvas : FrameworkElement
         typeof(GraphCanvas),
         new PropertyMetadata(false));
 
-    private const double IdealDistance = 72.0d;
+    public static readonly DependencyProperty SurfaceBrushProperty = DependencyProperty.Register(
+        nameof(SurfaceBrush),
+        typeof(Brush),
+        typeof(GraphCanvas),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     private const int InitialSimulationFrames = 90;
     private const int InteractionSimulationFrames = 240;
 
@@ -91,6 +96,12 @@ public sealed class GraphCanvas : FrameworkElement
         set => SetValue(IsMiniViewProperty, value);
     }
 
+    public Brush? SurfaceBrush
+    {
+        get => (Brush?)GetValue(SurfaceBrushProperty);
+        set => SetValue(SurfaceBrushProperty, value);
+    }
+
     public void FitToGraph()
     {
         EnsureLayout();
@@ -101,7 +112,10 @@ public sealed class GraphCanvas : FrameworkElement
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
-        drawingContext.DrawRectangle(new SolidColorBrush(Color.FromRgb(248, 250, 255)), null, new Rect(RenderSize));
+        drawingContext.DrawRectangle(
+            SurfaceBrush ?? GetBrush("GraphCanvasBrush", Color.FromRgb(248, 250, 255)),
+            null,
+            new Rect(RenderSize));
 
         KnowledgeGraphReadModel? currentGraph = Graph;
         if (currentGraph is null || currentGraph.Nodes.Count == 0)
@@ -332,7 +346,7 @@ public sealed class GraphCanvas : FrameworkElement
                 .OrderBy(node => node.Title, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            double radius = 88.0d * Math.Max(1, depthGroup.Key);
+            double radius = GetInitialRingRadius(currentGraph, depthGroup.Key);
             double offset = depthGroup.Key % 2 == 0 ? Math.PI / Math.Max(1, nodes.Length) : 0;
 
             for (int i = 0; i < nodes.Length; i++)
@@ -414,6 +428,7 @@ public sealed class GraphCanvas : FrameworkElement
     private bool StepSimulation(KnowledgeGraphReadModel currentGraph)
     {
         EnsureVelocityEntries(currentGraph);
+        double idealDistance = GetIdealDistance(currentGraph);
         Dictionary<string, Vector> forces = currentGraph.Nodes.ToDictionary(
             node => node.DocumentId,
             _ => new Vector(),
@@ -444,7 +459,7 @@ public sealed class GraphCanvas : FrameworkElement
                 }
 
                 double effectiveDistance = Math.Max(26.0d, distance);
-                double strength = IdealDistance * IdealDistance / effectiveDistance;
+                double strength = idealDistance * idealDistance / effectiveDistance;
                 forces[a.DocumentId] += direction * strength;
                 forces[b.DocumentId] -= direction * strength;
             }
@@ -473,7 +488,7 @@ public sealed class GraphCanvas : FrameworkElement
             }
 
             double mentionWeight = Math.Min(3.0d, Math.Max(1.0d, edge.MentionCount));
-            double targetDistance = IdealDistance + 8.0d;
+            double targetDistance = idealDistance + 6.0d;
             double strength = (distance - targetDistance) * 0.090d * mentionWeight;
             forces[edge.SourceDocumentId] += direction * strength;
             forces[edge.TargetDocumentId] -= direction * strength;
@@ -495,7 +510,7 @@ public sealed class GraphCanvas : FrameworkElement
                 Vector radial = new(position.X, position.Y);
                 double radius = radial.Length;
                 radial /= radius;
-                double targetRadius = Math.Max(78.0d, node.Depth * 82.0d);
+                double targetRadius = GetTargetRadius(currentGraph, node.Depth);
                 forces[node.DocumentId] += radial * ((targetRadius - radius) * 0.006d);
             }
         }
@@ -562,9 +577,11 @@ public sealed class GraphCanvas : FrameworkElement
         double maxY = positions.Values.Max(point => point.Y) + 80;
         double width = Math.Max(1, maxX - minX);
         double height = Math.Max(1, maxY - minY);
-        zoom = Math.Clamp(Math.Min(ActualWidth / width, ActualHeight / height), 0.35d, 2.2d);
+        double maxZoom = GetMaxAutoFitZoom(Graph?.Nodes.Count ?? positions.Count);
+        zoom = Math.Clamp(Math.Min(ActualWidth / width, ActualHeight / height), 0.35d, maxZoom);
         Point center = new((minX + maxX) / 2.0d, (minY + maxY) / 2.0d);
         if (centerOnCurrentNode
+            && !IsMiniView
             && Graph?.CurrentDocumentId is { Length: > 0 } currentDocumentId
             && positions.TryGetValue(currentDocumentId, out Point currentPosition))
         {
@@ -638,16 +655,16 @@ public sealed class GraphCanvas : FrameworkElement
             Point end = target - direction * (targetRadius + 5.0d) + normal * offset;
 
             bool highlighted = IsHighlighted(edge.SourceDocumentId) || IsHighlighted(edge.TargetDocumentId);
-            Color color = highlighted
-                ? Color.FromRgb(49, 86, 212)
-                : Color.FromRgb(160, 169, 188);
-            Pen pen = new(new SolidColorBrush(color), highlighted ? 2.0d : 1.2d)
+            Brush edgeBrush = highlighted
+                ? GetBrush("GraphEdgeHighlightBrush", Color.FromRgb(49, 86, 212))
+                : GetBrush("GraphEdgeBrush", Color.FromRgb(160, 169, 188));
+            Pen pen = new(edgeBrush, highlighted ? 2.0d : 1.2d)
             {
                 StartLineCap = PenLineCap.Round,
                 EndLineCap = PenLineCap.Round,
             };
             drawingContext.DrawLine(pen, start, end);
-            DrawArrowHead(drawingContext, end, direction, color, highlighted);
+            DrawArrowHead(drawingContext, end, direction, edgeBrush, highlighted);
 
             if (edge.MentionCount > 1 && zoom > 0.55d)
             {
@@ -671,13 +688,18 @@ public sealed class GraphCanvas : FrameworkElement
             Point center = ToScreen(world);
             double radius = GetNodeRadius(node) * zoom;
             bool highlighted = IsHighlighted(node.DocumentId);
-            Brush fill = new SolidColorBrush(GetNodeFill(node, highlighted));
-            Pen stroke = new(new SolidColorBrush(GetNodeStroke(node, highlighted)), highlighted ? 2.4d : 1.4d);
+            Brush fill = GetNodeFill(node, highlighted);
+            Pen stroke = new(GetNodeStroke(node, highlighted), highlighted ? 2.4d : 1.4d);
             drawingContext.DrawEllipse(fill, stroke, center, radius, radius);
 
             if (node.IsCurrent)
             {
-                drawingContext.DrawEllipse(null, new Pen(new SolidColorBrush(Color.FromRgb(255, 255, 255)), 2.0d), center, radius - 4.0d, radius - 4.0d);
+                drawingContext.DrawEllipse(
+                    null,
+                    new Pen(GetBrush("GraphNodeCurrentRingBrush", Color.FromRgb(255, 255, 255)), 2.0d),
+                    center,
+                    radius - 4.0d,
+                    radius - 4.0d);
             }
 
             if (ShouldDrawNodeLabel(node, highlighted))
@@ -699,7 +721,9 @@ public sealed class GraphCanvas : FrameworkElement
         FormattedText formatted = CreateFormattedText(
             text,
             fontSize,
-            node.IsCurrent ? Brushes.White : new SolidColorBrush(Color.FromRgb(31, 36, 51)));
+            node.IsCurrent
+                ? GetBrush("GraphCurrentNodeLabelForegroundBrush", Color.FromRgb(255, 255, 255))
+                : GetBrush("GraphNodeLabelForegroundBrush", Color.FromRgb(31, 36, 51)));
         Point textPoint = new(
             center.X - formatted.Width / 2.0d,
             center.Y + radius + 6.0d);
@@ -710,8 +734,10 @@ public sealed class GraphCanvas : FrameworkElement
             formatted.Height + 4.0d);
         drawingContext.PushOpacity(opacity);
         drawingContext.DrawRoundedRectangle(
-            new SolidColorBrush(node.IsCurrent ? Color.FromRgb(49, 86, 212) : Color.FromArgb(230, 255, 255, 255)),
-            new Pen(new SolidColorBrush(Color.FromArgb(90, 200, 207, 220)), 1.0d),
+            node.IsCurrent
+                ? GetBrush("GraphCurrentNodeLabelBackgroundBrush", Color.FromRgb(49, 86, 212))
+                : GetBrush("GraphNodeLabelBackgroundBrush", Color.FromArgb(230, 255, 255, 255)),
+            new Pen(GetBrush("GraphToolLineBrush", Color.FromArgb(90, 200, 207, 220)), 1.0d),
             background,
             5.0d,
             5.0d);
@@ -721,10 +747,13 @@ public sealed class GraphCanvas : FrameworkElement
 
     private void DrawBadge(DrawingContext drawingContext, Point center, string text)
     {
-        FormattedText formatted = CreateFormattedText(text, 10.0d, Brushes.White);
+        FormattedText formatted = CreateFormattedText(
+            text,
+            10.0d,
+            GetBrush("GraphBadgeForegroundBrush", Color.FromRgb(255, 255, 255)));
         double radius = Math.Max(8.0d, formatted.Width / 2.0d + 5.0d);
         drawingContext.DrawEllipse(
-            new SolidColorBrush(Color.FromRgb(97, 105, 126)),
+            GetBrush("GraphBadgeBackgroundBrush", Color.FromRgb(97, 105, 126)),
             null,
             center,
             radius,
@@ -736,7 +765,7 @@ public sealed class GraphCanvas : FrameworkElement
         DrawingContext drawingContext,
         Point end,
         Vector direction,
-        Color color,
+        Brush brush,
         bool highlighted)
     {
         Vector normal = new(-direction.Y, direction.X);
@@ -755,7 +784,7 @@ public sealed class GraphCanvas : FrameworkElement
         }
 
         geometry.Freeze();
-        drawingContext.DrawGeometry(new SolidColorBrush(color), null, geometry);
+        drawingContext.DrawGeometry(brush, null, geometry);
     }
 
     private KnowledgeGraphNodeReadModel? HitTestNode(Point screenPoint)
@@ -874,44 +903,141 @@ public sealed class GraphCanvas : FrameworkElement
             : Math.Max(8.0d, 14.0d - node.Depth * 1.4d);
     }
 
-    private static Color GetNodeFill(KnowledgeGraphNodeReadModel node, bool highlighted)
+    private Brush GetNodeFill(KnowledgeGraphNodeReadModel node, bool highlighted)
     {
         if (node.IsCurrent)
         {
-            return Color.FromRgb(49, 86, 212);
+            return GetBrush("GraphNodeCurrentFillBrush", Color.FromRgb(49, 86, 212));
         }
 
         if (highlighted)
         {
-            return Color.FromRgb(255, 245, 225);
+            return GetBrush("GraphNodeHighlightFillBrush", Color.FromRgb(255, 245, 225));
         }
 
-        return node.Depth switch
+        string key = node.Depth switch
+        {
+            1 => "GraphNodeDepthOneFillBrush",
+            2 => "GraphNodeDepthTwoFillBrush",
+            _ => "GraphNodeFillBrush",
+        };
+        Color fallback = node.Depth switch
         {
             1 => Color.FromRgb(218, 245, 235),
             2 => Color.FromRgb(238, 242, 255),
             _ => Color.FromRgb(241, 244, 248),
         };
+        return GetBrush(key, fallback);
     }
 
-    private static Color GetNodeStroke(KnowledgeGraphNodeReadModel node, bool highlighted)
+    private Brush GetNodeStroke(KnowledgeGraphNodeReadModel node, bool highlighted)
     {
         if (highlighted)
         {
-            return Color.FromRgb(222, 112, 43);
+            return GetBrush("GraphNodeHighlightStrokeBrush", Color.FromRgb(222, 112, 43));
         }
 
         if (node.IsCurrent)
         {
-            return Color.FromRgb(28, 58, 176);
+            return GetBrush("GraphNodeCurrentStrokeBrush", Color.FromRgb(28, 58, 176));
         }
 
-        return node.Depth switch
+        string key = node.Depth switch
+        {
+            1 => "GraphNodeDepthOneStrokeBrush",
+            2 => "GraphNodeDepthTwoStrokeBrush",
+            _ => "GraphNodeStrokeBrush",
+        };
+        Color fallback = node.Depth switch
         {
             1 => Color.FromRgb(47, 138, 107),
             2 => Color.FromRgb(86, 105, 192),
             _ => Color.FromRgb(105, 112, 132),
         };
+        return GetBrush(key, fallback);
+    }
+
+    private Brush GetBrush(string resourceKey, Color fallback)
+    {
+        return TryFindResource(resourceKey) as Brush
+            ?? new SolidColorBrush(fallback);
+    }
+
+    private static double GetInitialRingRadius(KnowledgeGraphReadModel graph, int depth)
+    {
+        return Math.Max(
+            34.0d,
+            (52.0d * Math.Max(1, depth) + 6.0d * Math.Max(0, depth - 1)) * GetLayoutScale(graph.Nodes.Count));
+    }
+
+    private static double GetTargetRadius(KnowledgeGraphReadModel graph, int depth)
+    {
+        return Math.Max(34.0d, depth * 48.0d * GetLayoutScale(graph.Nodes.Count));
+    }
+
+    private static double GetIdealDistance(KnowledgeGraphReadModel graph)
+    {
+        return 44.0d * GetLayoutScale(graph.Nodes.Count);
+    }
+
+    private double GetMaxAutoFitZoom(int nodeCount)
+    {
+        if (IsMiniView)
+        {
+            if (nodeCount <= 4)
+            {
+                return 1.05d;
+            }
+
+            if (nodeCount <= 8)
+            {
+                return 1.18d;
+            }
+
+            if (nodeCount <= 16)
+            {
+                return 1.36d;
+            }
+
+            return 1.65d;
+        }
+
+        if (nodeCount <= 4)
+        {
+            return 1.35d;
+        }
+
+        if (nodeCount <= 8)
+        {
+            return 1.55d;
+        }
+
+        if (nodeCount <= 16)
+        {
+            return 1.85d;
+        }
+
+        return 2.2d;
+    }
+
+    private static double GetLayoutScale(int nodeCount)
+    {
+        if (nodeCount <= 4)
+        {
+            return 0.68d;
+        }
+
+        if (nodeCount <= 8)
+        {
+            return 0.78d;
+        }
+
+        if (nodeCount <= 16)
+        {
+            return 0.90d;
+        }
+
+        return 1.05d;
     }
 
     private static Vector ClampVector(Vector vector, double maxLength)
@@ -961,11 +1087,14 @@ public sealed class GraphCanvas : FrameworkElement
 
     private FormattedText CreateFormattedText(string text, double fontSize, Brush brush)
     {
+        FontFamily fontFamily = TryFindResource("AppSansFontFamily") as FontFamily
+            ?? new FontFamily("Inter, Roboto, Noto Sans, Segoe UI");
+
         return new FormattedText(
             text,
             CultureInfo.CurrentUICulture,
             FlowDirection.LeftToRight,
-            new Typeface("Segoe UI"),
+            new Typeface(fontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
             fontSize,
             brush,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);

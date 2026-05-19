@@ -8,7 +8,7 @@
         MinWidth="640"
         MinHeight="420"
         WindowStartupLocation="CenterOwner"
-        Background="#F7F9FC"
+        Background="{DynamicResource PageBrush}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
     <Window.Resources>
@@ -19,9 +19,9 @@
             <Setter Property="MinWidth" Value="86" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="#D9E1EE" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="Foreground" Value="#22304A" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
@@ -41,15 +41,15 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F8FAFF" />
-                    <Setter Property="BorderBrush" Value="#AFC0F8" />
+                    <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#EEF4FF" />
+                    <Setter Property="Background" Value="{DynamicResource NoteFillBrush}" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#EEF2F7" />
-                    <Setter Property="Foreground" Value="#98A2B3" />
+                    <Setter Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource DisabledTextBrush}" />
                     <Setter Property="Cursor" Value="Arrow" />
                 </Trigger>
             </Style.Triggers>
@@ -58,21 +58,21 @@
         <Style x:Key="PrimaryDocumentImportButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource DocumentImportButtonStyle}">
-            <Setter Property="Background" Value="#3156D4" />
-            <Setter Property="BorderBrush" Value="#3156D4" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2448C2" />
-                    <Setter Property="BorderBrush" Value="#2448C2" />
+                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#1E3FAF" />
+                    <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#DCE3EF" />
-                    <Setter Property="BorderBrush" Value="#DCE3EF" />
-                    <Setter Property="Foreground" Value="#667085" />
+                    <Setter Property="Background" Value="{DynamicResource DisabledLineBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource DisabledLineBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
                     <Setter Property="Cursor" Value="Arrow" />
                 </Trigger>
             </Style.Triggers>
@@ -85,14 +85,14 @@
             <Setter Property="MinWidth" Value="30" />
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Foreground" Value="#667085" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FFF1F2" />
-                    <Setter Property="BorderBrush" Value="#FECDCA" />
-                    <Setter Property="Foreground" Value="#B42318" />
+                    <Setter Property="Background" Value="{DynamicResource PdfFillBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource DangerLineBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -101,46 +101,46 @@
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="CornerRadius" Value="999" />
-            <Setter Property="Background" Value="#EEF4FF" />
-            <Setter Property="BorderBrush" Value="#C7D7FE" />
+            <Setter Property="Background" Value="{DynamicResource NoteFillBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
 
         <Style x:Key="StatusBadgeStyle" TargetType="Border">
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="CornerRadius" Value="999" />
-            <Setter Property="Background" Value="#EEF4FF" />
-            <Setter Property="BorderBrush" Value="#C7D7FE" />
+            <Setter Property="Background" Value="{DynamicResource NoteFillBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Importing}">
-                    <Setter Property="Background" Value="#FFF7ED" />
-                    <Setter Property="BorderBrush" Value="#FED7AA" />
+                    <Setter Property="Background" Value="{DynamicResource WarningSurfaceBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource WarningLineBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Success}">
-                    <Setter Property="Background" Value="#ECFDF3" />
-                    <Setter Property="BorderBrush" Value="#ABEFC6" />
+                    <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessLineBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Failed}">
-                    <Setter Property="Background" Value="#FEF3F2" />
-                    <Setter Property="BorderBrush" Value="#FECDCA" />
+                    <Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource DangerLineBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="StatusTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#3156D4" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Importing}">
-                    <Setter Property="Foreground" Value="#B54708" />
+                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Success}">
-                    <Setter Property="Foreground" Value="#067647" />
+                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Status}" Value="{x:Static documentImport:DocumentImportStatus.Failed}">
-                    <Setter Property="Foreground" Value="#B42318" />
+                    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -154,8 +154,8 @@
 
         <Border x:Name="DropZone"
                 Padding="18"
-                Background="#FFFFFF"
-                BorderBrush="#E1E6F0"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="1"
                 CornerRadius="13"
                 AllowDrop="True"
@@ -185,14 +185,14 @@
                                TextAlignment="Center"
                                FontSize="21"
                                FontWeight="SemiBold"
-                               Foreground="#1F2433" />
+                               Foreground="{DynamicResource InkBrush}" />
                     <TextBlock Text="Import DOCX, PDF, or MD files only. DOCX and MD become editable notes; PDFs stay readable in the PDF viewer."
                                Margin="0,7,0,0"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
                                TextWrapping="Wrap"
                                FontSize="12.5"
-                               Foreground="#667085" />
+                               Foreground="{DynamicResource MutedBrush}" />
 
                     <Button Content="Import files"
                             Margin="0,18,0,0"
@@ -220,8 +220,8 @@
                     </Grid.RowDefinitions>
 
                     <Border Padding="13"
-                            Background="#F8FAFF"
-                            BorderBrush="#E1E6F0"
+                            Background="{DynamicResource PanelAltBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
                             CornerRadius="11">
                         <Grid>
@@ -233,11 +233,11 @@
                                 <TextBlock Text="{Binding QueueSummary}"
                                            FontSize="16"
                                            FontWeight="SemiBold"
-                                           Foreground="#1F2433" />
+                                           Foreground="{DynamicResource InkBrush}" />
                                 <TextBlock Text="Ready files will be converted or imported into the current collection."
                                            Margin="0,3,0,0"
                                            FontSize="12"
-                                           Foreground="#667085" />
+                                           Foreground="{DynamicResource MutedBrush}" />
                             </StackPanel>
                             <Button Grid.Column="1"
                                     Content="Import files"
@@ -256,10 +256,10 @@
                                Visibility="{Binding HasMessage, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#475467" />
+                                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMessageError}" Value="True">
-                                        <Setter Property="Foreground" Value="#B42318" />
+                                        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -267,8 +267,8 @@
                     </TextBlock>
 
                     <Border Grid.Row="2"
-                            Background="#FFFFFF"
-                            BorderBrush="#EDF1F7"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource LineSoftBrush}"
                             BorderThickness="1"
                             CornerRadius="10">
                         <ScrollViewer Padding="10"
@@ -279,8 +279,8 @@
                                     <DataTemplate>
                                         <Border Margin="0,0,0,8"
                                                 Padding="10"
-                                                Background="#FFFFFF"
-                                                BorderBrush="#E4E9F2"
+                                                Background="{DynamicResource PanelBrush}"
+                                                BorderBrush="{DynamicResource LineSoftBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="9">
                                             <Grid>
@@ -294,13 +294,13 @@
                                                 <Border Width="38"
                                                         Height="38"
                                                         CornerRadius="10"
-                                                        Background="#EEF4FF"
-                                                        BorderBrush="#C7D7FE"
+                                                        Background="{DynamicResource NoteFillBrush}"
+                                                        BorderBrush="{DynamicResource ControlBorderHoverBrush}"
                                                         BorderThickness="1">
                                                     <TextBlock Text="{Binding TypeLabel}"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
-                                                               Foreground="#3156D4"
+                                                               Foreground="{DynamicResource AccentStrongBrush}"
                                                                FontSize="10"
                                                                FontWeight="SemiBold" />
                                                 </Border>
@@ -309,17 +309,17 @@
                                                             Margin="10,0,12,0"
                                                             VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding FileName}"
-                                                               Foreground="#1F2433"
+                                                               Foreground="{DynamicResource InkBrush}"
                                                                FontSize="13"
                                                                FontWeight="SemiBold"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Text="{Binding ImportModeLabel}"
                                                                Margin="0,2,0,0"
-                                                               Foreground="#667085"
+                                                               Foreground="{DynamicResource MutedBrush}"
                                                                FontSize="12" />
                                                     <TextBlock Text="{Binding ErrorMessage}"
                                                                Margin="0,5,0,0"
-                                                               Foreground="#B42318"
+                                                               Foreground="{DynamicResource DangerBrush}"
                                                                FontSize="12"
                                                                TextWrapping="Wrap"
                                                                Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -331,7 +331,7 @@
                                                     <TextBlock Text="{Binding FileSizeLabel}"
                                                                Margin="0,0,8,0"
                                                                VerticalAlignment="Center"
-                                                               Foreground="#667085"
+                                                               Foreground="{DynamicResource MutedBrush}"
                                                                FontSize="12" />
                                                     <Border Style="{StaticResource StatusBadgeStyle}">
                                                         <TextBlock Text="{Binding StatusLabel}"
@@ -369,8 +369,8 @@
         <Border Grid.Row="1"
                 Margin="0,12,0,0"
                 Padding="12"
-                Background="#FFFFFF"
-                BorderBrush="#E1E6F0"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="1"
                 CornerRadius="12">
             <Grid>

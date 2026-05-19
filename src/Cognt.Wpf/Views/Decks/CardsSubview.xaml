@@ -131,9 +131,9 @@
                                 <DataTemplate>
                                     <Border Padding="18"
                                             CornerRadius="8"
-                                            BorderBrush="{StaticResource LineBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}"
                                             BorderThickness="1"
-                                            Background="#F8FAFC">
+                                            Background="{DynamicResource PanelAltBrush}">
                                         <StackPanel>
                                             <TextBlock Text="{Binding Title}"
                                                        Style="{StaticResource PanelTitleStyle}" />
@@ -160,13 +160,16 @@
                                     <EventSetter Event="PreviewMouseRightButtonDown"
                                                  Handler="CardsDataGridRow_PreviewMouseRightButtonDown" />
                                     <Setter Property="ContextMenu" Value="{StaticResource CardRowContextMenu}" />
-                                    <Setter Property="Background" Value="{Binding RowBackgroundColor, FallbackValue=#FFFFFF}" />
+                                    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
                                     <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                        </DataTrigger>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#F8FAFF" />
+                                            <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
                                         </Trigger>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="#EEF2FF" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                                         </Trigger>
                                     </Style.Triggers>
                                 </Style>
@@ -181,10 +184,38 @@
                                                     VerticalAlignment="Center"
                                                     Padding="7,3"
                                                     CornerRadius="4"
-                                                    BorderBrush="{Binding StatusBorderColor}"
-                                                    BorderThickness="1"
-                                                    Background="{Binding StatusBackgroundColor}">
-                                                <TextBlock Text="{Binding Status}" Foreground="{Binding StatusForegroundColor}" FontSize="12" />
+                                                    BorderThickness="1">
+                                                <Border.Style>
+                                                    <Style TargetType="{x:Type Border}">
+                                                        <Setter Property="Background" Value="{DynamicResource NoteFillBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Relearning">
+                                                                <Setter Property="Background" Value="{DynamicResource WarningSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource WarningLineBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Review">
+                                                                <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource SuccessLineBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding Status}" FontSize="12">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="{x:Type TextBlock}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource BlueBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Relearning">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Review">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -198,10 +229,45 @@
                                                     VerticalAlignment="Center"
                                                     Padding="7,3"
                                                     CornerRadius="4"
-                                                    BorderBrush="{Binding RecallBorderColor}"
-                                                    BorderThickness="1"
-                                                    Background="{Binding RecallBackgroundColor}">
-                                                <TextBlock Text="{Binding Recall}" Foreground="{Binding RecallForegroundColor}" FontSize="12" />
+                                                    BorderThickness="1">
+                                                <Border.Style>
+                                                    <Style TargetType="{x:Type Border}">
+                                                        <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Recall}" Value="Easy">
+                                                                <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource SuccessLineBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Recall}" Value="Good">
+                                                                <Setter Property="Background" Value="{DynamicResource ReviewGoodSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource ReviewGoodLineBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Recall}" Value="Hard">
+                                                                <Setter Property="Background" Value="{DynamicResource WarningSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource WarningLineBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding Recall}" FontSize="12">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="{x:Type TextBlock}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Recall}" Value="Easy">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Recall}" Value="Good">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource BlueBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Recall}" Value="Hard">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -233,7 +299,7 @@
               Grid.RowSpan="2"
               Grid.ColumnSpan="1"
               Panel.ZIndex="20"
-              Background="#660F172A"
+              Background="{DynamicResource WindowScrimBrush}"
               Visibility="{Binding FiltersModalVisibility}">
             <Border MaxWidth="430"
                     MaxHeight="700"
@@ -285,17 +351,17 @@
                                             <Border Grid.Column="1"
                                                     Padding="7,1"
                                                     CornerRadius="8"
-                                                    Background="#E0E7FF">
+                                                    Background="{DynamicResource BadgeSurfaceBrush}">
                                                 <TextBlock Text="{Binding Count}"
                                                            FontSize="10"
-                                                           Foreground="{StaticResource InkBrush}" />
+                                                           Foreground="{DynamicResource InkBrush}" />
                                             </Border>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
+                            <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,20,0,16" />
 
                             <TextBlock Text="SOURCE"
                                        Style="{StaticResource SmallMutedTextStyle}"
@@ -318,17 +384,17 @@
                                             <Border Grid.Column="1"
                                                     Padding="7,1"
                                                     CornerRadius="8"
-                                                    Background="#E0E7FF">
+                                                    Background="{DynamicResource BadgeSurfaceBrush}">
                                                 <TextBlock Text="{Binding Count}"
                                                            FontSize="10"
-                                                           Foreground="{StaticResource InkBrush}" />
+                                                           Foreground="{DynamicResource InkBrush}" />
                                             </Border>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,20,0,16" />
+                            <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,20,0,16" />
 
                             <TextBlock Text="TAGS"
                                        Style="{StaticResource SmallMutedTextStyle}"
@@ -351,10 +417,10 @@
                                             <Border Grid.Column="1"
                                                     Padding="7,1"
                                                     CornerRadius="8"
-                                                    Background="#E0E7FF">
+                                                    Background="{DynamicResource BadgeSurfaceBrush}">
                                                 <TextBlock Text="{Binding Count}"
                                                            FontSize="10"
-                                                           Foreground="{StaticResource InkBrush}" />
+                                                           Foreground="{DynamicResource InkBrush}" />
                                             </Border>
                                         </Grid>
                                     </DataTemplate>

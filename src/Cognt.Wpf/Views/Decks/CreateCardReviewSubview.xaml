@@ -39,14 +39,14 @@
                         <Path Width="14"
                               Height="14"
                               Margin="0,0,8,0"
-                              Stroke="{StaticResource InkBrush}"
+                              Stroke="{DynamicResource InkBrush}"
                               StrokeThickness="1.7"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
                               StrokeLineJoin="Round"
                               Data="M 9 2 L 3 7 L 9 12 M 3 7 L 14 7" />
                         <TextBlock Text="Back to Cards"
-                                   Foreground="{StaticResource InkBrush}"
+                                   Foreground="{DynamicResource InkBrush}"
                                    FontSize="13" />
                     </StackPanel>
                 </Button>
@@ -54,7 +54,7 @@
                            Margin="12,0"
                            Style="{StaticResource MutedTextStyle}" />
                 <TextBlock Text="Add Cards"
-                           Foreground="{StaticResource InkBrush}"
+                           Foreground="{DynamicResource InkBrush}"
                            FontSize="16"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
@@ -107,9 +107,9 @@
                         <Border Margin="0,8,0,0"
                                 MinHeight="36"
                                 CornerRadius="6"
-                                BorderBrush="{StaticResource LineBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1"
-                                Background="#FFFFFF">
+                                Background="{DynamicResource PanelBrush}">
                             <WrapPanel Margin="8,5"
                                        VerticalAlignment="Center">
                                 <ItemsControl ItemsSource="{Binding Tags}">
@@ -122,10 +122,10 @@
                                         <DataTemplate>
                                             <Border Padding="8,3"
                                                     CornerRadius="6"
-                                                    Background="#EEF2FF"
+                                                    Background="{DynamicResource AccentSoftBrush}"
                                                     Margin="0,0,6,4">
                                                 <TextBlock Text="{Binding}"
-                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Foreground="{DynamicResource MutedBrush}"
                                                            FontSize="12" />
                                             </Border>
                                         </DataTemplate>
@@ -136,7 +136,7 @@
                                          Padding="4,1"
                                          BorderThickness="0"
                                          Background="Transparent"
-                                         Foreground="{StaticResource InkBrush}"
+                                         Foreground="{DynamicResource InkBrush}"
                                          Text="{Binding PendingTagText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          TextChanged="TagInputTextBox_TextChanged"
                                          PreviewKeyDown="TagInputTextBox_PreviewKeyDown" />
@@ -161,10 +161,10 @@
                                Style="{StaticResource SmallMutedTextStyle}" />
                 </Grid>
 
-                <Border BorderBrush="{StaticResource LineBrush}"
+                <Border BorderBrush="{DynamicResource LineBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Background="#FFFFFF"
+                        Background="{DynamicResource PanelBrush}"
                         MinHeight="472">
                     <ContentControl x:Name="CardTextEditorHost"
                                     Focusable="True"
