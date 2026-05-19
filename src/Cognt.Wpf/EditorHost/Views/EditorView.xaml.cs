@@ -6,6 +6,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Abstractions;
 using Cognt.Wpf.EditorHost.Models.Editor;
 using Cognt.Wpf.EditorHost.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
@@ -20,8 +21,9 @@ public partial class EditorView : UserControl
         Faulted,
     }
 
-    private readonly BlockSuiteHostBridge blockSuiteBridge = new();
+    private readonly BlockSuiteHostBridge blockSuiteBridge;
     private readonly IServiceProvider serviceProvider;
+    private readonly ILogger<EditorView> logger;
     private IReadOnlyList<KnowledgeMentionTargetReadModel> mentionTargets = [];
     private string currentContent = string.Empty;
     private string currentTitle = string.Empty;
@@ -35,8 +37,10 @@ public partial class EditorView : UserControl
     private bool isRestoringHost;
     private bool suppressBridgeCommands;
     private bool currentReadOnlyState;
+    private EditorTheme? currentTheme;
 
     public event EventHandler<string>? ContentChanged;
+    public event EventHandler? DocumentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
     public event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;
     public event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
@@ -50,9 +54,15 @@ public partial class EditorView : UserControl
 
     public bool IsShowingTransientEditor => isShowingTransientEditor;
 
-    public EditorView(IServiceProvider serviceProvider)
+    public EditorView(
+        IServiceProvider serviceProvider,
+        ILogger<EditorView> logger,
+        ILogger<BlockSuiteHostBridge> bridgeLogger)
     {
         this.serviceProvider = serviceProvider;
+        this.logger = logger;
+        blockSuiteBridge = new BlockSuiteHostBridge(bridgeLogger);
+        this.logger.LogInformation("EditorView constructed.");
         InitializeComponent();
         ConfigureBlockSuiteHost();
         BindBlockSuiteBridge();
@@ -63,6 +73,10 @@ public partial class EditorView : UserControl
 
     public async Task WarmUpAsync()
     {
+        logger.LogDebug(
+            "EditorView warmup started. HostState={HostState} BridgeReady={BridgeReady}",
+            hostState,
+            blockSuiteBridge.IsReady);
         await EnsureViewLoadedAsync();
         UpdateLayout();
         BlockSuiteHostView.UpdateLayout();
@@ -73,15 +87,26 @@ public partial class EditorView : UserControl
             HostStartupTimeout,
             "The BlockSuite host did not finish starting.");
         hostState = EditorHostState.Ready;
+        logger.LogInformation("EditorView warmup completed. HostState={HostState}", hostState);
+
+        if (currentTheme is not null)
+        {
+            await WaitWithTimeoutAsync(
+                blockSuiteBridge.ApplyThemeAsync(currentTheme),
+                EditorOperationTimeout,
+                "The editor did not apply the active theme.");
+        }
     }
 
     private async Task EnsureViewLoadedAsync()
     {
         if (IsLoaded)
         {
+            logger.LogDebug("EditorView already loaded.");
             return;
         }
 
+        logger.LogDebug("Waiting for EditorView Loaded event.");
         TaskCompletionSource loadedCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         void OnLoaded(object? sender, RoutedEventArgs e)
@@ -115,6 +140,12 @@ public partial class EditorView : UserControl
         string? path = null,
         string? collectionRoot = null)
     {
+        logger.LogInformation(
+            "EditorView LoadNote requested. Path={Path} Title={Title} ContentLength={ContentLength} CollectionRoot={CollectionRoot}",
+            path,
+            title,
+            content.Length,
+            collectionRoot);
         ClearTransientEditorState();
         int requestId = ++loadRequestId;
         ShowLoadingState("Loading note", "Opening the selected note...");
@@ -127,6 +158,11 @@ public partial class EditorView : UserControl
 
         if (requestId != loadRequestId)
         {
+            logger.LogWarning(
+                "EditorView LoadNote superseded before bridge load. Path={Path} RequestId={RequestId} CurrentRequestId={CurrentRequestId}",
+                path,
+                requestId,
+                loadRequestId);
             ClearTransientEditorState();
             return;
         }
@@ -141,8 +177,9 @@ public partial class EditorView : UserControl
                 GetDocumentLoadTimeout(content),
                 "The editor did not finish loading the note.");
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "EditorView LoadNote failed. Path={Path} RequestId={RequestId}", path, requestId);
             if (requestId == loadRequestId)
             {
                 currentSourcePath = null;
@@ -154,6 +191,11 @@ public partial class EditorView : UserControl
 
         if (requestId != loadRequestId)
         {
+            logger.LogWarning(
+                "EditorView LoadNote superseded after bridge load. Path={Path} RequestId={RequestId} CurrentRequestId={CurrentRequestId}",
+                path,
+                requestId,
+                loadRequestId);
             return;
         }
 
@@ -162,6 +204,7 @@ public partial class EditorView : UserControl
         SetBlockSuiteHostVisible(true);
         ShowReadyState();
         await FlushMentionTargetsAsync();
+        logger.LogInformation("EditorView LoadNote completed. Path={Path} RequestId={RequestId}", path, requestId);
     }
 
     public async Task SetReadOnlyAsync(bool isReadOnly)
@@ -176,6 +219,16 @@ public partial class EditorView : UserControl
             blockSuiteBridge.SetReadOnlyModeAsync(isReadOnly),
             EditorOperationTimeout,
             "The editor did not change modes.");
+    }
+
+    public void ApplyTheme(EditorTheme theme)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+
+        currentTheme = theme;
+        RunBlockSuiteCommand(
+            blockSuiteBridge.ApplyThemeAsync(theme),
+            "theme update");
     }
 
     public void PostExtractResult(bool ok, string? createdPath = null, string? error = null)
@@ -273,6 +326,11 @@ public partial class EditorView : UserControl
 
     private async void EditorView_Loaded(object sender, RoutedEventArgs e)
     {
+        logger.LogDebug(
+            "EditorView Loaded event. NeedsHostRestore={NeedsHostRestore} IsRestoringHost={IsRestoringHost} BridgeReady={BridgeReady}",
+            needsHostRestore,
+            isRestoringHost,
+            blockSuiteBridge.IsReady);
         if (isRestoringHost || !needsHostRestore)
         {
             hostState = blockSuiteBridge.IsReady ? EditorHostState.Ready : EditorHostState.Loading;
@@ -284,6 +342,10 @@ public partial class EditorView : UserControl
 
     private void EditorView_Unloaded(object sender, RoutedEventArgs e)
     {
+        logger.LogDebug(
+            "EditorView Unloaded event. HostState={HostState} BridgeReady={BridgeReady}",
+            hostState,
+            blockSuiteBridge.IsReady);
         if (!IsLoaded && hostState == EditorHostState.Unloaded)
         {
             return;
@@ -296,9 +358,11 @@ public partial class EditorView : UserControl
     {
         if (isRestoringHost)
         {
+            logger.LogDebug("EditorView restore skipped because restore is already running.");
             return;
         }
 
+        logger.LogInformation("EditorView restore started. Path={Path}", currentSourcePath);
         isRestoringHost = true;
         hostState = EditorHostState.Loading;
         ShowLoadingState("Restoring editor", "Reattaching the note editor...");
@@ -328,12 +392,14 @@ public partial class EditorView : UserControl
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "EditorView restore failed. Path={Path}", currentSourcePath);
             hostState = EditorHostState.Faulted;
             ShowFailedState(ex.Message, canRetry: true);
         }
         finally
         {
             isRestoringHost = false;
+            logger.LogDebug("EditorView restore finished. HostState={HostState}", hostState);
         }
     }
 }
