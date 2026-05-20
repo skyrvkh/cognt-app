@@ -23,7 +23,17 @@ internal sealed partial class SqliteFlashcardStore
         return ToReadModel(repository.LoadReviewSettings());
     }
 
-    internal AppReadModels.FlashcardReviewQueueReadModel LoadReviewQueue(string collectionId)
+    internal AppReadModels.FlashcardReviewQueueReadModel LoadReviewQueue(
+        string collectionId,
+        AppReadModels.FlashcardReviewQueueMode mode = AppReadModels.FlashcardReviewQueueMode.Scheduled,
+        CramScope? cramScope = null)
+    {
+        return mode == AppReadModels.FlashcardReviewQueueMode.Cram
+            ? LoadCramReviewQueue(collectionId, cramScope)
+            : LoadScheduledReviewQueue(collectionId);
+    }
+
+    private AppReadModels.FlashcardReviewQueueReadModel LoadScheduledReviewQueue(string collectionId)
     {
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
         using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
@@ -65,6 +75,59 @@ internal sealed partial class SqliteFlashcardStore
             nextIntradayDueUtc);
     }
 
+    private AppReadModels.FlashcardReviewQueueReadModel LoadCramReviewQueue(
+        string collectionId,
+        CramScope? cramScope)
+    {
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        var (todayStartUtc, tomorrowStartUtc) = GetLocalTodayUtcBounds(nowUtc);
+        CramScope scope = (cramScope ?? CramScope.All).Normalize();
+        PersistenceQueueCounts counts = repository.LoadCramReviewQueueCounts(
+            nowUtc,
+            todayStartUtc,
+            tomorrowStartUtc,
+            scope);
+        IReadOnlyList<PersistenceQueueCandidate> candidates = repository.LoadCramReviewQueueCandidates(
+            nowUtc,
+            todayStartUtc,
+            tomorrowStartUtc,
+            scope);
+        HashSet<long> schedulerEligibleCardIds = candidates
+            .Where(candidate => candidate.Category != PersistenceQueueCategory.New
+                && candidate.DueUtc <= nowUtc)
+            .Select(candidate => candidate.CardId)
+            .ToHashSet();
+        long[] cardIds = candidates
+            .Select(candidate => candidate.CardId)
+            .ToArray();
+        Dictionary<long, FlashcardRecord> cardsById = repository
+            .LoadCardsByIds(cardIds)
+            .ToDictionary(card => card.Id);
+
+        ReviewQueueCards loadedCards = LoadReviewCardsForPlan(collectionPath, cardIds, cardsById);
+        repository.MarkCardsDeleted(loadedCards.StaleCardIds);
+        AppReadModels.FlashcardReviewCardReadModel[] reviewCards = loadedCards.ReviewCards
+            .Select(card => card with
+            {
+                WasDueAtQueueStart = schedulerEligibleCardIds.Contains(card.Id),
+            })
+            .ToArray();
+
+        return new AppReadModels.FlashcardReviewQueueReadModel(
+            reviewCards,
+            CreateCramSummary(
+                ToReadModel(counts),
+                reviewCards.Length,
+                cardIds.Length,
+                Math.Max(0, cardIds.Length - reviewCards.Length)))
+        {
+            Mode = AppReadModels.FlashcardReviewQueueMode.Cram,
+        };
+    }
+
     private static AppReadModels.FlashcardReviewSettingsReadModel ToReadModel(
         PersistenceSettings settings)
     {
@@ -82,7 +145,33 @@ internal sealed partial class SqliteFlashcardStore
             counts.OverdueCards,
             counts.DueCards,
             counts.NewCards,
-            counts.SuspendedCardsExcluded);
+            counts.SuspendedCardsExcluded)
+        {
+            FutureReviewCards = counts.FutureReviewCards,
+        };
+    }
+
+    private static AppReadModels.FlashcardReviewQueueSummaryReadModel CreateCramSummary(
+        AppQueueCounts counts,
+        int queuedCards,
+        int selectedCards,
+        int skippedInvalidCards)
+    {
+        return new AppReadModels.FlashcardReviewQueueSummaryReadModel(
+            counts.LearningDueCards,
+            counts.RelearningDueCards,
+            counts.OverdueCards,
+            counts.DueCards,
+            counts.NewCards,
+            counts.SuspendedCardsExcluded,
+            0,
+            0,
+            queuedCards)
+        {
+            FutureReviewCards = counts.FutureReviewCards,
+            SelectedCards = selectedCards,
+            SkippedInvalidCards = skippedInvalidCards,
+        };
     }
 
     private static AppReviewLimitUsage ToReadModel(PersistenceReviewLimitUsage usage)

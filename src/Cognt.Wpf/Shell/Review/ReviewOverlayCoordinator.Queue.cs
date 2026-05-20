@@ -1,6 +1,7 @@
 using System.Windows.Threading;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.Views;
 
 namespace CogntApp.Shell.Review;
@@ -24,6 +25,17 @@ internal sealed partial class ReviewOverlayCoordinator
             return Task.CompletedTask;
         }
 
+        if (reviewQueue.Mode == FlashcardReviewQueueMode.Cram)
+        {
+            if (exitWhenUnavailable)
+            {
+                ExitReviewRequested?.Invoke(this, EventArgs.Empty);
+                return Task.CompletedTask;
+            }
+
+            throw new InvalidOperationException("No cards match the current cram scope.");
+        }
+
         DateTimeOffset? nextDueUtc = GetPreferredNextDueUtc(reviewQueue);
         if (CanAutoResume(reviewQueue) && nextDueUtc.HasValue)
         {
@@ -43,13 +55,77 @@ internal sealed partial class ReviewOverlayCoordinator
 
     private FlashcardReviewQueueReadModel LoadReviewQueue(string collectionId)
     {
-        return reviewQueueQuery.Execute(new FlashcardCollectionQueryRequest(collectionId));
+        return reviewQueueQuery.Execute(new FlashcardReviewQueueQueryRequest(
+            collectionId,
+            activeQueueMode,
+            activeQueueMode == FlashcardReviewQueueMode.Cram ? activeCramScope : null));
     }
 
     private async Task ReloadReviewQueueAsync(string collectionId, bool exitWhenUnavailable)
     {
         FlashcardReviewQueueReadModel reviewQueue = LoadReviewQueue(collectionId);
         await ShowReviewQueueAsync(reviewQueue, exitWhenUnavailable);
+    }
+
+    private Task ShowMaterializedCramQueueAsync(bool exitWhenUnavailable)
+    {
+        ReviewView review = reviewView
+            ?? throw new InvalidOperationException("The review surface is not ready.");
+        CramSessionState state = activeCramState
+            ?? throw new InvalidOperationException("No active cram session exists.");
+        FlashcardReviewQueueSummaryReadModel summary = activeCramSummary
+            ?? new FlashcardReviewQueueSummaryReadModel(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        if (state.IsEmpty)
+        {
+            review.ShowCramEmptyState(summary);
+            return Task.CompletedTask;
+        }
+
+        if (state.IsComplete)
+        {
+            review.ShowCramCompletion(state.CreateCompletionSummary(DateTimeOffset.UtcNow));
+            return Task.CompletedTask;
+        }
+
+        if (!state.CurrentCardId.HasValue
+            || !activeCramCardsById.TryGetValue(state.CurrentCardId.Value, out FlashcardReviewCardReadModel? card))
+        {
+            if (exitWhenUnavailable)
+            {
+                ExitReviewRequested?.Invoke(this, EventArgs.Empty);
+                return Task.CompletedTask;
+            }
+
+            throw new InvalidOperationException("The next cram card is no longer available.");
+        }
+
+        review.ShowCard(
+            card,
+            summary with
+            {
+                TotalCards = state.ValidCardCount,
+            });
+        review.ShowCramProgress(ToCramProgress(state));
+        return Task.CompletedTask;
+    }
+
+    private static CramReviewProgress ToCramProgress(CramSessionState state)
+    {
+        CramCardProgress progress = state.CurrentProgress
+            ?? throw new InvalidOperationException("No active cram progress exists.");
+        int effectivePasses = progress.EffectivePasses(state.Settings.PassCountingMode);
+        string progressLabel = state.Settings.PassCountingMode == CramPassCountingMode.Consecutive
+            ? "Current streak"
+            : "Successful ratings";
+
+        return new CramReviewProgress(
+            state.MasteredCardCount,
+            state.ValidCardCount,
+            state.RemainingCardCount,
+            progressLabel,
+            effectivePasses,
+            state.Settings.RequiredPassCount,
+            progress.TotalAttempts);
     }
 
     private void ScheduleQueueRefresh(DateTimeOffset dueUtc)
@@ -102,6 +178,16 @@ internal sealed partial class ReviewOverlayCoordinator
 
     private static void EnsureReviewQueueAvailable(FlashcardReviewQueueReadModel reviewQueue)
     {
+        if (reviewQueue.Mode == FlashcardReviewQueueMode.Cram)
+        {
+            if (reviewQueue.Cards.Count == 0)
+            {
+                throw new InvalidOperationException("No cards match the current cram scope.");
+            }
+
+            return;
+        }
+
         if (reviewQueue.Cards.Count == 0 && !CanAutoResume(reviewQueue))
         {
             throw new InvalidOperationException("No review cards are available for the current daily limits.");

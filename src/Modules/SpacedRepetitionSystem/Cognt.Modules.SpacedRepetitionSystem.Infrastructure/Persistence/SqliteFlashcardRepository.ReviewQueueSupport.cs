@@ -15,6 +15,20 @@ internal sealed partial class SqliteFlashcardRepository
             reader.GetInt32(5));
     }
 
+    private static FlashcardReviewQueueCounts ReadCramReviewQueueCounts(SqliteDataReader reader)
+    {
+        return new FlashcardReviewQueueCounts(
+            reader.GetInt32(0),
+            reader.GetInt32(1),
+            reader.GetInt32(2),
+            reader.GetInt32(3),
+            reader.GetInt32(4),
+            reader.GetInt32(5))
+        {
+            FutureReviewCards = reader.GetInt32(6),
+        };
+    }
+
     private static FlashcardReviewLimitUsage ReadReviewLimitUsage(SqliteDataReader reader)
     {
         return new FlashcardReviewLimitUsage(
@@ -53,6 +67,64 @@ internal sealed partial class SqliteFlashcardRepository
         }
 
         return candidates;
+    }
+
+    private static IReadOnlyList<FlashcardReviewQueueCandidate> LoadCandidatesByDynamicKind(
+        SqliteConnection connection,
+        string sql,
+        ReviewQueueQueryBounds bounds,
+        Action<SqliteCommand>? configureCommand = null)
+    {
+        List<FlashcardReviewQueueCandidate> candidates = [];
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$now", bounds.Now);
+        command.Parameters.AddWithValue("$todayStart", bounds.TodayStart);
+        command.Parameters.AddWithValue("$tomorrowStart", bounds.TomorrowStart);
+        configureCommand?.Invoke(command);
+
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            candidates.Add(new FlashcardReviewQueueCandidate(
+                reader.GetInt64(0),
+                (FlashcardReviewQueueCategory)reader.GetInt32(2),
+                DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(1))));
+        }
+
+        return candidates;
+    }
+
+    private static long[] NormalizeDeckScope(IReadOnlySet<long> deckIds)
+    {
+        return deckIds
+            .Where(id => id > 0)
+            .Order()
+            .ToArray();
+    }
+
+    private static string CreateDeckFilterClause(IReadOnlyList<long> deckIds)
+    {
+        return deckIds.Count == 0
+            ? string.Empty
+            : $"AND deck_id IN ({string.Join(", ", CreateDeckParameterNames(deckIds.Count))})";
+    }
+
+    private static void AddDeckFilterParameters(SqliteCommand command, IReadOnlyList<long> deckIds)
+    {
+        string[] names = CreateDeckParameterNames(deckIds.Count);
+        for (int index = 0; index < deckIds.Count; index++)
+        {
+            command.Parameters.AddWithValue(names[index], deckIds[index]);
+        }
+    }
+
+    private static string[] CreateDeckParameterNames(int count)
+    {
+        return Enumerable
+            .Range(0, count)
+            .Select(index => string.Concat("$deckId", index.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+            .ToArray();
     }
 
     private DateTimeOffset? LoadNextFutureDueUtcFromSql(DateTimeOffset nowUtc, string sql)

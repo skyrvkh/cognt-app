@@ -85,6 +85,7 @@ public sealed partial class DecksViewModel
             Statistics.LoadCollection(null);
             CreateCardReview.LoadDecks([]);
             PracticeDueCount = "0";
+            CramCardCount = "0";
             return;
         }
 
@@ -114,6 +115,7 @@ public sealed partial class DecksViewModel
             collectionId,
             selectedDecks.Select(deck => deck.Name).ToArray());
         PracticeDueCount = workspace.PracticeDueCount;
+        CramCardCount = NumericTextFormatter.Format(cardsScopeDecks.Sum(deck => deck.TotalCards));
         CreateCardReview.LoadDecks(workspace.Decks.Select(deck => deck.Name));
     }
 

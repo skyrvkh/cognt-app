@@ -29,6 +29,8 @@ public sealed record FlashcardReviewQueueCounts(
     int SuspendedCardsExcluded)
 {
     public int ReviewDueCards => OverdueCards + DueCards;
+
+    public int FutureReviewCards { get; init; }
 }
 
 public sealed record FlashcardReviewQueuePlan(

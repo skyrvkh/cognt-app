@@ -58,7 +58,20 @@
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
+                    <Button Click="CramButton_Click"
+                            Style="{StaticResource OutlineButtonStyle}"
+                            ToolTip="Cram cards from the selected decks">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Cram"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            <Border Style="{StaticResource PracticeCountBadgeStyle}">
+                                <TextBlock Text="{Binding CramCardCount}"
+                                           Style="{StaticResource PracticeCountTextStyle}" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
                     <Button Click="PracticeButton_Click"
+                            Margin="10,0,0,0"
                             Style="{StaticResource PracticeButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Practice"
