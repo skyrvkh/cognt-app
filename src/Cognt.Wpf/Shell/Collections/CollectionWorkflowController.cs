@@ -64,6 +64,23 @@ internal sealed class CollectionWorkflowController
         popup.IsOpen = false;
     }
 
+    internal void OpenExistingCollection(Popup popup)
+    {
+        ArgumentNullException.ThrowIfNull(popup);
+
+        string? collectionPath = dialogs.PromptForExistingCollectionPath(
+            "Open Existing Collection",
+            viewModel.GetDefaultCollectionCreationParentPath(),
+            viewModel.CollectionDirectoryExtension);
+        if (string.IsNullOrWhiteSpace(collectionPath))
+        {
+            return;
+        }
+
+        viewModel.LoadCollection(collectionPath);
+        popup.IsOpen = false;
+    }
+
     internal void RemoveCurrentCollection(Popup popup)
     {
         ArgumentNullException.ThrowIfNull(popup);

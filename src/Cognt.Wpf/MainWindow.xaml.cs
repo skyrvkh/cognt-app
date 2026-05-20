@@ -248,6 +248,11 @@ public partial class MainWindow : Window
         collectionWorkflow.CreateCollection(CollectionSelectorPopup);
     }
 
+    private void OpenExistingCollectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        collectionWorkflow.OpenExistingCollection(CollectionSelectorPopup);
+    }
+
     private void ImportButton_Click(object sender, RoutedEventArgs e)
     {
         attachmentWorkflow.ShowDocumentImport(this);

@@ -15,6 +15,11 @@ internal interface IShellDialogService
         string defaultName,
         string defaultParentPath,
         string actionLabel);
+
+    string? PromptForExistingCollectionPath(
+        string title,
+        string defaultParentPath,
+        string collectionDirectoryExtension);
 }
 
 internal sealed record CollectionCreationPromptResult(

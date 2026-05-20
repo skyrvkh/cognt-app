@@ -137,6 +137,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<Navigation.CollectionOptionViewModel> AvailableCollections { get; } = [];
 
+    internal string CollectionDirectoryExtension => collectionPathResolver.CollectionDirectoryExtension;
+
     public ObservableCollection<GlobalSearchResultReadModel> GlobalSearchResults { get; } = [];
 
     public ObservableCollection<ThemeOptionViewModel> ThemeOptions { get; } = [];

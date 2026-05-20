@@ -1303,29 +1303,56 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Button Style="{StaticResource CollectionSwitcherPrimaryButtonStyle}"
-                                                AutomationProperties.Name="Add collection"
-                                                Click="AddCollectionButton_Click">
-                                            <StackPanel Orientation="Horizontal"
-                                                        HorizontalAlignment="Center">
-                                                <Path Data="M12,5 L12,19 M5,12 L19,12"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Stretch="Uniform"
-                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                      StrokeThickness="1.8"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round" />
-                                                <TextBlock Text="New collection"
-                                                           Margin="7,0,0,0"
-                                                           FontSize="13"
-                                                           FontWeight="SemiBold" />
-                                            </StackPanel>
-                                        </Button>
+                                        <StackPanel>
+                                            <Button Style="{StaticResource CollectionSwitcherPrimaryButtonStyle}"
+                                                    AutomationProperties.Name="Add collection"
+                                                    Click="AddCollectionButton_Click">
+                                                <StackPanel Orientation="Horizontal"
+                                                            HorizontalAlignment="Center">
+                                                    <Path Data="M12,5 L12,19 M5,12 L19,12"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Stretch="Uniform"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          StrokeThickness="1.8"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round" />
+                                                    <TextBlock Text="New collection"
+                                                               Margin="7,0,0,0"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Style="{StaticResource CollectionPopoverButtonStyle}"
+                                                    AutomationProperties.Name="Open existing collection"
+                                                    Margin="0,6,0,0"
+                                                    Foreground="{DynamicResource AccentStrongBrush}"
+                                                    Click="OpenExistingCollectionButton_Click">
+                                                <StackPanel Orientation="Horizontal"
+                                                            HorizontalAlignment="Center">
+                                                    <Path Data="M4,7 L9,7 L10.5,9 L20,9 L20,18 L4,18 Z"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Stretch="Uniform"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          StrokeThickness="1.7"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round"
+                                                          StrokeLineJoin="Round" />
+                                                    <TextBlock Text="Open existing"
+                                                               Margin="7,0,0,0"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
 
                                         <Button Grid.Column="2"
                                                 Style="{StaticResource CollectionSwitcherDangerButtonStyle}"
+                                                VerticalAlignment="Top"
                                                 ToolTip="Remove current collection"
                                                 AutomationProperties.Name="Remove current collection"
                                                 Click="RemoveCollectionButton_Click">

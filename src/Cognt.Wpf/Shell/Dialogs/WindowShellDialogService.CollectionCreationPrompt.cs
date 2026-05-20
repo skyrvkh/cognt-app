@@ -167,6 +167,42 @@ internal sealed partial class WindowShellDialogService
             : null;
     }
 
+    public string? PromptForExistingCollectionPath(
+        string title,
+        string defaultParentPath,
+        string collectionDirectoryExtension)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(defaultParentPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(collectionDirectoryExtension);
+
+        OpenFolderDialog folderDialog = new()
+        {
+            Title = title,
+            InitialDirectory = Directory.Exists(defaultParentPath)
+                ? defaultParentPath
+                : Environment.CurrentDirectory,
+            Multiselect = false,
+        };
+
+        if (folderDialog.ShowDialog(ownerWindow) != true)
+        {
+            return null;
+        }
+
+        string selectedPath = folderDialog.FolderName.Trim();
+        string directoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(selectedPath));
+        if (!directoryName.EndsWith(collectionDirectoryExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowWarning(
+                title,
+                $"Choose a collection folder ending with \"{collectionDirectoryExtension}\".");
+            return null;
+        }
+
+        return selectedPath;
+    }
+
     private static TextBlock CreateCollectionPromptLabel(string text, Thickness? margin = null)
     {
         return new TextBlock

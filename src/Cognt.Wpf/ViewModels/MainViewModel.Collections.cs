@@ -97,9 +97,15 @@ public sealed partial class MainViewModel
         string collectionDirectoryName = NormalizeCollectionDirectoryName(rawName);
         string collectionPath = Path.Combine(parentPath, collectionDirectoryName);
 
-        if (Directory.Exists(collectionPath) || File.Exists(collectionPath))
+        if (Directory.Exists(collectionPath))
         {
-            throw new InvalidOperationException($"A collection named \"{FormatCollectionName(collectionPath)}\" already exists.");
+            LoadCollection(collectionPath);
+            return;
+        }
+
+        if (File.Exists(collectionPath))
+        {
+            throw new InvalidOperationException($"A file named \"{Path.GetFileName(collectionPath)}\" already exists.");
         }
 
         Directory.CreateDirectory(collectionPath);
