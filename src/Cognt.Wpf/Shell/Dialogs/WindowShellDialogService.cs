@@ -1,12 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using CogntApp.Design;
 
 namespace CogntApp.Shell.Dialogs;
 
 internal sealed partial class WindowShellDialogService(Window owner) : IShellDialogService
 {
-    private static readonly Brush PromptForeground = CreateFrozenSolidColorBrush("#1F2937");
     private readonly Window ownerWindow = owner ?? throw new ArgumentNullException(nameof(owner));
 
     public void ShowInfo(string title, string message)
@@ -35,7 +35,9 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             Width = width,
             ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = Brushes.White,
+            Background = ThemeResourceLookup.Brush("PanelBrush", Brushes.White),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontSize = 13,
             Owner = ownerWindow,
             Content = content,
         };
@@ -51,6 +53,8 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             Margin = margin ?? default,
             IsDefault = isDefault,
             IsCancel = isCancel,
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontSize = 13,
         };
     }
 
@@ -93,19 +97,13 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
         ArgumentNullException.ThrowIfNull(message);
     }
 
-    private static Brush CreateFrozenSolidColorBrush(string color)
-    {
-        SolidColorBrush brush = (SolidColorBrush)new BrushConverter().ConvertFromString(color)!;
-        brush.Freeze();
-        return brush;
-    }
-
     private static TextBlock CreatePromptLabel(string text, Thickness? margin = null)
     {
         return new TextBlock
         {
             Text = text,
-            Foreground = PromptForeground,
+            Foreground = ThemeResourceLookup.Brush("InkBrush", Brushes.Black),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
             FontSize = 13,
             Margin = margin ?? new Thickness(0, 0, 0, 8),
         };
@@ -119,6 +117,8 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             Height = 30,
             Padding = new Thickness(8, 3, 8, 3),
             VerticalContentAlignment = VerticalAlignment.Center,
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontSize = 13,
         };
     }
 }
