@@ -35,6 +35,51 @@ public sealed partial class MainViewModel
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void RenameNoteItem(long itemId, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(openCollectionPath))
+        {
+            throw new InvalidOperationException("No collection is open.");
+        }
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            throw new InvalidOperationException("Name is required.");
+        }
+
+        NoteTreeNodeViewModel? loadedNode = FindTreeNode(itemId);
+        if (loadedNode is not null)
+        {
+            if (string.Equals(newName, loadedNode.Title, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            RenameNode(loadedNode, newName);
+            return;
+        }
+
+        KnowledgeTreeItemReadModel? treeItem = noteService.GetItem(openCollectionPath, itemId)
+            ?? throw new InvalidOperationException("This note no longer exists.");
+
+        if (string.Equals(newName, treeItem.Title, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        noteService.RenameItem(openCollectionPath, itemId, newName);
+
+        if (currentNoteItemId == itemId)
+        {
+            currentNoteTitle = newName;
+            CurrentNoteTitleChanged?.Invoke(this, currentNoteTitle);
+        }
+
+        UpdateRecentNoteTitle(ResolveNotePath(treeItem), newName);
+        RefreshEditorBreadcrumb();
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void RenameNode(NoteTreeNodeViewModel node, string newName)
     {
         EnsureCanModifyNode(node, "renamed");

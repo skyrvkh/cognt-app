@@ -7,6 +7,7 @@ using System.Collections;
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -18,6 +19,7 @@ public partial class MainWindow
 {
     private const double RightPaneDockWidth = 420.0d;
     private readonly Dictionary<LayoutFloatingWindowControl, CancelEventHandler> protectedToolWindowHandlers = new();
+    private bool isCommittingNoteTabRename;
 
     private Task QueueOpenNoteDocumentAsync(string notePath, bool selectInTree)
     {
@@ -648,6 +650,11 @@ public partial class MainWindow
 
     private void NoteDocumentHeader_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (IsNoteTabRenameInput(e.OriginalSource))
+        {
+            return;
+        }
+
         if (ResolveHeaderDocument(sender as DependencyObject) is not { } document)
         {
             return;
@@ -655,6 +662,14 @@ public partial class MainWindow
 
         document.IsSelected = true;
         document.IsActive = true;
+
+        if (e.ClickCount >= 2)
+        {
+            BeginRenameNoteTab(document, (FrameworkElement)sender);
+            e.Handled = true;
+            return;
+        }
+
         noteDocumentDragController.Begin(document, ToScreenDip(((FrameworkElement)sender).PointToScreen(e.GetPosition((IInputElement)sender))));
         Mouse.Capture(sender as IInputElement);
         e.Handled = true;
@@ -662,6 +677,11 @@ public partial class MainWindow
 
     private async void NoteDocumentHeader_PreviewMouseMove(object sender, MouseEventArgs e)
     {
+        if (IsNoteTabRenameInput(e.OriginalSource))
+        {
+            return;
+        }
+
         if (e.LeftButton != MouseButtonState.Pressed
             || ResolveHeaderDocument(sender as DependencyObject) is not { } document)
         {
@@ -689,16 +709,180 @@ public partial class MainWindow
         }
     }
 
+    private void RenameNoteTabMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryResolveLayoutDocument((sender as FrameworkElement)?.DataContext, out LayoutDocument? document)
+            && document is not null
+            && GetContextMenuPlacementTarget(sender) is { } header)
+        {
+            BeginRenameNoteTab(document, header);
+            e.Handled = true;
+        }
+    }
+
     private void NoteDocumentHeader_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         Mouse.Capture(null);
         noteDocumentDragController.Reset();
     }
 
+    private void BeginRenameNoteTab(LayoutDocument document, FrameworkElement header)
+    {
+        NoteWorkspaceDocumentSession? session = FindNoteDocumentSession(document);
+        if (session?.ItemId is not long)
+        {
+            return;
+        }
+
+        TextBox? renameTextBox = FindNamedDescendant<TextBox>(header, "DocumentDockTabRenameTextBox");
+        TextBlock? titleTextBlock = FindNamedDescendant<TextBlock>(header, "DocumentDockTabTitle");
+        if (renameTextBox is null)
+        {
+            return;
+        }
+
+        Mouse.Capture(null);
+        noteDocumentDragController.Reset();
+        renameTextBox.Tag = document;
+        renameTextBox.Text = session.Title;
+        if (titleTextBlock is not null)
+        {
+            titleTextBlock.Visibility = Visibility.Collapsed;
+        }
+
+        renameTextBox.Visibility = Visibility.Visible;
+        Dispatcher.BeginInvoke(() =>
+        {
+            renameTextBox.Focus();
+            Keyboard.Focus(renameTextBox);
+            renameTextBox.SelectAll();
+        }, DispatcherPriority.Input);
+    }
+
+    private void NoteDocumentTabRenameTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox renameTextBox)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            CommitNoteTabRename(renameTextBox);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            CancelNoteTabRename(renameTextBox);
+            e.Handled = true;
+        }
+    }
+
+    private void NoteDocumentTabRenameTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox renameTextBox)
+        {
+            CommitNoteTabRename(renameTextBox);
+        }
+    }
+
+    private void CommitNoteTabRename(TextBox renameTextBox)
+    {
+        if (isCommittingNoteTabRename || renameTextBox.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        LayoutDocument? document = renameTextBox.Tag as LayoutDocument
+            ?? ResolveHeaderDocument(renameTextBox);
+        NoteWorkspaceDocumentSession? session = document is null ? null : FindNoteDocumentSession(document);
+        if (session?.ItemId is not long itemId)
+        {
+            CancelNoteTabRename(renameTextBox);
+            return;
+        }
+
+        string newTitle = renameTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(newTitle))
+        {
+            ShowNoteTabRenameWarning(renameTextBox, "Name is required.");
+            return;
+        }
+
+        if (string.Equals(newTitle, session.Title, StringComparison.Ordinal))
+        {
+            CancelNoteTabRename(renameTextBox);
+            return;
+        }
+
+        isCommittingNoteTabRename = true;
+        try
+        {
+            viewModel.RenameNoteItem(itemId, newTitle);
+            session.UpdateTitle(newTitle);
+            EndNoteTabRename(renameTextBox);
+        }
+        catch (Exception ex)
+        {
+            shellDialogs.ShowWarning("Rename Failed", $"The note could not be renamed:{Environment.NewLine}{ex.Message}");
+            RefocusNoteTabRename(renameTextBox);
+        }
+        finally
+        {
+            isCommittingNoteTabRename = false;
+        }
+    }
+
+    private void ShowNoteTabRenameWarning(TextBox renameTextBox, string message)
+    {
+        isCommittingNoteTabRename = true;
+        try
+        {
+            shellDialogs.ShowWarning("Rename", message);
+        }
+        finally
+        {
+            isCommittingNoteTabRename = false;
+        }
+
+        RefocusNoteTabRename(renameTextBox);
+    }
+
+    private void RefocusNoteTabRename(TextBox renameTextBox)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (renameTextBox.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            renameTextBox.Focus();
+            Keyboard.Focus(renameTextBox);
+            renameTextBox.SelectAll();
+        }, DispatcherPriority.Input);
+    }
+
+    private void CancelNoteTabRename(TextBox renameTextBox)
+    {
+        EndNoteTabRename(renameTextBox);
+    }
+
+    private static void EndNoteTabRename(TextBox renameTextBox)
+    {
+        renameTextBox.Visibility = Visibility.Collapsed;
+        renameTextBox.Tag = null;
+
+        if (VisualTreeHelper.GetParent(renameTextBox) is DependencyObject parent
+            && FindNamedDescendant<TextBlock>(parent, "DocumentDockTabTitle") is { } titleTextBlock)
+        {
+            titleTextBlock.Visibility = Visibility.Visible;
+        }
+    }
+
     private async Task DetachNoteDocumentAsync(LayoutDocument document, Point screenPoint)
     {
-        NoteWorkspaceDocumentSession? session = openNoteDocuments.Values.FirstOrDefault(candidate =>
-            ReferenceEquals(candidate.LayoutDocument, document));
+        NoteWorkspaceDocumentSession? session = FindNoteDocumentSession(document);
         if (session is null || !session.IsDocked)
         {
             return;
@@ -711,6 +895,52 @@ public partial class MainWindow
             RedockNoteDocumentAsync,
             WorkspaceIntersects);
         ActivateNoteDocument(session, selectInTree: true);
+    }
+
+    private NoteWorkspaceDocumentSession? FindNoteDocumentSession(LayoutDocument document)
+    {
+        return openNoteDocuments.Values.FirstOrDefault(candidate =>
+            ReferenceEquals(candidate.LayoutDocument, document));
+    }
+
+    private static FrameworkElement? GetContextMenuPlacementTarget(object sender)
+    {
+        return ((sender as FrameworkElement)?.Parent as ContextMenu)?.PlacementTarget as FrameworkElement;
+    }
+
+    private static bool IsNoteTabRenameInput(object? source)
+    {
+        for (DependencyObject? current = source as DependencyObject; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is TextBox { Name: "DocumentDockTabRenameTextBox" })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static T? FindNamedDescendant<T>(DependencyObject source, string name)
+        where T : FrameworkElement
+    {
+        int childCount = VisualTreeHelper.GetChildrenCount(source);
+        for (int index = 0; index < childCount; index++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(source, index);
+            if (child is T element && string.Equals(element.Name, name, StringComparison.Ordinal))
+            {
+                return element;
+            }
+
+            T? descendant = FindNamedDescendant<T>(child, name);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     private async Task RedockNoteDocumentAsync(NoteWorkspaceDocumentSession session)

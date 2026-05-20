@@ -1408,7 +1408,8 @@
                     Background="{DynamicResource PanelBrush}"
                     BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="14,6">
+                    Padding="14,6"
+                    Visibility="Collapsed">
                 <Border.Style>
                     <Style TargetType="{x:Type Border}">
                         <Setter Property="Visibility" Value="Visible" />
@@ -1511,15 +1512,27 @@
                                     PreviewMouseLeftButtonUp="NoteDocumentHeader_PreviewMouseLeftButtonUp">
                                 <Border.ContextMenu>
                                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="Rename"
+                                                  Click="RenameNoteTabMenuItem_Click" />
                                         <MenuItem Header="Open in New Window"
                                                   Click="OpenNoteInNewWindowMenuItem_Click" />
                                     </ContextMenu>
                                 </Border.ContextMenu>
-                                <TextBlock x:Name="DocumentDockTabTitle"
-                                           Text="{Binding Title}"
-                                           FontSize="12.5"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
+                                <Grid>
+                                    <TextBlock x:Name="DocumentDockTabTitle"
+                                               Text="{Binding Title}"
+                                               FontSize="12.5"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBox x:Name="DocumentDockTabRenameTextBox"
+                                             Text="{Binding Title, Mode=OneWay}"
+                                             MinWidth="120"
+                                             MaxWidth="260"
+                                             Visibility="Collapsed"
+                                             Style="{StaticResource EditorBreadcrumbTextBoxStyle}"
+                                             LostKeyboardFocus="NoteDocumentTabRenameTextBox_LostKeyboardFocus"
+                                             PreviewKeyDown="NoteDocumentTabRenameTextBox_PreviewKeyDown" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </xcad:DockingManager.DocumentHeaderTemplate>
