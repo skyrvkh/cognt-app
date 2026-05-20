@@ -1,6 +1,7 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
@@ -78,9 +79,11 @@ internal sealed partial class SqliteFlashcardStore :
     }
 
     FlashcardReviewQueueReadModel IFlashcardReviewReader.LoadReviewQueue(
-        string collectionId)
+        string collectionId,
+        FlashcardReviewQueueMode mode,
+        CramScope? cramScope)
     {
-        return LoadReviewQueue(collectionId);
+        return LoadReviewQueue(collectionId, mode, cramScope);
     }
 
     internal IReadOnlyList<FlashcardDeckSummaryReadModel> LoadDeckSummaries(string collectionId)

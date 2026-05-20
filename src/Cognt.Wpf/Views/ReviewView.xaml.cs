@@ -98,6 +98,14 @@ public partial class ReviewView : UserControl
         currentMultimodalContent = null;
         ReviewCardImage.Source = null;
         ReviewCardMaskCanvas.Children.Clear();
+        CompletionSummaryText.Visibility = Visibility.Collapsed;
+        CramCompletionSummaryText.Text = string.Empty;
+        CramCompletionOverlay.Visibility = Visibility.Collapsed;
+        ShortcutStrip.Visibility = Visibility.Visible;
+        RatingsPanel.Visibility = Visibility.Visible;
+        StageGapBeforeShortcutsRow.Height = new GridLength(14);
+        StageGapBeforeRatingsRow.Height = new GridLength(16);
+        ExitReviewLabel.Text = "Exit Review";
         RaiseReviewCommandStateChanged();
     }
 

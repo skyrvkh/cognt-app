@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels.Decks;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
@@ -10,6 +11,8 @@ namespace CogntApp.Views;
 public partial class DecksView : UserControl
 {
     internal event EventHandler? PracticeRequested;
+
+    internal event EventHandler<CramRequestedEventArgs>? CramRequested;
 
     internal event EventHandler<CreateCardEditorHostRequestedEventArgs>? CreateCardEditorHostRequested;
 
@@ -42,6 +45,23 @@ public partial class DecksView : UserControl
     private void PracticeButton_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         PracticeRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CramButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        CramSettingsDialog dialog = new()
+        {
+            Owner = Window.GetWindow(this),
+        };
+
+        if (dialog.ShowDialog() != true || dialog.SelectedSettings is null)
+        {
+            return;
+        }
+
+        CramRequested?.Invoke(
+            this,
+            new CramRequestedEventArgs(ViewModel.CreateCramScope(), dialog.SelectedSettings));
     }
 
     private void CreateCardReviewSubview_CardEditorHostRequested(
@@ -113,4 +133,20 @@ public partial class DecksView : UserControl
     {
         WarningMessageRequested?.Invoke(this, e);
     }
+}
+
+internal sealed class CramRequestedEventArgs : EventArgs
+{
+    internal CramRequestedEventArgs(CramScope scope, CrammingSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        Scope = scope;
+        Settings = settings;
+    }
+
+    internal CramScope Scope { get; }
+
+    internal CrammingSettings Settings { get; }
 }

@@ -13,6 +13,17 @@ internal static partial class FlashcardRequestGuards
         return request;
     }
 
+    internal static FlashcardReviewQueueQueryRequest EnsureReviewQueueQueryRequest(
+        FlashcardReviewQueueQueryRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCollectionId(request.CollectionId);
+        return request with
+        {
+            CramScope = request.CramScope?.Normalize(),
+        };
+    }
+
     internal static FlashcardCardsQueryRequest EnsureCardsQueryRequest(
         FlashcardCardsQueryRequest? request)
     {

@@ -2,6 +2,7 @@ using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Shell.Workspace;
+using CogntApp.Views;
 using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
@@ -16,6 +17,11 @@ public partial class MainWindow
     private async void DecksView_PracticeRequested(object? sender, EventArgs e)
     {
         await overlayNavigation.HandlePracticeRequestedAsync();
+    }
+
+    private async void DecksView_CramRequested(object? sender, CramRequestedEventArgs e)
+    {
+        await overlayNavigation.HandleCramRequestedAsync(e.Scope, e.Settings);
     }
 
     private async void DecksView_CreateCardEditorHostRequested(

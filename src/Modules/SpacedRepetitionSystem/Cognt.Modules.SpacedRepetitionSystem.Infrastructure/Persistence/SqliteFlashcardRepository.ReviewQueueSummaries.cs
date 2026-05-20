@@ -1,3 +1,4 @@
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Microsoft.Data.Sqlite;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
@@ -48,6 +49,70 @@ internal sealed partial class SqliteFlashcardRepository
             using SqliteDataReader reader = command.ExecuteReader();
             return reader.Read()
                 ? ReadReviewQueueCounts(reader)
+                : new FlashcardReviewQueueCounts(0, 0, 0, 0, 0, 0);
+        });
+    }
+
+    internal FlashcardReviewQueueCounts LoadCramReviewQueueCounts(
+        DateTimeOffset nowUtc,
+        DateTimeOffset todayStartUtc,
+        DateTimeOffset tomorrowStartUtc,
+        CramScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        long now = nowUtc.ToUnixTimeSeconds();
+        long todayStart = todayStartUtc.ToUnixTimeSeconds();
+        long tomorrowStart = tomorrowStartUtc.ToUnixTimeSeconds();
+        long[] deckIds = NormalizeDeckScope(scope.DeckIds);
+        string deckFilter = CreateDeckFilterClause(deckIds);
+        string activeScopePredicate = scope.ExcludeSuspendedCards
+            ? "is_suspended = 0"
+            : "1 = 1";
+        string suspendedExcludedExpression = scope.ExcludeSuspendedCards
+            ? $"""
+              COALESCE(SUM(CASE
+                  WHEN is_suspended = 1
+                   AND state IN ({NewStateValue}, {LearningStateValue}, {ReviewStateValue}, {RelearningStateValue})
+                  THEN 1 ELSE 0 END), 0)
+              """
+            : "0";
+
+        return UseConnection(connection =>
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = $"""
+                SELECT
+                    COALESCE(SUM(CASE WHEN {activeScopePredicate} AND state = {LearningStateValue} THEN 1 ELSE 0 END), 0) AS learning_cards,
+                    COALESCE(SUM(CASE WHEN {activeScopePredicate} AND state = {RelearningStateValue} THEN 1 ELSE 0 END), 0) AS relearning_cards,
+                    COALESCE(SUM(CASE WHEN {activeScopePredicate} AND state = {ReviewStateValue} AND due_at < $todayStart THEN 1 ELSE 0 END), 0) AS overdue_cards,
+                    COALESCE(SUM(CASE
+                        WHEN {activeScopePredicate}
+                         AND state = {ReviewStateValue}
+                         AND due_at >= $todayStart
+                         AND due_at < $tomorrowStart
+                         AND due_at <= $now
+                        THEN 1 ELSE 0 END), 0) AS due_cards,
+                    COALESCE(SUM(CASE WHEN {activeScopePredicate} AND state = {NewStateValue} THEN 1 ELSE 0 END), 0) AS new_cards,
+                    {suspendedExcludedExpression} AS suspended_cards_excluded,
+                    COALESCE(SUM(CASE
+                        WHEN {activeScopePredicate}
+                         AND state = {ReviewStateValue}
+                         AND due_at > $now
+                        THEN 1 ELSE 0 END), 0) AS future_review_cards
+                FROM flashcard_card
+                WHERE is_deleted = 0
+                  AND back_rel_path IS NULL
+                  {deckFilter};
+                """;
+            command.Parameters.AddWithValue("$now", now);
+            command.Parameters.AddWithValue("$todayStart", todayStart);
+            command.Parameters.AddWithValue("$tomorrowStart", tomorrowStart);
+            AddDeckFilterParameters(command, deckIds);
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            return reader.Read()
+                ? ReadCramReviewQueueCounts(reader)
                 : new FlashcardReviewQueueCounts(0, 0, 0, 0, 0, 0);
         });
     }

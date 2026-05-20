@@ -12,7 +12,16 @@ public sealed record FlashcardReviewCardReadModel(
     FlashcardContentKind BackContentKind = FlashcardContentKind.LegacyText,
     FlashcardMaterializationStatus MaterializationStatus = FlashcardMaterializationStatus.Ok,
     MultimodalClozeReadModel? FrontMultimodalContent = null,
-    MultimodalClozeReadModel? BackMultimodalContent = null);
+    MultimodalClozeReadModel? BackMultimodalContent = null)
+{
+    public bool WasDueAtQueueStart { get; init; }
+}
+
+public enum FlashcardReviewQueueMode
+{
+    Scheduled = 0,
+    Cram = 1,
+}
 
 public sealed record FlashcardReviewSettingsReadModel(
     int MaximumReviewCardsPerDay,
@@ -48,7 +57,10 @@ public sealed record FlashcardReviewQueueReadModel(
     IReadOnlyList<FlashcardReviewCardReadModel> Cards,
     FlashcardReviewQueueSummaryReadModel Summary,
     DateTimeOffset? NextDueUtc = null,
-    DateTimeOffset? NextIntradayDueUtc = null);
+    DateTimeOffset? NextIntradayDueUtc = null)
+{
+    public FlashcardReviewQueueMode Mode { get; init; } = FlashcardReviewQueueMode.Scheduled;
+}
 
 public sealed record FlashcardReviewQueueSummaryReadModel(
     int LearningDueCards,
@@ -59,4 +71,11 @@ public sealed record FlashcardReviewQueueSummaryReadModel(
     int SuspendedCardsExcluded,
     int ReviewLimitExcluded,
     int NewLimitExcluded,
-    int TotalCards);
+    int TotalCards)
+{
+    public int FutureReviewCards { get; init; }
+
+    public int SelectedCards { get; init; }
+
+    public int SkippedInvalidCards { get; init; }
+}

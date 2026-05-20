@@ -1,6 +1,7 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ public static class SpacedRepetitionModule
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IFlashcardScheduler>(_ => new FsrsFlashcardScheduler());
+        services.AddSingleton<ICramSessionEngine>(_ => new CramSessionEngine());
         services.AddSingleton<SqliteFlashcardStore>(provider =>
             new SqliteFlashcardStore(provider.GetRequiredService<IFlashcardScheduler>()));
         services.AddSingleton<IFlashcardDeckReader>(provider => provider.GetRequiredService<SqliteFlashcardStore>());

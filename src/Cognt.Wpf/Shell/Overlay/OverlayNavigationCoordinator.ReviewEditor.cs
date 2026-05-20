@@ -1,3 +1,4 @@
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels.Decks.PresentationModels;
 
 namespace CogntApp.Shell.Overlay;
@@ -9,6 +10,16 @@ internal sealed partial class OverlayNavigationCoordinator
         int requestId = ++editorOpenRequestId;
         viewModel.SaveCurrentNoteFromEditor();
         await TryShowReviewOverlayAsync(requestId);
+    }
+
+    internal async Task HandleCramRequestedAsync(CramScope scope, CrammingSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        int requestId = ++editorOpenRequestId;
+        viewModel.SaveCurrentNoteFromEditor();
+        await TryShowCramOverlayAsync(requestId, scope, settings);
     }
 
     internal async Task HandleCreateCardEditorHostRequestedAsync(CreateCardEditorHostRequestedEventArgs e)

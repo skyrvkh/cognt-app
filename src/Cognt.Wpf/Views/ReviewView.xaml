@@ -167,6 +167,9 @@
                             <TextBlock x:Name="QueueDueText"
                                        Margin="8,0"
                                        Style="{StaticResource SmallMutedTextStyle}" />
+                            <TextBlock x:Name="QueueFutureText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}" />
                             <TextBlock x:Name="QueueNewText"
                                        Margin="8,0"
                                        Style="{StaticResource SmallMutedTextStyle}" />
@@ -181,6 +184,24 @@
                                        Foreground="{DynamicResource InkBrush}"
                                        FontSize="12"
                                        FontWeight="SemiBold" />
+                            <TextBlock x:Name="CramMasteredText"
+                                       Margin="8,0"
+                                       Foreground="{DynamicResource InkBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Visibility="Collapsed" />
+                            <TextBlock x:Name="CramRemainingText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       Visibility="Collapsed" />
+                            <TextBlock x:Name="CramCurrentProgressText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       Visibility="Collapsed" />
+                            <TextBlock x:Name="CramAttemptsText"
+                                       Margin="8,0"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       Visibility="Collapsed" />
                         </WrapPanel>
                     </Border>
 
@@ -344,6 +365,14 @@
                                                    FontSize="14"
                                                    TextAlignment="Center"
                                                    TextWrapping="Wrap" />
+                                        <TextBlock x:Name="CompletionSummaryText"
+                                                   Margin="0,12,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedBrush}"
+                                                   FontSize="13"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="Collapsed" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -566,5 +595,76 @@
                 </Grid>
             </Grid>
         </ScrollViewer>
+
+        <Grid x:Name="CramCompletionOverlay"
+              Grid.RowSpan="2"
+              Background="#990F172A"
+              Visibility="Collapsed">
+            <Border Width="520"
+                    MaxWidth="620"
+                    MaxHeight="680"
+                    Padding="28"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource PanelBrush}"
+                    BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="36"
+                                      Direction="270"
+                                      Opacity="0.22"
+                                      ShadowDepth="10"
+                                      Color="{DynamicResource ShadowColor}" />
+                </Border.Effect>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Cram session complete"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource InkBrush}"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center" />
+                    <TextBlock Text="Every valid selected card reached the configured mastery target."
+                               Grid.Row="1"
+                               Margin="0,8,0,18"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource MutedBrush}"
+                               FontSize="14"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap" />
+
+                    <ScrollViewer Grid.Row="2"
+                                  MaxHeight="360"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="CramCompletionSummaryText"
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   FontSize="14"
+                                   LineHeight="24"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </ScrollViewer>
+
+                    <Button Grid.Row="3"
+                            Width="140"
+                            Height="40"
+                            Margin="0,22,0,0"
+                            HorizontalAlignment="Center"
+                            Click="ExitReview_Click"
+                            Style="{StaticResource PrimaryButtonStyle}">
+                        <TextBlock Text="Close"
+                                   HorizontalAlignment="Center" />
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

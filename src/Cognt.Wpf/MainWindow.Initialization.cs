@@ -21,6 +21,7 @@ public partial class MainWindow
         noteCardQueueView.OpenImageOcclusionRequested += NoteCardQueueView_OpenImageOcclusionRequested;
 
         decksView.PracticeRequested += DecksView_PracticeRequested;
+        decksView.CramRequested += DecksView_CramRequested;
         decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
         decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
         decksView.InfoMessageRequested += DecksView_InfoMessageRequested;

@@ -32,7 +32,10 @@ internal sealed record FlashcardReviewQueueCounts(
     int OverdueCards,
     int DueCards,
     int NewCards,
-    int SuspendedCardsExcluded);
+    int SuspendedCardsExcluded)
+{
+    internal int FutureReviewCards { get; init; }
+}
 
 internal sealed record FlashcardReviewSettingsReadModel(
     int MaximumReviewCardsPerDay,

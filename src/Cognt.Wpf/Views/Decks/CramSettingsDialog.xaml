@@ -1,0 +1,132 @@
+<Window x:Class="CogntApp.Views.Decks.CramSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cram Settings"
+        Width="520"
+        Height="560"
+        MinWidth="480"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource PageBrush}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <Border Margin="18"
+            Padding="20"
+            Style="{StaticResource PanelStyle}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="Cram Session"
+                           Style="{StaticResource PanelTitleStyle}"
+                           FontSize="20" />
+                <TextBlock Text="Configure how many successful ratings each selected card needs before it is mastered."
+                           Margin="0,8,0,0"
+                           TextWrapping="Wrap"
+                           Style="{StaticResource MutedTextStyle}" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1"
+                          Margin="0,22,0,18"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Required successful ratings"
+                               Style="{StaticResource MutedTextStyle}"
+                               FontWeight="SemiBold" />
+                    <TextBox Width="92"
+                             HorizontalAlignment="Left"
+                             Margin="0,8,0,18"
+                             Text="{Binding RequiredPassCountText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBoxStyle}" />
+
+                    <TextBlock Text="Ratings that count"
+                               Style="{StaticResource MutedTextStyle}"
+                               FontWeight="SemiBold" />
+                    <StackPanel Margin="0,8,0,18">
+                        <CheckBox Content="Hard"
+                                  IsChecked="{Binding CountHardAsPass, Mode=TwoWay}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Good"
+                                  IsChecked="{Binding CountGoodAsPass, Mode=TwoWay}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Easy"
+                                  IsChecked="{Binding CountEasyAsPass, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <TextBlock Text="Counting"
+                               Style="{StaticResource MutedTextStyle}"
+                               FontWeight="SemiBold" />
+                    <StackPanel Margin="0,8,0,18">
+                        <RadioButton Content="Cumulative"
+                                     GroupName="PassCountingMode"
+                                     IsChecked="{Binding UseCumulativeCounting, Mode=TwoWay}"
+                                     Margin="0,0,0,8" />
+                        <RadioButton Content="Consecutive"
+                                     GroupName="PassCountingMode"
+                                     IsChecked="{Binding UseConsecutiveCounting, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <TextBlock Text="Show an unmastered card again after"
+                               Style="{StaticResource MutedTextStyle}"
+                               FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,8,0,18">
+                        <TextBox Width="92"
+                                 Text="{Binding RetryAfterOtherCardsText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource InputTextBoxStyle}" />
+                        <TextBlock Text="other cards"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource MutedTextStyle}" />
+                    </StackPanel>
+
+                    <CheckBox Content="Randomize cards with equal review count"
+                              IsChecked="{Binding ShuffleRemainingCards, Mode=TwoWay}"
+                              Margin="0,0,0,10" />
+                    <CheckBox Content="Apply ratings to normal schedule"
+                              IsChecked="{Binding AffectNormalSchedule, Mode=TwoWay}" />
+
+                    <Border Margin="0,18,0,0"
+                            Padding="12"
+                            Background="#FFF7ED"
+                            BorderBrush="#FDBA74"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasValidationMessage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding ValidationMessage}"
+                                   Foreground="#9A3412"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Grid Grid.Row="2">
+                <Button Content="Cancel"
+                        Width="92"
+                        HorizontalAlignment="Left"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource OutlineButtonStyle}" />
+                <Button Content="Start Cramming"
+                        Width="142"
+                        HorizontalAlignment="Right"
+                        Command="{Binding StartCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 
@@ -15,6 +16,7 @@ public sealed partial class DecksViewModel : ObservableObject
     private string collectionId = string.Empty;
     private string? sourceRelPath;
     private string practiceDueCount = "0";
+    private string cramCardCount = "0";
 
     internal event EventHandler<UserMessageRequestedEventArgs>? InfoMessageRequested;
 
@@ -68,5 +70,21 @@ public sealed partial class DecksViewModel : ObservableObject
     {
         get => practiceDueCount;
         private set => SetProperty(ref practiceDueCount, value);
+    }
+
+    public string CramCardCount
+    {
+        get => cramCardCount;
+        private set => SetProperty(ref cramCardCount, value);
+    }
+
+    internal CramScope CreateCramScope()
+    {
+        return new CramScope
+        {
+            DeckIds = Decks.SelectedDeckIds.ToHashSet(),
+            IncludeSubdecks = true,
+            ExcludeSuspendedCards = true,
+        };
     }
 }

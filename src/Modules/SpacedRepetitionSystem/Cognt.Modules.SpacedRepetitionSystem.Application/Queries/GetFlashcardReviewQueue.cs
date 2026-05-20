@@ -12,6 +12,13 @@ internal sealed class GetFlashcardReviewQueue(IFlashcardReviewReader flashcardRe
     {
         request = FlashcardRequestGuards.EnsureCollectionQueryRequest(request);
 
-        return reviews.LoadReviewQueue(request.CollectionId);
+        return Execute(new FlashcardReviewQueueQueryRequest(request.CollectionId));
+    }
+
+    public FlashcardReviewQueueReadModel Execute(FlashcardReviewQueueQueryRequest request)
+    {
+        request = FlashcardRequestGuards.EnsureReviewQueueQueryRequest(request);
+
+        return reviews.LoadReviewQueue(request.CollectionId, request.Mode, request.CramScope);
     }
 }

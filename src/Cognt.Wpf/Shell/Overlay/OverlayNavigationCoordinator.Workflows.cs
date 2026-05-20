@@ -1,4 +1,5 @@
 using System.Windows;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels;
 
 namespace CogntApp.Shell.Overlay;
@@ -40,6 +41,29 @@ internal sealed partial class OverlayNavigationCoordinator
             }
 
             dialogs.ShowWarning("Review Not Ready", $"Review mode could not start: {ex.Message}");
+            await CloseReviewIfActiveAsync();
+            ShowDecksOverlay();
+        }
+    }
+
+    private async Task TryShowCramOverlayAsync(
+        int requestId,
+        CramScope scope,
+        CrammingSettings settings)
+    {
+        try
+        {
+            await CloseCreateCardEditorIfActiveAsync();
+            await reviewOverlay.ShowCramOverlayAsync(scope, settings);
+        }
+        catch (Exception ex)
+        {
+            if (requestId != editorOpenRequestId)
+            {
+                return;
+            }
+
+            dialogs.ShowWarning("Cram Not Ready", $"Cram mode could not start: {ex.Message}");
             await CloseReviewIfActiveAsync();
             ShowDecksOverlay();
         }
