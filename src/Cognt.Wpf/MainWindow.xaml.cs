@@ -6,6 +6,7 @@ using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Wpf.EditorHost;
 using Cognt.Wpf.EditorHost.Views;
 using CogntApp.Features.NoteToCard;
@@ -78,6 +79,7 @@ public partial class MainWindow : Window
         NoteGraphToolView noteGraphToolView,
         IFlashcardReviewQueueQuery reviewQueueQuery,
         IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
+        ICramSessionEngine cramSessionEngine,
         DecksView decksView,
         IImageMaskEditorDialogService imageMaskEditorDialogs,
         IEditorViewFactory editorViewFactory,
@@ -125,6 +127,7 @@ public partial class MainWindow : Window
             shellDialogs,
             reviewQueueQuery,
             recordFlashcardReviewCommand,
+            cramSessionEngine,
             () => this.viewModel.OpenCollectionPath);
         overlayNavigation = new OverlayNavigationCoordinator(
             shellDialogs,
