@@ -8,6 +8,92 @@
              d:DesignWidth="1120"
              Background="{DynamicResource PageBrush}">
 
+    <UserControl.Resources>
+        <Style x:Key="SettingsNumberTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource InputTextBoxStyle}">
+            <Setter Property="Width" Value="128" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentStrongBrush}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftBrush}" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
+                    <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.65" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SettingsWideTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource SettingsNumberTextBoxStyle}">
+            <Setter Property="Width" Value="128" />
+            <Setter Property="TextAlignment" Value="Left" />
+        </Style>
+
+        <Style x:Key="SettingsToggleButtonStyle"
+               TargetType="{x:Type ToggleButton}">
+            <Setter Property="Width" Value="128" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="Root"
+                                Background="{DynamicResource ControlBrush}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <TextBlock x:Name="StateText"
+                                       Text="Off"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource MutedBrush}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="StateText" Property="Text" Value="On" />
+                                <Setter TargetName="StateText" Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.65" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
         <Grid MaxWidth="920"
@@ -17,25 +103,10 @@
                 <StackPanel>
                     <TextBlock Text="Settings"
                                Style="{StaticResource AppPageTitleTextStyle}" />
-                    <TextBlock Text="Editor and appearance settings are app-wide. Graph and review settings are saved with the current collection."
+                    <TextBlock Text="Appearance, editor, graph, and review preferences are saved with the current collection."
                                Margin="0,10,0,0"
                                Style="{StaticResource MetaTextStyle}" />
                 </StackPanel>
-
-                <Border Margin="0,28,0,0"
-                        Style="{StaticResource PanelCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="Appearance"
-                                   Style="{StaticResource PanelTitleStyle}" />
-                        <TextBlock Text="{Binding CurrentThemeDescription}"
-                                   Margin="0,8,0,0"
-                                   Style="{StaticResource MetaTextStyle}" />
-                        <ToggleButton Margin="0,18,0,0"
-                                      HorizontalAlignment="Left"
-                                      IsChecked="{Binding IsGraphiteTheme, Mode=TwoWay}"
-                                      Style="{StaticResource ThemeModeToggleStyle}" />
-                    </StackPanel>
-                </Border>
 
                 <Border Margin="0,28,0,0"
                         Padding="18"
@@ -58,7 +129,7 @@
                                    FontSize="15"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource InkBrush}" />
-                        <TextBlock Text="Collection settings are saved per `.cognt` collection and are loaded when you switch collections."
+                        <TextBlock Text="Collection settings are saved per .cognt collection and are loaded when you switch collections."
                                    Margin="0,8,0,0"
                                    Style="{StaticResource MetaTextStyle}"
                                    TextWrapping="Wrap" />
@@ -77,179 +148,177 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
+
                     <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Appearance"
+                                           Style="{StaticResource PanelTitleStyle}" />
+                                <TextBlock Text="{Binding CurrentThemeDescription}"
+                                           Margin="0,6,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1"
+                                          Margin="28,0,0,0"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          IsChecked="{Binding IsGraphiteTheme, Mode=TwoWay}"
+                                          Style="{StaticResource ThemeModeToggleStyle}" />
+                        </Grid>
+
+                        <Border Height="1"
+                                Margin="0,24,0,0"
+                                Background="{DynamicResource LineBrush}" />
+
                         <TextBlock Text="Interface"
+                                   Margin="0,24,0,0"
                                    Style="{StaticResource PanelTitleStyle}" />
-                        <Grid Margin="0,18,0,26">
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Global text size"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Applies to shared navigation text, breadcrumbs, note titles, and attachment titles."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     Text="{Binding GlobalTextFontSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Auto-save"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Collection-local editor save behavior."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1"
+                                          Style="{StaticResource SettingsToggleButtonStyle}"
+                                          IsChecked="{Binding IsAutoSaveEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Auto-save interval"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Minutes after the latest edit before timed auto-save runs."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     IsEnabled="{Binding IsAutoSaveEnabled}"
+                                     Text="{Binding AutoSaveIntervalMinutesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Save on close"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Save pending note changes when a tab, detached note, or the app closes."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1"
+                                          Style="{StaticResource SettingsToggleButtonStyle}"
+                                          IsChecked="{Binding IsSaveOnCloseEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Border Margin="0,16,0,0"
+                                Padding="14"
+                                Background="{DynamicResource DangerSurfaceBrush}"
+                                BorderBrush="{DynamicResource DangerLineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <Border.Style>
+                                <Style TargetType="{x:Type Border}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasAutoSaveSettingsValidationMessage}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding AutoSaveSettingsValidationMessage}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource DangerBrush}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border Height="1"
+                                Margin="0,24,0,0"
+                                Background="{DynamicResource LineBrush}" />
+
+                        <Grid Margin="0,24,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="Global text size"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource InkBrush}" />
-                                <TextBlock Text="Applies to shared navigation text such as breadcrumbs, note titles, and attachment titles."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}"
-                                           TextWrapping="Wrap" />
-                                <Slider Minimum="9"
-                                        Maximum="18"
-                                        TickFrequency="1"
-                                        IsSnapToTickEnabled="True"
-                                        Margin="0,14,0,0"
-                                        Value="{Binding GlobalTextFontSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Graph"
+                                           Style="{StaticResource PanelTitleStyle}" />
+                                <TextBlock Text="{Binding CurrentCollectionName}"
+                                           Margin="0,6,0,0"
+                                           Style="{StaticResource MetaTextStyle}" />
                             </StackPanel>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding GlobalTextFontSize, StringFormat={}{0:0}px}"
-                                       Margin="20,0,0,0"
-                                       VerticalAlignment="Top"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentStrongBrush}" />
+                                       Text="Loading graph settings..."
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource MutedBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsGraphSettingsLoading}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Grid>
 
-                        <Border Margin="0,0,0,30"
-                                Padding="16"
-                                Background="{DynamicResource PanelAltBrush}"
-                                BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Auto-save"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkBrush}" />
-                                        <TextBlock Text="When off, editing does not save on every change. Notes are still saved when their tab or the app closes."
-                                                   Margin="0,4,0,0"
-                                                   Style="{StaticResource MetaTextStyle}"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding AutoSaveIntervalSummary}"
-                                               Margin="20,0,0,0"
-                                               VerticalAlignment="Top"
-                                               FontSize="13"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AccentStrongBrush}" />
-                                </Grid>
-
-                                <CheckBox Margin="0,16,0,0"
-                                          Content="Enable timed auto-save"
-                                          FontSize="13"
-                                          Foreground="{DynamicResource InkBrush}"
-                                          IsChecked="{Binding IsAutoSaveEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                                <Grid Margin="0,16,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Interval in minutes"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkBrush}" />
-                                        <TextBox Style="{StaticResource ValueInputStyle}"
-                                                 Text="{Binding AutoSaveIntervalMinutesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1"
-                                               Text="Use 1-60 minutes. A new timer starts after the latest edit, so rapid typing does not write repeatedly."
-                                               Margin="20,22,0,0"
-                                               Style="{StaticResource MetaTextStyle}"
-                                               TextWrapping="Wrap" />
-                                </Grid>
-
-                                <Border Margin="0,16,0,0"
-                                        Padding="14"
-                                        Background="{DynamicResource DangerSurfaceBrush}"
-                                        BorderBrush="{DynamicResource DangerLineBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8">
-                                    <Border.Style>
-                                        <Style TargetType="{x:Type Border}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasAutoSaveSettingsValidationMessage}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding AutoSaveSettingsValidationMessage}"
-                                               FontSize="12"
-                                               Foreground="{DynamicResource DangerBrush}"
-                                               TextWrapping="Wrap" />
-                                </Border>
-
-                                <Grid Margin="0,18,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Text="{Binding AutoSaveSettingsStatusMessage}"
-                                               VerticalAlignment="Center"
-                                               FontSize="12"
-                                               Foreground="{DynamicResource SuccessBrush}"
-                                               TextWrapping="Wrap" />
-
-                                    <Button Grid.Column="1"
-                                            Margin="16,0,0,0"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            Command="{Binding ResetEditorSettingsCommand}">
-                                        <TextBlock Text="Reset" />
-                                    </Button>
-
-                                    <Button Grid.Column="2"
-                                            Margin="12,0,0,0"
-                                            Style="{StaticResource PrimaryButtonStyle}"
-                                            Command="{Binding SaveEditorSettingsCommand}"
-                                            IsEnabled="{Binding CanSaveEditorSettings}">
-                                        <TextBlock Text="Save editor settings" />
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock Text="Graph"
-                                   Style="{StaticResource PanelTitleStyle}" />
-                        <TextBlock Text="{Binding CurrentCollectionName}"
-                                   Margin="0,6,0,0"
-                                   Style="{StaticResource MetaTextStyle}" />
-
-                        <TextBlock Text="Loading graph settings..."
-                                   Margin="0,14,0,0"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource MutedBrush}">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsGraphSettingsLoading}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-
-                        <Grid Margin="0,22,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="24" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.Style>
-                                <Style TargetType="{x:Type Grid}">
+                        <StackPanel Margin="0,8,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="{x:Type StackPanel}">
                                     <Setter Property="IsEnabled" Value="True" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding CanEditGraphSettings}" Value="False">
@@ -257,47 +326,50 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Grid.Style>
+                            </StackPanel.Style>
 
-                            <StackPanel Grid.Column="0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="Neighbor depth"
                                                FontSize="13"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource InkBrush}" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding GraphSettingsNeighborDepthDisplay}"
+                                    <TextBlock Text="Number of inbound and outgoing link hops to include from the current note."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                         Text="{Binding GraphSettingsNeighborDepthText, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Maximum nodes"
                                                FontSize="13"
                                                FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AccentStrongBrush}" />
-                                </Grid>
-                                <TextBlock Text="Number of inbound/outgoing link hops to include from the current note."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}"
-                                           TextWrapping="Wrap" />
-                                <TextBox Style="{StaticResource ValueInputStyle}"
-                                         Text="{Binding GraphSettingsNeighborDepthText, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Maximum nodes"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource InkBrush}" />
-                                <TextBlock Text="Caps dense neighborhoods so the graph stays readable."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}"
-                                           TextWrapping="Wrap" />
-                                <TextBox Style="{StaticResource ValueInputStyle}"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Caps dense neighborhoods so the graph stays readable."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsNumberTextBoxStyle}"
                                          Text="{Binding GraphSettingsMaxNodesText, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                        </Grid>
+                            </Grid>
+                        </StackPanel>
 
-                        <Border Margin="0,18,0,0"
+                        <Border Margin="0,16,0,0"
                                 Padding="14"
                                 Background="{DynamicResource DangerSurfaceBrush}"
                                 BorderBrush="{DynamicResource DangerLineBrush}"
@@ -341,132 +413,43 @@
                                        TextWrapping="Wrap" />
                         </Border>
 
-                        <Grid Margin="0,24,0,30">
+                        <Border Height="1"
+                                Margin="0,24,0,0"
+                                Background="{DynamicResource LineBrush}" />
+
+                        <Grid Margin="0,24,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-
-                            <TextBlock Text="{Binding GraphSettingsStatusMessage}"
+                            <StackPanel>
+                                <TextBlock Text="Review Limits"
+                                           Style="{StaticResource PanelTitleStyle}" />
+                                <TextBlock Text="{Binding CurrentCollectionName}"
+                                           Margin="0,6,0,0"
+                                           Style="{StaticResource MetaTextStyle}" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1"
+                                       Text="Loading collection settings..."
                                        VerticalAlignment="Center"
                                        FontSize="12"
-                                       Foreground="{DynamicResource SuccessBrush}"
-                                       TextWrapping="Wrap" />
-
-                            <Button Grid.Column="1"
-                                    Height="38"
-                                    Padding="18,0"
-                                    Margin="16,0,0,0"
-                                    Background="{DynamicResource PanelBrush}"
-                                    BorderBrush="{DynamicResource ControlBorderBrush}"
-                                    Foreground="{DynamicResource AccentStrongBrush}"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Command="{Binding ResetGraphSettingsCommand}"
-                                    IsEnabled="{Binding CanEditGraphSettings}">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Cursor" Value="Hand" />
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="8">
-                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                                          HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center" />
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
+                                       Foreground="{DynamicResource MutedBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsReviewSettingsLoading}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Button.Style>
-                                <TextBlock Text="Reset" />
-                            </Button>
-
-                            <Button Grid.Column="2"
-                                    Height="38"
-                                    Padding="18,0"
-                                    Margin="16,0,0,0"
-                                    Background="{DynamicResource AccentStrongBrush}"
-                                    BorderBrush="{DynamicResource AccentStrongBrush}"
-                                    Foreground="{DynamicResource OnAccentBrush}"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Command="{Binding SaveGraphSettingsCommand}"
-                                    IsEnabled="{Binding CanSaveGraphSettings}">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Cursor" Value="Hand" />
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="8">
-                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                                          HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center" />
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter Property="Background" Value="{DynamicResource DisabledTextBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource DisabledTextBrush}" />
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Text="Save graph settings" />
-                            </Button>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Grid>
 
-                        <TextBlock Text="Review Limits"
-                                   Style="{StaticResource PanelTitleStyle}" />
-                        <TextBlock Text="{Binding CurrentCollectionName}"
-                                   Margin="0,6,0,0"
-                                   Style="{StaticResource MetaTextStyle}" />
-
-                        <TextBlock Text="Loading collection settings..."
-                                   Margin="0,14,0,0"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource MutedBrush}">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsReviewSettingsLoading}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-
-                        <Grid Margin="0,22,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="24" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.Style>
-                                <Style TargetType="{x:Type Grid}">
+                        <StackPanel Margin="0,8,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="{x:Type StackPanel}">
                                     <Setter Property="IsEnabled" Value="True" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding CanEditReviewSettings}" Value="False">
@@ -474,86 +457,179 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Grid.Style>
+                            </StackPanel.Style>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Daily review limit"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource InkBrush}" />
-                                <TextBlock Text="Maximum due review cards to schedule per day."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}" />
-                                <TextBox Style="{StaticResource ValueInputStyle}"
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Daily review limit"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Maximum due review cards to schedule per day."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsNumberTextBoxStyle}"
                                          Text="{Binding ReviewSettingsDailyLimitText, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
+                            </Grid>
 
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="New card limit"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource InkBrush}" />
-                                <TextBlock Text="Maximum new cards to introduce per day."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}" />
-                                <TextBox Style="{StaticResource ValueInputStyle}"
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="New card limit"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Maximum new cards to introduce per day."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsNumberTextBoxStyle}"
                                          Text="{Binding ReviewSettingsNewCardsLimitText, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                        </Grid>
+                            </Grid>
 
-                        <Border Margin="0,24,0,0"
-                                Padding="16"
-                                Background="{DynamicResource PanelAltBrush}"
-                                BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <Border.Style>
-                                <Style TargetType="{x:Type Border}">
-                                    <Setter Property="IsEnabled" Value="True" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CanEditReviewSettings}" Value="False">
-                                            <Setter Property="IsEnabled" Value="False" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="Desired retention"
                                                FontSize="13"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource InkBrush}" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding ReviewSettingsDesiredRetentionDisplay}"
+                                    <TextBlock Text="Used by FSRS when calculating the next review interval. Enter 70-99."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                         Text="{Binding ReviewSettingsDesiredRetentionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Learning steps"
                                                FontSize="13"
                                                FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AccentStrongBrush}" />
-                                </Grid>
-                                <TextBlock Text="Used by the FSRS scheduler when calculating the next review interval."
-                                           Margin="0,4,0,0"
-                                           Style="{StaticResource MetaTextStyle}" />
-                                <Slider Minimum="0.70"
-                                        Maximum="0.99"
-                                        TickFrequency="0.01"
-                                        IsSnapToTickEnabled="True"
-                                        Margin="0,14,0,0"
-                                        Value="{Binding ReviewSettingsDesiredRetention, Mode=TwoWay}" />
-                                <DockPanel Margin="0,4,0,0">
-                                    <TextBlock Text="70%"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Intervals before a new card graduates, for example 1m, 10m."
+                                               Margin="0,4,0,0"
                                                Style="{StaticResource MetaTextStyle}"
-                                               DockPanel.Dock="Left" />
-                                    <TextBlock Text="99%"
-                                               Style="{StaticResource MetaTextStyle}"
-                                               DockPanel.Dock="Right" />
-                                </DockPanel>
-                            </StackPanel>
-                        </Border>
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsWideTextBoxStyle}"
+                                         Text="{Binding ReviewSettingsLearningStepsText, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
 
-                        <Border Margin="0,18,0,0"
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Relearning steps"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Intervals used after a review card is forgotten, for example 10m."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SettingsWideTextBoxStyle}"
+                                         Text="{Binding ReviewSettingsRelearningStepsText, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="FSRS optimization"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Disabled by default. Uses review history to tune scheduler settings when enabled."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1"
+                                              Style="{StaticResource SettingsToggleButtonStyle}"
+                                              IsChecked="{Binding IsFsrsOptimizationEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Expander Margin="0,16,0,0"
+                                      Header="Advanced (optional)"
+                                      Foreground="{DynamicResource InkBrush}">
+                                <StackPanel Margin="0,12,0,0">
+                                    <TextBlock Text="FSRS parameters"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Optional custom scheduler values. Leave every field empty to use built-in defaults, or optimizer output when optimization is enabled."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                    <Border Margin="0,12,0,0"
+                                            Padding="12"
+                                            Background="{DynamicResource PanelAltBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                        <ItemsControl ItemsSource="{Binding ReviewSettingsFsrsParameters}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="128" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding DisplayName}"
+                                                                       FontSize="13"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource InkBrush}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding RangeDisplay}"
+                                                                       Margin="0,3,0,0"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource MutedBrush}"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <TextBox Grid.Column="1"
+                                                                 Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                                                 Text="{Binding ValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+
+                        <Border Margin="0,16,0,0"
                                 Padding="14"
                                 Background="{DynamicResource DangerSurfaceBrush}"
                                 BorderBrush="{DynamicResource DangerLineBrush}"
@@ -597,114 +673,47 @@
                                        TextWrapping="Wrap" />
                         </Border>
 
-                        <Grid Margin="0,24,0,0">
+                        <Border Height="1"
+                                Margin="0,24,0,0"
+                                Background="{DynamicResource LineBrush}" />
+
+                        <Grid Margin="0,22,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="{Binding ReviewSettingsStatusMessage}"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SuccessBrush}"
-                                       TextWrapping="Wrap" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding AutoSaveSettingsStatusMessage}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource SuccessBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding GraphSettingsStatusMessage}"
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource SuccessBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ReviewSettingsStatusMessage}"
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource SuccessBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="Settings are saved with the active collection. Switching collections loads that collection's saved appearance, editor, graph, and review preferences."
+                                           Margin="0,8,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
 
                             <Button Grid.Column="1"
-                                    Height="38"
-                                    Padding="18,0"
-                                    Margin="16,0,0,0"
-                                    Background="{DynamicResource PanelBrush}"
-                                    BorderBrush="{DynamicResource ControlBorderBrush}"
-                                    Foreground="{DynamicResource AccentStrongBrush}"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Command="{Binding ResetReviewSettingsCommand}"
-                                    IsEnabled="{Binding CanEditReviewSettings}">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Cursor" Value="Hand" />
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="8">
-                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                                          HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center" />
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Text="Reset" />
-                            </Button>
-
-                            <Button Grid.Column="2"
-                                    Height="38"
-                                    Padding="18,0"
-                                    Margin="16,0,0,0"
-                                    Background="{DynamicResource AccentStrongBrush}"
-                                    BorderBrush="{DynamicResource AccentStrongBrush}"
-                                    Foreground="{DynamicResource OnAccentBrush}"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Command="{Binding SaveReviewSettingsCommand}"
-                                    IsEnabled="{Binding CanSaveReviewSettings}">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Cursor" Value="Hand" />
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="8">
-                                                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                                          HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center" />
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter Property="Background" Value="{DynamicResource DisabledTextBrush}" />
-                                                <Setter Property="BorderBrush" Value="{DynamicResource DisabledTextBrush}" />
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Text="Save collection settings" />
+                                    Margin="24,0,0,0"
+                                    VerticalAlignment="Bottom"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding SaveSettingsCommand}"
+                                    IsEnabled="{Binding CanSaveSettings}">
+                                <TextBlock Text="Save settings" />
                             </Button>
                         </Grid>
                     </StackPanel>
-                </Border>
-
-                <Border Margin="0,18,0,0"
-                        Padding="16"
-                        Background="{DynamicResource WarningSurfaceBrush}"
-                        BorderBrush="{DynamicResource WarningLineBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                    <TextBlock Text="These values affect the active collection only. Switching collections loads that collection's saved review settings."
-                               FontSize="12"
-                               Foreground="{DynamicResource WarningBrush}"
-                               TextWrapping="Wrap" />
                 </Border>
             </StackPanel>
         </Grid>
