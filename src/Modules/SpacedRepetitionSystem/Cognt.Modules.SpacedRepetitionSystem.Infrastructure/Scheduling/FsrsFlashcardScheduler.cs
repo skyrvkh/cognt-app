@@ -19,6 +19,9 @@ internal sealed partial class FsrsFlashcardScheduler : IFlashcardScheduler
         string serializedState,
         FlashcardReviewRatingReadModel rating,
         double desiredRetention,
+        IReadOnlyList<TimeSpan>? learningSteps,
+        IReadOnlyList<TimeSpan>? relearningSteps,
+        IReadOnlyList<double>? parameters,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -27,7 +30,7 @@ internal sealed partial class FsrsFlashcardScheduler : IFlashcardScheduler
         DateTimeOffset reviewAt = DateTimeOffset.UtcNow;
         int elapsedDays = CalculateElapsedDays(previous.Card.LastReview, reviewAt);
 
-        FsrsScheduler scheduler = CreateScheduler(desiredRetention);
+        FsrsScheduler scheduler = CreateScheduler(desiredRetention, learningSteps, relearningSteps, parameters);
         (FsrsCard nextCard, FsrsReviewLog reviewLog) = scheduler.ReviewCard(
             previous.Card,
             ToFsrsRating(rating),
@@ -41,13 +44,20 @@ internal sealed partial class FsrsFlashcardScheduler : IFlashcardScheduler
             ToLearningState(nextCard.State)));
     }
 
-    private static FsrsScheduler CreateScheduler(double desiredRetention)
+    private static FsrsScheduler CreateScheduler(
+        double desiredRetention,
+        IReadOnlyList<TimeSpan>? learningSteps,
+        IReadOnlyList<TimeSpan>? relearningSteps,
+        IReadOnlyList<double>? parameters)
     {
         return new FsrsScheduler(
+            parameters,
             desiredRetention: Math.Clamp(
                 desiredRetention,
                 FlashcardReviewSettingsReadModel.MinimumDesiredRetention,
-                FlashcardReviewSettingsReadModel.MaximumDesiredRetention));
+                FlashcardReviewSettingsReadModel.MaximumDesiredRetention),
+            learningSteps: learningSteps,
+            relearningSteps: relearningSteps);
     }
 
 }

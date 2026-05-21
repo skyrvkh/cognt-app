@@ -20,7 +20,11 @@ internal sealed class UpdateFlashcardReviewSettings(IFlashcardReviewWriter flash
             new FlashcardReviewSettingsReadModel(
                 request.MaximumReviewCardsPerDay,
                 request.MaximumNewCardsPerDay,
-                request.DesiredRetention).Normalize(),
+                request.DesiredRetention,
+                request.LearningSteps,
+                request.RelearningSteps,
+                request.IsOptimizationEnabled,
+                request.FsrsParameters).Normalize(),
             cancellationToken);
     }
 }

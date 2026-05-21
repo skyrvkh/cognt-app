@@ -44,6 +44,8 @@ public sealed partial class MainViewModel
 
     public ICommand ResetEditorSettingsCommand { get; private set; } = null!;
 
+    public ICommand SaveSettingsCommand { get; private set; } = null!;
+
     public ICommand GenerateReadyNoteCardsCommand { get; private set; } = null!;
 
     public ICommand GenerateSelectedNoteCardCommand { get; private set; } = null!;
@@ -85,6 +87,7 @@ public sealed partial class MainViewModel
         ResetGraphSettingsCommand = new RelayCommand(ResetGraphSettings);
         SaveEditorSettingsCommand = new RelayCommand(_ => SaveEditorSettings(), _ => CanSaveEditorSettings);
         ResetEditorSettingsCommand = new RelayCommand(ResetEditorSettings);
+        SaveSettingsCommand = new RelayCommand(_ => SaveSettings(), _ => CanSaveSettings);
         GenerateReadyNoteCardsCommand = new RelayCommand(() => _ = GenerateReadyCardCandidatesAsync());
         GenerateSelectedNoteCardCommand = new RelayCommand(() => _ = GenerateSelectedCardCandidateAsync());
         PreviewSelectedCardCandidateCommand = new RelayCommand(PreviewSelectedCardCandidate);

@@ -2,7 +2,7 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
 
 internal sealed partial class FsrsScheduler
 {
-    private static readonly double[] LowerBoundsParameters =
+    internal static readonly double[] LowerBoundsParameters =
     [
         StabilityMin,
         StabilityMin,
@@ -27,7 +27,7 @@ internal sealed partial class FsrsScheduler
         0.1
     ];
 
-    private static readonly double[] UpperBoundsParameters =
+    internal static readonly double[] UpperBoundsParameters =
     [
         InitialStabilityMax,
         InitialStabilityMax,

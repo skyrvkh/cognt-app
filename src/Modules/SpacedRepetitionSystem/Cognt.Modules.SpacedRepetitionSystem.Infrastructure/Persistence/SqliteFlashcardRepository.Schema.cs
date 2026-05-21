@@ -77,6 +77,10 @@ internal sealed partial class SqliteFlashcardRepository
               max_due_review_cards_per_day INTEGER NOT NULL,
               max_new_cards_per_day INTEGER NOT NULL,
               desired_retention REAL NOT NULL DEFAULT 0.9,
+              learning_steps TEXT NOT NULL DEFAULT '60,600',
+              relearning_steps TEXT NOT NULL DEFAULT '600',
+              fsrs_optimization_enabled INTEGER NOT NULL DEFAULT 0,
+              fsrs_parameters TEXT,
               updated_at INTEGER NOT NULL
             );
             """;

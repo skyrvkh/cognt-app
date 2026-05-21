@@ -11,5 +11,8 @@ internal interface IFlashcardScheduler
         string serializedState,
         FlashcardReviewRatingReadModel rating,
         double desiredRetention,
+        IReadOnlyList<TimeSpan>? learningSteps,
+        IReadOnlyList<TimeSpan>? relearningSteps,
+        IReadOnlyList<double>? parameters = null,
         CancellationToken cancellationToken = default);
 }

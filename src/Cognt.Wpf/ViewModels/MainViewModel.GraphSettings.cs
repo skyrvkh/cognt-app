@@ -97,6 +97,7 @@ public sealed partial class MainViewModel
             {
                 OnPropertyChanged(nameof(HasGraphSettingsValidationMessage));
                 OnPropertyChanged(nameof(CanSaveGraphSettings));
+                RaiseSettingsCommandStates();
             }
         }
     }
@@ -126,6 +127,7 @@ public sealed partial class MainViewModel
             {
                 OnPropertyChanged(nameof(CanEditGraphSettings));
                 OnPropertyChanged(nameof(CanSaveGraphSettings));
+                RaiseSettingsCommandStates();
             }
         }
     }
@@ -139,6 +141,7 @@ public sealed partial class MainViewModel
             {
                 OnPropertyChanged(nameof(CanEditGraphSettings));
                 OnPropertyChanged(nameof(CanSaveGraphSettings));
+                RaiseSettingsCommandStates();
             }
         }
     }

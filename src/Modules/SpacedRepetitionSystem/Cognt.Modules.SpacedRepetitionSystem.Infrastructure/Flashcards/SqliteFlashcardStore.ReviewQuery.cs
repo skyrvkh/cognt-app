@@ -134,7 +134,11 @@ internal sealed partial class SqliteFlashcardStore
         return new AppReadModels.FlashcardReviewSettingsReadModel(
             settings.MaximumReviewCardsPerDay,
             settings.MaximumNewCardsPerDay,
-            settings.DesiredRetention).Normalize();
+            settings.DesiredRetention,
+            settings.LearningSteps,
+            settings.RelearningSteps,
+            settings.IsOptimizationEnabled,
+            settings.FsrsParameters).Normalize();
     }
 
     private static AppQueueCounts ToReadModel(PersistenceQueueCounts counts)

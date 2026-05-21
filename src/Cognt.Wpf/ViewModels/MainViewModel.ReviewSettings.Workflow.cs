@@ -31,7 +31,11 @@ public sealed partial class MainViewModel
                     openCollectionPath,
                     normalized.MaximumReviewCardsPerDay,
                     normalized.MaximumNewCardsPerDay,
-                    normalized.DesiredRetention)).GetAwaiter().GetResult();
+                    normalized.DesiredRetention,
+                    normalized.LearningSteps,
+                    normalized.RelearningSteps,
+                    normalized.IsOptimizationEnabled,
+                    normalized.FsrsParameters)).GetAwaiter().GetResult();
 
             persistedReviewSettings = normalized;
             ApplyReviewSettings(normalized);
@@ -83,9 +87,14 @@ public sealed partial class MainViewModel
 
     private void ApplyReviewSettings(FlashcardReviewSettingsReadModel settings)
     {
-        ReviewSettingsDailyLimitText = settings.MaximumReviewCardsPerDay.ToString(CultureInfo.InvariantCulture);
-        ReviewSettingsNewCardsLimitText = settings.MaximumNewCardsPerDay.ToString(CultureInfo.InvariantCulture);
-        ReviewSettingsDesiredRetention = settings.DesiredRetention;
+        FlashcardReviewSettingsReadModel normalized = settings.Normalize();
+        ReviewSettingsDailyLimitText = normalized.MaximumReviewCardsPerDay.ToString(CultureInfo.InvariantCulture);
+        ReviewSettingsNewCardsLimitText = normalized.MaximumNewCardsPerDay.ToString(CultureInfo.InvariantCulture);
+        ReviewSettingsDesiredRetention = normalized.DesiredRetention;
+        ReviewSettingsLearningStepsText = FormatReviewSteps(normalized.LearningSteps);
+        ReviewSettingsRelearningStepsText = FormatReviewSteps(normalized.RelearningSteps);
+        IsFsrsOptimizationEnabled = normalized.IsOptimizationEnabled;
+        ApplyFsrsParameterSettings(normalized.FsrsParameters);
         UpdateReviewSettingsValidation();
     }
 

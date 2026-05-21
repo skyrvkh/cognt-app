@@ -42,7 +42,7 @@ internal sealed partial class FsrsScheduler : IEquatable<FsrsScheduler>
 
     internal double GetCardRetrievability(FsrsCard card, DateTimeOffset? currentDatetime = null)
     {
-        if (card.LastReview is null)
+        if (card.LastReview is null || card.Stability is null)
         {
             return 0;
         }
@@ -84,5 +84,32 @@ internal sealed partial class FsrsScheduler : IEquatable<FsrsScheduler>
 
         FsrsReviewLog reviewLog = new(card.CardId, rating, reviewAt, reviewDuration);
         return (card, reviewLog);
+    }
+
+    internal FsrsCard RescheduleCard(FsrsCard card, IReadOnlyList<FsrsReviewLog> reviewLogs)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        ArgumentNullException.ThrowIfNull(reviewLogs);
+
+        foreach (FsrsReviewLog reviewLog in reviewLogs)
+        {
+            if (reviewLog.CardId != card.CardId)
+            {
+                throw new ArgumentException(
+                    $"ReviewLog card_id {reviewLog.CardId} does not match Card card_id {card.CardId}",
+                    nameof(reviewLogs));
+            }
+        }
+
+        FsrsCard rescheduledCard = new(cardId: card.CardId, due: card.Due);
+        foreach (FsrsReviewLog reviewLog in reviewLogs.OrderBy(log => log.ReviewDatetime))
+        {
+            (rescheduledCard, _) = ReviewCard(
+                rescheduledCard,
+                reviewLog.Rating,
+                reviewLog.ReviewDatetime);
+        }
+
+        return rescheduledCard;
     }
 }

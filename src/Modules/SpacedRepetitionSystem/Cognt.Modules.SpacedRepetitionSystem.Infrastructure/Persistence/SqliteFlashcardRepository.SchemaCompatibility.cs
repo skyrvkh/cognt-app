@@ -19,6 +19,10 @@ internal sealed partial class SqliteFlashcardRepository
         new("flashcard_card", "source_target_id", "TEXT"),
         new("flashcard_card", "source_snapshot_hash", "TEXT"),
         new("flashcard_review_settings", "desired_retention", "REAL NOT NULL DEFAULT 0.9"),
+        new("flashcard_review_settings", "learning_steps", "TEXT NOT NULL DEFAULT '60,600'"),
+        new("flashcard_review_settings", "relearning_steps", "TEXT NOT NULL DEFAULT '600'"),
+        new("flashcard_review_settings", "fsrs_optimization_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        new("flashcard_review_settings", "fsrs_parameters", "TEXT"),
     ];
 
     private static void EnsureCompatibilityColumns(SqliteConnection connection)
