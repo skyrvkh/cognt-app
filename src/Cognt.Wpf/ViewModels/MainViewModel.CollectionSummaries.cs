@@ -97,5 +97,6 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(CanSaveReviewSettings));
         OnPropertyChanged(nameof(CanEditGraphSettings));
         OnPropertyChanged(nameof(CanSaveGraphSettings));
+        RaiseSettingsCommandStates();
     }
 }

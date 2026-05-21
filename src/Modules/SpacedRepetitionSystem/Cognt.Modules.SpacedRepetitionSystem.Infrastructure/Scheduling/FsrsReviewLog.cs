@@ -46,6 +46,13 @@ internal sealed class FsrsReviewLog : IEquatable<FsrsReviewLog>
         return JsonSerializer.Serialize(ToDictionary(), FsrsJson.Options(writeIndented));
     }
 
+    internal static FsrsReviewLog FromJson(string sourceJson)
+    {
+        FsrsReviewLogDictionary source = JsonSerializer.Deserialize<FsrsReviewLogDictionary>(sourceJson, FsrsJson.Options())
+            ?? throw new JsonException();
+        return FromDictionary(source);
+    }
+
     public bool Equals(FsrsReviewLog? other)
     {
         return other is not null

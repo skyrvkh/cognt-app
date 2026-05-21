@@ -11,4 +11,8 @@ public sealed record UpdateFlashcardReviewSettingsRequest(
     string CollectionId,
     int MaximumReviewCardsPerDay,
     int MaximumNewCardsPerDay,
-    double DesiredRetention);
+    double DesiredRetention,
+    IReadOnlyList<TimeSpan>? LearningSteps = null,
+    IReadOnlyList<TimeSpan>? RelearningSteps = null,
+    bool IsOptimizationEnabled = false,
+    IReadOnlyList<double>? FsrsParameters = null);
