@@ -6,6 +6,7 @@ namespace CogntApp.ViewModels;
 public sealed partial class MainViewModel
 {
     private bool isAutoSaveEnabled;
+    private bool isSaveOnCloseEnabled = EditorSettings.Default.IsSaveOnCloseEnabled;
     private string autoSaveIntervalMinutesText = EditorSettings.Default.AutoSaveIntervalMinutes.ToString(CultureInfo.InvariantCulture);
     private string autoSaveSettingsStatusMessage = string.Empty;
     private string autoSaveSettingsValidationMessage = string.Empty;
@@ -18,7 +19,6 @@ public sealed partial class MainViewModel
             if (SetProperty(ref isAutoSaveEnabled, value))
             {
                 AutoSaveSettingsStatusMessage = string.Empty;
-                OnPropertyChanged(nameof(AutoSaveIntervalSummary));
                 OnPropertyChanged(nameof(CanRunAutoSave));
                 RaiseEditorSettingsCommandStates();
                 AutoSaveSettingsChanged?.Invoke(this, EventArgs.Empty);
@@ -36,7 +36,6 @@ public sealed partial class MainViewModel
                 AutoSaveSettingsStatusMessage = string.Empty;
                 ValidateAutoSaveSettings();
                 OnPropertyChanged(nameof(AutoSaveInterval));
-                OnPropertyChanged(nameof(AutoSaveIntervalSummary));
                 OnPropertyChanged(nameof(CanRunAutoSave));
                 RaiseEditorSettingsCommandStates();
                 AutoSaveSettingsChanged?.Invoke(this, EventArgs.Empty);
@@ -46,9 +45,19 @@ public sealed partial class MainViewModel
 
     public TimeSpan AutoSaveInterval => TimeSpan.FromMinutes(GetValidatedAutoSaveIntervalMinutes());
 
-    public string AutoSaveIntervalSummary => IsAutoSaveEnabled
-        ? $"Every {GetValidatedAutoSaveIntervalMinutes()} minute(s)"
-        : "Off. Notes save when closed.";
+    public bool IsSaveOnCloseEnabled
+    {
+        get => isSaveOnCloseEnabled;
+        set
+        {
+            if (SetProperty(ref isSaveOnCloseEnabled, value))
+            {
+                AutoSaveSettingsStatusMessage = string.Empty;
+                RaiseEditorSettingsCommandStates();
+                AutoSaveSettingsChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
 
     public string AutoSaveSettingsStatusMessage
     {
@@ -77,12 +86,17 @@ public sealed partial class MainViewModel
 
     public bool CanRunAutoSave => IsAutoSaveEnabled && CanSaveEditorSettings;
 
+    public bool CanSaveOnClose => IsSaveOnCloseEnabled && CanSaveEditorSettings;
+
     private void InitializeEditorSettings()
     {
-        ApplyEditorSettings(editorSettingsService.Load(), save: false, raiseChanged: false);
-        AutoSaveSettingsStatusMessage = IsAutoSaveEnabled
-            ? $"Auto-save is on every {GetValidatedAutoSaveIntervalMinutes()} minute(s)."
-            : "Auto-save is off. Notes save when closed.";
+        RefreshEditorSettings();
+    }
+
+    private void RefreshEditorSettings()
+    {
+        ApplyEditorSettings(editorSettingsService.Load(OpenCollectionPath), save: false, raiseChanged: true);
+        AutoSaveSettingsStatusMessage = string.Empty;
     }
 
     private void SaveEditorSettings()
@@ -95,38 +109,48 @@ public sealed partial class MainViewModel
         }
 
         ApplyEditorSettings(
-            new EditorSettings(IsAutoSaveEnabled, intervalMinutes),
+            new EditorSettings(
+                IsAutoSaveEnabled,
+                intervalMinutes,
+                IsSaveOnCloseEnabled,
+                GlobalTextFontSize,
+                SelectedThemeOption.Theme),
             save: true,
             raiseChanged: true);
-        AutoSaveSettingsStatusMessage = IsAutoSaveEnabled
-            ? $"Auto-save will run every {intervalMinutes} minute(s)."
-            : "Auto-save is off. Notes save when closed.";
+        AutoSaveSettingsStatusMessage = HasOpenCollection
+            ? $"Editor preferences saved for {CurrentCollectionName}."
+            : "Editor preferences saved.";
     }
 
     private void ResetEditorSettings()
     {
         ApplyEditorSettings(EditorSettings.Default, save: true, raiseChanged: true);
-        AutoSaveSettingsStatusMessage = "Editor settings reset. Auto-save is off.";
+        AutoSaveSettingsStatusMessage = "Editor preferences reset.";
     }
 
     private void ApplyEditorSettings(EditorSettings settings, bool save, bool raiseChanged)
     {
         EditorSettings normalized = settings.Normalize();
         isAutoSaveEnabled = normalized.IsAutoSaveEnabled;
+        isSaveOnCloseEnabled = normalized.IsSaveOnCloseEnabled;
         autoSaveIntervalMinutesText = normalized.AutoSaveIntervalMinutes.ToString(CultureInfo.InvariantCulture);
         AutoSaveSettingsValidationMessage = string.Empty;
 
+        ApplyGlobalTextFontSize(normalized.GlobalTextFontSize);
+        ApplyThemePreference(normalized.Theme);
+
         OnPropertyChanged(nameof(IsAutoSaveEnabled));
+        OnPropertyChanged(nameof(IsSaveOnCloseEnabled));
         OnPropertyChanged(nameof(AutoSaveIntervalMinutesText));
         OnPropertyChanged(nameof(AutoSaveInterval));
-        OnPropertyChanged(nameof(AutoSaveIntervalSummary));
         OnPropertyChanged(nameof(CanSaveEditorSettings));
         OnPropertyChanged(nameof(CanRunAutoSave));
+        OnPropertyChanged(nameof(CanSaveOnClose));
         RaiseEditorSettingsCommandStates();
 
         if (save)
         {
-            editorSettingsService.Save(normalized);
+            editorSettingsService.Save(normalized, OpenCollectionPath);
         }
 
         if (raiseChanged)
@@ -170,9 +194,39 @@ public sealed partial class MainViewModel
 
     private void RaiseEditorSettingsCommandStates()
     {
+        RaiseSettingsCommandStates();
+
         if (SaveEditorSettingsCommand is RelayCommand saveCommand)
         {
             saveCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void ApplyGlobalTextFontSize(double fontSize)
+    {
+        double normalized = Math.Clamp(
+            Math.Round(fontSize, 0),
+            EditorSettings.MinimumGlobalTextFontSize,
+            EditorSettings.MaximumGlobalTextFontSize);
+        globalTextFontSize = normalized;
+        globalTextFontSizeText = normalized.ToString("0", CultureInfo.InvariantCulture);
+        OnPropertyChanged(nameof(GlobalTextFontSize));
+        OnPropertyChanged(nameof(GlobalTextFontSizeText));
+    }
+
+    private void ApplyThemePreference(ApplicationTheme theme)
+    {
+        ThemeOptionViewModel option = ThemeOptions.FirstOrDefault(candidate => candidate.Theme == theme)
+            ?? ThemeOptions.First(candidate => candidate.Theme == ApplicationTheme.Light);
+
+        if (!ReferenceEquals(selectedThemeOption, option))
+        {
+            selectedThemeOption = option;
+            themeService.ApplyTheme(option.Theme);
+            OnPropertyChanged(nameof(SelectedThemeOption));
+            OnPropertyChanged(nameof(CurrentThemeDescription));
+            OnPropertyChanged(nameof(CurrentThemeName));
+            OnPropertyChanged(nameof(IsGraphiteTheme));
         }
     }
 }

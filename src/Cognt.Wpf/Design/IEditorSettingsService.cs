@@ -2,7 +2,7 @@ namespace CogntApp.Design;
 
 public interface IEditorSettingsService
 {
-    EditorSettings Load();
+    EditorSettings Load(string? collectionPath = null);
 
-    void Save(EditorSettings settings);
+    void Save(EditorSettings settings, string? collectionPath = null);
 }

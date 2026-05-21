@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
@@ -165,6 +166,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!viewModel.CanSaveOnClose)
+        {
+            hasSavedOpenDocumentsForClose = true;
+            return;
+        }
+
         e.Cancel = true;
         isSavingOpenDocumentsForClose = true;
 
@@ -177,7 +184,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save open notes before closing.");
-            shellDialogs.ShowWarning("Close Failed", $"Open notes could not be saved before closing: {ex.Message}");
+            ReportCloseSaveFailure(ex);
         }
         finally
         {
@@ -190,13 +197,16 @@ public partial class MainWindow : Window
         logger.LogInformation("MainWindow closing. OpenDocumentCount={OpenDocumentCount}", openNoteDocuments.Count);
         foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values)
         {
-            try
+            if (viewModel.CanSaveOnClose)
             {
-                session.SavePendingChanges();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to save note while closing application. NotePath={NotePath}", session.NotePath);
+                try
+                {
+                    session.SavePendingChanges();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to save note while closing application. NotePath={NotePath}", session.NotePath);
+                }
             }
 
             session.Dispose();
@@ -214,6 +224,30 @@ public partial class MainWindow : Window
         {
             await session.SavePendingChangesAsync();
         }
+    }
+
+    private void ReportCloseSaveFailure(Exception exception)
+    {
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            if (!IsVisible || hasSavedOpenDocumentsForClose)
+            {
+                return;
+            }
+
+            try
+            {
+                shellDialogs.ShowWarning(
+                    "Close Failed",
+                    $"Open notes could not be saved before closing: {exception.Message}");
+            }
+            catch (InvalidOperationException dialogException)
+            {
+                logger.LogWarning(
+                    dialogException,
+                    "Could not show close failure warning because the window was not in a valid state.");
+            }
+        }, DispatcherPriority.ApplicationIdle);
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

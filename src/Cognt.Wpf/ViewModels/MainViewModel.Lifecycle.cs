@@ -1,6 +1,7 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using CogntApp.Design;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -53,8 +54,10 @@ public sealed partial class MainViewModel
         NoteToCardDeckNames.Clear();
         ApplyReviewSettings(FlashcardReviewSettingsReadModel.Default);
         ApplyGraphSettings(KnowledgeGraphSettingsReadModel.Default);
+        ApplyEditorSettings(EditorSettings.Default, save: false, raiseChanged: true);
         ReviewSettingsStatusMessage = string.Empty;
         GraphSettingsStatusMessage = string.Empty;
+        AutoSaveSettingsStatusMessage = string.Empty;
         ClearCurrentNoteState();
         OnPropertyChanged(nameof(OpenCollectionPath));
         OnPropertyChanged(nameof(CurrentCollectionPath));

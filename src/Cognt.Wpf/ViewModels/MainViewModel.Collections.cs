@@ -49,6 +49,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(CurrentCollectionName));
         RefreshAvailableCollections();
         ClearCurrentNoteState();
+        RefreshEditorSettings();
         RefreshNotesTree(preserveExpansion: true);
         RefreshReviewSettings();
         RefreshGraphSettings();

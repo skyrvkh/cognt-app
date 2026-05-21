@@ -302,7 +302,7 @@ public partial class MainWindow
 
     private async Task CloseNoteDocumentAsync(NoteWorkspaceDocumentSession session, bool savePendingChanges = true)
     {
-        if (savePendingChanges)
+        if (savePendingChanges && viewModel.CanSaveOnClose)
         {
             await session.SavePendingChangesAsync();
         }
