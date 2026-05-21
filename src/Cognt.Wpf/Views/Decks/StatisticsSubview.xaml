@@ -40,7 +40,7 @@
                           StrokeEndLineCap="Round"
                           StrokeLineJoin="Round"
                           Data="M 9 2 L 3 7 L 9 12 M 3 7 L 14 7" />
-                    <TextBlock Text="Back to Decks/Cards"
+                    <TextBlock Text="Back to Review"
                                Foreground="{DynamicResource InkBrush}"
                                FontSize="13" />
                 </StackPanel>
@@ -162,7 +162,7 @@
 
                 <Border Margin="0,14,0,0" Padding="16" Style="{StaticResource PanelStyle}">
                     <StackPanel>
-                        <TextBlock Text="Study Heatmap - Previous 26 Weeks"
+                        <TextBlock Text="Study Heatmap - Previous 52 Weeks"
                                    Style="{StaticResource PanelTitleStyle}"
                                    TextWrapping="Wrap" />
                         <lvc:CartesianChart x:Name="StudyHeatmapChart"

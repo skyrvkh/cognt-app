@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
 namespace CogntApp.ViewModels;
 
@@ -20,6 +21,7 @@ public sealed partial class AllNotesViewModel
             allNotes = [];
             allTreeRoots = [];
             noteLookupByRelativePath = new(StringComparer.OrdinalIgnoreCase);
+            cardCountsBySourceRelativePath = new(StringComparer.OrdinalIgnoreCase);
             VisibleTreeNodes.Clear();
             hasLoadedCatalog = true;
             RebuildFilterOptions([]);
@@ -40,6 +42,9 @@ public sealed partial class AllNotesViewModel
                 () => noteService.LoadNoteCatalog(currentCollectionId),
                 cancellationToken);
             noteLookupByRelativePath = allNotes.ToDictionary(note => note.RelativePath, StringComparer.OrdinalIgnoreCase);
+            cardCountsBySourceRelativePath = await Task.Run(
+                () => LoadCardCountsBySourceRelativePath(currentCollectionId),
+                cancellationToken);
             allTreeRoots = await Task.Run(
                 () => BuildTreeItems(parentId: null, depth: 0),
                 cancellationToken);
@@ -59,6 +64,7 @@ public sealed partial class AllNotesViewModel
             allNotes = [];
             allTreeRoots = [];
             noteLookupByRelativePath = new(StringComparer.OrdinalIgnoreCase);
+            cardCountsBySourceRelativePath = new(StringComparer.OrdinalIgnoreCase);
             hasLoadedCatalog = true;
             VisibleNotes.Clear();
             VisibleTreeNodes.Clear();
@@ -93,12 +99,12 @@ public sealed partial class AllNotesViewModel
     private async Task ApplyFiltersAsync(CancellationToken cancellationToken)
     {
         string query = searchQuery.Trim();
-        string? selectedTag = NormalizeFilterValue(SelectedTagOption?.Value, AllTagsValue);
-        string? selectedType = NormalizeFilterValue(SelectedTypeOption?.Value, AllTypesValue);
+        string[] selectedTags = GetSelectedFilterValues(TagOptions, AllTagsValue);
+        string[] selectedTypes = GetSelectedFilterValues(TypeOptions, AllTypesValue);
         AllNotesSortKey sortKey = SelectedSortOption?.SortKey ?? AllNotesSortKey.ModifiedNewest;
         bool hasActiveFilters = !string.IsNullOrWhiteSpace(query)
-            || !string.IsNullOrWhiteSpace(selectedTag)
-            || !string.IsNullOrWhiteSpace(selectedType);
+            || selectedTags.Length > 0
+            || selectedTypes.Length > 0;
 
         IReadOnlySet<string>? matchingRelativePaths = null;
         if (!string.IsNullOrWhiteSpace(query) && allNotes.Count > 0)
@@ -119,15 +125,24 @@ public sealed partial class AllNotesViewModel
                 queryable = queryable.Where(note => matchingRelativePaths.Contains(note.RelativePath));
             }
 
-            if (!string.IsNullOrWhiteSpace(selectedTag))
+            if (selectedTags.Length > 0)
             {
-                queryable = queryable.Where(note => note.Tags.Contains(selectedTag, StringComparer.OrdinalIgnoreCase));
+                queryable = queryable.Where(note => note.Tags.Any(tag => selectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
             }
 
-            if (!string.IsNullOrWhiteSpace(selectedType)
-                && Enum.TryParse(selectedType, ignoreCase: true, out KnowledgeNoteListItemType noteType))
+            if (selectedTypes.Length > 0)
             {
-                queryable = queryable.Where(note => note.Type == noteType);
+                HashSet<KnowledgeNoteListItemType> selectedTypeValues = selectedTypes
+                    .Select(type => Enum.TryParse(type, ignoreCase: true, out KnowledgeNoteListItemType noteType)
+                        ? (KnowledgeNoteListItemType?)noteType
+                        : null)
+                    .OfType<KnowledgeNoteListItemType>()
+                    .ToHashSet();
+
+                if (selectedTypeValues.Count > 0)
+                {
+                    queryable = queryable.Where(note => selectedTypeValues.Contains(note.Type));
+                }
             }
 
             IOrderedEnumerable<KnowledgeNoteListItemReadModel> ordered = sortKey switch
@@ -162,5 +177,21 @@ public sealed partial class AllNotesViewModel
         OnPropertyChanged(nameof(ShouldShowEmptyState));
         OnPropertyChanged(nameof(ResultsSummary));
         openNoteCommand.RaiseCanExecuteChanged();
+    }
+
+    private Dictionary<string, int> LoadCardCountsBySourceRelativePath(string collectionId)
+    {
+        try
+        {
+            return flashcardCardsQuery
+                .Execute(new FlashcardCardsQueryRequest(collectionId, Limit: 1000))
+                .Where(card => !string.IsNullOrWhiteSpace(card.SourceRelPath))
+                .GroupBy(card => NormalizeSourceRelativePath(card.SourceRelPath!), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+        {
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 }

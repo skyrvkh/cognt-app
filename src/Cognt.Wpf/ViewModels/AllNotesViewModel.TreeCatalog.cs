@@ -24,7 +24,8 @@ public sealed partial class AllNotesViewModel
                     item.Title,
                     NormalizeTreeItemRelativePath(item.FileRelPath),
                     GetTreeTypeLabel(item),
-                    GetTreeLocationLabel(item),
+                    GetTreeTagsLabel(item),
+                    GetTreeCardCountLabel(item),
                     GetTreeCreatedAtLabel(item),
                     GetTreeModifiedAtLabel(item),
                     children)
@@ -81,7 +82,8 @@ public sealed partial class AllNotesViewModel
             node.Title,
             node.RelativePath,
             node.TypeLabel,
-            node.LocationLabel,
+            node.TagsLabel,
+            node.CardCountLabel,
             node.CreatedAtLabel,
             node.ModifiedAtLabel,
             children)
@@ -119,18 +121,23 @@ public sealed partial class AllNotesViewModel
         };
     }
 
-    private static string GetTreeLocationLabel(KnowledgeTreeItemReadModel item)
+    private string GetTreeTagsLabel(KnowledgeTreeItemReadModel item)
     {
         string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        if (string.IsNullOrWhiteSpace(relativePath))
+        if (relativePath is null || !noteLookupByRelativePath.TryGetValue(relativePath, out KnowledgeNoteListItemReadModel? note))
         {
-            return item.ParentId.HasValue ? "Folder" : "Workspace root";
+            return string.Empty;
         }
 
-        string? directory = Path.GetDirectoryName(relativePath.Replace('/', Path.DirectorySeparatorChar));
-        return string.IsNullOrWhiteSpace(directory)
-            ? "Workspace root"
-            : directory.Replace(Path.DirectorySeparatorChar, '/');
+        return note.Tags.Count == 0
+            ? string.Empty
+            : string.Join(", ", note.Tags);
+    }
+
+    private string GetTreeCardCountLabel(KnowledgeTreeItemReadModel item)
+    {
+        string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
+        return FormatCardCount(GetCardCount(relativePath));
     }
 
     private string TryFormatTreeTimestamp(

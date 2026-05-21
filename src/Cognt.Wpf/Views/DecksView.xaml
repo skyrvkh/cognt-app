@@ -49,7 +49,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Decks / Cards"
+                <TextBlock Text="Review"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource InkBrush}"
                            FontSize="18"

@@ -1171,6 +1171,12 @@ internal sealed class NoteWorkspaceDocumentSession
             Activate(selectInTree: false);
             viewModel.SaveMentionSource(e.SourcePath, e.Content);
             MarkContentPersisted(currentContent);
+            if (viewModel.TryOpenPdfDocumentByRelativePath(e.RelativePath))
+            {
+                editorView?.PostMentionOpenResult(ok: true);
+                return;
+            }
+
             string targetPath = viewModel.ResolveMentionPath(e.RelativePath);
             await openNoteAsync(targetPath, true);
             editorView?.PostMentionOpenResult(ok: true);

@@ -10,7 +10,7 @@ namespace CogntApp.ViewModels.Decks.PresentationModels;
 
 internal static partial class StatisticsPresentationFactory
 {
-    private const int HeatmapWeekCount = 26;
+    private const int HeatmapWeekCount = 52;
     private const int DaysPerWeek = 7;
     private const int MovingAverageWindowDays = 7;
 

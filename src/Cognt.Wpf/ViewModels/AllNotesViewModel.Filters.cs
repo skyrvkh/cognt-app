@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Collections.ObjectModel;
-using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 
 namespace CogntApp.ViewModels;
@@ -9,32 +8,56 @@ public sealed partial class AllNotesViewModel
 {
     private void RebuildFilterOptions(IReadOnlyList<KnowledgeNoteListItemReadModel> notes)
     {
-        string? previousTag = SelectedTagOption?.Value;
-        string? previousType = SelectedTypeOption?.Value;
+        string[] previousTags = GetSelectedFilterValues(TagOptions, AllTagsValue);
+        string[] previousTypes = GetSelectedFilterValues(TypeOptions, AllTypesValue);
 
-        TagOptions.Clear();
-        TagOptions.Add(new AllNotesFilterOptionViewModel("All tags", AllTagsValue));
-        foreach (string tag in notes
-                     .SelectMany(note => note.Tags)
-                     .Where(tag => !string.IsNullOrWhiteSpace(tag))
-                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                     .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase))
+        foreach (AllNotesFilterOptionViewModel option in TagOptions.Concat(TypeOptions))
         {
-            TagOptions.Add(new AllNotesFilterOptionViewModel(tag, tag));
+            option.PropertyChanged -= FilterOption_PropertyChanged;
         }
 
-        TypeOptions.Clear();
-        TypeOptions.Add(new AllNotesFilterOptionViewModel("All types", AllTypesValue));
-        foreach (KnowledgeNoteListItemType type in notes
-                     .Select(note => note.Type)
-                     .Distinct()
-                     .OrderBy(type => GetTypeLabel(type), StringComparer.OrdinalIgnoreCase))
+        isUpdatingFilterOptions = true;
+        try
         {
-            TypeOptions.Add(new AllNotesFilterOptionViewModel(GetTypeLabel(type), type.ToString()));
+            TagOptions.Clear();
+            AddFilterOption(
+                TagOptions,
+                new AllNotesFilterOptionViewModel("All tags", AllTagsValue, previousTags.Length == 0));
+            foreach (string tag in notes
+                         .SelectMany(note => note.Tags)
+                         .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase))
+            {
+                AddFilterOption(
+                    TagOptions,
+                    new AllNotesFilterOptionViewModel(tag, tag, previousTags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
+            }
+
+            TypeOptions.Clear();
+            AddFilterOption(
+                TypeOptions,
+                new AllNotesFilterOptionViewModel("All types", AllTypesValue, previousTypes.Length == 0));
+            foreach (KnowledgeNoteListItemType type in notes
+                         .Select(note => note.Type)
+                         .Distinct()
+                         .OrderBy(type => GetTypeLabel(type), StringComparer.OrdinalIgnoreCase))
+            {
+                AddFilterOption(
+                    TypeOptions,
+                    new AllNotesFilterOptionViewModel(
+                        GetTypeLabel(type),
+                        type.ToString(),
+                        previousTypes.Contains(type.ToString(), StringComparer.OrdinalIgnoreCase)));
+            }
+        }
+        finally
+        {
+            isUpdatingFilterOptions = false;
         }
 
-        SelectedTagOption = FindFilterOption(TagOptions, previousTag) ?? TagOptions.FirstOrDefault();
-        SelectedTypeOption = FindFilterOption(TypeOptions, previousType) ?? TypeOptions.FirstOrDefault();
+        SelectedTagOption = TagOptions.FirstOrDefault(option => option.IsSelected) ?? TagOptions.FirstOrDefault();
+        SelectedTypeOption = TypeOptions.FirstOrDefault(option => option.IsSelected) ?? TypeOptions.FirstOrDefault();
         SelectedSortOption ??= SortOptions.FirstOrDefault();
     }
 
@@ -58,14 +81,14 @@ public sealed partial class AllNotesViewModel
         EmptyStateMessage = "Try clearing search, tag, type, or sort filters.";
     }
 
-    private static AllNotesListItemViewModel ToListItemViewModel(KnowledgeNoteListItemReadModel note)
+    private AllNotesListItemViewModel ToListItemViewModel(KnowledgeNoteListItemReadModel note)
     {
         return new AllNotesListItemViewModel(
             note.RelativePath,
             note.Title,
             GetTypeLabel(note.Type),
-            GetLocationLabel(note.RelativePath),
             note.Tags.Count == 0 ? string.Empty : string.Join(", ", note.Tags),
+            FormatCardCount(GetCardCount(note.RelativePath)),
             FormatTimestamp(note.CreatedAt),
             FormatTimestamp(note.UpdatedAt));
     }
@@ -88,32 +111,35 @@ public sealed partial class AllNotesViewModel
         };
     }
 
-    private static string GetLocationLabel(string relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            return "Workspace root";
-        }
-
-        string normalizedPath = relativePath.Replace('/', Path.DirectorySeparatorChar);
-        string? directory = Path.GetDirectoryName(normalizedPath);
-        return string.IsNullOrWhiteSpace(directory)
-            ? "Workspace root"
-            : directory.Replace(Path.DirectorySeparatorChar, '/');
-    }
-
-    private static string? NormalizeFilterValue(string? value, string allValue)
-    {
-        return string.Equals(value, allValue, StringComparison.Ordinal)
-            ? null
-            : value;
-    }
-
-    private static AllNotesFilterOptionViewModel? FindFilterOption(
+    private static string[] GetSelectedFilterValues(
         IEnumerable<AllNotesFilterOptionViewModel> options,
-        string? value)
+        string allValue)
     {
-        return options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase));
+        return options
+            .Where(option => option.IsSelected && !string.Equals(option.Value, allValue, StringComparison.Ordinal))
+            .Select(option => option.Value)
+            .ToArray();
+    }
+
+    private int GetCardCount(string? relativePath)
+    {
+        return string.IsNullOrWhiteSpace(relativePath)
+            ? 0
+            : cardCountsBySourceRelativePath.TryGetValue(NormalizeSourceRelativePath(relativePath), out int count)
+                ? count
+                : 0;
+    }
+
+    private static string FormatCardCount(int cardCount)
+    {
+        return cardCount == 0
+            ? string.Empty
+            : cardCount.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string NormalizeSourceRelativePath(string relativePath)
+    {
+        return relativePath.Replace('\\', '/').Trim('/');
     }
 
     private static IReadOnlyList<AllNotesSortOptionViewModel> CreateSortOptions()
@@ -132,8 +158,8 @@ public sealed record AllNotesListItemViewModel(
     string RelativePath,
     string Title,
     string TypeLabel,
-    string LocationLabel,
     string TagsLabel,
+    string CardCountLabel,
     string CreatedAtLabel,
     string ModifiedAtLabel);
 
@@ -147,14 +173,14 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
         string title,
         string? relativePath,
         string typeLabel,
-        string locationLabel,
+        string tagsLabel,
+        string cardCountLabel,
         string createdAtLabel,
         string modifiedAtLabel,
         IEnumerable<AllNotesTreeItemViewModel> children)
     {
         ArgumentNullException.ThrowIfNull(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(typeLabel);
-        ArgumentException.ThrowIfNullOrWhiteSpace(locationLabel);
         ArgumentNullException.ThrowIfNull(children);
 
         Id = id;
@@ -162,7 +188,8 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
         Title = title;
         RelativePath = relativePath;
         TypeLabel = typeLabel;
-        LocationLabel = locationLabel;
+        TagsLabel = tagsLabel;
+        CardCountLabel = cardCountLabel;
         CreatedAtLabel = createdAtLabel;
         ModifiedAtLabel = modifiedAtLabel;
 
@@ -182,7 +209,9 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
 
     public string TypeLabel { get; }
 
-    public string LocationLabel { get; }
+    public string TagsLabel { get; }
+
+    public string CardCountLabel { get; }
 
     public string CreatedAtLabel { get; }
 
@@ -207,7 +236,30 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
     };
 }
 
-public sealed record AllNotesFilterOptionViewModel(string Label, string Value);
+public sealed class AllNotesFilterOptionViewModel : ObservableObject
+{
+    private bool isSelected;
+
+    public AllNotesFilterOptionViewModel(string label, string value, bool isSelected = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+        Label = label;
+        Value = value;
+        this.isSelected = isSelected;
+    }
+
+    public string Label { get; }
+
+    public string Value { get; }
+
+    public bool IsSelected
+    {
+        get => isSelected;
+        set => SetProperty(ref isSelected, value);
+    }
+}
 
 public sealed record AllNotesSortOptionViewModel(string Label, AllNotesSortKey SortKey);
 

@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -11,6 +14,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private const string AllTagsValue = "__all_tags";
     private const string AllTypesValue = "__all_types";
     private readonly INoteService noteService;
+    private readonly IFlashcardCardsQuery flashcardCardsQuery;
     private readonly RelayCommand openNoteCommand;
     private string currentCollectionId = string.Empty;
     private string searchQuery = string.Empty;
@@ -26,20 +30,26 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? applyFiltersCancellation;
     private IReadOnlyList<KnowledgeNoteListItemReadModel> allNotes = [];
     private IReadOnlyList<AllNotesTreeItemViewModel> allTreeRoots = [];
+    private Dictionary<string, int> cardCountsBySourceRelativePath = new(StringComparer.OrdinalIgnoreCase);
     private bool isTreeViewMode;
+    private bool isUpdatingFilterOptions;
 
-    public AllNotesViewModel(INoteService noteService)
+    public AllNotesViewModel(INoteService noteService, IFlashcardCardsQuery flashcardCardsQuery)
     {
         ArgumentNullException.ThrowIfNull(noteService);
+        ArgumentNullException.ThrowIfNull(flashcardCardsQuery);
 
         this.noteService = noteService;
+        this.flashcardCardsQuery = flashcardCardsQuery;
         openNoteCommand = new RelayCommand(OpenNoteFromCommand, CanOpenNoteFromCommand);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         CreateNoteCommand = new RelayCommand(() => CreateNoteRequested?.Invoke(this, EventArgs.Empty));
         ImportDocumentsCommand = new RelayCommand(() => ImportDocumentsRequested?.Invoke(this, EventArgs.Empty));
+        ShowDataGridViewCommand = new RelayCommand(() => IsTreeViewMode = false);
+        ShowTreeViewCommand = new RelayCommand(() => IsTreeViewMode = true);
 
-        TagOptions.Add(new AllNotesFilterOptionViewModel("All tags", AllTagsValue));
-        TypeOptions.Add(new AllNotesFilterOptionViewModel("All types", AllTypesValue));
+        AddFilterOption(TagOptions, new AllNotesFilterOptionViewModel("All tags", AllTagsValue, isSelected: true));
+        AddFilterOption(TypeOptions, new AllNotesFilterOptionViewModel("All types", AllTypesValue, isSelected: true));
 
         foreach (AllNotesSortOptionViewModel option in CreateSortOptions())
         {
@@ -81,6 +91,10 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     public ICommand CreateNoteCommand { get; }
 
     public ICommand ImportDocumentsCommand { get; }
+
+    public ICommand ShowDataGridViewCommand { get; }
+
+    public ICommand ShowTreeViewCommand { get; }
 
     public string SearchQuery
     {
@@ -148,11 +162,14 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
             if (SetProperty(ref isTreeViewMode, value))
             {
                 OnPropertyChanged(nameof(IsListViewMode));
+                OnPropertyChanged(nameof(ViewModeLabel));
             }
         }
     }
 
     public bool IsListViewMode => !IsTreeViewMode;
+
+    public string ViewModeLabel => IsTreeViewMode ? "Tree view" : "Data grid";
 
     public string NoteCountLabel => $"{allNotes.Count} note{(allNotes.Count == 1 ? string.Empty : "s")}";
 
@@ -205,8 +222,8 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private void ClearFilters()
     {
         SearchQuery = string.Empty;
-        SelectedTagOption = TagOptions.FirstOrDefault();
-        SelectedTypeOption = TypeOptions.FirstOrDefault();
+        SelectOnlyAllFilterOption(TagOptions, AllTagsValue);
+        SelectOnlyAllFilterOption(TypeOptions, AllTypesValue);
         SelectedSortOption = SortOptions.FirstOrDefault();
     }
 
@@ -238,5 +255,104 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         {
             OpenNoteRequested?.Invoke(this, new OpenAllNotesRequestedEventArgs(relativePath));
         }
+    }
+
+    private void AddFilterOption(
+        ObservableCollection<AllNotesFilterOptionViewModel> collection,
+        AllNotesFilterOptionViewModel option)
+    {
+        option.PropertyChanged += FilterOption_PropertyChanged;
+        collection.Add(option);
+    }
+
+    private void FilterOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (isUpdatingFilterOptions || e.PropertyName != nameof(AllNotesFilterOptionViewModel.IsSelected))
+        {
+            return;
+        }
+
+        if (sender is not AllNotesFilterOptionViewModel option)
+        {
+            return;
+        }
+
+        ObservableCollection<AllNotesFilterOptionViewModel>? owner = TagOptions.Contains(option)
+            ? TagOptions
+            : TypeOptions.Contains(option)
+                ? TypeOptions
+                : null;
+
+        if (owner is null)
+        {
+            return;
+        }
+
+        string allValue = ReferenceEquals(owner, TagOptions) ? AllTagsValue : AllTypesValue;
+        NormalizeFilterSelection(owner, allValue, option);
+        QueueApplyFilters();
+    }
+
+    private void NormalizeFilterSelection(
+        ObservableCollection<AllNotesFilterOptionViewModel> options,
+        string allValue,
+        AllNotesFilterOptionViewModel changedOption)
+    {
+        isUpdatingFilterOptions = true;
+        try
+        {
+            if (string.Equals(changedOption.Value, allValue, StringComparison.Ordinal))
+            {
+                if (changedOption.IsSelected)
+                {
+                    foreach (AllNotesFilterOptionViewModel option in options.Where(option => option != changedOption))
+                    {
+                        option.IsSelected = false;
+                    }
+                }
+                else if (!options.Any(option => option.IsSelected))
+                {
+                    changedOption.IsSelected = true;
+                }
+
+                return;
+            }
+
+            AllNotesFilterOptionViewModel? allOption = options
+                .FirstOrDefault(option => string.Equals(option.Value, allValue, StringComparison.Ordinal));
+            if (changedOption.IsSelected && allOption is not null)
+            {
+                allOption.IsSelected = false;
+            }
+            else if (!options.Any(option => option.IsSelected && !string.Equals(option.Value, allValue, StringComparison.Ordinal))
+                && allOption is not null)
+            {
+                allOption.IsSelected = true;
+            }
+        }
+        finally
+        {
+            isUpdatingFilterOptions = false;
+        }
+    }
+
+    private void SelectOnlyAllFilterOption(
+        ObservableCollection<AllNotesFilterOptionViewModel> options,
+        string allValue)
+    {
+        isUpdatingFilterOptions = true;
+        try
+        {
+            foreach (AllNotesFilterOptionViewModel option in options)
+            {
+                option.IsSelected = string.Equals(option.Value, allValue, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            isUpdatingFilterOptions = false;
+        }
+
+        QueueApplyFilters();
     }
 }

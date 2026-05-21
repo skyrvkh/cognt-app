@@ -52,6 +52,31 @@ public sealed partial class MainViewModel
             treeTitle);
     }
 
+    internal bool TryOpenPdfDocumentByRelativePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        string normalizedPath = NormalizeRelativePath(relativePath);
+        NoteTreeNodeViewModel? loadedPdfNode = FindPdfTreeNodeByRelativePath(NoteRoots, normalizedPath);
+        if (loadedPdfNode is not null && !string.IsNullOrWhiteSpace(loadedPdfNode.FileRelPath))
+        {
+            OpenPdfDocumentByRelativePath(loadedPdfNode.FileRelPath, loadedPdfNode.Id, loadedPdfNode.Title);
+            return true;
+        }
+
+        if (!string.Equals(Path.GetExtension(normalizedPath), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string title = Path.GetFileNameWithoutExtension(normalizedPath);
+        OpenPdfDocument(new KnowledgePdfDocumentReadModel(normalizedPath, title));
+        return true;
+    }
+
     private void OpenPdfDocument(
         KnowledgePdfDocumentReadModel document,
         long? treeItemId = null,
@@ -83,6 +108,32 @@ public sealed partial class MainViewModel
             : item.Title;
         document = new KnowledgePdfDocumentReadModel(normalizedPath, title);
         return true;
+    }
+
+    private static NoteTreeNodeViewModel? FindPdfTreeNodeByRelativePath(
+        IEnumerable<NoteTreeNodeViewModel> nodes,
+        string normalizedRelativePath)
+    {
+        foreach (NoteTreeNodeViewModel node in nodes)
+        {
+            if (node.Kind == KnowledgeItemKind.PdfDocument
+                && !string.IsNullOrWhiteSpace(node.FileRelPath)
+                && string.Equals(
+                    NormalizeRelativePath(node.FileRelPath),
+                    normalizedRelativePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            NoteTreeNodeViewModel? childMatch = FindPdfTreeNodeByRelativePath(node.Children, normalizedRelativePath);
+            if (childMatch is not null)
+            {
+                return childMatch;
+            }
+        }
+
+        return null;
     }
 
     internal string ResolveDocumentPath(string relativePath)

@@ -86,6 +86,12 @@ internal sealed partial class EditorWorkflowCoordinator
         try
         {
             viewModel.SaveMentionSource(e.SourcePath, e.Content);
+            if (viewModel.TryOpenPdfDocumentByRelativePath(e.RelativePath))
+            {
+                editorView.PostMentionOpenResult(ok: true);
+                return;
+            }
+
             string targetPath = viewModel.ResolveMentionPath(e.RelativePath);
             bool opened = await OpenNoteAsync(targetPath, selectInTree: true);
             editorView.PostMentionOpenResult(
