@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
@@ -46,6 +47,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private int currentCollectionCardCount;
     private bool isEditorReadOnly;
     private double globalTextFontSize = 11;
+    private string globalTextFontSizeText = "11";
     private ThemeOptionViewModel selectedThemeOption = null!;
     public MainViewModel(
         PkmNoteService noteService,
@@ -87,6 +89,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         this.themeService = themeService;
         this.editorSettingsService = editorSettingsService;
 
+        InitializeReviewParameterSettings();
         InitializeThemeOptions();
         InitializeEditorSettings();
         InitializeCommands();
@@ -214,8 +217,34 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         get => globalTextFontSize;
         set
         {
-            double normalized = Math.Clamp(Math.Round(value, 0), 9, 18);
-            SetProperty(ref globalTextFontSize, normalized);
+            double normalized = Math.Clamp(
+                Math.Round(value, 0),
+                EditorSettings.MinimumGlobalTextFontSize,
+                EditorSettings.MaximumGlobalTextFontSize);
+            if (SetProperty(ref globalTextFontSize, normalized))
+            {
+                globalTextFontSizeText = normalized.ToString("0", CultureInfo.InvariantCulture);
+                OnPropertyChanged(nameof(GlobalTextFontSizeText));
+                AutoSaveSettingsStatusMessage = string.Empty;
+                RaiseEditorSettingsCommandStates();
+            }
+        }
+    }
+
+    public string GlobalTextFontSizeText
+    {
+        get => globalTextFontSizeText;
+        set
+        {
+            if (!SetProperty(ref globalTextFontSizeText, value))
+            {
+                return;
+            }
+
+            if (double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out double fontSize))
+            {
+                GlobalTextFontSize = fontSize;
+            }
         }
     }
 
@@ -231,10 +260,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
             selectedThemeOption = value;
             themeService.ApplyTheme(value.Theme);
+            AutoSaveSettingsStatusMessage = string.Empty;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentThemeDescription));
             OnPropertyChanged(nameof(CurrentThemeName));
             OnPropertyChanged(nameof(IsGraphiteTheme));
+            RaiseEditorSettingsCommandStates();
         }
     }
 
