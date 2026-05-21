@@ -110,6 +110,47 @@
         </Style.Triggers>
     </Style>
 
+    <Style TargetType="{x:Type ContextMenu}">
+        <Setter Property="Background" Value="{DynamicResource ContextMenuBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ContextMenuForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ContextMenuBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="6" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="HasDropShadow" Value="True" />
+    </Style>
+
+    <Style TargetType="{x:Type MenuItem}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource ContextMenuForegroundBrush}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ContextMenuHoverBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource ContextMenuHoverForegroundBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource ContextMenuDisabledForegroundBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type Separator}">
+        <Setter Property="Margin" Value="4,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Separator}">
+                    <Border Height="1"
+                            Background="{DynamicResource ContextMenuSeparatorBrush}"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="PanelCardStyle" TargetType="Border" BasedOn="{StaticResource PanelStyle}">
         <Setter Property="Padding" Value="22" />
     </Style>

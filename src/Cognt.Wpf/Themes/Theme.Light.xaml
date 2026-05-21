@@ -35,6 +35,13 @@
     <SolidColorBrush x:Key="ControlHoverBrush" Color="#F1F5FB" />
     <SolidColorBrush x:Key="ControlBorderBrush" Color="#D9E1EE" />
     <SolidColorBrush x:Key="ControlBorderHoverBrush" Color="#B8C3D6" />
+    <SolidColorBrush x:Key="ContextMenuBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ContextMenuForegroundBrush" Color="#142033" />
+    <SolidColorBrush x:Key="ContextMenuBorderBrush" Color="#D9E1EE" />
+    <SolidColorBrush x:Key="ContextMenuHoverBackgroundBrush" Color="#EEF2FF" />
+    <SolidColorBrush x:Key="ContextMenuHoverForegroundBrush" Color="#142033" />
+    <SolidColorBrush x:Key="ContextMenuDisabledForegroundBrush" Color="#98A2B3" />
+    <SolidColorBrush x:Key="ContextMenuSeparatorBrush" Color="#DDE4EF" />
     <SolidColorBrush x:Key="DisabledSurfaceBrush" Color="#EEF2F7" />
     <SolidColorBrush x:Key="DisabledLineBrush" Color="#D9E1EE" />
     <SolidColorBrush x:Key="DisabledTextBrush" Color="#98A2B3" />
