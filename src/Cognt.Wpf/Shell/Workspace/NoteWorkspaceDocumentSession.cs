@@ -247,7 +247,7 @@ internal sealed class NoteWorkspaceDocumentSession
             return;
         }
 
-        if (savePendingChanges)
+        if (savePendingChanges && viewModel.CanSaveOnClose)
         {
             await SavePendingChangesAsync();
         }
