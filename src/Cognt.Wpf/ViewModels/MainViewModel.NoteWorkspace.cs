@@ -24,7 +24,7 @@ public sealed partial class MainViewModel
             ? Path.GetFileNameWithoutExtension(notePath)
             : title.Trim();
         lastSavedContent = savedContent ?? content;
-        ClearNoteToCardTags();
+        LoadNoteToCardTagsForCurrentNote();
         OnPropertyChanged(nameof(CurrentNotePath));
         OnPropertyChanged(nameof(CurrentNoteRelativePath));
         RefreshEditorBreadcrumb();
