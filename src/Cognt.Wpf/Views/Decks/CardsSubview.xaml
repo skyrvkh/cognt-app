@@ -23,6 +23,34 @@
                       IsEnabled="{Binding CanEdit}" />
             <MenuItem Header="Preview"
                       Click="PreviewCardMenuItem_Click" />
+            <Separator />
+            <MenuItem Header="{Binding SuspensionAction}"
+                      Command="{Binding DataContext.ToggleSuspensionCommand, Source={x:Reference CardsDataGrid}}"
+                      CommandParameter="{Binding}"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Postpone 1 day"
+                      Tag="1"
+                      Click="PostponePresetMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Postpone 3 days"
+                      Tag="3"
+                      Click="PostponePresetMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Postpone 7 days"
+                      Tag="7"
+                      Click="PostponePresetMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Postpone 14 days"
+                      Tag="14"
+                      Click="PostponePresetMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Postpone 30 days"
+                      Tag="30"
+                      Click="PostponePresetMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Custom..."
+                      Click="CustomPostponeMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
         </ContextMenu>
     </UserControl.Resources>
     <Grid x:Name="LayoutRoot"
@@ -152,7 +180,7 @@
                                   ItemsSource="{Binding CardLibraryRows}"
                                   SelectedIndex="0"
                                   MinRowHeight="58"
-                                  SelectionMode="Single"
+                                  SelectionMode="Extended"
                                   SelectionUnit="FullRow"
                                   Style="{StaticResource FlashcardsDataGridStyle}">
                             <DataGrid.RowStyle>
@@ -177,6 +205,7 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Binding="{Binding Question}" Header="Front Preview" Width="*" MinWidth="260" ElementStyle="{StaticResource GridTextBlockStyle}" />
                                 <DataGridTextColumn Binding="{Binding Deck}" Header="Deck" Width="150" ElementStyle="{StaticResource GridTextBlockStyle}" />
+                                <DataGridTextColumn Binding="{Binding TagsLabel}" Header="Tags" Width="160" ElementStyle="{StaticResource GridTextBlockStyle}" />
                                 <DataGridTemplateColumn Header="Status" Width="118">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -198,6 +227,10 @@
                                                                 <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
                                                                 <Setter Property="BorderBrush" Value="{DynamicResource SuccessLineBrush}" />
                                                             </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Suspended">
+                                                                <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+                                                            </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
@@ -211,6 +244,9 @@
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Status}" Value="Review">
                                                                     <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Suspended">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -399,33 +435,37 @@
                             <TextBlock Text="TAGS"
                                        Style="{StaticResource SmallMutedTextStyle}"
                                        FontWeight="SemiBold" />
-                            <ListBox ItemsSource="{Binding CardFilterTagRows}"
-                                     SelectedItem="{Binding SelectedTagFilter, Mode=TwoWay}"
-                                     Margin="0,8,0,0"
-                                     MaxHeight="170"
-                                     Style="{StaticResource FilterListBoxStyle}">
-                                <ListBox.ItemTemplate>
+                            <ScrollViewer Margin="0,8,0,0"
+                                          MaxHeight="170"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding CardFilterTagRows}">
+                                    <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}"
-                                                       Style="{StaticResource MutedTextStyle}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <Border Grid.Column="1"
-                                                    Padding="7,1"
-                                                    CornerRadius="8"
-                                                    Background="{DynamicResource BadgeSurfaceBrush}">
-                                                <TextBlock Text="{Binding Count}"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource InkBrush}" />
-                                            </Border>
-                                        </Grid>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Margin="0,0,0,6"
+                                                  Foreground="{DynamicResource InkBrush}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}"
+                                                           Style="{StaticResource MutedTextStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <Border Grid.Column="1"
+                                                        Padding="7,1"
+                                                        CornerRadius="8"
+                                                        Background="{DynamicResource BadgeSurfaceBrush}">
+                                                    <TextBlock Text="{Binding Count}"
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource InkBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </CheckBox>
                                     </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                     </ScrollViewer>
 

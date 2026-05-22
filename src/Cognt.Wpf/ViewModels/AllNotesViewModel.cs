@@ -16,6 +16,9 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private readonly INoteService noteService;
     private readonly IFlashcardCardsQuery flashcardCardsQuery;
     private readonly RelayCommand openNoteCommand;
+    private readonly RelayCommand showCardsCommand;
+    private readonly RelayCommand addTagsCommand;
+    private readonly RelayCommand removeTagsCommand;
     private string currentCollectionId = string.Empty;
     private string searchQuery = string.Empty;
     private bool isLoading;
@@ -42,6 +45,9 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         this.noteService = noteService;
         this.flashcardCardsQuery = flashcardCardsQuery;
         openNoteCommand = new RelayCommand(OpenNoteFromCommand, CanOpenNoteFromCommand);
+        showCardsCommand = new RelayCommand(ShowCardsFromCommand, CanShowCardsFromCommand);
+        addTagsCommand = new RelayCommand(parameter => RequestTagEdit(parameter, KnowledgeTagOperationKind.Add), CanRequestTagEdit);
+        removeTagsCommand = new RelayCommand(parameter => RequestTagEdit(parameter, KnowledgeTagOperationKind.Remove), CanRequestTagEdit);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
         CreateNoteCommand = new RelayCommand(() => CreateNoteRequested?.Invoke(this, EventArgs.Empty));
         ImportDocumentsCommand = new RelayCommand(() => ImportDocumentsRequested?.Invoke(this, EventArgs.Empty));
@@ -62,6 +68,10 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     }
 
     internal event EventHandler<OpenAllNotesRequestedEventArgs>? OpenNoteRequested;
+
+    internal event EventHandler<OpenNoteCardsRequestedEventArgs>? ShowCardsRequested;
+
+    internal event EventHandler<TagEditRequestedEventArgs>? TagEditRequested;
 
     internal event EventHandler? CreateNoteRequested;
 
@@ -85,6 +95,12 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     public ObservableCollection<AllNotesSortOptionViewModel> SortOptions { get; } = [];
 
     public ICommand OpenNoteCommand => openNoteCommand;
+
+    public ICommand ShowCardsCommand => showCardsCommand;
+
+    public ICommand AddTagsCommand => addTagsCommand;
+
+    public ICommand RemoveTagsCommand => removeTagsCommand;
 
     public ICommand ClearFiltersCommand { get; }
 
@@ -255,6 +271,76 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         {
             OpenNoteRequested?.Invoke(this, new OpenAllNotesRequestedEventArgs(relativePath));
         }
+    }
+
+    private bool CanShowCardsFromCommand(object? parameter)
+    {
+        return parameter switch
+        {
+            AllNotesListItemViewModel note => note.HasCards,
+            AllNotesTreeItemViewModel treeItem => treeItem.HasCards,
+            _ => false
+        };
+    }
+
+    private void ShowCardsFromCommand(object? parameter)
+    {
+        (string? relativePath, string? title) = parameter switch
+        {
+            AllNotesListItemViewModel note when note.HasCards => (note.RelativePath, note.Title),
+            AllNotesTreeItemViewModel treeItem when treeItem.HasCards => (treeItem.RelativePath, treeItem.Title),
+            _ => (null, null)
+        };
+
+        if (!string.IsNullOrWhiteSpace(relativePath) && !string.IsNullOrWhiteSpace(title))
+        {
+            ShowCardsRequested?.Invoke(this, new OpenNoteCardsRequestedEventArgs(relativePath, title));
+        }
+    }
+
+    internal void RequestBulkTagEdit(
+        IReadOnlyList<long> itemIds,
+        KnowledgeTagOperationKind operation)
+    {
+        if (itemIds.Count == 0)
+        {
+            return;
+        }
+
+        TagEditRequested?.Invoke(
+            this,
+            new TagEditRequestedEventArgs(
+                itemIds,
+                operation,
+                itemIds.Count == 1 ? "1 item" : $"{itemIds.Count} selected items"));
+    }
+
+    private bool CanRequestTagEdit(object? parameter)
+    {
+        return GetTagTarget(parameter) is { Id: > 0 };
+    }
+
+    private void RequestTagEdit(object? parameter, KnowledgeTagOperationKind operation)
+    {
+        (long id, string title) = GetTagTarget(parameter) ?? default;
+        if (id <= 0)
+        {
+            return;
+        }
+
+        TagEditRequested?.Invoke(
+            this,
+            new TagEditRequestedEventArgs([id], operation, title));
+    }
+
+    private static (long Id, string Title)? GetTagTarget(object? parameter)
+    {
+        return parameter switch
+        {
+            AllNotesListItemViewModel note => (note.ItemId, note.Title),
+            AllNotesTreeItemViewModel treeItem => (treeItem.Id, treeItem.Title),
+            _ => null
+        };
     }
 
     private void AddFilterOption(

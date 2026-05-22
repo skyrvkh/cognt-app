@@ -44,6 +44,7 @@ internal static class WpfServiceCollectionExtensions
                 provider.GetRequiredService<IDecksWorkspaceDataProvider>(),
                 provider.GetRequiredService<ICreateFlashcardsCommand>(),
                 provider.GetRequiredService<IUpdateFlashcardFrontContentCommand>(),
+                provider.GetRequiredService<IUpdateFlashcardSchedulingCommand>(),
                 provider.GetRequiredService<IKnowledgeDocumentContentFactory>(),
                 provider.GetRequiredService<StatisticsSubviewViewModel>()));
         services.AddSingleton<DecksView>();
