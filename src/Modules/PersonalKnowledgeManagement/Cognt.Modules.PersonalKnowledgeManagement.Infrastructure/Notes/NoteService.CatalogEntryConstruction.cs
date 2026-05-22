@@ -31,7 +31,8 @@ internal sealed partial class NoteService
     private static NoteCatalogEntry? TryCreateNoteCatalogEntry(
         string root,
         KnowledgeTreeItemRow row,
-        IReadOnlyDictionary<long, IReadOnlyList<AttachmentRow>> attachmentsByNoteId)
+        IReadOnlyDictionary<long, IReadOnlyList<AttachmentRow>> attachmentsByNoteId,
+        IReadOnlyDictionary<long, IReadOnlyList<string>> assignedTagsByItemId)
     {
         if (string.IsNullOrWhiteSpace(row.FileRelPath))
         {
@@ -59,18 +60,39 @@ internal sealed partial class NoteService
             : row.Title;
         string plainText = SearchableDocumentText.ExtractPlainText(notePath, content);
         string pathText = Path.GetDirectoryName(relativePath)?.Replace('\\', '/') ?? string.Empty;
-        IReadOnlyList<string> tags = ExtractNoteTags(notePath, content);
+        IReadOnlyList<string> contentTags = ExtractNoteTags(notePath, content);
+        IReadOnlyList<string> assignedTags = assignedTagsByItemId.TryGetValue(row.Id, out IReadOnlyList<string>? existingTags)
+            ? existingTags
+            : [];
+        IReadOnlyList<string> tags = MergeTags(assignedTags, contentTags);
         string searchText = NormalizeSearchText(title, relativePath, pathText, plainText, tags);
 
         return new NoteCatalogEntry(
             new KnowledgeNoteListItemReadModel(
+                row.Id,
                 title,
                 relativePath,
                 ClassifyNoteListItemType(notePath, noteAttachments),
                 tags,
                 DateTimeOffset.FromUnixTimeSeconds(row.CreatedAt),
-                DateTimeOffset.FromUnixTimeSeconds(row.UpdatedAt)),
+                DateTimeOffset.FromUnixTimeSeconds(row.UpdatedAt),
+                assignedTags,
+                contentTags),
             searchText);
+    }
+
+    private static IReadOnlyList<string> MergeTags(
+        IReadOnlyList<string> assignedTags,
+        IReadOnlyList<string> contentTags)
+    {
+        return assignedTags
+            .Concat(contentTags)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => SearchableDocumentText.NormalizeWhitespace(tag))
+            .Where(tag => tag.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string? TryReadCatalogNoteContent(string notePath)

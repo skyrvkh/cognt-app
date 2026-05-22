@@ -49,6 +49,50 @@ internal sealed partial class SqliteFlashcardStore
         repository.ApplyReview(cardId, ToPersistenceRating(rating), schedule);
     }
 
+    public Task SetCardSuspensionAsync(
+        string collectionId,
+        long cardId,
+        bool isSuspended,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId);
+        repository.SetCardSuspension(cardId, isSuspended);
+        return Task.CompletedTask;
+    }
+
+    public Task PostponeCardDueDateAsync(
+        string collectionId,
+        long cardId,
+        int days,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        FlashcardRecord card = repository.GetCard(cardId);
+        StoredFsrsCard stored = FsrsStoredStateCodec.Read(card.SerializedState);
+        FsrsCard postponedCard = stored.Card.Copy();
+        DateTimeOffset dueUtc = card.DueUtc.AddDays(days);
+        postponedCard.Due = dueUtc;
+
+        StoredFsrsCard postponedStored = new(
+            postponedCard,
+            stored.Reps,
+            stored.Lapses,
+            stored.ElapsedDays,
+            Math.Max(0, stored.ScheduledDays + days));
+
+        repository.PostponeCardDueDate(
+            cardId,
+            dueUtc,
+            FsrsStoredStateCodec.Serialize(postponedStored),
+            postponedStored.ScheduledDays);
+        return Task.CompletedTask;
+    }
+
     private static (double DesiredRetention, IReadOnlyList<double>? Parameters) CreateSchedulerOptimization(
         SqliteFlashcardRepository repository,
         PersistenceSettings settings)

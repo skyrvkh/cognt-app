@@ -285,10 +285,15 @@ public sealed partial class MainViewModel
 
     private void CommitPendingNoteToCardTags()
     {
-        AppendNoteToCardTags(NoteToCardPendingTagText.Split(
+        string[] addedTags = AppendNoteToCardTags(NoteToCardPendingTagText.Split(
             ',',
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
         NoteToCardPendingTagText = string.Empty;
+
+        if (addedTags.Length > 0)
+        {
+            PersistCurrentNoteToCardTagAdditions(addedTags);
+        }
     }
 
     private void RemoveNoteToCardTag(object? parameter)
@@ -303,26 +308,74 @@ public sealed partial class MainViewModel
         if (existingTag is not null)
         {
             NoteToCardTags.Remove(existingTag);
+            PersistCurrentNoteToCardTagRemovals([existingTag]);
         }
     }
 
-    private void AppendNoteToCardTags(IEnumerable<string> tags)
+    private string[] AppendNoteToCardTags(IEnumerable<string> tags)
     {
+        List<string> addedTags = [];
         foreach (string tag in tags
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
+            .Select(NormalizeTagDisplayName)
+            .Where(value => value.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!NoteToCardTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
             {
                 NoteToCardTags.Add(tag);
+                addedTags.Add(tag);
             }
         }
+
+        return addedTags.ToArray();
     }
 
     private void ClearNoteToCardTags()
     {
         NoteToCardTags.Clear();
         NoteToCardPendingTagText = string.Empty;
+    }
+
+    private void LoadNoteToCardTagsForCurrentNote()
+    {
+        ClearNoteToCardTags();
+        if (string.IsNullOrWhiteSpace(openCollectionPath) || currentNoteItemId is not > 0)
+        {
+            return;
+        }
+
+        AppendNoteToCardTags(noteService.LoadAssignedTags(openCollectionPath, [currentNoteItemId.Value]));
+    }
+
+    private void PersistCurrentNoteToCardTagAdditions(IReadOnlyList<string> tags)
+    {
+        if (string.IsNullOrWhiteSpace(openCollectionPath) || currentNoteItemId is not > 0 || tags.Count == 0)
+        {
+            return;
+        }
+
+        noteService.AssignTags(openCollectionPath, [currentNoteItemId.Value], tags, includeDescendants: false);
+        RefreshNotesTree(preserveExpansion: true);
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void PersistCurrentNoteToCardTagRemovals(IReadOnlyList<string> tags)
+    {
+        if (string.IsNullOrWhiteSpace(openCollectionPath) || currentNoteItemId is not > 0 || tags.Count == 0)
+        {
+            return;
+        }
+
+        noteService.RemoveTags(openCollectionPath, [currentNoteItemId.Value], tags, includeDescendants: false);
+        RefreshNotesTree(preserveExpansion: true);
+        MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static string NormalizeTagDisplayName(string? tag)
+    {
+        return string.IsNullOrWhiteSpace(tag)
+            ? string.Empty
+            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
     }
 }

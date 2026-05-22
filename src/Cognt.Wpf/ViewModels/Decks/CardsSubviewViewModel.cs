@@ -7,6 +7,7 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed partial class CardsSubviewViewModel : ObservableObject
 {
+    private readonly Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards;
     private IReadOnlyList<CardLibraryRow> cardLibraryRows = [];
     private IReadOnlyList<CardEmptyStateRow> cardEmptyStates = [];
     private string showingSummary = "Showing 0 cards";
@@ -17,10 +18,16 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
 
     public CardsSubviewViewModel(
         Action showCreateCardReview,
-        Action<CardLibraryRow> showEditCard)
+        Action<CardLibraryRow> showEditCard,
+        Func<CardLibraryRow, bool, Task> setCardSuspension,
+        Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards)
     {
         ArgumentNullException.ThrowIfNull(showCreateCardReview);
         ArgumentNullException.ThrowIfNull(showEditCard);
+        ArgumentNullException.ThrowIfNull(setCardSuspension);
+        ArgumentNullException.ThrowIfNull(postponeCards);
+
+        this.postponeCards = postponeCards;
 
         AddCardCommand = new RelayCommand(showCreateCardReview);
         EditCardCommand = new RelayCommand(parameter =>
@@ -36,6 +43,18 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
                 showEditCard(card);
             }
         });
+        ToggleSuspensionCommand = new RelayCommand(async parameter =>
+        {
+            if (parameter is CardLibraryRow card && card.CanSchedule)
+            {
+                await setCardSuspension(card, !card.IsSuspended);
+            }
+        });
+        PostponeOneDayCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 1, postponeCards));
+        PostponeThreeDaysCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 3, postponeCards));
+        PostponeSevenDaysCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 7, postponeCards));
+        PostponeFourteenDaysCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 14, postponeCards));
+        PostponeThirtyDaysCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 30, postponeCards));
         OpenFiltersCommand = new RelayCommand(() => IsFiltersOpen = true);
         CloseFiltersCommand = new RelayCommand(() => IsFiltersOpen = false);
         ApplyFiltersCommand = new RelayCommand(() =>
@@ -54,6 +73,18 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     public ICommand AddCardCommand { get; }
 
     public ICommand EditCardCommand { get; }
+
+    public ICommand ToggleSuspensionCommand { get; }
+
+    public ICommand PostponeOneDayCommand { get; }
+
+    public ICommand PostponeThreeDaysCommand { get; }
+
+    public ICommand PostponeSevenDaysCommand { get; }
+
+    public ICommand PostponeFourteenDaysCommand { get; }
+
+    public ICommand PostponeThirtyDaysCommand { get; }
 
     public IReadOnlyList<CardLibraryRow> CardLibraryRows
     {
@@ -134,5 +165,29 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
             isDeckScopeSelected,
             decks.Count);
         UpdateActiveFilterSummary();
+    }
+
+    internal Task PostponeCardsAsync(IReadOnlyList<CardLibraryRow> cards, int days)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+
+        CardLibraryRow[] schedulableCards = cards
+            .Where(card => card.CanSchedule)
+            .GroupBy(card => card.Id)
+            .Select(group => group.First())
+            .ToArray();
+        return schedulableCards.Length == 0
+            ? Task.CompletedTask
+            : postponeCards(schedulableCards, days);
+    }
+
+    private static Task PostponeAsync(
+        object? parameter,
+        int days,
+        Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards)
+    {
+        return parameter is CardLibraryRow card && card.CanSchedule
+            ? postponeCards([card], days)
+            : Task.CompletedTask;
     }
 }

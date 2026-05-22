@@ -852,7 +852,8 @@
                             </TreeView.Resources>
                         </TreeView>
 
-                        <DataGrid Grid.Row="1"
+                        <DataGrid x:Name="AllNotesDataGrid"
+                                  Grid.Row="1"
                                   AutoGenerateColumns="False"
                                   Background="{DynamicResource SurfaceBrush}"
                                   BorderThickness="0"

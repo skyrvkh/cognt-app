@@ -133,6 +133,11 @@ public partial class MainWindow
         }
     }
 
+    private async void AllNotesViewModel_ShowCardsRequested(object? sender, OpenNoteCardsRequestedEventArgs e)
+    {
+        await overlayNavigation.HandleNoteCardsRequestedAsync(e);
+    }
+
     private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
     {
         if (viewModel.AddNoteCommand.CanExecute(null))

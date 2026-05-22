@@ -86,9 +86,19 @@ public sealed record CardLibraryRow(
 
     public string FrontContent { get; init; } = string.Empty;
 
+    public DateTimeOffset DueUtc { get; init; }
+
     public IReadOnlyList<string> Tags { get; init; } = [];
 
+    public string TagsLabel => Tags.Count == 0 ? string.Empty : string.Join(", ", Tags);
+
+    public bool IsSuspended { get; init; }
+
     public bool CanEdit => Id > 0 && !string.IsNullOrWhiteSpace(FrontContent);
+
+    public bool CanSchedule => Id > 0;
+
+    public string SuspensionAction => IsSuspended ? "Unsuspend Card" : "Suspend Card";
 
     internal static CardLibraryRow Learning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
     {
@@ -127,7 +137,33 @@ public sealed record CardLibraryRow(
 
 public sealed record CardFilterDeckRow(string Name, string Count, long? Id = null);
 
-public sealed record CardFilterOptionRow(string Name, string Count, string? Value = null);
+public sealed class CardFilterOptionRow : ObservableObject
+{
+    private bool isSelected;
+
+    public CardFilterOptionRow(string name, string count, string? value = null, bool isSelected = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(count);
+
+        Name = name;
+        Count = count;
+        Value = value;
+        this.isSelected = isSelected;
+    }
+
+    public string Name { get; }
+
+    public string Count { get; }
+
+    public string? Value { get; }
+
+    public bool IsSelected
+    {
+        get => isSelected;
+        set => SetProperty(ref isSelected, value);
+    }
+}
 
 public sealed record CardEmptyStateRow(
     string Title,

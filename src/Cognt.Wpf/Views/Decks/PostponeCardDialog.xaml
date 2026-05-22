@@ -1,0 +1,94 @@
+<Window x:Class="CogntApp.Views.Decks.PostponeCardDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Custom Postpone"
+        Width="430"
+        Height="360"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource PageBrush}">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Custom Postpone"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource InkBrush}" />
+            <TextBlock x:Name="SummaryText"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource MutedBrush}"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                Margin="0,18,0,0"
+                Padding="12"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Background="{DynamicResource PanelBrush}">
+            <StackPanel>
+                <TextBlock Text="Current due"
+                           Foreground="{DynamicResource MutedBrush}" />
+                <TextBlock x:Name="CurrentDueText"
+                           Margin="0,4,0,0"
+                           Foreground="{DynamicResource InkBrush}"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="Calculated new due"
+                           Margin="0,14,0,0"
+                           Foreground="{DynamicResource MutedBrush}" />
+                <TextBlock x:Name="CalculatedDueText"
+                           Margin="0,4,0,0"
+                           Foreground="{DynamicResource InkBrush}"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="2"
+                    Margin="0,18,0,0">
+            <TextBlock Text="Postpone by N days"
+                       Foreground="{DynamicResource MutedBrush}" />
+            <TextBox x:Name="DaysTextBox"
+                     Margin="0,8,0,0"
+                     MinHeight="34"
+                     VerticalContentAlignment="Center"
+                     Style="{StaticResource InputTextBoxStyle}"
+                     TextChanged="DaysTextBox_TextChanged" />
+            <TextBlock x:Name="ValidationText"
+                       Margin="0,8,0,0"
+                       Foreground="{DynamicResource DangerBrush}"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3"
+                   Margin="0,12,0,0"
+                   Text="Postpone only moves the due date. It does not suspend the card or record a memory review."
+                   Foreground="{DynamicResource MutedBrush}"
+                   TextWrapping="Wrap" />
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Width="88"
+                    IsCancel="True"
+                    Style="{StaticResource OutlineButtonStyle}" />
+            <Button x:Name="ConfirmButton"
+                    Content="Confirm"
+                    Width="88"
+                    Margin="10,0,0,0"
+                    IsDefault="True"
+                    Click="Confirm_Click"
+                    Style="{StaticResource PrimaryButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</Window>

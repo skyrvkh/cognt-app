@@ -6,18 +6,28 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed partial class CardsSubviewViewModel
 {
+    private string? requestedSourceFilter;
+    private bool resetFiltersForRequestedSource;
+
+    internal void RequestSourceFilter(string? sourceRelPath)
+    {
+        requestedSourceFilter = string.IsNullOrWhiteSpace(sourceRelPath)
+            ? CardsPresentationFactory.AllSourcesValue
+            : sourceRelPath.Replace('\\', '/').Trim('/');
+        resetFiltersForRequestedSource = true;
+    }
+
     public FlashcardCardsQueryRequest CreateCardsRequest(
         string collectionId,
         bool includeDeckFilter = true)
     {
-        // TODO: Suspended/hidden cards are not represented in flashcard_card.
         // TODO: Text search should be added here when a card search service exists.
         return new FlashcardCardsQueryRequest(
             collectionId,
             includeDeckFilter ? SelectedDeckFilter?.Id : null,
             GetSelectedFilterKind(),
             GetSelectedSourceRelPath(),
-            GetSelectedTag());
+            Tags: GetSelectedTags());
     }
 
     private void ConfigureFilterOptions(
@@ -26,9 +36,13 @@ public sealed partial class CardsSubviewViewModel
         DateTimeOffset nowUtc,
         IReadOnlyDictionary<string, string> sourceTitlesByRelPath)
     {
-        string? previousStatus = SelectedStatusFilter?.Value;
-        string? previousSource = SelectedSourceFilter?.Value;
-        string? previousTag = SelectedTagFilter?.Value;
+        string? previousStatus = resetFiltersForRequestedSource
+            ? FlashcardCardsFilterKind.All.ToString()
+            : SelectedStatusFilter?.Value;
+        string? previousSource = requestedSourceFilter ?? SelectedSourceFilter?.Value;
+        string[] previousTags = resetFiltersForRequestedSource
+            ? []
+            : GetSelectedTags();
 
         CardsFilterOptionsState options = CardsPresentationFactory.CreateFilterOptions(
             cards,
@@ -43,7 +57,9 @@ public sealed partial class CardsSubviewViewModel
         SelectedDeckFilter = CardFilterDeckRows.FirstOrDefault();
         SelectedStatusFilter = FindOption(CardFilterStatusRows, previousStatus) ?? CardFilterStatusRows.FirstOrDefault();
         SelectedSourceFilter = FindOption(CardFilterSourceRows, previousSource) ?? CardFilterSourceRows.FirstOrDefault();
-        SelectedTagFilter = FindOption(CardFilterTagRows, previousTag) ?? CardFilterTagRows.FirstOrDefault();
+        ConfigureSelectedTagFilters(previousTags);
+        requestedSourceFilter = null;
+        resetFiltersForRequestedSource = false;
     }
 
     private void ResetFilterSelections()
@@ -51,7 +67,7 @@ public sealed partial class CardsSubviewViewModel
         SelectedDeckFilter = CardFilterDeckRows.FirstOrDefault();
         SelectedStatusFilter = CardFilterStatusRows.FirstOrDefault();
         SelectedSourceFilter = CardFilterSourceRows.FirstOrDefault();
-        SelectedTagFilter = CardFilterTagRows.FirstOrDefault();
+        ConfigureSelectedTagFilters([]);
     }
 
     private FlashcardCardsFilterKind GetSelectedFilterKind()
@@ -68,11 +84,14 @@ public sealed partial class CardsSubviewViewModel
             : SelectedSourceFilter?.Value;
     }
 
-    private string? GetSelectedTag()
+    private string[] GetSelectedTags()
     {
-        return string.Equals(SelectedTagFilter?.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal)
-            ? null
-            : SelectedTagFilter?.Value;
+        return CardFilterTagRows
+            .Where(row => row.IsSelected && !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
+            .Select(row => row.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToArray();
     }
 
     private void UpdateActiveFilterSummary()
@@ -81,10 +100,66 @@ public sealed partial class CardsSubviewViewModel
             SelectedDeckFilter,
             SelectedStatusFilter,
             SelectedSourceFilter,
-            SelectedTagFilter,
             GetSelectedFilterKind(),
             GetSelectedSourceRelPath(),
-            GetSelectedTag());
+            GetSelectedTags());
+    }
+
+    private void ConfigureSelectedTagFilters(IReadOnlyList<string> selectedTags)
+    {
+        bool hasSelectedTags = selectedTags.Count > 0;
+        foreach (CardFilterOptionRow row in CardFilterTagRows)
+        {
+            row.PropertyChanged -= CardFilterTagRow_PropertyChanged;
+            row.IsSelected = string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal)
+                ? !hasSelectedTags
+                : row.Value is not null && selectedTags.Contains(row.Value, StringComparer.OrdinalIgnoreCase);
+            row.PropertyChanged += CardFilterTagRow_PropertyChanged;
+        }
+
+        UpdateActiveFilterSummary();
+    }
+
+    private void CardFilterTagRow_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(CardFilterOptionRow.IsSelected)
+            || sender is not CardFilterOptionRow changed)
+        {
+            return;
+        }
+
+        if (string.Equals(changed.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
+        {
+            if (changed.IsSelected)
+            {
+                foreach (CardFilterOptionRow row in CardFilterTagRows.Where(row => row != changed))
+                {
+                    row.IsSelected = false;
+                }
+            }
+            else if (!CardFilterTagRows.Any(row => row.IsSelected))
+            {
+                changed.IsSelected = true;
+            }
+
+            UpdateActiveFilterSummary();
+            return;
+        }
+
+        CardFilterOptionRow? allTags = FindOption(CardFilterTagRows, CardsPresentationFactory.AllTagsValue);
+        if (changed.IsSelected && allTags is not null)
+        {
+            allTags.IsSelected = false;
+        }
+        else if (!CardFilterTagRows.Any(row =>
+                     row.IsSelected
+                     && !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
+                 && allTags is not null)
+        {
+            allTags.IsSelected = true;
+        }
+
+        UpdateActiveFilterSummary();
     }
 
     private static CardFilterOptionRow? FindOption(

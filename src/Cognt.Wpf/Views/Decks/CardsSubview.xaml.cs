@@ -87,9 +87,14 @@ public partial class CardsSubview : UserControl
             return;
         }
 
-        row.IsSelected = true;
+        if (!row.IsSelected)
+        {
+            CardsDataGrid.SelectedItems.Clear();
+            row.IsSelected = true;
+            CardsDataGrid.SelectedItem = card;
+        }
+
         row.Focus();
-        CardsDataGrid.SelectedItem = card;
         row.ContextMenu!.PlacementTarget = row;
     }
 
@@ -112,5 +117,59 @@ public partial class CardsSubview : UserControl
         {
             ShowCardPreview(card);
         }
+    }
+
+    private async void PostponePresetMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card
+            || !int.TryParse((sender as FrameworkElement)?.Tag?.ToString(), out int days))
+        {
+            return;
+        }
+
+        await PostponeCardsAsync(GetContextCards(card), days);
+    }
+
+    private async void CustomPostponeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        CardLibraryRow[] cards = GetContextCards(card);
+        PostponeCardDialog dialog = new(cards.Select(item => item.DueUtc).ToArray())
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            await PostponeCardsAsync(cards, dialog.Days);
+        }
+    }
+
+    private async Task PostponeCardsAsync(IReadOnlyList<CardLibraryRow> cards, int days)
+    {
+        if (ViewModel is null || cards.Count == 0)
+        {
+            return;
+        }
+
+        await ViewModel.PostponeCardsAsync(cards, days);
+    }
+
+    private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard)
+    {
+        CardLibraryRow[] selectedCards = CardsDataGrid.SelectedItems
+            .OfType<CardLibraryRow>()
+            .Where(card => card.CanSchedule)
+            .GroupBy(card => card.Id)
+            .Select(group => group.First())
+            .ToArray();
+
+        return selectedCards.Any(card => card.Id == contextCard.Id)
+            ? selectedCards
+            : [contextCard];
     }
 }

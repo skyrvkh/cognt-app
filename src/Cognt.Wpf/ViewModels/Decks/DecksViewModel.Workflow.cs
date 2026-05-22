@@ -19,6 +19,22 @@ public sealed partial class DecksViewModel
         RefreshFlashcards();
     }
 
+    internal void ShowCardsForSource(
+        string collectionId,
+        string sourceRelPath,
+        string sourceLabel)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRelPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceLabel);
+
+        this.collectionId = string.IsNullOrWhiteSpace(collectionId) ? string.Empty : collectionId;
+        this.sourceRelPath = sourceRelPath;
+        Cards.RequestSourceFilter(sourceRelPath);
+        CreateCardReview.SetSource(sourceLabel);
+        RefreshFlashcards();
+        NavigateToSubview(FlashcardsTab.DecksCards, Decks);
+    }
+
     internal async Task<int> CreateCardsAsync(
         string deckName,
         string content,
@@ -61,6 +77,55 @@ public sealed partial class DecksViewModel
 
         RefreshFlashcards();
         SetActiveTab(FlashcardsTab.DecksCards);
+    }
+
+    internal async Task SetCardSuspensionAsync(CardLibraryRow card, bool isSuspended)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+
+        await RunFlashcardsMutationAsync(
+            async () =>
+            {
+                EnsureCollectionOpen();
+                await updateFlashcardSchedulingCommand.SetSuspensionAsync(
+                    new UpdateFlashcardSuspensionRequest(collectionId, card.Id, isSuspended));
+                RefreshFlashcards();
+                return isSuspended ? "Card suspended." : "Card unsuspended.";
+            },
+            failurePrefix: isSuspended ? "Card could not be suspended" : "Card could not be unsuspended");
+    }
+
+    internal async Task PostponeCardAsync(CardLibraryRow card, int days)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+
+        await PostponeCardsAsync([card], days);
+    }
+
+    internal async Task PostponeCardsAsync(IReadOnlyList<CardLibraryRow> cards, int days)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+
+        await RunFlashcardsMutationAsync(
+            async () =>
+            {
+                EnsureCollectionOpen();
+                CardLibraryRow[] distinctCards = cards
+                    .Where(card => card.CanSchedule)
+                    .GroupBy(card => card.Id)
+                    .Select(group => group.First())
+                    .ToArray();
+                foreach (CardLibraryRow card in distinctCards)
+                {
+                    await updateFlashcardSchedulingCommand.PostponeDueDateAsync(
+                        new PostponeFlashcardDueDateRequest(collectionId, card.Id, days));
+                }
+
+                RefreshFlashcards();
+                string cardLabel = distinctCards.Length == 1 ? "Card" : $"{distinctCards.Length} cards";
+                return $"{cardLabel} postponed by {days} day{(days == 1 ? string.Empty : "s")}.";
+            },
+            failurePrefix: "Card could not be postponed");
     }
 
     internal async Task HandleSaveCardRequestedAsync(SaveCardRequestedEventArgs request)
