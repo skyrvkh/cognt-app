@@ -616,6 +616,20 @@
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
+                        <Button MinWidth="84"
+                                Margin="0,0,6,0"
+                                Click="AddTagsBulk_Click"
+                                AutomationProperties.Name="Add tags to selected notes"
+                                Style="{StaticResource FilterActionButtonStyle}">
+                            <TextBlock Text="Add Tags" />
+                        </Button>
+                        <Button MinWidth="104"
+                                Margin="0,0,12,0"
+                                Click="RemoveTagsBulk_Click"
+                                AutomationProperties.Name="Remove tags from selected notes"
+                                Style="{StaticResource FilterActionButtonStyle}">
+                            <TextBlock Text="Remove Tags" />
+                        </Button>
                         <TextBlock VerticalAlignment="Center"
                                    Foreground="{DynamicResource MutedBrush}"
                                    FontSize="12"
@@ -800,7 +814,18 @@
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type viewModels:AllNotesTreeItemViewModel}"
                                                           ItemsSource="{Binding Children}">
-                                    <Grid MinHeight="42">
+                                    <Grid MinHeight="42"
+                                          Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TreeView}}">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="Add Tags"
+                                                          Command="{Binding AddTagsCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="Remove Tags"
+                                                          Command="{Binding RemoveTagsCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" SharedSizeGroup="NameColumn" />
                                             <ColumnDefinition Width="130" SharedSizeGroup="TypeColumn" />
@@ -839,10 +864,23 @@
                                                    Text="{Binding TagsLabel}"
                                                    ToolTip="{Binding TagsLabel}"
                                                    Style="{StaticResource TableCellTextStyle}" />
-                                        <TextBlock Grid.Column="3"
-                                                   Margin="10,0,0,0"
-                                                   Text="{Binding CardCountLabel}"
-                                                   Style="{StaticResource TableCellTextStyle}" />
+                                        <Button Grid.Column="3"
+                                                Margin="10,0,0,0"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding DataContext.ShowCardsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding HasCards}"
+                                                AutomationProperties.Name="{Binding Title, StringFormat=Show cards for {0}}"
+                                                Style="{StaticResource FilterActionButtonStyle}">
+                                            <Button.Visibility>
+                                                <Binding Path="HasCards">
+                                                    <Binding.Converter>
+                                                        <BooleanToVisibilityConverter />
+                                                    </Binding.Converter>
+                                                </Binding>
+                                            </Button.Visibility>
+                                            <TextBlock Text="{Binding CardCountLabel}" />
+                                        </Button>
                                         <TextBlock Grid.Column="4"
                                                    Margin="10,0,0,0"
                                                    Text="{Binding ModifiedAtLabel}"
@@ -866,7 +904,27 @@
                                   IsReadOnly="True"
                                   ItemsSource="{Binding VisibleNotes}"
                                   RowHeight="46"
+                                  SelectionMode="Extended"
+                                  SelectionUnit="FullRow"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Tag"
+                                            Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    <Setter Property="ContextMenu">
+                                        <Setter.Value>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="Add Tags"
+                                                          Command="{Binding AddTagsCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="Remove Tags"
+                                                          Command="{Binding RemoveTagsCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            </ContextMenu>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Style>
                                 <Style TargetType="{x:Type DataGrid}">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -899,8 +957,27 @@
                                                     Binding="{Binding TypeLabel}" />
                                 <DataGridTextColumn Width="180"
                                                     Binding="{Binding TagsLabel}" />
-                                <DataGridTextColumn Width="82"
-                                                    Binding="{Binding CardCountLabel}" />
+                                <DataGridTemplateColumn Width="82">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button HorizontalAlignment="Left"
+                                                    Command="{Binding DataContext.ShowCardsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding HasCards}"
+                                                    AutomationProperties.Name="{Binding Title, StringFormat=Show cards for {0}}"
+                                                    Style="{StaticResource FilterActionButtonStyle}">
+                                                <Button.Visibility>
+                                                    <Binding Path="HasCards">
+                                                        <Binding.Converter>
+                                                            <BooleanToVisibilityConverter />
+                                                        </Binding.Converter>
+                                                    </Binding>
+                                                </Button.Visibility>
+                                                <TextBlock Text="{Binding CardCountLabel}" />
+                                            </Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Width="154"
                                                     Binding="{Binding ModifiedAtLabel}" />
                             </DataGrid.Columns>
