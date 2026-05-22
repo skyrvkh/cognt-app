@@ -807,6 +807,13 @@
                                                   Header="Duplicate"
                                                   Click="DuplicateTreeItem_Click" />
                                         <Separator />
+                                        <MenuItem x:Name="AddTagsTreeMenuItem"
+                                                  Header="Add Tags"
+                                                  Click="AddTagsTreeItem_Click" />
+                                        <MenuItem x:Name="RemoveTagsTreeMenuItem"
+                                                  Header="Remove Tags"
+                                                  Click="RemoveTagsTreeItem_Click" />
+                                        <Separator />
                                         <MenuItem Header="Delete"
                                                   Click="DeleteTreeItem_Click" />
                                     </ContextMenu>
