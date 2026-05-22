@@ -15,27 +15,22 @@ public sealed class DecksSubviewViewModel : ObservableObject
     private bool suppressDeckSelectionChanged;
 
     public DecksSubviewViewModel(
-        Action showCreateCardReview,
         Action showStatistics,
         CardsSubviewViewModel cards,
         StatisticsSubviewViewModel statistics)
     {
-        ArgumentNullException.ThrowIfNull(showCreateCardReview);
         ArgumentNullException.ThrowIfNull(showStatistics);
         ArgumentNullException.ThrowIfNull(cards);
         ArgumentNullException.ThrowIfNull(statistics);
 
         Cards = cards;
         Statistics = statistics;
-        AddCardCommand = new RelayCommand(showCreateCardReview);
         ShowStatisticsCommand = new RelayCommand(showStatistics);
         SelectAllDecksCommand = new RelayCommand(() => SetAllDeckSelections(true));
         ClearDeckSelectionCommand = new RelayCommand(() => SetAllDeckSelections(false));
     }
 
     public event EventHandler? SelectedDecksChanged;
-
-    public ICommand AddCardCommand { get; }
 
     public ICommand ShowStatisticsCommand { get; }
 

@@ -1,8 +1,8 @@
 using System.IO;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
-using CogntApp.ViewModels.Navigation;
 using CogntApp.ViewModels.Decks.PresentationModels;
+using CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels.Decks;
 
@@ -14,8 +14,6 @@ public sealed partial class DecksViewModel
         string? sourceLabel)
     {
         this.collectionId = collectionId;
-        this.sourceRelPath = sourceRelPath;
-        CreateCardReview.SetSource(sourceLabel);
         RefreshFlashcards();
     }
 
@@ -28,55 +26,9 @@ public sealed partial class DecksViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceLabel);
 
         this.collectionId = string.IsNullOrWhiteSpace(collectionId) ? string.Empty : collectionId;
-        this.sourceRelPath = sourceRelPath;
         Cards.RequestSourceFilter(sourceRelPath);
-        CreateCardReview.SetSource(sourceLabel);
         RefreshFlashcards();
         NavigateToSubview(FlashcardsTab.DecksCards, Decks);
-    }
-
-    internal async Task<int> CreateCardsAsync(
-        string deckName,
-        string content,
-        IReadOnlyList<string> tags)
-    {
-        EnsureCollectionOpen();
-
-        int created = await createFlashcardsCommand.ExecuteAsync(
-            new CreateFlashcardsRequest(
-                collectionId,
-                string.IsNullOrWhiteSpace(deckName) ? "Default" : deckName.Trim(),
-                content,
-                tags,
-                sourceRelPath));
-
-        RefreshFlashcards();
-        SetActiveTab(FlashcardsTab.DecksCards);
-        return created;
-    }
-
-    internal async Task HandleCreateCardsRequestedAsync(CreateCardsRequestedEventArgs request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        await RunFlashcardsMutationAsync(
-            async () =>
-            {
-                int created = await CreateCardsAsync(request.DeckName, request.Content, request.Tags);
-                return $"Created {created} card{(created == 1 ? string.Empty : "s")}.";
-            },
-            failurePrefix: "Cards could not be created");
-    }
-
-    internal async Task UpdateCardFrontAsync(long cardId, string frontContent)
-    {
-        EnsureCollectionOpen();
-
-        await updateFlashcardFrontContentCommand.ExecuteAsync(
-            new UpdateFlashcardFrontContentRequest(collectionId, cardId, frontContent));
-
-        RefreshFlashcards();
-        SetActiveTab(FlashcardsTab.DecksCards);
     }
 
     internal async Task SetCardSuspensionAsync(CardLibraryRow card, bool isSuspended)
@@ -128,17 +80,69 @@ public sealed partial class DecksViewModel
             failurePrefix: "Card could not be postponed");
     }
 
-    internal async Task HandleSaveCardRequestedAsync(SaveCardRequestedEventArgs request)
+    internal async Task DeleteCardsAsync(IReadOnlyList<CardLibraryRow> cards)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(cards);
 
         await RunFlashcardsMutationAsync(
             async () =>
             {
-                await UpdateCardFrontAsync(request.CardId, request.Content);
-                return "Card saved.";
+                EnsureCollectionOpen();
+                long[] cardIds = GetDistinctCardIds(cards);
+                int deletedCards = await deleteFlashcardsCommand.ExecuteAsync(
+                    new DeleteFlashcardsRequest(collectionId, cardIds));
+                RefreshFlashcards();
+                return deletedCards == 1
+                    ? "Card deleted."
+                    : $"{deletedCards} cards deleted.";
             },
-            failurePrefix: "Card could not be saved");
+            failurePrefix: "Cards could not be deleted");
+    }
+
+    internal async Task AddTagsToCardsAsync(
+        IReadOnlyList<CardLibraryRow> cards,
+        IReadOnlyList<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        await RunFlashcardsMutationAsync(
+            async () =>
+            {
+                EnsureCollectionOpen();
+                long[] cardIds = GetDistinctCardIds(cards);
+                int updatedCards = await updateFlashcardTagsCommand.AddTagsAsync(
+                    new AddFlashcardTagsRequest(collectionId, cardIds, tags));
+                RefreshFlashcards();
+                string tagLabel = string.Join(", ", tags);
+                return updatedCards == 0
+                    ? $"Tags already assigned or unsupported for selected cards: {tagLabel}."
+                    : $"Added {tagLabel} to {updatedCards} card{(updatedCards == 1 ? string.Empty : "s")}.";
+            },
+            failurePrefix: "Card tags could not be updated");
+    }
+
+    internal async Task RemoveTagsFromCardsAsync(
+        IReadOnlyList<CardLibraryRow> cards,
+        IReadOnlyList<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        await RunFlashcardsMutationAsync(
+            async () =>
+            {
+                EnsureCollectionOpen();
+                long[] cardIds = GetDistinctCardIds(cards);
+                int updatedCards = await updateFlashcardTagsCommand.RemoveTagsAsync(
+                    new RemoveFlashcardTagsRequest(collectionId, cardIds, tags));
+                RefreshFlashcards();
+                string tagLabel = string.Join(", ", tags);
+                return updatedCards == 0
+                    ? $"Tags were not assigned or unsupported for selected cards: {tagLabel}."
+                    : $"Removed {tagLabel} from {updatedCards} card{(updatedCards == 1 ? string.Empty : "s")}.";
+            },
+            failurePrefix: "Card tags could not be updated");
     }
 
     private void RefreshFlashcards()
@@ -148,7 +152,6 @@ public sealed partial class DecksViewModel
             Decks.LoadDecks([]);
             Cards.LoadFlashcards([], [], [], new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             Statistics.LoadCollection(null);
-            CreateCardReview.LoadDecks([]);
             PracticeDueCount = "0";
             CramCardCount = "0";
             return;
@@ -181,7 +184,6 @@ public sealed partial class DecksViewModel
             selectedDecks.Select(deck => deck.Name).ToArray());
         PracticeDueCount = workspace.PracticeDueCount;
         CramCardCount = NumericTextFormatter.Format(cardsScopeDecks.Sum(deck => deck.TotalCards));
-        CreateCardReview.LoadDecks(workspace.Decks.Select(deck => deck.Name));
     }
 
     private static IReadOnlyList<FlashcardDeckSummaryReadModel> GetSelectedDecks(
@@ -213,6 +215,15 @@ public sealed partial class DecksViewModel
 
         return cards
             .Where(card => selectedDeckNames.Contains(card.DeckName))
+            .ToArray();
+    }
+
+    private static long[] GetDistinctCardIds(IReadOnlyList<CardLibraryRow> cards)
+    {
+        return cards
+            .Select(card => card.Id)
+            .Where(id => id > 0)
+            .Distinct()
             .ToArray();
     }
 
