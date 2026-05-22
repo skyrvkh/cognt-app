@@ -74,6 +74,68 @@ internal static partial class FlashcardRequestGuards
         return request;
     }
 
+    internal static DeleteFlashcardsRequest EnsureDeleteFlashcardsRequest(
+        DeleteFlashcardsRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCollectionId(request.CollectionId);
+        long[] cardIds = NormalizeCardIds(request.CardIds);
+        if (cardIds.Length == 0)
+        {
+            throw new ArgumentException("At least one card must be selected.", nameof(request));
+        }
+
+        return request with { CardIds = cardIds };
+    }
+
+    internal static AddFlashcardTagsRequest EnsureAddFlashcardTagsRequest(
+        AddFlashcardTagsRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCollectionId(request.CollectionId);
+        long[] cardIds = NormalizeCardIds(request.CardIds);
+        IReadOnlyList<string> tags = NormalizeStrings(request.Tags);
+        if (cardIds.Length == 0)
+        {
+            throw new ArgumentException("At least one card must be selected.", nameof(request));
+        }
+
+        if (tags.Count == 0)
+        {
+            throw new ArgumentException("At least one tag must be supplied.", nameof(request));
+        }
+
+        return request with
+        {
+            CardIds = cardIds,
+            Tags = tags,
+        };
+    }
+
+    internal static RemoveFlashcardTagsRequest EnsureRemoveFlashcardTagsRequest(
+        RemoveFlashcardTagsRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCollectionId(request.CollectionId);
+        long[] cardIds = NormalizeCardIds(request.CardIds);
+        IReadOnlyList<string> tags = NormalizeStrings(request.Tags);
+        if (cardIds.Length == 0)
+        {
+            throw new ArgumentException("At least one card must be selected.", nameof(request));
+        }
+
+        if (tags.Count == 0)
+        {
+            throw new ArgumentException("At least one tag must be supplied.", nameof(request));
+        }
+
+        return request with
+        {
+            CardIds = cardIds,
+            Tags = tags,
+        };
+    }
+
     internal static RecordFlashcardReviewRequest EnsureRecordReviewRequest(
         RecordFlashcardReviewRequest? request)
     {
@@ -102,5 +164,14 @@ internal static partial class FlashcardRequestGuards
         }
 
         return request;
+    }
+
+    private static long[] NormalizeCardIds(IEnumerable<long>? cardIds)
+    {
+        return cardIds?
+            .Where(cardId => cardId > 0)
+            .Distinct()
+            .ToArray()
+            ?? [];
     }
 }

@@ -7,14 +7,9 @@ namespace CogntApp;
 
 public partial class MainWindow
 {
-    private void AddTagsTreeItem_Click(object sender, System.Windows.RoutedEventArgs e)
+    private void EditTagsTreeItem_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         RequestNavigationTagEdit(KnowledgeTagOperationKind.Add);
-    }
-
-    private void RemoveTagsTreeItem_Click(object sender, System.Windows.RoutedEventArgs e)
-    {
-        RequestNavigationTagEdit(KnowledgeTagOperationKind.Remove);
     }
 
     private void RequestNavigationTagEdit(KnowledgeTagOperationKind operation)
@@ -55,11 +50,36 @@ public partial class MainWindow
                 return;
             }
 
-            KnowledgeTagOperationResult result = viewModel.ApplyTags(
-                e.ItemIds,
-                dialog.SelectedTags,
-                dialog.IncludeDescendants,
-                e.Operation);
+            KnowledgeTagOperationResult? addResult = null;
+            KnowledgeTagOperationResult? removeResult = null;
+            if (e.Operation == KnowledgeTagOperationKind.Add)
+            {
+                if (dialog.SelectedTags.Count > 0)
+                {
+                    addResult = viewModel.ApplyTags(
+                        e.ItemIds,
+                        dialog.SelectedTags,
+                        dialog.IncludeDescendants,
+                        KnowledgeTagOperationKind.Add);
+                }
+
+                if (dialog.RemovedTags.Count > 0)
+                {
+                    removeResult = viewModel.ApplyTags(
+                        e.ItemIds,
+                        dialog.RemovedTags,
+                        dialog.IncludeDescendants,
+                        KnowledgeTagOperationKind.Remove);
+                }
+            }
+            else
+            {
+                removeResult = viewModel.ApplyTags(
+                    e.ItemIds,
+                    dialog.SelectedTags,
+                    dialog.IncludeDescendants,
+                    e.Operation);
+            }
 
             if (!string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath))
             {
@@ -68,12 +88,26 @@ public partial class MainWindow
 
             shellDialogs.ShowInfo(
                 "Tags Updated",
-                FormatTagOperationResult(result));
+                FormatTagEditResult(addResult, removeResult));
         }
         catch (Exception ex)
         {
             shellDialogs.ShowWarning("Tags", $"Tags could not be updated:{Environment.NewLine}{ex.Message}");
         }
+    }
+
+    private static string FormatTagEditResult(
+        KnowledgeTagOperationResult? addResult,
+        KnowledgeTagOperationResult? removeResult)
+    {
+        string[] messages = new[] { addResult, removeResult }
+            .Where(result => result is not null)
+            .Select(result => FormatTagOperationResult(result!))
+            .ToArray();
+
+        return messages.Length == 0
+            ? "No tag changes were applied."
+            : string.Join(Environment.NewLine, messages);
     }
 
     private static string FormatTagOperationResult(KnowledgeTagOperationResult result)

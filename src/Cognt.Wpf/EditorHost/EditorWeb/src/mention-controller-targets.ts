@@ -10,7 +10,7 @@ export function normalizeMentionPathKey(relativePath: string) {
 
 export function getMentionDisplayTitle(target: MentionTarget) {
   const title = target.title.trim()
-    || getNotePathFileName(target.relativePath).replace(/\.(json|md|markdown)$/i, '').trim();
+    || getNotePathFileName(target.relativePath).replace(/\.(json|md|markdown|pdf)$/i, '').trim();
   return title.length > 0 ? title : target.relativePath;
 }
 

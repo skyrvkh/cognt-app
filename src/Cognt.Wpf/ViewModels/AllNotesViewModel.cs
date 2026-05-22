@@ -49,6 +49,9 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         addTagsCommand = new RelayCommand(parameter => RequestTagEdit(parameter, KnowledgeTagOperationKind.Add), CanRequestTagEdit);
         removeTagsCommand = new RelayCommand(parameter => RequestTagEdit(parameter, KnowledgeTagOperationKind.Remove), CanRequestTagEdit);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
+        ClearSearchCommand = new RelayCommand(ClearSearch);
+        ClearTagFiltersCommand = new RelayCommand(() => SelectOnlyAllFilterOption(TagOptions, AllTagsValue));
+        ClearTypeFiltersCommand = new RelayCommand(() => SelectOnlyAllFilterOption(TypeOptions, AllTypesValue));
         CreateNoteCommand = new RelayCommand(() => CreateNoteRequested?.Invoke(this, EventArgs.Empty));
         ImportDocumentsCommand = new RelayCommand(() => ImportDocumentsRequested?.Invoke(this, EventArgs.Empty));
         ShowDataGridViewCommand = new RelayCommand(() => IsTreeViewMode = false);
@@ -104,6 +107,12 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
 
     public ICommand ClearFiltersCommand { get; }
 
+    public ICommand ClearSearchCommand { get; }
+
+    public ICommand ClearTagFiltersCommand { get; }
+
+    public ICommand ClearTypeFiltersCommand { get; }
+
     public ICommand CreateNoteCommand { get; }
 
     public ICommand ImportDocumentsCommand { get; }
@@ -119,6 +128,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref searchQuery, value))
             {
+                RefreshFilterPresentationState();
                 QueueApplyFilters();
             }
         }
@@ -193,6 +203,28 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         ? $"Showing {VisibleNotes.Count} of {allNotes.Count} notes"
         : $"0 of {allNotes.Count} notes";
 
+    public string TypeFilterLabel => CreateFilterButtonLabel(TypeOptions, AllTypesValue, "Any type", "1 type", "types");
+
+    public string TagFilterLabel => CreateFilterButtonLabel(TagOptions, AllTagsValue, "Any tag", "1 tag", "tags");
+
+    public bool HasSearchQuery => !string.IsNullOrWhiteSpace(SearchQuery);
+
+    public bool HasSelectedTypeFilters => GetSelectedFilterValues(TypeOptions, AllTypesValue).Length > 0;
+
+    public bool HasSelectedTagFilters => GetSelectedFilterValues(TagOptions, AllTagsValue).Length > 0;
+
+    public bool HasActiveFilters => HasSearchQuery || HasSelectedTypeFilters || HasSelectedTagFilters;
+
+    public IReadOnlyList<AllNotesFilterOptionViewModel> ActiveTypeFilters =>
+        TypeOptions
+            .Where(option => option.IsSelected && !string.Equals(option.Value, AllTypesValue, StringComparison.Ordinal))
+            .ToArray();
+
+    public IReadOnlyList<AllNotesFilterOptionViewModel> ActiveTagFilters =>
+        TagOptions
+            .Where(option => option.IsSelected && !string.Equals(option.Value, AllTagsValue, StringComparison.Ordinal))
+            .ToArray();
+
     public string CollectionLabel => string.IsNullOrWhiteSpace(currentCollectionId)
         ? "No collection selected"
         : Path.GetFileName(currentCollectionId.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -243,6 +275,11 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         SelectedSortOption = SortOptions.FirstOrDefault();
     }
 
+    private void ClearSearch()
+    {
+        SearchQuery = string.Empty;
+    }
+
     private bool CanOpenNoteFromCommand(object? parameter)
     {
         if (string.IsNullOrWhiteSpace(currentCollectionId))
@@ -253,7 +290,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
         return parameter switch
         {
             AllNotesListItemViewModel note => !string.IsNullOrWhiteSpace(note.RelativePath),
-            AllNotesTreeItemViewModel => true,
+            AllNotesTreeItemViewModel treeItem => treeItem.CanOpen,
             _ => false
         };
     }
@@ -376,6 +413,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
 
         string allValue = ReferenceEquals(owner, TagOptions) ? AllTagsValue : AllTypesValue;
         NormalizeFilterSelection(owner, allValue, option);
+        RefreshFilterPresentationState();
         QueueApplyFilters();
     }
 
@@ -439,6 +477,35 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
             isUpdatingFilterOptions = false;
         }
 
+        RefreshFilterPresentationState();
         QueueApplyFilters();
+    }
+
+    private void RefreshFilterPresentationState()
+    {
+        OnPropertyChanged(nameof(TypeFilterLabel));
+        OnPropertyChanged(nameof(TagFilterLabel));
+        OnPropertyChanged(nameof(HasSearchQuery));
+        OnPropertyChanged(nameof(HasSelectedTypeFilters));
+        OnPropertyChanged(nameof(HasSelectedTagFilters));
+        OnPropertyChanged(nameof(HasActiveFilters));
+        OnPropertyChanged(nameof(ActiveTypeFilters));
+        OnPropertyChanged(nameof(ActiveTagFilters));
+    }
+
+    private static string CreateFilterButtonLabel(
+        IEnumerable<AllNotesFilterOptionViewModel> options,
+        string allValue,
+        string emptyLabel,
+        string singularLabel,
+        string pluralSuffix)
+    {
+        string[] selected = GetSelectedFilterValues(options, allValue);
+        return selected.Length switch
+        {
+            0 => emptyLabel,
+            1 => singularLabel,
+            _ => $"{selected.Length} {pluralSuffix}"
+        };
     }
 }

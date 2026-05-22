@@ -62,4 +62,76 @@ internal sealed partial class SqliteFlashcardStore
         return Task.CompletedTask;
     }
 
+    public Task<int> DeleteCardsAsync(
+        string collectionId,
+        IReadOnlyList<long> cardIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cardIds);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        FlashcardRecord[] activeCards = repository.LoadCardsByIds(cardIds).ToArray();
+        repository.MarkCardsDeleted(activeCards.Select(card => card.Id).ToArray());
+        return Task.FromResult(activeCards.Length);
+    }
+
+    public Task<int> AddTagsToCardsAsync(
+        string collectionId,
+        IReadOnlyList<long> cardIds,
+        IReadOnlyList<string> tags,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cardIds);
+        ArgumentNullException.ThrowIfNull(tags);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        int updatedCards = 0;
+        foreach (FlashcardRecord card in repository.LoadCardsByIds(cardIds))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string existingContent = FlashcardCollectionStorage.ReadFlashcardFile(collectionPath, card.FrontRelPath);
+            if (!FlashcardCardContentCodec.TryAddTags(existingContent, tags, out string updatedContent))
+            {
+                continue;
+            }
+
+            FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, card.FrontRelPath, updatedContent);
+            updatedCards++;
+        }
+
+        return Task.FromResult(updatedCards);
+    }
+
+    public Task<int> RemoveTagsFromCardsAsync(
+        string collectionId,
+        IReadOnlyList<long> cardIds,
+        IReadOnlyList<string> tags,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cardIds);
+        ArgumentNullException.ThrowIfNull(tags);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        int updatedCards = 0;
+        foreach (FlashcardRecord card in repository.LoadCardsByIds(cardIds))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string existingContent = FlashcardCollectionStorage.ReadFlashcardFile(collectionPath, card.FrontRelPath);
+            if (!FlashcardCardContentCodec.TryRemoveTags(existingContent, tags, out string updatedContent))
+            {
+                continue;
+            }
+
+            FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, card.FrontRelPath, updatedContent);
+            updatedCards++;
+        }
+
+        return Task.FromResult(updatedCards);
+    }
 }
