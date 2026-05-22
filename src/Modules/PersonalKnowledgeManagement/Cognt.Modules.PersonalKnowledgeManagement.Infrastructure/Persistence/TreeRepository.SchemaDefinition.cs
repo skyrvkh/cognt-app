@@ -110,5 +110,26 @@ internal sealed partial class SqliteTreeRepository
         CREATE INDEX IF NOT EXISTS idx_note_attachments_attachment
         ON note_attachments(collection_id, attachment_id, created_at DESC);
 
+        CREATE TABLE IF NOT EXISTS tag (
+          id INTEGER PRIMARY KEY,
+          normalized_name TEXT NOT NULL UNIQUE,
+          display_name TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS item_tag (
+          item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
+          tag_id INTEGER NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (item_id, tag_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tag_display_name
+        ON tag(display_name COLLATE NOCASE, id);
+
+        CREATE INDEX IF NOT EXISTS idx_item_tag_tag
+        ON item_tag(tag_id, item_id);
+
         """;
 }

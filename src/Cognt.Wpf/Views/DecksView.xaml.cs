@@ -42,6 +42,14 @@ public partial class DecksView : UserControl
         ViewModel.SetCollectionContext(collectionId, sourceRelPath, sourceLabel);
     }
 
+    internal void ShowCardsForSource(
+        string collectionId,
+        string sourceRelPath,
+        string sourceLabel)
+    {
+        ViewModel.ShowCardsForSource(collectionId, sourceRelPath, sourceLabel);
+    }
+
     private void PracticeButton_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         PracticeRequested?.Invoke(this, EventArgs.Empty);

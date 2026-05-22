@@ -14,4 +14,16 @@ public interface IFlashcardReviewWriter
         long cardId,
         FlashcardReviewRatingReadModel rating,
         CancellationToken cancellationToken = default);
+
+    Task SetCardSuspensionAsync(
+        string collectionId,
+        long cardId,
+        bool isSuspended,
+        CancellationToken cancellationToken = default);
+
+    Task PostponeCardDueDateAsync(
+        string collectionId,
+        long cardId,
+        int days,
+        CancellationToken cancellationToken = default);
 }

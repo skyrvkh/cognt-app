@@ -56,7 +56,8 @@ internal sealed class FlashcardCardSummaryRecord
         DateTimeOffset dueUtc,
         FlashcardLearningState state,
         FlashcardReviewRating? lastRating,
-        DateTimeOffset? lastReviewedUtc)
+        DateTimeOffset? lastReviewedUtc,
+        bool isSuspended)
     {
         Id = id;
         DeckName = deckName;
@@ -66,6 +67,7 @@ internal sealed class FlashcardCardSummaryRecord
         State = state;
         LastRating = lastRating;
         LastReviewedUtc = lastReviewedUtc;
+        IsSuspended = isSuspended;
     }
 
     internal long Id { get; }
@@ -83,4 +85,6 @@ internal sealed class FlashcardCardSummaryRecord
     internal FlashcardReviewRating? LastRating { get; }
 
     internal DateTimeOffset? LastReviewedUtc { get; }
+
+    internal bool IsSuspended { get; }
 }

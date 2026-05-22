@@ -82,4 +82,25 @@ internal static partial class FlashcardRequestGuards
         EnsureReviewRating(request.Rating);
         return request;
     }
+
+    internal static UpdateFlashcardSuspensionRequest EnsureUpdateSuspensionRequest(
+        UpdateFlashcardSuspensionRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCardCommandTarget(request.CollectionId, request.CardId);
+        return request;
+    }
+
+    internal static PostponeFlashcardDueDateRequest EnsurePostponeDueDateRequest(
+        PostponeFlashcardDueDateRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCardCommandTarget(request.CollectionId, request.CardId);
+        if (request.Days <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), request.Days, "Postpone days must be positive.");
+        }
+
+        return request;
+    }
 }

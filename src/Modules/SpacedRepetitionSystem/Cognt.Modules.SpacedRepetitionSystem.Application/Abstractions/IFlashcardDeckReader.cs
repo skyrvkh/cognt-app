@@ -13,5 +13,6 @@ public interface IFlashcardDeckReader
         FlashcardCardsFilterKind filter = FlashcardCardsFilterKind.All,
         string? sourceRelPath = null,
         string? tag = null,
+        IReadOnlyList<string>? tags = null,
         int limit = 500);
 }

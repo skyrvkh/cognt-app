@@ -11,6 +11,22 @@ internal interface ITreeRepository : IDisposable
 
     IReadOnlyList<KnowledgeTreeItemRow> LoadNoteItems();
 
+    IReadOnlyList<long> ExpandItemIds(
+        IReadOnlyList<long> rootItemIds,
+        bool includeDescendants);
+
+    IReadOnlyList<ItemTagRow> LoadTagsByItemIds(IReadOnlyList<long> itemIds);
+
+    IReadOnlyList<string> LoadTagNames();
+
+    void AssignTagsToItems(
+        IReadOnlyList<long> itemIds,
+        IReadOnlyList<string> tags);
+
+    void RemoveTagsFromItems(
+        IReadOnlyList<long> itemIds,
+        IReadOnlyList<string> normalizedTags);
+
     IReadOnlyList<KnowledgeTreeItemRow> SearchNoteItems(string query, int limit);
 
     long CreateFolder(long? parentId, string title, long? previousSiblingId = null, long? nextSiblingId = null);

@@ -120,6 +120,25 @@ public interface INoteService : IDisposable
     IReadOnlyList<KnowledgeNoteListItemReadModel> LoadNoteCatalog(
         string collectionId);
 
+    IReadOnlyList<string> LoadAvailableTags(
+        string collectionId);
+
+    IReadOnlyList<string> LoadAssignedTags(
+        string collectionId,
+        IReadOnlyList<long> itemIds);
+
+    KnowledgeTagOperationResult AssignTags(
+        string collectionId,
+        IReadOnlyList<long> rootItemIds,
+        IReadOnlyList<string> tags,
+        bool includeDescendants);
+
+    KnowledgeTagOperationResult RemoveTags(
+        string collectionId,
+        IReadOnlyList<long> rootItemIds,
+        IReadOnlyList<string> tags,
+        bool includeDescendants);
+
     KnowledgeDocumentLinksReadModel ReadDocumentLinks(
         string collectionId,
         string currentRelativePath,

@@ -37,11 +37,19 @@ internal static partial class FlashcardCardContentCodec
     {
         return tags?
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => tag.Trim())
+            .Select(NormalizeTagDisplayName)
+            .Where(tag => tag.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray()
             ?? [];
+    }
+
+    private static string NormalizeTagDisplayName(string? tag)
+    {
+        return string.IsNullOrWhiteSpace(tag)
+            ? string.Empty
+            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
     }
 
     private sealed record FlashcardCardDocument(

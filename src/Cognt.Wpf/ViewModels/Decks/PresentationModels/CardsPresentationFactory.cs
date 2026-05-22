@@ -30,7 +30,8 @@ internal static partial class CardsPresentationFactory
             card.LastReviewedUtc,
             card.LastRating,
             card.FrontContent,
-            card.Tags);
+            card.Tags,
+            card.IsSuspended);
     }
 
     private static CardLibraryRow CreateCardLibraryRow(
@@ -44,13 +45,16 @@ internal static partial class CardsPresentationFactory
         DateTimeOffset? lastReviewedUtc,
         FlashcardReviewRatingReadModel? lastRating,
         string frontContent,
-        IReadOnlyList<string> tags)
+        IReadOnlyList<string> tags,
+        bool isSuspended)
     {
         string due = FormatDue(dueUtc);
         string lastReviewed = FormatLastReviewed(lastReviewedUtc);
         string recall = FormatRecall(lastRating);
 
-        CardLibraryRow row = state switch
+        CardLibraryRow row = isSuspended
+            ? new CardLibraryRow(frontText, deckName, "Suspended", due, lastReviewed, recall, isSelected)
+            : state switch
         {
             FlashcardCardStateReadModel.Relearning => CardLibraryRow.Relearning(isSelected, frontText, deckName, due, lastReviewed, recall),
             FlashcardCardStateReadModel.Review => CardLibraryRow.Review(isSelected, frontText, deckName, due, lastReviewed, recall),
@@ -63,7 +67,9 @@ internal static partial class CardsPresentationFactory
             Id = id,
             Answer = backText,
             FrontContent = frontContent,
-            Tags = tags
+            DueUtc = dueUtc,
+            Tags = tags,
+            IsSuspended = isSuspended
         };
     }
 

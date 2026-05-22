@@ -177,6 +177,7 @@ public sealed partial class AllNotesViewModel
         OnPropertyChanged(nameof(ShouldShowEmptyState));
         OnPropertyChanged(nameof(ResultsSummary));
         openNoteCommand.RaiseCanExecuteChanged();
+        showCardsCommand.RaiseCanExecuteChanged();
     }
 
     private Dictionary<string, int> LoadCardCountsBySourceRelativePath(string collectionId)

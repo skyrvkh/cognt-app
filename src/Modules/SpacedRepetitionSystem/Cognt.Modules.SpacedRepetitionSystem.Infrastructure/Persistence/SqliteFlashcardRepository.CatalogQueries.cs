@@ -27,6 +27,7 @@ internal sealed partial class SqliteFlashcardRepository
                     SELECT c.id, c.deck_id, d.name, c.front_rel_path, c.source_rel_path,
                            c.due_at, c.state,
                            latest.rating, latest.reviewed_at,
+                           c.is_suspended,
                            COALESCE((
                                SELECT COUNT(*)
                                FROM flashcard_review_history h
@@ -49,16 +50,17 @@ internal sealed partial class SqliteFlashcardRepository
                       AND c.back_rel_path IS NULL
                 )
                 SELECT id, name, front_rel_path, source_rel_path,
-                       due_at, state, rating, reviewed_at
+                       due_at, state, rating, reviewed_at, is_suspended
                 FROM card_metrics
                 WHERE ($deckId IS NULL OR deck_id = $deckId)
                   AND ($sourceRelPath IS NULL OR source_rel_path = $sourceRelPath)
                   AND (
                       $filter = 0
-                      OR ($filter = 1 AND due_at <= $now)
+                      OR ($filter = 1 AND due_at <= $now AND is_suspended = 0)
                       OR ($filter = 2 AND state = {NewStateValue})
                       OR ($filter = 3 AND state IN ({LearningStateValue}, {RelearningStateValue}))
                       OR ($filter = 4 AND reviewed_today_count > 0)
+                      OR ($filter = 5 AND is_suspended = 1)
                   )
                 ORDER BY due_at, id
                 LIMIT $limit;

@@ -149,6 +149,26 @@ internal sealed partial class OverlayNavigationCoordinator
         return Task.CompletedTask;
     }
 
+    internal async Task HandleNoteCardsRequestedAsync(OpenNoteCardsRequestedEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        try
+        {
+            editorOpenRequestId++;
+            await CloseOverlayWorkflowsAsync();
+            decksView.ShowCardsForSource(
+                viewModel.OpenCollectionPath,
+                e.RelativePath,
+                e.Title);
+            ShowOverlay(decksView);
+        }
+        catch (Exception ex)
+        {
+            dialogs.ShowWarning("Cards Not Ready", $"The note's cards could not be opened: {ex.Message}");
+        }
+    }
+
     internal void HideOverlay()
     {
         overlayHost.Hide();

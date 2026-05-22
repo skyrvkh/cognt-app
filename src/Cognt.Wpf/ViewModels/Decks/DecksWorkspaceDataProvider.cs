@@ -78,6 +78,7 @@ internal sealed class DecksWorkspaceDataProvider : IDecksWorkspaceDataProvider
         return request.DeckId is null
             && request.Filter == FlashcardCardsFilterKind.All
             && string.IsNullOrWhiteSpace(request.SourceRelPath)
-            && string.IsNullOrWhiteSpace(request.Tag);
+            && string.IsNullOrWhiteSpace(request.Tag)
+            && (request.Tags is null || request.Tags.Count == 0);
     }
 }

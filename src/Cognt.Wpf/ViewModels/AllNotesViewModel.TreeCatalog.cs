@@ -25,6 +25,7 @@ public sealed partial class AllNotesViewModel
                     NormalizeTreeItemRelativePath(item.FileRelPath),
                     GetTreeTypeLabel(item),
                     GetTreeTagsLabel(item),
+                    GetTreeCardCount(item),
                     GetTreeCardCountLabel(item),
                     GetTreeCreatedAtLabel(item),
                     GetTreeModifiedAtLabel(item),
@@ -83,6 +84,7 @@ public sealed partial class AllNotesViewModel
             node.RelativePath,
             node.TypeLabel,
             node.TagsLabel,
+            node.CardCount,
             node.CardCountLabel,
             node.CreatedAtLabel,
             node.ModifiedAtLabel,
@@ -136,8 +138,13 @@ public sealed partial class AllNotesViewModel
 
     private string GetTreeCardCountLabel(KnowledgeTreeItemReadModel item)
     {
+        return FormatCardCount(GetTreeCardCount(item));
+    }
+
+    private int GetTreeCardCount(KnowledgeTreeItemReadModel item)
+    {
         string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        return FormatCardCount(GetCardCount(relativePath));
+        return GetCardCount(relativePath);
     }
 
     private string TryFormatTreeTimestamp(

@@ -14,6 +14,7 @@ public enum FlashcardCardsFilterKind
     New = 2,
     LearningOrRelearning = 3,
     ReviewedToday = 4,
+    Suspended = 5,
 }
 
 public sealed record FlashcardCardsQueryRequest(
@@ -22,6 +23,7 @@ public sealed record FlashcardCardsQueryRequest(
     FlashcardCardsFilterKind Filter = FlashcardCardsFilterKind.All,
     string? SourceRelPath = null,
     string? Tag = null,
+    IReadOnlyList<string>? Tags = null,
     int Limit = FlashcardCardsQueryRequest.DefaultLimit)
 {
     public const int DefaultLimit = 500;

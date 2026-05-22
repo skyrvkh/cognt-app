@@ -90,6 +90,22 @@ internal sealed class OpenAllNotesRequestedEventArgs
     internal string RelativePath { get; }
 }
 
+internal sealed class OpenNoteCardsRequestedEventArgs
+{
+    internal OpenNoteCardsRequestedEventArgs(string relativePath, string title)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        RelativePath = relativePath;
+        Title = title;
+    }
+
+    internal string RelativePath { get; }
+
+    internal string Title { get; }
+}
+
 internal sealed class CollectionRemovalPlan
 {
     private CollectionRemovalPlan(bool canRemove, string message)

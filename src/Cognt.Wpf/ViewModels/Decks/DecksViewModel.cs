@@ -11,6 +11,7 @@ public sealed partial class DecksViewModel : ObservableObject
     private readonly IDecksWorkspaceDataProvider workspaceDataProvider;
     private readonly ICreateFlashcardsCommand createFlashcardsCommand;
     private readonly IUpdateFlashcardFrontContentCommand updateFlashcardFrontContentCommand;
+    private readonly IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand;
     private object currentSubview;
     private FlashcardsTab activeTab = FlashcardsTab.DecksCards;
     private string collectionId = string.Empty;
@@ -26,20 +27,27 @@ public sealed partial class DecksViewModel : ObservableObject
         IDecksWorkspaceDataProvider workspaceDataProvider,
         ICreateFlashcardsCommand createFlashcardsCommand,
         IUpdateFlashcardFrontContentCommand updateFlashcardFrontContentCommand,
+        IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand,
         IKnowledgeDocumentContentFactory documentContentFactory,
         StatisticsSubviewViewModel statistics)
     {
         ArgumentNullException.ThrowIfNull(workspaceDataProvider);
         ArgumentNullException.ThrowIfNull(createFlashcardsCommand);
         ArgumentNullException.ThrowIfNull(updateFlashcardFrontContentCommand);
+        ArgumentNullException.ThrowIfNull(updateFlashcardSchedulingCommand);
         ArgumentNullException.ThrowIfNull(documentContentFactory);
         ArgumentNullException.ThrowIfNull(statistics);
 
         this.workspaceDataProvider = workspaceDataProvider;
         this.createFlashcardsCommand = createFlashcardsCommand;
         this.updateFlashcardFrontContentCommand = updateFlashcardFrontContentCommand;
+        this.updateFlashcardSchedulingCommand = updateFlashcardSchedulingCommand;
 
-        Cards = new CardsSubviewViewModel(ShowCreateCardReview, ShowEditCard);
+        Cards = new CardsSubviewViewModel(
+            ShowCreateCardReview,
+            ShowEditCard,
+            SetCardSuspensionAsync,
+            PostponeCardsAsync);
         Cards.FiltersChanged += Cards_FiltersChanged;
         CreateCardReview = new CreateCardReviewSubviewViewModel(
             () => SetActiveTab(FlashcardsTab.DecksCards),

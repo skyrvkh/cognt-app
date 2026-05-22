@@ -47,6 +47,8 @@ public partial class MainWindow
         noteInspectorViewModel.OutlineNavigationRequested += NoteInspectorViewModel_OutlineNavigationRequested;
 
         allNotesViewModel.OpenNoteRequested += AllNotesViewModel_OpenNoteRequested;
+        allNotesViewModel.ShowCardsRequested += AllNotesViewModel_ShowCardsRequested;
+        allNotesViewModel.TagEditRequested += AllNotesViewModel_TagEditRequested;
         allNotesViewModel.CreateNoteRequested += AllNotesViewModel_CreateNoteRequested;
         allNotesViewModel.ImportDocumentsRequested += AllNotesViewModel_ImportDocumentsRequested;
     }

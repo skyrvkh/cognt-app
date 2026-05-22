@@ -80,10 +80,9 @@ internal static partial class CardsPresentationFactory
         CardFilterDeckRow? selectedDeckFilter,
         CardFilterOptionRow? selectedStatusFilter,
         CardFilterOptionRow? selectedSourceFilter,
-        CardFilterOptionRow? selectedTagFilter,
         FlashcardCardsFilterKind filterKind,
         string? selectedSourceRelPath,
-        string? selectedTag)
+        IReadOnlyList<string> selectedTags)
     {
         List<string> filters = [];
 
@@ -102,9 +101,9 @@ internal static partial class CardsPresentationFactory
             filters.Add($"Source: {selectedSourceFilter.Name}");
         }
 
-        if (!string.IsNullOrWhiteSpace(selectedTag) && selectedTag is not null)
+        if (selectedTags.Count > 0)
         {
-            filters.Add($"Tag: {selectedTagFilter!.Name}");
+            filters.Add($"Tags: {string.Join(", ", selectedTags)}");
         }
 
         return filters.Count == 0 ? "All cards" : string.Join(" | ", filters);
@@ -118,10 +117,11 @@ internal static partial class CardsPresentationFactory
         return
         [
             new("All cards", NumericTextFormatter.Format(cards.Count), FlashcardCardsFilterKind.All.ToString()),
-            new("Due cards", NumericTextFormatter.Format(cards.Count(card => card.DueUtc <= nowUtc)), FlashcardCardsFilterKind.Due.ToString()),
+            new("Due cards", NumericTextFormatter.Format(cards.Count(card => card.DueUtc <= nowUtc && !card.IsSuspended)), FlashcardCardsFilterKind.Due.ToString()),
             new("New cards", NumericTextFormatter.Format(cards.Count(card => card.State == FlashcardCardStateReadModel.New)), FlashcardCardsFilterKind.New.ToString()),
             new("Learning/relearning", NumericTextFormatter.Format(cards.Count(card => card.State is FlashcardCardStateReadModel.Learning or FlashcardCardStateReadModel.Relearning)), FlashcardCardsFilterKind.LearningOrRelearning.ToString()),
-            new("Reviewed today", NumericTextFormatter.Format(cards.Count(card => ToLocalDate(card.LastReviewedUtc) == today)), FlashcardCardsFilterKind.ReviewedToday.ToString())
+            new("Reviewed today", NumericTextFormatter.Format(cards.Count(card => ToLocalDate(card.LastReviewedUtc) == today)), FlashcardCardsFilterKind.ReviewedToday.ToString()),
+            new("Suspended", NumericTextFormatter.Format(cards.Count(card => card.IsSuspended)), FlashcardCardsFilterKind.Suspended.ToString())
         ];
     }
 

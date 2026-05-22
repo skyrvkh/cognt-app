@@ -26,12 +26,28 @@ public enum KnowledgeNoteListItemType
 }
 
 public sealed record KnowledgeNoteListItemReadModel(
+    long ItemId,
     string Title,
     string RelativePath,
     KnowledgeNoteListItemType Type,
     IReadOnlyList<string> Tags,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<string>? AssignedTags = null,
+    IReadOnlyList<string>? ContentTags = null);
+
+public enum KnowledgeTagOperationKind
+{
+    Add = 1,
+    Remove = 2
+}
+
+public sealed record KnowledgeTagOperationResult(
+    int RequestedRootCount,
+    int AffectedItemCount,
+    IReadOnlyList<string> Tags,
+    bool IncludedDescendants,
+    KnowledgeTagOperationKind Operation);
 
 public sealed record KnowledgeOpenedNoteReadModel(
     string RelativePath,

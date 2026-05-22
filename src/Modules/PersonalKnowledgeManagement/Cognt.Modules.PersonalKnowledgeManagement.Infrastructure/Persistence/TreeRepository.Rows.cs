@@ -144,3 +144,19 @@ internal sealed class NoteAttachmentRow
 
     internal long CreatedAt { get; }
 }
+
+internal sealed class ItemTagRow
+{
+    internal ItemTagRow(long itemId, string displayName, string normalizedName)
+    {
+        ItemId = itemId;
+        DisplayName = displayName;
+        NormalizedName = normalizedName;
+    }
+
+    internal long ItemId { get; }
+
+    internal string DisplayName { get; }
+
+    internal string NormalizedName { get; }
+}

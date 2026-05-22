@@ -36,6 +36,7 @@ internal sealed partial class SqliteFlashcardStore :
         FlashcardCardsFilterKind filter,
         string? sourceRelPath,
         string? tag,
+        IReadOnlyList<string>? tags,
         int limit)
     {
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
@@ -51,7 +52,7 @@ internal sealed partial class SqliteFlashcardStore :
             filter,
             sourceRelPath,
             limit);
-        CardSummaries loadedSummaries = LoadMaterializedCardSummaries(collectionPath, cards, tag);
+        CardSummaries loadedSummaries = LoadMaterializedCardSummaries(collectionPath, cards, tag, tags);
 
         repository.MarkCardsDeleted(loadedSummaries.StaleCardIds);
         return loadedSummaries.Summaries;

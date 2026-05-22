@@ -15,9 +15,9 @@ internal sealed partial class SqliteFlashcardRepository
             command.CommandText = $"""
                 SELECT d.id,
                        d.name,
-                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.state = {NewStateValue} THEN 1 ELSE 0 END), 0) AS new_cards,
-                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.state IN ({LearningStateValue}, {RelearningStateValue}) THEN 1 ELSE 0 END), 0) AS learning_cards,
-                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.due_at <= $now THEN 1 ELSE 0 END), 0) AS due_cards,
+                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.is_suspended = 0 AND c.state = {NewStateValue} THEN 1 ELSE 0 END), 0) AS new_cards,
+                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.is_suspended = 0 AND c.state IN ({LearningStateValue}, {RelearningStateValue}) THEN 1 ELSE 0 END), 0) AS learning_cards,
+                       COALESCE(SUM(CASE WHEN c.id IS NOT NULL AND c.is_suspended = 0 AND c.due_at <= $now THEN 1 ELSE 0 END), 0) AS due_cards,
                        COALESCE(COUNT(c.id), 0) AS total_cards
                 FROM flashcard_deck d
                 LEFT JOIN flashcard_card c ON c.deck_id = d.id
@@ -91,6 +91,7 @@ internal sealed partial class SqliteFlashcardRepository
             DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(4)),
             (FlashcardLearningState)reader.GetInt32(5),
             reader.IsDBNull(6) ? null : (FlashcardReviewRating)reader.GetInt32(6),
-            reader.IsDBNull(7) ? null : DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(7)));
+            reader.IsDBNull(7) ? null : DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(7)),
+            reader.GetInt32(8) != 0);
     }
 }

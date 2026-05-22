@@ -118,7 +118,8 @@ public sealed class CreateCardReviewSubviewViewModel : ObservableObject
     {
         foreach (string tag in tags
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
+            .Select(NormalizeTagDisplayName)
+            .Where(value => value.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
@@ -131,5 +132,12 @@ public sealed class CreateCardReviewSubviewViewModel : ObservableObject
     private bool ContainsDeckName(string deckName)
     {
         return DeckNames.Contains(deckName, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeTagDisplayName(string? tag)
+    {
+        return string.IsNullOrWhiteSpace(tag)
+            ? string.Empty
+            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
     }
 }

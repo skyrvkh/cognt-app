@@ -83,12 +83,15 @@ public sealed partial class AllNotesViewModel
 
     private AllNotesListItemViewModel ToListItemViewModel(KnowledgeNoteListItemReadModel note)
     {
+        int cardCount = GetCardCount(note.RelativePath);
         return new AllNotesListItemViewModel(
+            note.ItemId,
             note.RelativePath,
             note.Title,
             GetTypeLabel(note.Type),
             note.Tags.Count == 0 ? string.Empty : string.Join(", ", note.Tags),
-            FormatCardCount(GetCardCount(note.RelativePath)),
+            cardCount,
+            FormatCardCount(cardCount),
             FormatTimestamp(note.CreatedAt),
             FormatTimestamp(note.UpdatedAt));
     }
@@ -155,13 +158,18 @@ public sealed partial class AllNotesViewModel
 }
 
 public sealed record AllNotesListItemViewModel(
+    long ItemId,
     string RelativePath,
     string Title,
     string TypeLabel,
     string TagsLabel,
+    int CardCount,
     string CardCountLabel,
     string CreatedAtLabel,
-    string ModifiedAtLabel);
+    string ModifiedAtLabel)
+{
+    public bool HasCards => CardCount > 0;
+}
 
 public sealed class AllNotesTreeItemViewModel : ObservableObject
 {
@@ -174,6 +182,7 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
         string? relativePath,
         string typeLabel,
         string tagsLabel,
+        int cardCount,
         string cardCountLabel,
         string createdAtLabel,
         string modifiedAtLabel,
@@ -189,6 +198,7 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
         RelativePath = relativePath;
         TypeLabel = typeLabel;
         TagsLabel = tagsLabel;
+        CardCount = cardCount;
         CardCountLabel = cardCountLabel;
         CreatedAtLabel = createdAtLabel;
         ModifiedAtLabel = modifiedAtLabel;
@@ -211,6 +221,8 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
 
     public string TagsLabel { get; }
 
+    public int CardCount { get; }
+
     public string CardCountLabel { get; }
 
     public string CreatedAtLabel { get; }
@@ -226,6 +238,9 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
     }
 
     public bool CanOpen => Kind == KnowledgeItemKind.Note
+        && !string.IsNullOrWhiteSpace(RelativePath);
+
+    public bool HasCards => CardCount > 0
         && !string.IsNullOrWhiteSpace(RelativePath);
 
     public string Prefix => Kind switch

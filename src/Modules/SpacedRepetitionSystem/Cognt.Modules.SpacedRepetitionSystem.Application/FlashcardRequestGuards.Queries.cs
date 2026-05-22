@@ -29,7 +29,10 @@ internal static partial class FlashcardRequestGuards
     {
         request = EnsureRequest(request);
         EnsureCollectionId(request.CollectionId);
-        return request;
+        return request with
+        {
+            Tags = NormalizeStrings(request.Tags),
+        };
     }
 
     internal static FlashcardProgressAnalyticsQueryRequest EnsureProgressAnalyticsQueryRequest(
@@ -58,5 +61,17 @@ internal static partial class FlashcardRequestGuards
         }
 
         return request;
+    }
+
+    private static IReadOnlyList<string> NormalizeStrings(IEnumerable<string>? values)
+    {
+        return values?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => string.Concat(value.Trim().Where(character => !char.IsWhiteSpace(character))))
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? [];
     }
 }
