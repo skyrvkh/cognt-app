@@ -27,6 +27,15 @@ public interface IFlashcardAuthoringWriter
         string frontContent,
         CancellationToken cancellationToken = default);
 
+    Task UpdateCardContentAsync(
+        string collectionId,
+        long cardId,
+        string frontContent,
+        string? backContent,
+        string deckName,
+        IReadOnlyList<string> tags,
+        CancellationToken cancellationToken = default);
+
     Task<int> DeleteCardsAsync(
         string collectionId,
         IReadOnlyList<long> cardIds,

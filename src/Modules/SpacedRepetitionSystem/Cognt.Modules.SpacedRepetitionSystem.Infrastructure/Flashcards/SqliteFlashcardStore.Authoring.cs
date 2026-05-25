@@ -62,6 +62,41 @@ internal sealed partial class SqliteFlashcardStore
         return Task.CompletedTask;
     }
 
+    public Task UpdateCardContentAsync(
+        string collectionId,
+        long cardId,
+        string frontContent,
+        string? backContent,
+        string deckName,
+        IReadOnlyList<string> tags,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deckName);
+        ArgumentNullException.ThrowIfNull(frontContent);
+        ArgumentNullException.ThrowIfNull(tags);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        FlashcardRecord card = repository.GetCard(cardId);
+        string existingContent = FlashcardCollectionStorage.ReadFlashcardFile(collectionPath, card.FrontRelPath);
+        if (!FlashcardCardContentCodec.TryUpdateEditableContent(
+                existingContent,
+                frontContent,
+                backContent,
+                tags,
+                out string updatedContent,
+                out string error))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        long deckId = repository.EnsureDeck(deckName);
+        repository.UpdateCardDeck(cardId, deckId);
+        FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, card.FrontRelPath, updatedContent);
+        return Task.CompletedTask;
+    }
+
     public Task<int> DeleteCardsAsync(
         string collectionId,
         IReadOnlyList<long> cardIds,

@@ -39,4 +39,56 @@ internal static partial class FlashcardCardContentCodec
             ? SerializeDocument(document with { ContextContent = updatedContent })
             : SerializeDocument(document with { FrontContent = updatedContent });
     }
+
+    internal static bool TryUpdateEditableContent(
+        string existingContent,
+        string frontContent,
+        string? backContent,
+        IReadOnlyList<string> tags,
+        out string updatedContent,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(frontContent);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        updatedContent = existingContent;
+        error = string.Empty;
+
+        if (!TryReadDocument(existingContent, out FlashcardCardDocument? document))
+        {
+            error = "Legacy card content is not editable in this dialog.";
+            return false;
+        }
+
+        string[] normalizedTags = NormalizeTags(tags);
+        if (string.Equals(document.CardType, BasicCardType, StringComparison.OrdinalIgnoreCase))
+        {
+            updatedContent = SerializeDocument(document with
+            {
+                FrontContent = frontContent,
+                BackContent = string.IsNullOrWhiteSpace(backContent) ? frontContent : backContent,
+                Tags = normalizedTags,
+            });
+            return true;
+        }
+
+        if (string.Equals(document.CardType, ClozeCardType, StringComparison.OrdinalIgnoreCase))
+        {
+            updatedContent = SerializeDocument(document with
+            {
+                FrontContent = frontContent,
+                Tags = normalizedTags,
+            });
+            return true;
+        }
+
+        if (string.Equals(document.CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase))
+        {
+            error = "Multimodal/image occlusion cards must be edited from the note-to-card queue.";
+            return false;
+        }
+
+        error = $"Card type '{document.CardType}' is not editable in this dialog.";
+        return false;
+    }
 }

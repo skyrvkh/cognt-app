@@ -76,6 +76,7 @@ public partial class DecksView : UserControl
     {
         WarningMessageRequested?.Invoke(this, e);
     }
+
 }
 
 internal sealed class CramRequestedEventArgs : EventArgs

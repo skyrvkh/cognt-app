@@ -17,10 +17,12 @@
              TextOptions.TextFormattingMode="Display">
     <UserControl.Resources>
         <ContextMenu x:Key="CardRowContextMenu">
-            <MenuItem Header="Edit Tags..."
-                      Click="AddTagsMenuItem_Click" />
-            <MenuItem Header="Delete Card(s)..."
-                      Click="DeleteCardsMenuItem_Click" />
+            <MenuItem Header="Edit Card"
+                      Click="EditCardMenuItem_Click"
+                      IsEnabled="{Binding CanEdit}" />
+            <MenuItem Header="Edit Tags"
+                      Click="EditTagsMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
             <Separator />
             <MenuItem Header="{Binding SuspensionAction}"
                       Command="{Binding DataContext.ToggleSuspensionCommand, Source={x:Reference CardsDataGrid}}"
@@ -86,18 +88,9 @@
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              ToolTip="Search cards by front, back, deck, source, or tag"
                              Style="{StaticResource InputTextBoxStyle}" />
-                    <Button Content="Edit Tags"
-                            Width="96"
-                            Margin="0,0,10,0"
-                            Click="AddTagsButton_Click"
-                            Style="{StaticResource OutlineButtonStyle}" />
-                    <Button Content="Delete"
-                            Width="84"
-                            Margin="0,0,10,0"
-                            Click="DeleteCardsButton_Click"
-                            Style="{StaticResource OutlineButtonStyle}" />
-                    <Button Content="Filter"
-                            Width="92"
+                    <Button x:Name="CardFilterButton"
+                            Content="Add card filter"
+                            Width="132"
                             Command="{Binding OpenFiltersCommand}"
                             Style="{StaticResource OutlineButtonStyle}" />
                 </WrapPanel>
@@ -346,12 +339,22 @@
 
         </StackPanel>
 
-        <Border x:Name="FiltersPanel"
-                Grid.Row="1"
-                Margin="0,14,0,0"
-                Padding="18"
-                Visibility="{Binding FiltersPanelVisibility}"
-                Style="{StaticResource PanelStyle}">
+        <Popup x:Name="FiltersPopup"
+               PlacementTarget="{Binding ElementName=CardFilterButton}"
+               Placement="Bottom"
+               AllowsTransparency="True"
+               StaysOpen="False"
+               PopupAnimation="Fade"
+               IsOpen="{Binding IsFiltersOpen, Mode=TwoWay}"
+               DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+            <Border Width="440"
+                    MaxHeight="620"
+                    Margin="0,8,0,0"
+                    Padding="16"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -360,7 +363,7 @@
                     </Grid.RowDefinitions>
 
                     <Grid>
-                        <TextBlock Text="Card filters"
+                        <TextBlock Text="Add card filter"
                                    Style="{StaticResource PanelTitleStyle}"
                                    FontSize="18" />
                         <Button Content="x"
@@ -375,83 +378,197 @@
                                   Margin="0,18,0,16"
                                   VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <TextBlock Text="CARD FILTER"
+                            <TextBlock Text="DECK"
                                        Style="{StaticResource SmallMutedTextStyle}"
                                        FontWeight="SemiBold" />
-                            <ListBox ItemsSource="{Binding CardFilterStatusRows}"
-                                     SelectedItem="{Binding SelectedStatusFilter, Mode=TwoWay}"
-                                     Margin="0,8,0,0"
-                                     MaxHeight="210"
-                                     Style="{StaticResource FilterListBoxStyle}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}"
-                                                       Style="{StaticResource MutedTextStyle}" />
-                                            <Border Grid.Column="1"
-                                                    Padding="7,1"
+                            <TextBox MinHeight="34"
+                                     Margin="0,8,0,8"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding DeckFilterSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Search decks"
+                                     Style="{StaticResource InputTextBoxStyle}" />
+                            <ScrollViewer MaxHeight="150"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding VisibleCardFilterDeckRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10,8"
                                                     CornerRadius="8"
-                                                    Background="{DynamicResource BadgeSurfaceBrush}">
-                                                <TextBlock Text="{Binding Count}"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource InkBrush}" />
+                                                    BorderThickness="1"
+                                                    MouseLeftButtonUp="CardFilterOptionRow_MouseLeftButtonUp">
+                                                <Border.Style>
+                                                    <Style TargetType="{x:Type Border}">
+                                                        <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                            </DataTrigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Style="{StaticResource MutedTextStyle}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <Border Grid.Column="1"
+                                                            Margin="12,0,0,0"
+                                                            Padding="7,1"
+                                                            CornerRadius="8"
+                                                            Background="{DynamicResource BadgeSurfaceBrush}">
+                                                        <TextBlock Text="{Binding Count}"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource InkBrush}" />
+                                                    </Border>
+                                                </Grid>
                                             </Border>
-                                        </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,20,0,16" />
+
+                            <TextBlock Text="CARD STATUS"
+                                       Style="{StaticResource SmallMutedTextStyle}"
+                                       FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding CardFilterStatusRows}"
+                                          Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8"
+                                                Padding="10,8"
+                                                CornerRadius="8"
+                                                BorderThickness="1"
+                                                MouseLeftButtonUp="CardFilterOptionRow_MouseLeftButtonUp">
+                                            <Border.Style>
+                                                <Style TargetType="{x:Type Border}">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}"
+                                                           Style="{StaticResource MutedTextStyle}" />
+                                                <Border Grid.Column="1"
+                                                        Margin="12,0,0,0"
+                                                        Padding="7,1"
+                                                        CornerRadius="8"
+                                                        Background="{DynamicResource BadgeSurfaceBrush}">
+                                                    <TextBlock Text="{Binding Count}"
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource InkBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
                                     </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
                             <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,20,0,16" />
 
                             <TextBlock Text="SOURCE"
                                        Style="{StaticResource SmallMutedTextStyle}"
                                        FontWeight="SemiBold" />
-                            <ListBox ItemsSource="{Binding CardFilterSourceRows}"
-                                     SelectedItem="{Binding SelectedSourceFilter, Mode=TwoWay}"
-                                     Margin="0,8,0,0"
-                                     MaxHeight="150"
-                                     Style="{StaticResource FilterListBoxStyle}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}"
-                                                       Style="{StaticResource MutedTextStyle}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <Border Grid.Column="1"
-                                                    Padding="7,1"
+                            <TextBox MinHeight="34"
+                                     Margin="0,8,0,8"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding SourceFilterSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Search sources"
+                                     Style="{StaticResource InputTextBoxStyle}" />
+                            <ScrollViewer MaxHeight="150"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding VisibleCardFilterSourceRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10,8"
                                                     CornerRadius="8"
-                                                    Background="{DynamicResource BadgeSurfaceBrush}">
-                                                <TextBlock Text="{Binding Count}"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource InkBrush}" />
+                                                    BorderThickness="1"
+                                                    MouseLeftButtonUp="CardFilterOptionRow_MouseLeftButtonUp">
+                                                <Border.Style>
+                                                    <Style TargetType="{x:Type Border}">
+                                                        <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                            </DataTrigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding Name}"
+                                                           Style="{StaticResource MutedTextStyle}"
+                                                           TextTrimming="CharacterEllipsis" />
                                             </Border>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
 
                             <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,20,0,16" />
 
                             <TextBlock Text="TAGS"
                                        Style="{StaticResource SmallMutedTextStyle}"
                                        FontWeight="SemiBold" />
+                            <TextBox MinHeight="34"
+                                     Margin="0,8,0,8"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding TagFilterSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Search tags"
+                                     Style="{StaticResource InputTextBoxStyle}" />
                             <ScrollViewer Margin="0,8,0,0"
                                           MaxHeight="170"
                                           VerticalScrollBarVisibility="Auto">
-                                <ItemsControl ItemsSource="{Binding CardFilterTagRows}">
+                                <ItemsControl ItemsSource="{Binding VisibleCardFilterTagRows}">
                                     <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  Margin="0,0,0,6"
-                                                  Foreground="{DynamicResource InkBrush}">
+                                        <Border Margin="0,0,0,8"
+                                                Padding="10,8"
+                                                CornerRadius="8"
+                                                BorderThickness="1"
+                                                MouseLeftButtonUp="CardFilterOptionRow_MouseLeftButtonUp">
+                                            <Border.Style>
+                                                <Style TargetType="{x:Type Border}">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -461,6 +578,7 @@
                                                            Style="{StaticResource MutedTextStyle}"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <Border Grid.Column="1"
+                                                        Margin="12,0,0,0"
                                                         Padding="7,1"
                                                         CornerRadius="8"
                                                         Background="{DynamicResource BadgeSurfaceBrush}">
@@ -469,7 +587,7 @@
                                                                Foreground="{DynamicResource InkBrush}" />
                                                 </Border>
                                             </Grid>
-                                        </CheckBox>
+                                        </Border>
                                     </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -497,6 +615,7 @@
                         </WrapPanel>
                     </Grid>
                 </Grid>
-        </Border>
+            </Border>
+        </Popup>
     </Grid>
 </UserControl>

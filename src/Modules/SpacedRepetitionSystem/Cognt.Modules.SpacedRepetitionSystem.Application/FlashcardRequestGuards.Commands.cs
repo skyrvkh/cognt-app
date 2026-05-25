@@ -74,6 +74,22 @@ internal static partial class FlashcardRequestGuards
         return request;
     }
 
+    internal static UpdateFlashcardContentRequest EnsureUpdateContentRequest(
+        UpdateFlashcardContentRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCardCommandTarget(request.CollectionId, request.CardId);
+        ArgumentNullException.ThrowIfNull(request.FrontContent);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.DeckName);
+        ArgumentNullException.ThrowIfNull(request.Tags);
+
+        return request with
+        {
+            DeckName = request.DeckName.Trim(),
+            Tags = NormalizeStrings(request.Tags),
+        };
+    }
+
     internal static DeleteFlashcardsRequest EnsureDeleteFlashcardsRequest(
         DeleteFlashcardsRequest? request)
     {

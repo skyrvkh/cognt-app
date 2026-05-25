@@ -80,6 +80,34 @@ public sealed partial class DecksViewModel
             failurePrefix: "Card could not be postponed");
     }
 
+    internal async Task UpdateCardContentAsync(CardLibraryRow card, CardEditResult edit)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        ArgumentNullException.ThrowIfNull(edit);
+
+        await RunFlashcardsMutationAsync(
+            async () =>
+            {
+                EnsureCollectionOpen();
+                if (card.Id <= 0)
+                {
+                    throw new InvalidOperationException("Select a saved card before editing.");
+                }
+
+                await updateFlashcardContentCommand.ExecuteAsync(
+                    new UpdateFlashcardContentRequest(
+                        collectionId,
+                        card.Id,
+                        edit.FrontContent,
+                        edit.BackContent,
+                        edit.DeckName,
+                        edit.Tags));
+                RefreshFlashcards();
+                return "Card updated.";
+            },
+            failurePrefix: "Card could not be updated");
+    }
+
     internal async Task DeleteCardsAsync(IReadOnlyList<CardLibraryRow> cards)
     {
         ArgumentNullException.ThrowIfNull(cards);
@@ -159,7 +187,7 @@ public sealed partial class DecksViewModel
 
         DecksWorkspaceData workspace = workspaceDataProvider.Load(
             collectionId,
-            Cards.CreateCardsRequest(collectionId, includeDeckFilter: false));
+            Cards.CreateCardsRequest(collectionId));
 
         Decks.LoadDecks(workspace.Decks);
         IReadOnlyList<FlashcardDeckSummaryReadModel> selectedDecks = GetSelectedDecks(workspace.Decks, Decks.SelectedDeckIds);
@@ -251,6 +279,13 @@ public sealed partial class DecksViewModel
         {
             throw new InvalidOperationException("Open a collection before creating flashcards.");
         }
+    }
+
+    private IReadOnlyList<string> LoadAvailableTagNames()
+    {
+        return string.IsNullOrWhiteSpace(collectionId) || !Directory.Exists(collectionId)
+            ? []
+            : noteService.LoadAvailableTags(collectionId);
     }
 
     private void RaiseInfoMessage(string title, string message)

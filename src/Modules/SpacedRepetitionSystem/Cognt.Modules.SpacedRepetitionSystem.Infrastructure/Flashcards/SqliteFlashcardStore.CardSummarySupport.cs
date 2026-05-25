@@ -63,7 +63,11 @@ internal sealed partial class SqliteFlashcardStore
             ToReviewRating(card.LastRating),
             card.LastReviewedUtc,
             card.IsSuspended,
-            materialized.Status);
+            materialized.Status,
+            materialized.BackContent,
+            materialized.CardType,
+            materialized.FrontKind,
+            materialized.BackKind);
     }
 
     private static FlashcardCardStateReadModel ToCardState(FlashcardLearningState state)

@@ -42,8 +42,11 @@ internal static class WpfServiceCollectionExtensions
             new DecksViewModel(
                 provider.GetRequiredService<IDecksWorkspaceDataProvider>(),
                 provider.GetRequiredService<IUpdateFlashcardSchedulingCommand>(),
+                provider.GetRequiredService<IUpdateFlashcardContentCommand>(),
                 provider.GetRequiredService<IDeleteFlashcardsCommand>(),
                 provider.GetRequiredService<IUpdateFlashcardTagsCommand>(),
+                provider.GetRequiredService<INoteService>(),
+                provider.GetRequiredService<IEditorViewFactory>(),
                 provider.GetRequiredService<StatisticsSubviewViewModel>()));
         services.AddSingleton<DecksView>();
         services.AddSingleton<MainWindow>();

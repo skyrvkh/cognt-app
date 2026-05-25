@@ -1,5 +1,7 @@
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
+using Cognt.Wpf.EditorHost;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 
@@ -9,8 +11,10 @@ public sealed partial class DecksViewModel : ObservableObject
 {
     private readonly IDecksWorkspaceDataProvider workspaceDataProvider;
     private readonly IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand;
+    private readonly IUpdateFlashcardContentCommand updateFlashcardContentCommand;
     private readonly IDeleteFlashcardsCommand deleteFlashcardsCommand;
     private readonly IUpdateFlashcardTagsCommand updateFlashcardTagsCommand;
+    private readonly INoteService noteService;
     private object currentSubview;
     private FlashcardsTab activeTab = FlashcardsTab.DecksCards;
     private string collectionId = string.Empty;
@@ -24,27 +28,38 @@ public sealed partial class DecksViewModel : ObservableObject
     internal DecksViewModel(
         IDecksWorkspaceDataProvider workspaceDataProvider,
         IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand,
+        IUpdateFlashcardContentCommand updateFlashcardContentCommand,
         IDeleteFlashcardsCommand deleteFlashcardsCommand,
         IUpdateFlashcardTagsCommand updateFlashcardTagsCommand,
+        INoteService noteService,
+        IEditorViewFactory editorViewFactory,
         StatisticsSubviewViewModel statistics)
     {
         ArgumentNullException.ThrowIfNull(workspaceDataProvider);
         ArgumentNullException.ThrowIfNull(updateFlashcardSchedulingCommand);
+        ArgumentNullException.ThrowIfNull(updateFlashcardContentCommand);
         ArgumentNullException.ThrowIfNull(deleteFlashcardsCommand);
         ArgumentNullException.ThrowIfNull(updateFlashcardTagsCommand);
+        ArgumentNullException.ThrowIfNull(noteService);
+        ArgumentNullException.ThrowIfNull(editorViewFactory);
         ArgumentNullException.ThrowIfNull(statistics);
 
         this.workspaceDataProvider = workspaceDataProvider;
         this.updateFlashcardSchedulingCommand = updateFlashcardSchedulingCommand;
+        this.updateFlashcardContentCommand = updateFlashcardContentCommand;
         this.deleteFlashcardsCommand = deleteFlashcardsCommand;
         this.updateFlashcardTagsCommand = updateFlashcardTagsCommand;
+        this.noteService = noteService;
 
         Cards = new CardsSubviewViewModel(
             SetCardSuspensionAsync,
             PostponeCardsAsync,
+            UpdateCardContentAsync,
             DeleteCardsAsync,
             AddTagsToCardsAsync,
-            RemoveTagsFromCardsAsync);
+            RemoveTagsFromCardsAsync,
+            LoadAvailableTagNames,
+            editorViewFactory.Create);
         Cards.FiltersChanged += Cards_FiltersChanged;
         Statistics = statistics;
         Statistics.SetBackToDecksAction(() => SetActiveTab(FlashcardsTab.DecksCards));

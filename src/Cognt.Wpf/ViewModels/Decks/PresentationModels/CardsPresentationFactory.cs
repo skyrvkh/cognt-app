@@ -17,7 +17,9 @@ internal static partial class CardsPresentationFactory
             .ToArray();
     }
 
-    private static CardLibraryRow ToCardLibraryRow(FlashcardCardSummaryReadModel card, bool isSelected)
+    private static CardLibraryRow ToCardLibraryRow(
+        FlashcardCardSummaryReadModel card,
+        bool isSelected)
     {
         return CreateCardLibraryRow(
             isSelected,
@@ -30,6 +32,11 @@ internal static partial class CardsPresentationFactory
             card.LastReviewedUtc,
             card.LastRating,
             card.FrontContent,
+            card.BackContent,
+            card.CardType,
+            card.FrontContentKind,
+            card.BackContentKind,
+            card.SourceRelPath,
             card.Tags,
             card.IsSuspended);
     }
@@ -45,6 +52,11 @@ internal static partial class CardsPresentationFactory
         DateTimeOffset? lastReviewedUtc,
         FlashcardReviewRatingReadModel? lastRating,
         string frontContent,
+        string backContent,
+        string cardType,
+        Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts.FlashcardContentKind frontContentKind,
+        Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts.FlashcardContentKind backContentKind,
+        string? sourceRelPath,
         IReadOnlyList<string> tags,
         bool isSuspended)
     {
@@ -67,6 +79,11 @@ internal static partial class CardsPresentationFactory
             Id = id,
             Answer = backText,
             FrontContent = frontContent,
+            BackContent = backContent,
+            CardType = cardType,
+            FrontContentKind = frontContentKind,
+            BackContentKind = backContentKind,
+            SourceRelPath = sourceRelPath,
             DueUtc = dueUtc,
             Tags = NormalizeVisibleCardTags(tags),
             IsSuspended = isSuspended

@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Cognt.Wpf.EditorHost.Views;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Decks.PresentationModels;
 
@@ -8,10 +9,14 @@ namespace CogntApp.ViewModels.Decks;
 public sealed partial class CardsSubviewViewModel : ObservableObject
 {
     private readonly Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards;
+    private readonly Func<CardLibraryRow, CardEditResult, Task> updateCardContent;
     private readonly Func<IReadOnlyList<CardLibraryRow>, Task> deleteCards;
     private readonly Func<IReadOnlyList<CardLibraryRow>, IReadOnlyList<string>, Task> addTagsToCards;
     private readonly Func<IReadOnlyList<CardLibraryRow>, IReadOnlyList<string>, Task> removeTagsFromCards;
+    private readonly Func<IReadOnlyList<string>> loadAvailableTagNames;
+    private readonly Func<EditorView> createEditorView;
     private IReadOnlyList<CardLibraryRow> cardLibraryRows = [];
+    private IReadOnlyList<FlashcardDeckSummaryReadModel> deckRows = [];
     private IReadOnlyList<CardEmptyStateRow> cardEmptyStates = [];
     private string showingSummary = "Showing 0 cards";
     private string totalCards = "0";
@@ -22,20 +27,29 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     public CardsSubviewViewModel(
         Func<CardLibraryRow, bool, Task> setCardSuspension,
         Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards,
+        Func<CardLibraryRow, CardEditResult, Task> updateCardContent,
         Func<IReadOnlyList<CardLibraryRow>, Task> deleteCards,
         Func<IReadOnlyList<CardLibraryRow>, IReadOnlyList<string>, Task> addTagsToCards,
-        Func<IReadOnlyList<CardLibraryRow>, IReadOnlyList<string>, Task> removeTagsFromCards)
+        Func<IReadOnlyList<CardLibraryRow>, IReadOnlyList<string>, Task> removeTagsFromCards,
+        Func<IReadOnlyList<string>> loadAvailableTagNames,
+        Func<EditorView> createEditorView)
     {
         ArgumentNullException.ThrowIfNull(setCardSuspension);
         ArgumentNullException.ThrowIfNull(postponeCards);
+        ArgumentNullException.ThrowIfNull(updateCardContent);
         ArgumentNullException.ThrowIfNull(deleteCards);
         ArgumentNullException.ThrowIfNull(addTagsToCards);
         ArgumentNullException.ThrowIfNull(removeTagsFromCards);
+        ArgumentNullException.ThrowIfNull(loadAvailableTagNames);
+        ArgumentNullException.ThrowIfNull(createEditorView);
 
         this.postponeCards = postponeCards;
+        this.updateCardContent = updateCardContent;
         this.deleteCards = deleteCards;
         this.addTagsToCards = addTagsToCards;
         this.removeTagsFromCards = removeTagsFromCards;
+        this.loadAvailableTagNames = loadAvailableTagNames;
+        this.createEditorView = createEditorView;
 
         ToggleSuspensionCommand = new RelayCommand(async parameter =>
         {
@@ -133,6 +147,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
 
         CardLibraryRows = CardsPresentationFactory.CreateCardLibraryRows(visibleCards);
+        deckRows = decks;
 
         ConfigureFilterOptions(filterSourceCards, decks, nowUtc, sourceTitlesByRelPath);
         ShowingSummary = string.Concat(
@@ -185,6 +200,31 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
             : deleteCards(distinctCards);
     }
 
+    internal Task UpdateCardContentAsync(CardLibraryRow card, CardEditResult edit)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        ArgumentNullException.ThrowIfNull(edit);
+
+        return card.CanEdit
+            ? updateCardContent(card, edit)
+            : Task.CompletedTask;
+    }
+
+    internal EditorView CreateEditorView()
+    {
+        return createEditorView();
+    }
+
+    internal IReadOnlyList<string> GetDeckNames()
+    {
+        return deckRows
+            .Select(deck => deck.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     internal Task AddTagsToCardsAsync(
         IReadOnlyList<CardLibraryRow> cards,
         IReadOnlyList<string> tags)
@@ -221,11 +261,12 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
 
     internal IReadOnlyList<string> GetAvailableTagNames()
     {
-        return CardFilterTagRows
-            .Where(row => !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
-            .Select(row => row.Value)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!)
+        return loadAvailableTagNames()
+            .Concat(CardFilterTagRows
+                .Where(row => !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
+                .Select(row => row.Value)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();

@@ -14,6 +14,7 @@ internal sealed class MaterializedFlashcardContent
         FlashcardContentKind frontKind,
         FlashcardContentKind backKind,
         FlashcardMaterializationStatus status,
+        string cardType = "",
         MultimodalClozeReadModel? frontMultimodalContent = null,
         MultimodalClozeReadModel? backMultimodalContent = null)
     {
@@ -26,6 +27,7 @@ internal sealed class MaterializedFlashcardContent
         FrontKind = frontKind;
         BackKind = backKind;
         Status = status;
+        CardType = cardType;
         FrontMultimodalContent = frontMultimodalContent;
         BackMultimodalContent = backMultimodalContent;
     }
@@ -47,6 +49,8 @@ internal sealed class MaterializedFlashcardContent
     internal FlashcardContentKind BackKind { get; }
 
     internal FlashcardMaterializationStatus Status { get; }
+
+    internal string CardType { get; }
 
     internal MultimodalClozeReadModel? FrontMultimodalContent { get; }
 

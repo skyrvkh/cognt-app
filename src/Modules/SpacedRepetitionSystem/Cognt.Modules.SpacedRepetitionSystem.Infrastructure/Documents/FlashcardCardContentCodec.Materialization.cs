@@ -40,7 +40,8 @@ internal static partial class FlashcardCardContentCodec
             [],
             FlashcardContentKind.LegacyText,
             FlashcardContentKind.LegacyText,
-            FlashcardMaterializationStatus.Ok);
+            FlashcardMaterializationStatus.Ok,
+            string.Empty);
     }
 
     private static MaterializedFlashcardContent MaterializeBasic(FlashcardCardDocument document)
@@ -61,7 +62,8 @@ internal static partial class FlashcardCardContentCodec
             NormalizeTags(document.Tags),
             FlashcardContentKind.BlockSuite,
             FlashcardContentKind.BlockSuite,
-            FlashcardMaterializationStatus.Ok);
+            FlashcardMaterializationStatus.Ok,
+            BasicCardType);
     }
 
     private static MaterializedFlashcardContent MaterializeCloze(
@@ -83,6 +85,7 @@ internal static partial class FlashcardCardContentCodec
             NormalizeTags(document.Tags),
             FlashcardContentKind.BlockSuite,
             FlashcardContentKind.BlockSuite,
-            FlashcardMaterializationStatus.Ok);
+            FlashcardMaterializationStatus.Ok,
+            ClozeCardType);
     }
 }

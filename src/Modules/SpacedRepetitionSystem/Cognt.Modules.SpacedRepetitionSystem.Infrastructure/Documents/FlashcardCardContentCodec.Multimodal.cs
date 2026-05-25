@@ -54,6 +54,7 @@ internal static partial class FlashcardCardContentCodec
             FlashcardContentKind.MultimodalCloze,
             FlashcardContentKind.MultimodalCloze,
             status,
+            MultimodalClozeCardType,
             frontReadModel,
             backReadModel);
     }
