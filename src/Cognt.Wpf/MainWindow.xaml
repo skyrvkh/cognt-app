@@ -49,9 +49,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -239,9 +244,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -327,9 +337,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="7">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -363,9 +378,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -384,13 +404,18 @@
         </Style>
 
         <Style x:Key="CollectionSwitcherPrimaryButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -401,15 +426,34 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource DisabledTextBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource DisabledTextBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -434,8 +478,13 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -466,9 +515,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="7">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -729,11 +783,11 @@
                                                        Foreground="{DynamicResource MutedBrush}" />
                                         </Border>
 
-                                        <ScrollViewer MaxHeight="280"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled">
-                                            <ScrollViewer.Style>
-                                                <Style TargetType="{x:Type ScrollViewer}">
+                                        <ListBox MaxHeight="280"
+                                                 ItemsSource="{Binding GlobalSearchResults}">
+                                            <ListBox.Style>
+                                            <Style TargetType="ListBox"
+                                                       BasedOn="{StaticResource AppVirtualizedListBoxStyle}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ShouldShowGlobalSearchResults}" Value="True">
@@ -741,9 +795,8 @@
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </ScrollViewer.Style>
-                                            <ItemsControl ItemsSource="{Binding GlobalSearchResults}">
-                                                <ItemsControl.ItemTemplate>
+                                            </ListBox.Style>
+                                            <ListBox.ItemTemplate>
                                                     <DataTemplate>
                                                         <Button Style="{StaticResource CollectionPopoverButtonStyle}"
                                                                 Command="{Binding DataContext.OpenGlobalSearchResultCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -770,9 +823,8 @@
                                                             </StackPanel>
                                                         </Button>
                                                     </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
                                     </Grid>
                                 </Border>
                             </Popup>
@@ -796,7 +848,10 @@
                                           FontSize="13"
                                           Foreground="{DynamicResource MutedBrush}"
                                           AllowDrop="True"
+                                          ScrollViewer.CanContentScroll="True"
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          VirtualizingPanel.IsVirtualizing="True"
+                                          VirtualizingPanel.VirtualizationMode="Recycling"
                                           ItemsSource="{Binding NoteRoots}"
                                           PreviewKeyDown="NotesTree_PreviewKeyDown"
                                       PreviewMouseLeftButtonDown="NotesTree_PreviewMouseLeftButtonDown"
@@ -881,11 +936,18 @@
                                         </Grid>
                                     </HierarchicalDataTemplate>
                                 </TreeView.Resources>
+                                <TreeView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </TreeView.ItemsPanel>
                                 <TreeView.ItemContainerStyle>
                                     <Style TargetType="{x:Type TreeViewItem}"
                                            BasedOn="{StaticResource NavigationTreeViewItemStyle}">
                                         <Setter Property="IsExpanded"
                                                 Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                        <Setter Property="IsSelected"
+                                                Value="{Binding IsSelected, Mode=TwoWay}" />
                                         <Setter Property="AllowDrop"
                                                 Value="True" />
                                         <EventSetter Event="Expanded"
@@ -1166,12 +1228,12 @@
                                                    Foreground="{DynamicResource DimBrush}" />
                                     </Grid>
 
-                                    <ScrollViewer Grid.Row="3"
-                                                  MaxHeight="190"
-                                                  VerticalScrollBarVisibility="Auto"
-                                                  HorizontalScrollBarVisibility="Disabled">
-                                        <ScrollViewer.Style>
-                                            <Style TargetType="{x:Type ScrollViewer}">
+                                    <ListBox Grid.Row="3"
+                                             MaxHeight="190"
+                                             ItemsSource="{Binding AvailableCollections}">
+                                        <ListBox.Style>
+                                            <Style TargetType="ListBox"
+                                                   BasedOn="{StaticResource AppVirtualizedListBoxStyle}">
                                                 <Setter Property="Visibility" Value="Visible" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding HasAvailableCollections}" Value="False">
@@ -1179,9 +1241,8 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </ScrollViewer.Style>
-                                        <ItemsControl ItemsSource="{Binding AvailableCollections}">
-                                            <ItemsControl.ItemTemplate>
+                                        </ListBox.Style>
+                                        <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <Button Style="{StaticResource CollectionSwitcherRowButtonStyle}"
                                                             AutomationProperties.Name="{Binding Name}"
@@ -1253,7 +1314,7 @@
                                                                 </Ellipse>
                                                                 <Path Data="M5,9.5 L8,12.5 L13.5,6.5"
                                                                       Stretch="Uniform"
-                                                                      Stroke="{DynamicResource OnAccentBrush}"
+                                                                      Stroke="{DynamicResource VibrantButtonForegroundBrush}"
                                                                       StrokeThickness="1.8"
                                                                       StrokeStartLineCap="Round"
                                                                       StrokeEndLineCap="Round"
@@ -1270,12 +1331,11 @@
                                                                     </Path.Style>
                                                                 </Path>
                                                             </Grid>
-                                                        </Grid>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
+                                                            </Grid>
+                                                        </Button>
+                                                    </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
 
                                     <Border Grid.Row="3"
                                             Padding="12"
@@ -1318,21 +1378,23 @@
                                             <Button Style="{StaticResource CollectionSwitcherPrimaryButtonStyle}"
                                                     AutomationProperties.Name="Add collection"
                                                     Click="AddCollectionButton_Click">
-                                                <StackPanel Orientation="Horizontal"
+                                                                                                <StackPanel Orientation="Horizontal"
+                                                            TextElement.Foreground="{DynamicResource VibrantButtonForegroundBrush}"
                                                             HorizontalAlignment="Center">
                                                     <Path Data="M12,5 L12,19 M5,12 L19,12"
                                                           Width="14"
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Stretch="Uniform"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                                                           StrokeThickness="1.8"
                                                           StrokeStartLineCap="Round"
                                                           StrokeEndLineCap="Round" />
                                                     <TextBlock Text="New collection"
                                                                Margin="7,0,0,0"
                                                                FontSize="13"
-                                                               FontWeight="SemiBold" />
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource VibrantButtonForegroundBrush}" />
                                                 </StackPanel>
                                             </Button>
 
@@ -1348,7 +1410,7 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Stretch="Uniform"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                                                           StrokeThickness="1.7"
                                                           StrokeStartLineCap="Round"
                                                           StrokeEndLineCap="Round"
@@ -1371,7 +1433,7 @@
                                                   Width="12"
                                                   Height="12"
                                                   Stretch="Uniform"
-                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                                                   StrokeThickness="1.8"
                                                   StrokeStartLineCap="Round"
                                                   StrokeEndLineCap="Round" />

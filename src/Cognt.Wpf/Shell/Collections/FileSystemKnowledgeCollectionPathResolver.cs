@@ -50,10 +50,20 @@ internal sealed class FileSystemKnowledgeCollectionPathResolver : IKnowledgeColl
     {
         try
         {
-            return Directory
-                .EnumerateDirectories(directoryPath, $"*{CognCollectionDirectoryExtension}", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
+            string? firstCollectionPath = null;
+            foreach (string path in Directory.EnumerateDirectories(
+                         directoryPath,
+                         $"*{CognCollectionDirectoryExtension}",
+                         SearchOption.TopDirectoryOnly))
+            {
+                if (firstCollectionPath is null
+                    || StringComparer.OrdinalIgnoreCase.Compare(path, firstCollectionPath) < 0)
+                {
+                    firstCollectionPath = path;
+                }
+            }
+
+            return firstCollectionPath;
         }
         catch (Exception ex) when (IsRecoverableDirectoryDiscoveryException(ex))
         {

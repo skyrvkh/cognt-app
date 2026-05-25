@@ -47,18 +47,28 @@ public sealed class WpfThemeService : IThemeService
         Uri source = CreateThemeUri(theme);
         ResourceDictionary dictionary = new() { Source = source };
 
-        for (int index = 0; index < dictionaries.Count; index++)
+        int themeDictionaryIndex = -1;
+        for (int index = dictionaries.Count - 1; index >= 0; index--)
         {
             string? existingSource = dictionaries[index].Source?.OriginalString;
-            if (existingSource is not null
-                && existingSource.StartsWith(ThemeDictionaryPrefix, StringComparison.OrdinalIgnoreCase))
+            if (IsThemeDictionarySource(existingSource))
             {
-                dictionaries[index] = dictionary;
-                return;
+                themeDictionaryIndex = index;
+                dictionaries.RemoveAt(index);
             }
         }
 
-        dictionaries.Insert(0, dictionary);
+        dictionaries.Insert(themeDictionaryIndex >= 0 ? Math.Min(themeDictionaryIndex, dictionaries.Count) : 0, dictionary);
+    }
+
+    private static bool IsThemeDictionarySource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return false;
+        }
+
+        return source.Replace('\\', '/').Contains(ThemeDictionaryPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static Uri CreateThemeUri(ApplicationTheme theme)

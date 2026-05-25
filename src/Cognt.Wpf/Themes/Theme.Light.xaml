@@ -46,6 +46,8 @@
     <SolidColorBrush x:Key="DisabledLineBrush" Color="#D9E1EE" />
     <SolidColorBrush x:Key="DisabledTextBrush" Color="#98A2B3" />
     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PrimaryActionForegroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="VibrantButtonForegroundBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="DangerBrush" Color="#A23B3B" />
     <SolidColorBrush x:Key="DangerSurfaceBrush" Color="#FFF4F4" />
     <SolidColorBrush x:Key="DangerLineBrush" Color="#F1C9C9" />

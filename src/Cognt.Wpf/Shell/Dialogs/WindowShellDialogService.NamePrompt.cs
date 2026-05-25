@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using CogntApp.Design;
 
 namespace CogntApp.Shell.Dialogs;
 
@@ -12,8 +13,12 @@ internal sealed partial class WindowShellDialogService
         ArgumentNullException.ThrowIfNull(currentName);
         ArgumentException.ThrowIfNullOrWhiteSpace(actionLabel);
 
-        TextBlock promptTextBlock = CreatePromptLabel(prompt, new Thickness(0, 0, 0, 8));
-        TextBox nameTextBox = CreatePromptTextBox(currentName);
+        TextBlock promptTextBlock = CreateDialogLabel(
+            prompt,
+            ThemeResourceLookup.Brush("InkBrush", System.Windows.Media.Brushes.Black),
+            13,
+            new Thickness(0, 0, 0, 8));
+        TextBox nameTextBox = CreateDialogTextBox(currentName, 30, new Thickness(8, 3, 8, 3), 13);
         Button cancelButton = CreateDialogActionButton("Cancel", isCancel: true, margin: new Thickness(0, 0, 8, 0));
         Button confirmButton = CreateDialogActionButton(actionLabel, isDefault: true);
         StackPanel actionsPanel = CreateDialogActionsPanel(new Thickness(0, 14, 0, 0), cancelButton, confirmButton);

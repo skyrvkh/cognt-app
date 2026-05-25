@@ -18,6 +18,12 @@ internal static class ThemeResourceLookup
         return resource as FontFamily ?? new FontFamily(fallback);
     }
 
+    internal static Style? Style(string key)
+    {
+        object? resource = Application.Current?.TryFindResource(key);
+        return resource as Style;
+    }
+
     internal static SolidColorBrush SolidBrush(string key, string fallbackColor)
     {
         Color color = ColorValue(key, fallbackColor);

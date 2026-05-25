@@ -710,7 +710,9 @@
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Command="{Binding SaveSettingsCommand}"
                                     IsEnabled="{Binding CanSaveSettings}">
-                                <TextBlock Text="Save settings" />
+                                <TextBlock Text="Save settings"
+                                            Foreground="{DynamicResource VibrantButtonForegroundBrush}"
+                                            />
                             </Button>
                         </Grid>
                     </StackPanel>

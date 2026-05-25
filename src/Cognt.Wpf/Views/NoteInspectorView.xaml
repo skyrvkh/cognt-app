@@ -23,6 +23,10 @@
         </Style>
 
         <Style x:Key="InspectorButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="28" />
             <Setter Property="Padding" Value="8,0" />
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
@@ -39,9 +43,15 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -55,6 +65,10 @@
         </Style>
 
         <Style x:Key="OutlineItemButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Padding" Value="4,3" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
@@ -67,9 +81,15 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -204,3 +224,4 @@
         </Grid>
     </Grid>
 </UserControl>
+

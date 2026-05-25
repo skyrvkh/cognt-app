@@ -43,6 +43,114 @@
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="LineHeight" Value="{StaticResource LineHeightBody}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                         Value="True">
+                <Setter Property="Foreground">
+                    <Setter.Value>
+                        <PriorityBinding>
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                        </PriorityBinding>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                         Value="False">
+                <Setter Property="Foreground">
+                    <Setter.Value>
+                        <PriorityBinding>
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                        </PriorityBinding>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type AccessText}">
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                         Value="True">
+                <Setter Property="Foreground">
+                    <Setter.Value>
+                        <PriorityBinding>
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                        </PriorityBinding>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                         Value="False">
+                <Setter Property="Foreground">
+                    <Setter.Value>
+                        <PriorityBinding>
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                            <Binding Path="Foreground"
+                                     RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                        </PriorityBinding>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ButtonTemplateTextForegroundStyle" TargetType="TextBlock">
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <PriorityBinding>
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                </PriorityBinding>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ButtonTemplateAccessTextForegroundStyle" TargetType="AccessText">
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <PriorityBinding>
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type Control}}" />
+                </PriorityBinding>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="VibrantButtonTemplateTextForegroundStyle" TargetType="TextBlock">
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <PriorityBinding>
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                </PriorityBinding>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="VibrantButtonTemplateAccessTextForegroundStyle" TargetType="AccessText">
+        <Setter Property="Foreground">
+            <Setter.Value>
+                <PriorityBinding>
+                    <Binding Path="Foreground"
+                             RelativeSource="{RelativeSource AncestorType={x:Type ButtonBase}}" />
+                </PriorityBinding>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="AppDisplayTextStyle" TargetType="TextBlock">

@@ -45,7 +45,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
 
     private static Button CreateDialogActionButton(string label, bool isDefault = false, bool isCancel = false, Thickness? margin = null)
     {
-        return new Button
+        Button button = new()
         {
             Content = label,
             Width = 76,
@@ -56,6 +56,10 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
             FontSize = 13,
         };
+
+        button.Style = ThemeResourceLookup.Style(isDefault ? "PrimaryButtonStyle" : "OutlineButtonStyle");
+        ApplyButtonContentTextResources(button);
+        return button;
     }
 
     private static StackPanel CreateDialogActionsPanel(Thickness margin, params Button[] buttons)
@@ -97,28 +101,90 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
         ArgumentNullException.ThrowIfNull(message);
     }
 
-    private static TextBlock CreatePromptLabel(string text, Thickness? margin = null)
+    private static TextBlock CreateDialogLabel(
+        string text,
+        Brush foreground,
+        double fontSize,
+        Thickness? margin = null,
+        FontWeight? fontWeight = null)
     {
         return new TextBlock
         {
             Text = text,
-            Foreground = ThemeResourceLookup.Brush("InkBrush", Brushes.Black),
+            Foreground = foreground,
             FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
-            FontSize = 13,
+            FontSize = fontSize,
+            FontWeight = fontWeight ?? FontWeights.Normal,
             Margin = margin ?? new Thickness(0, 0, 0, 8),
         };
     }
 
-    private static TextBox CreatePromptTextBox(string text)
+    private static TextBox CreateDialogTextBox(
+        string text,
+        double height,
+        Thickness padding,
+        double fontSize,
+        Brush? background = null,
+        Brush? borderBrush = null,
+        Brush? foreground = null)
     {
         return new TextBox
         {
             Text = text,
-            Height = 30,
-            Padding = new Thickness(8, 3, 8, 3),
+            Height = height,
+            Padding = padding,
             VerticalContentAlignment = VerticalAlignment.Center,
+            Background = background ?? SystemColors.WindowBrush,
+            BorderBrush = borderBrush ?? SystemColors.ActiveBorderBrush,
+            Foreground = foreground ?? ThemeResourceLookup.Brush("InkBrush", Brushes.Black),
+            BorderThickness = new Thickness(1),
             FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
-            FontSize = 13,
+            FontSize = fontSize,
         };
+    }
+
+    private static Button CreateThemedDialogButton(
+        string label,
+        Brush background,
+        Brush borderBrush,
+        Brush foreground,
+        double height,
+        double minWidth,
+        Thickness padding,
+        double fontSize,
+        FontWeight fontWeight,
+        bool isDefault = false,
+        bool isCancel = false,
+        Thickness? margin = null,
+        string? styleKey = null)
+    {
+        Button button = new()
+        {
+            Content = label,
+            Height = height,
+            MinWidth = minWidth,
+            Padding = padding,
+            Margin = margin ?? default,
+            Background = background,
+            BorderBrush = borderBrush,
+            Foreground = foreground,
+            BorderThickness = new Thickness(1),
+            IsDefault = isDefault,
+            IsCancel = isCancel,
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontSize = fontSize,
+            FontWeight = fontWeight,
+            Cursor = System.Windows.Input.Cursors.Hand,
+        };
+
+        button.Style = ThemeResourceLookup.Style(string.IsNullOrWhiteSpace(styleKey) ? "OutlineButtonStyle" : styleKey);
+        ApplyButtonContentTextResources(button);
+        return button;
+    }
+
+    private static void ApplyButtonContentTextResources(Button button)
+    {
+        button.Resources[typeof(TextBlock)] = ThemeResourceLookup.Style("ButtonTemplateTextForegroundStyle");
+        button.Resources[typeof(AccessText)] = ThemeResourceLookup.Style("ButtonTemplateAccessTextForegroundStyle");
     }
 }
