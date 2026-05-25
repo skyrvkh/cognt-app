@@ -15,6 +15,14 @@ internal sealed partial class NoteService
         string root = GetExistingCollectionRoot(collectionId);
         string path = ResolveMentionPathInCollectionRoot(root, relativePath);
         string normalizedRelativePath = NormalizeRelativePath(Path.GetRelativePath(root, path));
+        if (IsPdfPath(path))
+        {
+            string title = Path.GetFileNameWithoutExtension(path);
+            return BlockSuiteDocumentContent.FromPlainText(
+                $"PDF document: {Path.GetFileName(path)}",
+                title);
+        }
+
         string content = File.ReadAllText(path, Encoding.UTF8);
         bool isBlockSuiteNote = IsBlockSuiteNotePath(path);
         string previewTitle = OpenTreeRepositoryForCollectionPath(root).FindNoteByFileRelPath(normalizedRelativePath)?.Title

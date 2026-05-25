@@ -10,13 +10,13 @@ internal sealed partial class NoteService
 
         try
         {
-            return ResolveExistingNotePathInRoot(
+            return ResolveExistingMentionablePathInRoot(
                 root,
                 normalizedRelativePath,
                 "Mention path is required.",
                 "Mention paths must be relative to the open collection root.",
                 "Mention path is outside the open collection root.",
-                "The mentioned note file does not exist.");
+                "The mentioned file does not exist.");
         }
         catch (FileNotFoundException) when (TryResolveRelocatedMentionPath(root, normalizedRelativePath) is { } resolvedPath)
         {

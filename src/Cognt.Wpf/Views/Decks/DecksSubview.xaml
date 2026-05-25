@@ -84,11 +84,6 @@
                                 Margin="10,0,0,0"
                                 Command="{Binding ShowStatisticsCommand}"
                                 Style="{StaticResource OutlineButtonStyle}" />
-                        <Button Content="+ Add Card"
-                                Width="110"
-                                Margin="10,0,0,0"
-                                Command="{Binding AddCardCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}" />
                     </WrapPanel>
                 </Grid>
 

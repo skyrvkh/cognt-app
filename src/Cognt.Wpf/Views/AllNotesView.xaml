@@ -616,19 +616,12 @@
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <Button MinWidth="84"
-                                Margin="0,0,6,0"
-                                Click="AddTagsBulk_Click"
-                                AutomationProperties.Name="Add tags to selected notes"
-                                Style="{StaticResource FilterActionButtonStyle}">
-                            <TextBlock Text="Add Tags" />
-                        </Button>
-                        <Button MinWidth="104"
+                        <Button MinWidth="88"
                                 Margin="0,0,12,0"
-                                Click="RemoveTagsBulk_Click"
-                                AutomationProperties.Name="Remove tags from selected notes"
+                                Click="EditTagsBulk_Click"
+                                AutomationProperties.Name="Edit tags for selected notes"
                                 Style="{StaticResource FilterActionButtonStyle}">
-                            <TextBlock Text="Remove Tags" />
+                            <TextBlock Text="Edit Tags" />
                         </Button>
                         <TextBlock VerticalAlignment="Center"
                                    Foreground="{DynamicResource MutedBrush}"

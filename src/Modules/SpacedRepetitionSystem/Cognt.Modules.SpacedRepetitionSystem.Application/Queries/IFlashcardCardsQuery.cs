@@ -24,6 +24,7 @@ public sealed record FlashcardCardsQueryRequest(
     string? SourceRelPath = null,
     string? Tag = null,
     IReadOnlyList<string>? Tags = null,
+    string? SearchText = null,
     int Limit = FlashcardCardsQueryRequest.DefaultLimit)
 {
     public const int DefaultLimit = 500;

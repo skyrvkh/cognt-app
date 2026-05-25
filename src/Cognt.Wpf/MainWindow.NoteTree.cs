@@ -69,6 +69,8 @@ public partial class MainWindow
     {
         NoteTreeNodeViewModel? node = noteTreeContextNode ?? (NotesTree.SelectedItem as NoteTreeNodeViewModel);
         DuplicateTreeMenuItem.IsEnabled = viewModel.CanDuplicateNode(node);
+        bool canEditTags = node is { Id: > 0, IsPlaceholder: false };
+        EditTagsTreeMenuItem.IsEnabled = canEditTags;
     }
 
     private void RenameSelectedTreeNode()

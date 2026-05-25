@@ -22,8 +22,7 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
         IReadOnlyList<ExpandedCardContextCard> expandedCards = CardContextCardExpansion.Expand(context);
-        IReadOnlyList<string> mergedTags = tags
-            .Concat(["source:note"])
+        IReadOnlyList<string> cardTags = tags
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -45,7 +44,7 @@ internal sealed partial class SqliteFlashcardStore
             cancellationToken.ThrowIfCancellationRequested();
             currentSlotIds.Add(card.CurrentSlotId);
 
-            string document = FlashcardCardContentCodec.CreateMultimodalClozeDocument(card, mergedTags);
+            string document = FlashcardCardContentCodec.CreateMultimodalClozeDocument(card, cardTags);
             string? sourceTargetId = card.CurrentTargetIds.FirstOrDefault();
 
             if (existingBySlotId.TryGetValue(card.CurrentSlotId, out GeneratedFlashcardSourceRecord? existing))

@@ -23,6 +23,7 @@ internal sealed class GetFlashcardCards(IFlashcardDeckReader flashcardReader) : 
             request.SourceRelPath,
             request.Tag,
             request.Tags,
+            request.SearchText,
             limit);
     }
 }

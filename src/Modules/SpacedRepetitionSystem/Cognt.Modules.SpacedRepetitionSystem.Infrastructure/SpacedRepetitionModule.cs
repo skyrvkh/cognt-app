@@ -48,6 +48,10 @@ public static class SpacedRepetitionModule
             new UpdateFlashcardReviewSettings(provider.GetRequiredService<IFlashcardReviewWriter>()));
         services.AddSingleton<IUpdateFlashcardFrontContentCommand>(provider =>
             new UpdateFlashcardFrontContent(provider.GetRequiredService<IFlashcardAuthoringWriter>()));
+        services.AddSingleton<IDeleteFlashcardsCommand>(provider =>
+            new DeleteFlashcards(provider.GetRequiredService<IFlashcardAuthoringWriter>()));
+        services.AddSingleton<IUpdateFlashcardTagsCommand>(provider =>
+            new UpdateFlashcardTags(provider.GetRequiredService<IFlashcardAuthoringWriter>()));
         services.AddSingleton<IUpdateFlashcardSchedulingCommand>(provider =>
             new UpdateFlashcardScheduling(provider.GetRequiredService<IFlashcardReviewWriter>()));
         services.AddSingleton<IRecordFlashcardReviewCommand>(provider =>

@@ -21,13 +21,13 @@ public sealed partial class CardsSubviewViewModel
         string collectionId,
         bool includeDeckFilter = true)
     {
-        // TODO: Text search should be added here when a card search service exists.
         return new FlashcardCardsQueryRequest(
             collectionId,
             includeDeckFilter ? SelectedDeckFilter?.Id : null,
             GetSelectedFilterKind(),
             GetSelectedSourceRelPath(),
-            Tags: GetSelectedTags());
+            Tags: GetSelectedTags(),
+            SearchText: SearchText);
     }
 
     private void ConfigureFilterOptions(
@@ -67,6 +67,7 @@ public sealed partial class CardsSubviewViewModel
         SelectedDeckFilter = CardFilterDeckRows.FirstOrDefault();
         SelectedStatusFilter = CardFilterStatusRows.FirstOrDefault();
         SelectedSourceFilter = CardFilterSourceRows.FirstOrDefault();
+        SearchText = string.Empty;
         ConfigureSelectedTagFilters([]);
     }
 
@@ -102,7 +103,8 @@ public sealed partial class CardsSubviewViewModel
             SelectedSourceFilter,
             GetSelectedFilterKind(),
             GetSelectedSourceRelPath(),
-            GetSelectedTags());
+            GetSelectedTags(),
+            SearchText);
     }
 
     private void ConfigureSelectedTagFilters(IReadOnlyList<string> selectedTags)

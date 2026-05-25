@@ -59,6 +59,7 @@ public sealed partial class AllNotesViewModel
         SelectedTagOption = TagOptions.FirstOrDefault(option => option.IsSelected) ?? TagOptions.FirstOrDefault();
         SelectedTypeOption = TypeOptions.FirstOrDefault(option => option.IsSelected) ?? TypeOptions.FirstOrDefault();
         SelectedSortOption ??= SortOptions.FirstOrDefault();
+        RefreshFilterPresentationState();
     }
 
     private void UpdateEmptyState(int resultCount)

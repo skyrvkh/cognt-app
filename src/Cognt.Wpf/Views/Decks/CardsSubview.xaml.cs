@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using CogntApp.ViewModels.Decks;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.Views;
@@ -98,27 +99,6 @@ public partial class CardsSubview : UserControl
         row.ContextMenu!.PlacementTarget = row;
     }
 
-    private void ShowCardPreview(CardLibraryRow card)
-    {
-        CardPreviewWindow previewWindow = new(card);
-
-        Window? owner = Window.GetWindow(this);
-        if (owner is not null)
-        {
-            previewWindow.Owner = owner;
-        }
-
-        previewWindow.ShowDialog();
-    }
-
-    private void PreviewCardMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if ((sender as FrameworkElement)?.DataContext is CardLibraryRow card)
-        {
-            ShowCardPreview(card);
-        }
-    }
-
     private async void PostponePresetMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card
@@ -127,7 +107,7 @@ public partial class CardsSubview : UserControl
             return;
         }
 
-        await PostponeCardsAsync(GetContextCards(card), days);
+        await PostponeCardsAsync(GetContextSchedulableCards(card), days);
     }
 
     private async void CustomPostponeMenuItem_Click(object sender, RoutedEventArgs e)
@@ -137,7 +117,7 @@ public partial class CardsSubview : UserControl
             return;
         }
 
-        CardLibraryRow[] cards = GetContextCards(card);
+        CardLibraryRow[] cards = GetContextSchedulableCards(card);
         PostponeCardDialog dialog = new(cards.Select(item => item.DueUtc).ToArray())
         {
             Owner = Window.GetWindow(this)
@@ -147,6 +127,36 @@ public partial class CardsSubview : UserControl
         {
             await PostponeCardsAsync(cards, dialog.Days);
         }
+    }
+
+    private async void AddTagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        await AddTagsToCardsAsync(GetContextCards(card));
+    }
+
+    private async void DeleteCardsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        await DeleteCardsAsync(GetContextCards(card));
+    }
+
+    private async void AddTagsButton_Click(object sender, RoutedEventArgs e)
+    {
+        await AddTagsToCardsAsync(GetSelectedCards());
+    }
+
+    private async void DeleteCardsButton_Click(object sender, RoutedEventArgs e)
+    {
+        await DeleteCardsAsync(GetSelectedCards());
     }
 
     private async Task PostponeCardsAsync(IReadOnlyList<CardLibraryRow> cards, int days)
@@ -159,11 +169,81 @@ public partial class CardsSubview : UserControl
         await ViewModel.PostponeCardsAsync(cards, days);
     }
 
+    private async Task AddTagsToCardsAsync(IReadOnlyList<CardLibraryRow> cards)
+    {
+        if (ViewModel is null || cards.Count == 0)
+        {
+            return;
+        }
+
+        string title = cards.Count == 1 ? "Selected card" : $"{cards.Count} selected cards";
+        string[] assignedTags = cards
+            .SelectMany(card => card.Tags)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        TagEditDialog dialog = new(
+            title,
+            KnowledgeTagOperationKind.Add,
+            ViewModel.GetAvailableTagNames(),
+            assignedTags,
+            showScope: false)
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            if (dialog.SelectedTags.Count > 0)
+            {
+                await ViewModel.AddTagsToCardsAsync(cards, dialog.SelectedTags);
+            }
+
+            if (dialog.RemovedTags.Count > 0)
+            {
+                await ViewModel.RemoveTagsFromCardsAsync(cards, dialog.RemovedTags);
+            }
+        }
+    }
+
+    private async Task DeleteCardsAsync(IReadOnlyList<CardLibraryRow> cards)
+    {
+        if (ViewModel is null || cards.Count == 0)
+        {
+            return;
+        }
+
+        string message = cards.Count == 1
+            ? "Delete the selected card? This removes it from review queues and card lists."
+            : $"Delete {cards.Count} selected cards? This removes them from review queues and card lists.";
+        MessageBoxResult result = MessageBox.Show(
+            Window.GetWindow(this),
+            message,
+            "Delete cards",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (result == MessageBoxResult.Yes)
+        {
+            await ViewModel.DeleteCardsAsync(cards);
+        }
+    }
+
+    private CardLibraryRow[] GetContextSchedulableCards(CardLibraryRow contextCard)
+    {
+        return GetContextCards(contextCard, requireSchedulable: true);
+    }
+
     private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard)
+    {
+        return GetContextCards(contextCard, requireSchedulable: false);
+    }
+
+    private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard, bool requireSchedulable)
     {
         CardLibraryRow[] selectedCards = CardsDataGrid.SelectedItems
             .OfType<CardLibraryRow>()
-            .Where(card => card.CanSchedule)
+            .Where(card => card.Id > 0 && (!requireSchedulable || card.CanSchedule))
             .GroupBy(card => card.Id)
             .Select(group => group.First())
             .ToArray();
@@ -171,5 +251,24 @@ public partial class CardsSubview : UserControl
         return selectedCards.Any(card => card.Id == contextCard.Id)
             ? selectedCards
             : [contextCard];
+    }
+
+    private CardLibraryRow[] GetSelectedCards()
+    {
+        CardLibraryRow[] selectedCards = CardsDataGrid.SelectedItems
+            .OfType<CardLibraryRow>()
+            .Where(card => card.Id > 0)
+            .GroupBy(card => card.Id)
+            .Select(group => group.First())
+            .ToArray();
+
+        if (selectedCards.Length > 0)
+        {
+            return selectedCards;
+        }
+
+        return CardsDataGrid.SelectedItem is CardLibraryRow selectedCard && selectedCard.Id > 0
+            ? [selectedCard]
+            : [];
     }
 }

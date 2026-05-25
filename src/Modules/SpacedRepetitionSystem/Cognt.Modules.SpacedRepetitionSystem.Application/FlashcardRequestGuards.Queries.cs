@@ -31,6 +31,9 @@ internal static partial class FlashcardRequestGuards
         EnsureCollectionId(request.CollectionId);
         return request with
         {
+            SearchText = string.IsNullOrWhiteSpace(request.SearchText)
+                ? null
+                : request.SearchText.Trim(),
             Tags = NormalizeStrings(request.Tags),
         };
     }

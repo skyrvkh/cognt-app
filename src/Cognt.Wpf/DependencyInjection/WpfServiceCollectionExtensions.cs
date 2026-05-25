@@ -1,5 +1,4 @@
 using Cognt.Wpf.EditorHost;
-using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
@@ -42,10 +41,9 @@ internal static class WpfServiceCollectionExtensions
         services.AddSingleton(provider =>
             new DecksViewModel(
                 provider.GetRequiredService<IDecksWorkspaceDataProvider>(),
-                provider.GetRequiredService<ICreateFlashcardsCommand>(),
-                provider.GetRequiredService<IUpdateFlashcardFrontContentCommand>(),
                 provider.GetRequiredService<IUpdateFlashcardSchedulingCommand>(),
-                provider.GetRequiredService<IKnowledgeDocumentContentFactory>(),
+                provider.GetRequiredService<IDeleteFlashcardsCommand>(),
+                provider.GetRequiredService<IUpdateFlashcardTagsCommand>(),
                 provider.GetRequiredService<StatisticsSubviewViewModel>()));
         services.AddSingleton<DecksView>();
         services.AddSingleton<MainWindow>();

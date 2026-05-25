@@ -14,5 +14,6 @@ public interface IFlashcardDeckReader
         string? sourceRelPath = null,
         string? tag = null,
         IReadOnlyList<string>? tags = null,
+        string? searchText = null,
         int limit = 500);
 }

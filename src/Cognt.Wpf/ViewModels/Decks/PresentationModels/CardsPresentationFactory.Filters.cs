@@ -82,7 +82,8 @@ internal static partial class CardsPresentationFactory
         CardFilterOptionRow? selectedSourceFilter,
         FlashcardCardsFilterKind filterKind,
         string? selectedSourceRelPath,
-        IReadOnlyList<string> selectedTags)
+        IReadOnlyList<string> selectedTags,
+        string? searchText)
     {
         List<string> filters = [];
 
@@ -104,6 +105,11 @@ internal static partial class CardsPresentationFactory
         if (selectedTags.Count > 0)
         {
             filters.Add($"Tags: {string.Join(", ", selectedTags)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            filters.Add($"Search: {searchText.Trim()}");
         }
 
         return filters.Count == 0 ? "All cards" : string.Join(" | ", filters);
@@ -148,6 +154,7 @@ internal static partial class CardsPresentationFactory
                 .SelectMany(card => card.Tags)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .GroupBy(tag => tag.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Where(group => !group.Key.StartsWith("source:", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new CardFilterOptionRow(
                     group.Key,

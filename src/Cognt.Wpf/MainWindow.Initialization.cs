@@ -22,8 +22,6 @@ public partial class MainWindow
 
         decksView.PracticeRequested += DecksView_PracticeRequested;
         decksView.CramRequested += DecksView_CramRequested;
-        decksView.CreateCardEditorHostRequested += DecksView_CreateCardEditorHostRequested;
-        decksView.CreateCardEditorReleased += DecksView_CreateCardEditorReleased;
         decksView.InfoMessageRequested += DecksView_InfoMessageRequested;
         decksView.WarningMessageRequested += DecksView_WarningMessageRequested;
     }

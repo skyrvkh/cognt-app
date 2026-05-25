@@ -11,14 +11,9 @@ public partial class AllNotesView : UserControl
         InitializeComponent();
     }
 
-    private void AddTagsBulk_Click(object sender, System.Windows.RoutedEventArgs e)
+    private void EditTagsBulk_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         RequestBulkTagEdit(KnowledgeTagOperationKind.Add);
-    }
-
-    private void RemoveTagsBulk_Click(object sender, System.Windows.RoutedEventArgs e)
-    {
-        RequestBulkTagEdit(KnowledgeTagOperationKind.Remove);
     }
 
     private void RequestBulkTagEdit(KnowledgeTagOperationKind operation)
