@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:views="clr-namespace:CogntApp.Views"
              xmlns:viewModels="clr-namespace:CogntApp.ViewModels"
              mc:Ignorable="d"
              d:DesignHeight="860"
@@ -36,7 +37,8 @@
                                 CornerRadius="8">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -75,7 +77,8 @@
                                 CornerRadius="8">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -210,7 +213,8 @@
                                 CornerRadius="8">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -224,6 +228,100 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="FilterToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="MinWidth" Value="112" />
+            <Setter Property="Padding" Value="11,0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="ToggleBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActiveFilterChipStyle" TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="ChipBorder"
+                                Background="{DynamicResource AccentSubtleBrush}"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12">
+                            <StackPanel Margin="{TemplateBinding Padding}"
+                                        Orientation="Horizontal">
+                                <ContentPresenter VerticalAlignment="Center"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
+                                <TextBlock Text="x"
+                                           Margin="7,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AccentStrongBrush}"
+                                           FontSize="11"
+                                           FontWeight="Bold" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                                <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActiveFilterButtonChipStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource FilterActionButtonStyle}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
         <Style x:Key="FilterCheckBoxStyle" TargetType="CheckBox">
@@ -323,7 +421,8 @@
                     <ControlTemplate TargetType="Button">
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -337,6 +436,10 @@
 
         <Style x:Key="AllNotesTreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="views:DoubleClickCommand.Command"
+                    Value="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=TreeView}}" />
+            <Setter Property="views:DoubleClickCommand.CommandParameter"
+                    Value="{Binding}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="0" />
@@ -471,13 +574,17 @@
                 Padding="12"
                 Style="{StaticResource CardStyle}">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <Grid MinWidth="260"
-                      Margin="0,0,10,0">
+                      Margin="0,0,12,0">
                     <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Search notes"
                              MinHeight="34"
@@ -528,64 +635,217 @@
                 </Grid>
 
                 <StackPanel Grid.Column="1"
-                            MaxWidth="680"
+                            Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <WrapPanel>
-                        <TextBlock Text="Types"
-                                   Margin="0,2,8,0"
-                                   Style="{StaticResource TableHeaderTextStyle}" />
-                        <ItemsControl ItemsSource="{Binding TypeOptions}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <CheckBox Content="{Binding Label}"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              AutomationProperties.Name="{Binding Label}"
-                                              Style="{StaticResource FilterCheckBoxStyle}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </WrapPanel>
-                    <WrapPanel Margin="0,4,0,0">
-                        <TextBlock Text="Tags"
-                                   Margin="0,2,8,0"
-                                   Style="{StaticResource TableHeaderTextStyle}" />
-                        <ScrollViewer MaxWidth="380"
-                                      HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding TagOptions}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Content="{Binding Label}"
-                                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  AutomationProperties.Name="{Binding Label}"
-                                                  Style="{StaticResource FilterCheckBoxStyle}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                        <ComboBox Width="176"
-                                  AutomationProperties.Name="Sort notes"
-                                  Style="{StaticResource FilterComboStyle}"
-                                  ItemsSource="{Binding SortOptions}"
-                                  SelectedItem="{Binding SelectedSortOption, Mode=TwoWay}" />
-                        <Button MinWidth="112"
-                                Command="{Binding ClearFiltersCommand}"
-                                AutomationProperties.Name="Clear filters"
-                                Style="{StaticResource FilterActionButtonStyle}">
-                            <TextBlock Text="Clear filters" />
-                        </Button>
-                    </WrapPanel>
+                    <Grid>
+                        <ToggleButton x:Name="TypeFilterToggle"
+                                      AutomationProperties.Name="Filter note types"
+                                      Style="{StaticResource FilterToggleButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Type"
+                                           Foreground="{DynamicResource MutedBrush}" />
+                                <TextBlock Text="{Binding TypeFilterLabel}"
+                                           Margin="6,0,8,0" />
+                                <Path Width="10"
+                                      Height="10"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M3,4 L6,7 L9,4" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <Popup PlacementTarget="{Binding ElementName=TypeFilterToggle}"
+                               Placement="Bottom"
+                               IsOpen="{Binding IsChecked, ElementName=TypeFilterToggle, Mode=TwoWay}"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade">
+                            <Border MinWidth="220"
+                                    Margin="0,6,0,0"
+                                    Padding="10"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                <DockPanel LastChildFill="True">
+                                    <Grid DockPanel.Dock="Top"
+                                          Margin="0,0,0,8">
+                                        <TextBlock Text="Types"
+                                                   VerticalAlignment="Center"
+                                                   Style="{StaticResource TableHeaderTextStyle}" />
+                                        <Button HorizontalAlignment="Right"
+                                                Command="{Binding ClearTypeFiltersCommand}"
+                                                AutomationProperties.Name="Clear type filters"
+                                                Style="{StaticResource FilterActionButtonStyle}">
+                                            <TextBlock Text="Any" />
+                                        </Button>
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding TypeOptions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Label}"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                          AutomationProperties.Name="{Binding Label}"
+                                                          Style="{StaticResource FilterCheckBoxStyle}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <Grid>
+                        <ToggleButton x:Name="TagFilterToggle"
+                                      AutomationProperties.Name="Filter tags"
+                                      Style="{StaticResource FilterToggleButtonStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Tags"
+                                           Foreground="{DynamicResource MutedBrush}" />
+                                <TextBlock Text="{Binding TagFilterLabel}"
+                                           Margin="6,0,8,0" />
+                                <Path Width="10"
+                                      Height="10"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M3,4 L6,7 L9,4" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <Popup PlacementTarget="{Binding ElementName=TagFilterToggle}"
+                               Placement="Bottom"
+                               IsOpen="{Binding IsChecked, ElementName=TagFilterToggle, Mode=TwoWay}"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade">
+                            <Border MinWidth="260"
+                                    Margin="0,6,0,0"
+                                    Padding="10"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                <DockPanel LastChildFill="True">
+                                    <Grid DockPanel.Dock="Top"
+                                          Margin="0,0,0,8">
+                                        <TextBlock Text="Tags"
+                                                   VerticalAlignment="Center"
+                                                   Style="{StaticResource TableHeaderTextStyle}" />
+                                        <Button HorizontalAlignment="Right"
+                                                Command="{Binding ClearTagFiltersCommand}"
+                                                AutomationProperties.Name="Clear tag filters"
+                                                Style="{StaticResource FilterActionButtonStyle}">
+                                            <TextBlock Text="Any" />
+                                        </Button>
+                                    </Grid>
+                                    <ScrollViewer MaxHeight="260"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding TagOptions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox Content="{Binding Label}"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                              AutomationProperties.Name="{Binding Label}"
+                                                              Style="{StaticResource FilterCheckBoxStyle}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <ComboBox Width="176"
+                              AutomationProperties.Name="Sort notes"
+                              Style="{StaticResource FilterComboStyle}"
+                              ItemsSource="{Binding SortOptions}"
+                              SelectedItem="{Binding SelectedSortOption, Mode=TwoWay}" />
+                    <Button MinWidth="96"
+                            Command="{Binding ClearFiltersCommand}"
+                            AutomationProperties.Name="Clear filters"
+                            Style="{StaticResource FilterActionButtonStyle}">
+                        <TextBlock Text="Reset" />
+                    </Button>
                 </StackPanel>
+
+                <WrapPanel Grid.Row="1"
+                           Grid.ColumnSpan="2"
+                           Margin="0,10,0,0"
+                           VerticalAlignment="Center">
+                    <WrapPanel.Style>
+                        <Style TargetType="{x:Type WrapPanel}">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasActiveFilters}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </WrapPanel.Style>
+                    <TextBlock Text="Active"
+                               Margin="0,5,8,0"
+                               Style="{StaticResource TableHeaderTextStyle}" />
+                    <Button Command="{Binding ClearSearchCommand}"
+                            AutomationProperties.Name="Clear search filter">
+                        <Button.Style>
+                            <Style TargetType="{x:Type Button}"
+                                   BasedOn="{StaticResource ActiveFilterButtonChipStyle}">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasSearchQuery}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding SearchQuery, StringFormat={}Search: {0}}" />
+                            <TextBlock Text="x"
+                                       Margin="7,0,0,0"
+                                       FontWeight="Bold" />
+                        </StackPanel>
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding ActiveTypeFilters}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label, StringFormat={}Type: {0}}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          AutomationProperties.Name="{Binding Label, StringFormat={}Remove type filter {0}}"
+                                          Style="{StaticResource ActiveFilterChipStyle}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding ActiveTagFilters}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label, StringFormat={}Tag: {0}}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          AutomationProperties.Name="{Binding Label, StringFormat={}Remove tag filter {0}}"
+                                          Style="{StaticResource ActiveFilterChipStyle}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </WrapPanel>
             </Grid>
         </Border>
 
@@ -811,11 +1071,8 @@
                                           Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TreeView}}">
                                         <Grid.ContextMenu>
                                             <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                                                <MenuItem Header="Add Tags"
+                                                <MenuItem Header="Edit Tags"
                                                           Command="{Binding AddTagsCommand}"
-                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                <MenuItem Header="Remove Tags"
-                                                          Command="{Binding RemoveTagsCommand}"
                                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                             </ContextMenu>
                                         </Grid.ContextMenu>
@@ -826,11 +1083,9 @@
                                             <ColumnDefinition Width="82" SharedSizeGroup="CardsColumn" />
                                             <ColumnDefinition Width="154" SharedSizeGroup="ModifiedColumn" />
                                         </Grid.ColumnDefinitions>
-                                        <Button Command="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                IsEnabled="{Binding CanOpen}"
-                                                AutomationProperties.Name="{Binding Title}"
-                                                Style="{StaticResource AllNotesTreeButtonStyle}">
+                                        <Grid MinHeight="48"
+                                              Margin="12,0"
+                                              AutomationProperties.Name="{Binding Title}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
@@ -847,7 +1102,7 @@
                                                                ToolTip="{Binding Title}" />
                                                 </StackPanel>
                                             </Grid>
-                                        </Button>
+                                        </Grid>
                                         <TextBlock Grid.Column="1"
                                                    Margin="10,0,0,0"
                                                    Text="{Binding TypeLabel}"
@@ -904,14 +1159,15 @@
                                 <Style TargetType="{x:Type DataGridRow}">
                                     <Setter Property="Tag"
                                             Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    <Setter Property="views:DoubleClickCommand.Command"
+                                            Value="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    <Setter Property="views:DoubleClickCommand.CommandParameter"
+                                            Value="{Binding}" />
                                     <Setter Property="ContextMenu">
                                         <Setter.Value>
                                             <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                                                <MenuItem Header="Add Tags"
+                                                <MenuItem Header="Edit Tags"
                                                           Command="{Binding AddTagsCommand}"
-                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                <MenuItem Header="Remove Tags"
-                                                          Command="{Binding RemoveTagsCommand}"
                                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                             </ContextMenu>
                                         </Setter.Value>
@@ -932,17 +1188,17 @@
                                 <DataGridTemplateColumn Width="*">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Command="{Binding DataContext.OpenNoteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    AutomationProperties.Name="{Binding Title}"
-                                                    Style="{StaticResource AllNotesTreeButtonStyle}">
+                                            <Border MinHeight="46"
+                                                    Padding="12,0"
+                                                    AutomationProperties.Name="{Binding Title}">
                                                 <TextBlock Text="{Binding Title}"
                                                            Foreground="{DynamicResource InkBrush}"
                                                            FontSize="13"
                                                            FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center"
                                                            ToolTip="{Binding Title}" />
-                                            </Button>
+                                            </Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
