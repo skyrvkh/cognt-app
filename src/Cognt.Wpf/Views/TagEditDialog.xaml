@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Edit Tags"
         Width="460"
-        Height="560"
+        Height="390"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{DynamicResource PageBrush}">
@@ -11,67 +11,98 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock x:Name="TitleText"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource InkBrush}" />
-            <TextBlock x:Name="SubtitleText"
-                       Margin="0,6,0,0"
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource MutedBrush}" />
-        </StackPanel>
-
-        <StackPanel Grid.Row="1"
-                    Margin="0,18,0,12">
-            <TextBlock Text="Add or select tags"
-                       Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock Text="Use commas for multiple tags. Spaces are removed from new tags."
-                       Margin="0,3,0,0"
-                       Foreground="{DynamicResource SubtleBrush}"
-                       FontSize="12"
-                       TextWrapping="Wrap" />
-            <DockPanel Margin="0,8,0,0">
-                <Button DockPanel.Dock="Right"
-                        Width="72"
-                        Margin="8,0,0,0"
-                        Content="Add"
-                        Click="AddPendingTag_Click"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-                <TextBox x:Name="PendingTagTextBox"
-                         MinHeight="34"
+        <StackPanel Grid.Row="0"
+                    Margin="0,0,0,12">
+            <Grid>
+                <TextBox x:Name="TagSearchTextBox"
+                         MinHeight="36"
                          VerticalContentAlignment="Center"
                          Style="{StaticResource InputTextBoxStyle}"
-                         PreviewKeyDown="PendingTagTextBox_PreviewKeyDown" />
-            </DockPanel>
+                         TextChanged="TagSearchTextBox_TextChanged"
+                         GotKeyboardFocus="TagSearchTextBox_GotKeyboardFocus"
+                         PreviewKeyDown="TagSearchTextBox_PreviewKeyDown" />
+                <Popup x:Name="TagSuggestionsPopup"
+                       PlacementTarget="{Binding ElementName=TagSearchTextBox}"
+                       Placement="Bottom"
+                       AllowsTransparency="True"
+                       StaysOpen="False"
+                       PopupAnimation="Fade">
+                    <Border Width="{Binding ActualWidth, ElementName=TagSearchTextBox}"
+                            Margin="0,4,0,0"
+                            Padding="4"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <ListBox x:Name="TagSuggestionsListBox"
+                                 MaxHeight="190"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 KeyboardNavigation.TabNavigation="Cycle">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Tag="{Binding}"
+                                            Click="Suggestion_Click"
+                                            HorizontalContentAlignment="Stretch"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Padding="9,7"
+                                            Cursor="Hand">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   Foreground="{DynamicResource InkBrush}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Button>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </Popup>
+            </Grid>
+
+            <ItemsControl x:Name="SelectedTagsItemsControl"
+                          Margin="0,10,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,8,8"
+                                Padding="9,4"
+                                Background="{DynamicResource AccentSoftBrush}"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding}"
+                                           Foreground="{DynamicResource InkBrush}"
+                                           FontSize="12" />
+                                <Button Content="x"
+                                        Tag="{Binding}"
+                                        Click="RemoveSelectedTag_Click"
+                                        Margin="7,-2,-4,-2"
+                                        Padding="4,0"
+                                        MinWidth="18"
+                                        MinHeight="18"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        Foreground="{DynamicResource MutedBrush}"
+                                        Cursor="Hand" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
 
-        <Border Grid.Row="2"
-                BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Background="{DynamicResource PanelBrush}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="TagItemsControl">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox Content="{Binding DisplayName}"
-                                      IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Margin="12,8"
-                                      Foreground="{DynamicResource InkBrush}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Border>
-
-        <StackPanel Grid.Row="3"
-                    Margin="0,14,0,0">
+        <StackPanel x:Name="ScopePanel"
+                    Grid.Row="1"
+                    Margin="0,8,0,0">
             <TextBlock Text="Scope"
                        Foreground="{DynamicResource MutedBrush}" />
             <RadioButton x:Name="ItemOnlyRadioButton"
@@ -89,7 +120,7 @@
                        TextWrapping="Wrap" />
         </StackPanel>
 
-        <StackPanel Grid.Row="4"
+        <StackPanel Grid.Row="2"
                     Margin="0,18,0,0"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">

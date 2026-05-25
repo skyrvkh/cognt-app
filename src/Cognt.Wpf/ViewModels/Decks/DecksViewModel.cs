@@ -1,4 +1,3 @@
-using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels;
@@ -9,13 +8,12 @@ namespace CogntApp.ViewModels.Decks;
 public sealed partial class DecksViewModel : ObservableObject
 {
     private readonly IDecksWorkspaceDataProvider workspaceDataProvider;
-    private readonly ICreateFlashcardsCommand createFlashcardsCommand;
-    private readonly IUpdateFlashcardFrontContentCommand updateFlashcardFrontContentCommand;
     private readonly IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand;
+    private readonly IDeleteFlashcardsCommand deleteFlashcardsCommand;
+    private readonly IUpdateFlashcardTagsCommand updateFlashcardTagsCommand;
     private object currentSubview;
     private FlashcardsTab activeTab = FlashcardsTab.DecksCards;
     private string collectionId = string.Empty;
-    private string? sourceRelPath;
     private string practiceDueCount = "0";
     private string cramCardCount = "0";
 
@@ -25,37 +23,32 @@ public sealed partial class DecksViewModel : ObservableObject
 
     internal DecksViewModel(
         IDecksWorkspaceDataProvider workspaceDataProvider,
-        ICreateFlashcardsCommand createFlashcardsCommand,
-        IUpdateFlashcardFrontContentCommand updateFlashcardFrontContentCommand,
         IUpdateFlashcardSchedulingCommand updateFlashcardSchedulingCommand,
-        IKnowledgeDocumentContentFactory documentContentFactory,
+        IDeleteFlashcardsCommand deleteFlashcardsCommand,
+        IUpdateFlashcardTagsCommand updateFlashcardTagsCommand,
         StatisticsSubviewViewModel statistics)
     {
         ArgumentNullException.ThrowIfNull(workspaceDataProvider);
-        ArgumentNullException.ThrowIfNull(createFlashcardsCommand);
-        ArgumentNullException.ThrowIfNull(updateFlashcardFrontContentCommand);
         ArgumentNullException.ThrowIfNull(updateFlashcardSchedulingCommand);
-        ArgumentNullException.ThrowIfNull(documentContentFactory);
+        ArgumentNullException.ThrowIfNull(deleteFlashcardsCommand);
+        ArgumentNullException.ThrowIfNull(updateFlashcardTagsCommand);
         ArgumentNullException.ThrowIfNull(statistics);
 
         this.workspaceDataProvider = workspaceDataProvider;
-        this.createFlashcardsCommand = createFlashcardsCommand;
-        this.updateFlashcardFrontContentCommand = updateFlashcardFrontContentCommand;
         this.updateFlashcardSchedulingCommand = updateFlashcardSchedulingCommand;
+        this.deleteFlashcardsCommand = deleteFlashcardsCommand;
+        this.updateFlashcardTagsCommand = updateFlashcardTagsCommand;
 
         Cards = new CardsSubviewViewModel(
-            ShowCreateCardReview,
-            ShowEditCard,
             SetCardSuspensionAsync,
-            PostponeCardsAsync);
+            PostponeCardsAsync,
+            DeleteCardsAsync,
+            AddTagsToCardsAsync,
+            RemoveTagsFromCardsAsync);
         Cards.FiltersChanged += Cards_FiltersChanged;
-        CreateCardReview = new CreateCardReviewSubviewViewModel(
-            () => SetActiveTab(FlashcardsTab.DecksCards),
-            documentContentFactory.FromPlainText(string.Empty, "Card Text"));
-        EditCard = new EditCardViewModel(() => SetActiveTab(FlashcardsTab.DecksCards));
         Statistics = statistics;
         Statistics.SetBackToDecksAction(() => SetActiveTab(FlashcardsTab.DecksCards));
-        Decks = new DecksSubviewViewModel(ShowCreateCardReview, ShowStatistics, Cards, Statistics);
+        Decks = new DecksSubviewViewModel(ShowStatistics, Cards, Statistics);
         Decks.SelectedDecksChanged += Decks_SelectedDecksChanged;
 
         currentSubview = Decks;
@@ -67,10 +60,6 @@ public sealed partial class DecksViewModel : ObservableObject
     public DecksSubviewViewModel Decks { get; }
 
     public CardsSubviewViewModel Cards { get; }
-
-    public CreateCardReviewSubviewViewModel CreateCardReview { get; }
-
-    public EditCardViewModel EditCard { get; }
 
     public StatisticsSubviewViewModel Statistics { get; }
 

@@ -17,12 +17,10 @@
              TextOptions.TextFormattingMode="Display">
     <UserControl.Resources>
         <ContextMenu x:Key="CardRowContextMenu">
-            <MenuItem Header="Edit"
-                      Command="{Binding DataContext.EditCardCommand, Source={x:Reference CardsDataGrid}}"
-                      CommandParameter="{Binding}"
-                      IsEnabled="{Binding CanEdit}" />
-            <MenuItem Header="Preview"
-                      Click="PreviewCardMenuItem_Click" />
+            <MenuItem Header="Edit Tags..."
+                      Click="AddTagsMenuItem_Click" />
+            <MenuItem Header="Delete Card(s)..."
+                      Click="DeleteCardsMenuItem_Click" />
             <Separator />
             <MenuItem Header="{Binding SuspensionAction}"
                       Command="{Binding DataContext.ToggleSuspensionCommand, Source={x:Reference CardsDataGrid}}"
@@ -81,6 +79,23 @@
                            Margin="12,0,0,0"
                            HorizontalAlignment="Right"
                            ItemHeight="36">
+                    <TextBox Width="230"
+                             MinHeight="36"
+                             Margin="0,0,10,0"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Search cards by front, back, deck, source, or tag"
+                             Style="{StaticResource InputTextBoxStyle}" />
+                    <Button Content="Edit Tags"
+                            Width="96"
+                            Margin="0,0,10,0"
+                            Click="AddTagsButton_Click"
+                            Style="{StaticResource OutlineButtonStyle}" />
+                    <Button Content="Delete"
+                            Width="84"
+                            Margin="0,0,10,0"
+                            Click="DeleteCardsButton_Click"
+                            Style="{StaticResource OutlineButtonStyle}" />
                     <Button Content="Filter"
                             Width="92"
                             Command="{Binding OpenFiltersCommand}"
@@ -331,19 +346,12 @@
 
         </StackPanel>
 
-        <Grid x:Name="FiltersModalOverlay"
-              Grid.RowSpan="2"
-              Grid.ColumnSpan="1"
-              Panel.ZIndex="20"
-              Background="{DynamicResource WindowScrimBrush}"
-              Visibility="{Binding FiltersModalVisibility}">
-            <Border MaxWidth="430"
-                    MaxHeight="700"
-                    Margin="16"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center"
-                    Padding="18"
-                    Style="{StaticResource PanelStyle}">
+        <Border x:Name="FiltersPanel"
+                Grid.Row="1"
+                Margin="0,14,0,0"
+                Padding="18"
+                Visibility="{Binding FiltersPanelVisibility}"
+                Style="{StaticResource PanelStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -352,7 +360,7 @@
                     </Grid.RowDefinitions>
 
                     <Grid>
-                        <TextBlock Text="Filters"
+                        <TextBlock Text="Card filters"
                                    Style="{StaticResource PanelTitleStyle}"
                                    FontSize="18" />
                         <Button Content="x"
@@ -489,7 +497,6 @@
                         </WrapPanel>
                     </Grid>
                 </Grid>
-            </Border>
-        </Grid>
+        </Border>
     </Grid>
 </UserControl>

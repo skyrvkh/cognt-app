@@ -68,9 +68,19 @@ internal static partial class CardsPresentationFactory
             Answer = backText,
             FrontContent = frontContent,
             DueUtc = dueUtc,
-            Tags = tags,
+            Tags = NormalizeVisibleCardTags(tags),
             IsSuspended = isSuspended
         };
+    }
+
+    private static string[] NormalizeVisibleCardTags(IReadOnlyList<string> tags)
+    {
+        return tags
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim())
+            .Where(tag => !tag.StartsWith("source:", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string FormatDue(DateTimeOffset due)

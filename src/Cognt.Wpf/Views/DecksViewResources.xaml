@@ -64,7 +64,8 @@
                                 CornerRadius="6">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -84,6 +85,23 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="PracticeButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
@@ -93,9 +111,9 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
+                    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
@@ -317,7 +335,8 @@
                     <ControlTemplate TargetType="Button">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
-                                          RecognizesAccessKey="True" />
+                                          RecognizesAccessKey="True"
+                                          TextElement.Foreground="{TemplateBinding Foreground}" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

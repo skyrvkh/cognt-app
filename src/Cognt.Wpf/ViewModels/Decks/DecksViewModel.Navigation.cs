@@ -1,6 +1,4 @@
 using System.Windows.Input;
-using CogntApp.ViewModels.Decks.PresentationModels;
-using CardLibraryRow = CogntApp.ViewModels.Decks.PresentationModels.CardLibraryRow;
 
 namespace CogntApp.ViewModels.Decks;
 
@@ -54,21 +52,9 @@ public sealed partial class DecksViewModel
         NavigateToSubview(tab, targetSubview);
     }
 
-    private void ShowCreateCardReview()
-    {
-        RefreshFlashcards();
-        NavigateToSubview(FlashcardsTab.DecksCards, CreateCardReview);
-    }
-
     private void ShowStatistics()
     {
         SetActiveTab(FlashcardsTab.Statistics);
-    }
-
-    private void ShowEditCard(CardLibraryRow card)
-    {
-        EditCard.SetCard(card);
-        NavigateToSubview(FlashcardsTab.DecksCards, EditCard);
     }
 
     private void NotifySelectedTabChanged()
@@ -80,8 +66,7 @@ public sealed partial class DecksViewModel
 
     private bool IsDirectSubview(object subview)
     {
-        return ReferenceEquals(subview, CreateCardReview)
-            || ReferenceEquals(subview, EditCard);
+        return false;
     }
 
     private void Cards_FiltersChanged(object? sender, EventArgs e)

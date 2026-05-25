@@ -126,7 +126,6 @@
         <Setter Property="Padding" Value="10,7" />
         <Setter Property="MinHeight" Value="30" />
         <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
         <Style.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
                 <Setter Property="Background" Value="{DynamicResource ContextMenuHoverBackgroundBrush}" />

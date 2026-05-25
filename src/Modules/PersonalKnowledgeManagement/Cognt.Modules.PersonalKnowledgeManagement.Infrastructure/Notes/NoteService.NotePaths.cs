@@ -6,13 +6,14 @@ internal sealed partial class NoteService
 {
     private static string ResolveExistingRelativeNotePathInRoot(string root, string relativePath)
     {
-        return ResolveExistingNotePathInRoot(
+        return ResolveExistingPathInRoot(
             root,
             relativePath,
             "Note relative path is required.",
             "Note paths must be relative to the open collection root.",
             "Note files must be inside the open collection root.",
-            "The note file does not exist.");
+            "The note file does not exist.",
+            EnsureNotePath);
     }
 
     private static string ResolveExistingNotePathInRoot(
@@ -22,6 +23,43 @@ internal sealed partial class NoteService
         string rootedPathMessage,
         string outsideRootMessage,
         string missingFileMessage)
+    {
+        return ResolveExistingPathInRoot(
+            root,
+            relativePath,
+            missingRelativePathMessage,
+            rootedPathMessage,
+            outsideRootMessage,
+            missingFileMessage,
+            EnsureNotePath);
+    }
+
+    private static string ResolveExistingMentionablePathInRoot(
+        string root,
+        string relativePath,
+        string missingRelativePathMessage,
+        string rootedPathMessage,
+        string outsideRootMessage,
+        string missingFileMessage)
+    {
+        return ResolveExistingPathInRoot(
+            root,
+            relativePath,
+            missingRelativePathMessage,
+            rootedPathMessage,
+            outsideRootMessage,
+            missingFileMessage,
+            EnsureMentionablePath);
+    }
+
+    private static string ResolveExistingPathInRoot(
+        string root,
+        string relativePath,
+        string missingRelativePathMessage,
+        string rootedPathMessage,
+        string outsideRootMessage,
+        string missingFileMessage,
+        Action<string> validatePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {
@@ -41,7 +79,7 @@ internal sealed partial class NoteService
             throw new UnauthorizedAccessException(outsideRootMessage);
         }
 
-        EnsureNotePath(fullPath);
+        validatePath(fullPath);
 
         if (File.Exists(fullPath))
         {
@@ -54,7 +92,7 @@ internal sealed partial class NoteService
             string aliasFullPath = Path.GetFullPath(Path.Combine(root, ToPlatformPath(aliasRelativePath)));
             if (IsPathInsideRoot(aliasFullPath, root) && File.Exists(aliasFullPath))
             {
-                EnsureNotePath(aliasFullPath);
+                validatePath(aliasFullPath);
                 return aliasFullPath;
             }
         }

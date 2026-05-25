@@ -20,16 +20,6 @@
         <DataTemplate DataType="{x:Type deckViewModels:StatisticsSubviewViewModel}">
             <subviews:StatisticsSubview />
         </DataTemplate>
-        <DataTemplate DataType="{x:Type deckViewModels:CreateCardReviewSubviewViewModel}">
-            <subviews:CreateCardReviewSubview CardEditorHostRequested="CreateCardReviewSubview_CardEditorHostRequested"
-                                              CardEditorReleased="CreateCardReviewSubview_CardEditorReleased"
-                                              CreateCardsRequested="CreateCardReviewSubview_CreateCardsRequested" />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type deckViewModels:EditCardViewModel}">
-            <subviews:EditCardView CardEditorHostRequested="EditCardView_CardEditorHostRequested"
-                                   CardEditorReleased="EditCardView_CardEditorReleased"
-                                   SaveCardRequested="EditCardView_SaveCardRequested" />
-        </DataTemplate>
     </UserControl.Resources>
 
     <Grid Background="{DynamicResource PageBrush}">

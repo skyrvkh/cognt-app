@@ -11,11 +11,13 @@ internal sealed partial class SqliteFlashcardStore
         string root,
         IEnumerable<FlashcardCardSummaryRecord> cards,
         string? tag,
-        IReadOnlyList<string>? tags)
+        IReadOnlyList<string>? tags,
+        string? searchText)
     {
         List<FlashcardCardSummaryReadModel> summaries = [];
         List<long> staleCardIds = [];
         string[] normalizedTags = NormalizeTagFilters(tag, tags);
+        string normalizedSearchText = NormalizeSearchText(searchText);
         foreach (FlashcardCardSummaryRecord card in cards)
         {
             if (!FlashcardCollectionStorage.TryLoadMaterializedCard(
@@ -29,6 +31,11 @@ internal sealed partial class SqliteFlashcardStore
             }
 
             if (!MatchesAnyTag(materialized.Tags, normalizedTags))
+            {
+                continue;
+            }
+
+            if (!MatchesSearch(card, materialized, normalizedSearchText))
             {
                 continue;
             }
@@ -98,6 +105,36 @@ internal sealed partial class SqliteFlashcardStore
         return tags
             .Select(NormalizeTagFilter)
             .Any(candidate => normalizedTags.Contains(candidate, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeSearchText(string? searchText)
+    {
+        return string.IsNullOrWhiteSpace(searchText)
+            ? string.Empty
+            : searchText.Trim();
+    }
+
+    private static bool MatchesSearch(
+        FlashcardCardSummaryRecord card,
+        MaterializedFlashcardContent materialized,
+        string searchText)
+    {
+        if (searchText.Length == 0)
+        {
+            return true;
+        }
+
+        return ContainsSearchText(materialized.FrontText, searchText)
+            || ContainsSearchText(materialized.BackText, searchText)
+            || ContainsSearchText(card.DeckName, searchText)
+            || ContainsSearchText(card.SourceRelPath, searchText)
+            || materialized.Tags.Any(tag => ContainsSearchText(tag, searchText));
+    }
+
+    private static bool ContainsSearchText(string? value, string searchText)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Contains(searchText, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class CardSummaries

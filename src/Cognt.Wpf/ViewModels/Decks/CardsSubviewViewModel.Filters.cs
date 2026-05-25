@@ -16,6 +16,7 @@ public sealed partial class CardsSubviewViewModel
     private CardFilterOptionRow? selectedSourceFilter;
     private CardFilterOptionRow? selectedTagFilter;
     private string activeFilterSummary = "No decks";
+    private string searchText = string.Empty;
     private bool isFiltersOpen;
 
     public event EventHandler? FiltersChanged;
@@ -106,6 +107,22 @@ public sealed partial class CardsSubviewViewModel
         private set => SetProperty(ref activeFilterSummary, value);
     }
 
+    public string SearchText
+    {
+        get => searchText;
+        set
+        {
+            string normalizedValue = value ?? string.Empty;
+            if (!SetProperty(ref searchText, normalizedValue))
+            {
+                return;
+            }
+
+            UpdateActiveFilterSummary();
+            FiltersChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public bool IsFiltersOpen
     {
         get => isFiltersOpen;
@@ -114,9 +131,12 @@ public sealed partial class CardsSubviewViewModel
             if (SetProperty(ref isFiltersOpen, value))
             {
                 OnPropertyChanged(nameof(FiltersModalVisibility));
+                OnPropertyChanged(nameof(FiltersPanelVisibility));
             }
         }
     }
 
     public Visibility FiltersModalVisibility => IsFiltersOpen ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility FiltersPanelVisibility => IsFiltersOpen ? Visibility.Visible : Visibility.Collapsed;
 }

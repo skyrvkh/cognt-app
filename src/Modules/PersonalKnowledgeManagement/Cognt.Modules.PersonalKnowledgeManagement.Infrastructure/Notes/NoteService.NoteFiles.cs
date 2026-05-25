@@ -13,6 +13,14 @@ internal sealed partial class NoteService
         }
     }
 
+    private static void EnsureMentionablePath(string path)
+    {
+        if (!IsMentionableFilePath(path))
+        {
+            throw new InvalidOperationException("Mentions can only open note or PDF files.");
+        }
+    }
+
     private static bool IsNoteFilePath(string path)
     {
         string extension = Path.GetExtension(path);
@@ -20,9 +28,19 @@ internal sealed partial class NoteService
             || string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsMentionableFilePath(string path)
+    {
+        return IsNoteFilePath(path) || IsPdfPath(path);
+    }
+
     private static bool IsBlockSuiteNotePath(string path)
     {
         return string.Equals(Path.GetExtension(path), BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPdfPath(string path)
+    {
+        return string.Equals(Path.GetExtension(path), PdfExtension, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeFileSystemName(string name, string label)
