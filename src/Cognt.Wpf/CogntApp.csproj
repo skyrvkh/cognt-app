@@ -11,6 +11,8 @@
     <RootNamespace>CogntApp</RootNamespace>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <BaseOutputPath>..\..\bin\</BaseOutputPath>
+    <AllowedReferenceRelatedFileExtensions></AllowedReferenceRelatedFileExtensions>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
@@ -104,6 +106,36 @@
                                       Condition="'$(PublishDir)' != ''" />
     </ItemGroup>
     <Delete Files="@(StaticWebAssetsRuntimeManifest)" />
+  </Target>
+
+  <Target Name="RemoveNonRuntimeBuildOutput"
+          AfterTargets="Build">
+    <ItemGroup>
+      <NonRuntimeBuildOutputFile Include="$(TargetDir)*.pdb" />
+      <NonRuntimeBuildOutputFile Include="$(TargetDir)*.xml" />
+      <NonRuntimeBuildOutputFile Include="$(TargetDir)NuGet.Config" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)EditorWeb" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)ca-ES" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)cs-CZ" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)de" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)es" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)fr" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)hu" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)it" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)ja" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)ko" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)nl-BE" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)pl" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)pt" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)ro" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)ru" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)sv" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)zh-Hans" />
+      <NonRuntimeBuildOutputDirectory Include="$(TargetDir)zh-Hant" />
+    </ItemGroup>
+    <Delete Files="@(NonRuntimeBuildOutputFile)" />
+    <RemoveDir Directories="@(NonRuntimeBuildOutputDirectory)"
+               Condition="Exists('%(NonRuntimeBuildOutputDirectory.Identity)')" />
   </Target>
 
 </Project>

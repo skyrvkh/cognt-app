@@ -32,6 +32,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="EditorWeb\**\*" />
+    <None Remove="EditorWeb\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EditorWebSource Include="EditorWeb\package.json">
       <EditorWebRelativePath>package.json</EditorWebRelativePath>
     </EditorWebSource>
