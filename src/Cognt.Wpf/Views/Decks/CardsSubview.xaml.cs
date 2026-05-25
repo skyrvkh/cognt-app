@@ -99,6 +99,23 @@ public partial class CardsSubview : UserControl
         row.ContextMenu!.PlacementTarget = row;
     }
 
+    private void CardFilterOptionRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        object? dataContext = (sender as FrameworkElement)?.DataContext;
+        if (dataContext is CardFilterOptionRow optionRow)
+        {
+            optionRow.IsSelected = !optionRow.IsSelected;
+            e.Handled = true;
+            return;
+        }
+
+        if (dataContext is CardFilterDeckRow deckRow)
+        {
+            deckRow.IsSelected = !deckRow.IsSelected;
+            e.Handled = true;
+        }
+    }
+
     private async void PostponePresetMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card
@@ -127,6 +144,26 @@ public partial class CardsSubview : UserControl
         {
             await PostponeCardsAsync(cards, dialog.Days);
         }
+    }
+
+    private async void EditCardMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        await EditCardAsync(card);
+    }
+
+    private async void EditTagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        await AddTagsToCardsAsync(GetContextCards(card));
     }
 
     private async void AddTagsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -167,6 +204,24 @@ public partial class CardsSubview : UserControl
         }
 
         await ViewModel.PostponeCardsAsync(cards, days);
+    }
+
+    private async Task EditCardAsync(CardLibraryRow card)
+    {
+        if (ViewModel is null || !card.CanEdit)
+        {
+            return;
+        }
+
+        EditCardDialog dialog = new(ViewModel.CreateEditorView, card, ViewModel.GetDeckNames())
+        {
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() == true && dialog.EditResult is not null)
+        {
+            await ViewModel.UpdateCardContentAsync(card, dialog.EditResult);
+        }
     }
 
     private async Task AddTagsToCardsAsync(IReadOnlyList<CardLibraryRow> cards)

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using CogntApp.ViewModels;
 
 namespace CogntApp.ViewModels.Decks.PresentationModels;
@@ -80,11 +81,25 @@ public sealed record CardLibraryRow(
     string Recall,
     bool IsSelected)
 {
+    private const string BasicCardType = "basic";
+    private const string ClozeCardType = "cloze";
+    private const string MultimodalClozeCardType = "multimodal-cloze";
+
     public long Id { get; init; }
 
     public string Answer { get; init; } = string.Empty;
 
     public string FrontContent { get; init; } = string.Empty;
+
+    public string BackContent { get; init; } = string.Empty;
+
+    public string CardType { get; init; } = string.Empty;
+
+    public FlashcardContentKind FrontContentKind { get; init; } = FlashcardContentKind.LegacyText;
+
+    public FlashcardContentKind BackContentKind { get; init; } = FlashcardContentKind.LegacyText;
+
+    public string? SourceRelPath { get; init; }
 
     public DateTimeOffset DueUtc { get; init; }
 
@@ -94,11 +109,42 @@ public sealed record CardLibraryRow(
 
     public bool IsSuspended { get; init; }
 
+    public bool IsBasicCard => string.Equals(CardType, BasicCardType, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsClozeCard => string.Equals(CardType, ClozeCardType, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsMultimodalCard => string.Equals(CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsEditableCardType => IsBasicCard || IsClozeCard;
+
     public bool CanEdit => Id > 0 && !string.IsNullOrWhiteSpace(FrontContent);
 
     public bool CanSchedule => Id > 0;
 
     public string SuspensionAction => IsSuspended ? "Unsuspend Card" : "Suspend Card";
+
+    public string CardTypeLabel => IsBasicCard
+        ? "Basic"
+        : IsClozeCard
+            ? "Cloze"
+            : IsMultimodalCard
+                ? "Image/multimodal cloze"
+                : string.IsNullOrWhiteSpace(CardType)
+                    ? "Legacy"
+                    : CardType;
+
+    public string SourceLabel => string.IsNullOrWhiteSpace(SourceRelPath) ? "No source note" : SourceRelPath;
+
+    public string SchedulingSummary => string.Concat(
+        "Status: ",
+        Status,
+        " | Due: ",
+        Due,
+        " | Last reviewed: ",
+        LastReviewed,
+        " | Recall: ",
+        Recall,
+        IsSuspended ? " | Suspended" : string.Empty);
 
     internal static CardLibraryRow Learning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
     {
@@ -135,7 +181,39 @@ public sealed record CardLibraryRow(
     }
 }
 
-public sealed record CardFilterDeckRow(string Name, string Count, long? Id = null);
+public sealed record CardEditResult(
+    string FrontContent,
+    string? BackContent,
+    string DeckName,
+    IReadOnlyList<string> Tags);
+
+public sealed class CardFilterDeckRow : ObservableObject
+{
+    private bool isSelected;
+
+    public CardFilterDeckRow(string name, string count, long? id = null, bool isSelected = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(count);
+
+        Name = name;
+        Count = count;
+        Id = id;
+        this.isSelected = isSelected;
+    }
+
+    public string Name { get; }
+
+    public string Count { get; }
+
+    public long? Id { get; }
+
+    public bool IsSelected
+    {
+        get => isSelected;
+        set => SetProperty(ref isSelected, value);
+    }
+}
 
 public sealed class CardFilterOptionRow : ObservableObject
 {

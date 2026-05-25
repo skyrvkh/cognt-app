@@ -7,6 +7,7 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed partial class CardsSubviewViewModel
 {
+    private const int MaxSearchFilterSuggestions = 40;
     private IReadOnlyList<CardFilterDeckRow> cardFilterDeckRows = [];
     private IReadOnlyList<CardFilterOptionRow> cardFilterStatusRows = [];
     private IReadOnlyList<CardFilterOptionRow> cardFilterSourceRows = [];
@@ -17,6 +18,9 @@ public sealed partial class CardsSubviewViewModel
     private CardFilterOptionRow? selectedTagFilter;
     private string activeFilterSummary = "No decks";
     private string searchText = string.Empty;
+    private string deckFilterSearchText = string.Empty;
+    private string sourceFilterSearchText = string.Empty;
+    private string tagFilterSearchText = string.Empty;
     private bool isFiltersOpen;
 
     public event EventHandler? FiltersChanged;
@@ -32,7 +36,13 @@ public sealed partial class CardsSubviewViewModel
     public IReadOnlyList<CardFilterDeckRow> CardFilterDeckRows
     {
         get => cardFilterDeckRows;
-        private set => SetProperty(ref cardFilterDeckRows, value);
+        private set
+        {
+            if (SetProperty(ref cardFilterDeckRows, value))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterDeckRows));
+            }
+        }
     }
 
     public IReadOnlyList<CardFilterOptionRow> CardFilterStatusRows
@@ -44,14 +54,39 @@ public sealed partial class CardsSubviewViewModel
     public IReadOnlyList<CardFilterOptionRow> CardFilterSourceRows
     {
         get => cardFilterSourceRows;
-        private set => SetProperty(ref cardFilterSourceRows, value);
+        private set
+        {
+            if (SetProperty(ref cardFilterSourceRows, value))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterSourceRows));
+            }
+        }
     }
 
     public IReadOnlyList<CardFilterOptionRow> CardFilterTagRows
     {
         get => cardFilterTagRows;
-        private set => SetProperty(ref cardFilterTagRows, value);
+        private set
+        {
+            if (SetProperty(ref cardFilterTagRows, value))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterTagRows));
+            }
+        }
     }
+
+    public IReadOnlyList<CardFilterOptionRow> VisibleCardFilterSourceRows =>
+        FilterOptionRows(
+            CardFilterSourceRows,
+            SourceFilterSearchText,
+            CardsPresentationFactory.AllSourcesValue,
+            SelectedSourceFilter);
+
+    public IReadOnlyList<CardFilterDeckRow> VisibleCardFilterDeckRows =>
+        FilterDeckRows(CardFilterDeckRows, DeckFilterSearchText, SelectedDeckFilter);
+
+    public IReadOnlyList<CardFilterOptionRow> VisibleCardFilterTagRows =>
+        FilterOptionRows(CardFilterTagRows, TagFilterSearchText, CardsPresentationFactory.AllTagsValue);
 
     public CardFilterDeckRow? SelectedDeckFilter
     {
@@ -60,6 +95,7 @@ public sealed partial class CardsSubviewViewModel
         {
             if (SetProperty(ref selectedDeckFilter, value))
             {
+                OnPropertyChanged(nameof(VisibleCardFilterDeckRows));
                 UpdateActiveFilterSummary();
             }
         }
@@ -84,6 +120,7 @@ public sealed partial class CardsSubviewViewModel
         {
             if (SetProperty(ref selectedSourceFilter, value))
             {
+                OnPropertyChanged(nameof(VisibleCardFilterSourceRows));
                 UpdateActiveFilterSummary();
             }
         }
@@ -123,6 +160,45 @@ public sealed partial class CardsSubviewViewModel
         }
     }
 
+    public string DeckFilterSearchText
+    {
+        get => deckFilterSearchText;
+        set
+        {
+            string normalizedValue = value ?? string.Empty;
+            if (SetProperty(ref deckFilterSearchText, normalizedValue))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterDeckRows));
+            }
+        }
+    }
+
+    public string SourceFilterSearchText
+    {
+        get => sourceFilterSearchText;
+        set
+        {
+            string normalizedValue = value ?? string.Empty;
+            if (SetProperty(ref sourceFilterSearchText, normalizedValue))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterSourceRows));
+            }
+        }
+    }
+
+    public string TagFilterSearchText
+    {
+        get => tagFilterSearchText;
+        set
+        {
+            string normalizedValue = value ?? string.Empty;
+            if (SetProperty(ref tagFilterSearchText, normalizedValue))
+            {
+                OnPropertyChanged(nameof(VisibleCardFilterTagRows));
+            }
+        }
+    }
+
     public bool IsFiltersOpen
     {
         get => isFiltersOpen;
@@ -139,4 +215,51 @@ public sealed partial class CardsSubviewViewModel
     public Visibility FiltersModalVisibility => IsFiltersOpen ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility FiltersPanelVisibility => IsFiltersOpen ? Visibility.Visible : Visibility.Collapsed;
+
+    private static IReadOnlyList<CardFilterDeckRow> FilterDeckRows(
+        IReadOnlyList<CardFilterDeckRow> rows,
+        string searchText,
+        CardFilterDeckRow? selectedRow = null)
+    {
+        string query = string.IsNullOrWhiteSpace(searchText)
+            ? string.Empty
+            : searchText.Trim();
+        bool HasConcreteValue(CardFilterDeckRow row) => row.Id.HasValue;
+
+        return rows
+            .Where(row => HasConcreteValue(row) && (row.IsSelected || ReferenceEquals(row, selectedRow)))
+            .Concat(rows.Where(row =>
+                query.Length > 0
+                && HasConcreteValue(row)
+                && !row.IsSelected
+                && !ReferenceEquals(row, selectedRow)
+                && row.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .Take(MaxSearchFilterSuggestions)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CardFilterOptionRow> FilterOptionRows(
+        IReadOnlyList<CardFilterOptionRow> rows,
+        string searchText,
+        string allValue,
+        CardFilterOptionRow? selectedRow = null)
+    {
+        string query = string.IsNullOrWhiteSpace(searchText)
+            ? string.Empty
+            : searchText.Trim();
+        bool HasConcreteValue(CardFilterOptionRow row) =>
+            !string.Equals(row.Value, allValue, StringComparison.Ordinal);
+
+        return rows
+            .Where(row => HasConcreteValue(row) && (row.IsSelected || ReferenceEquals(row, selectedRow)))
+            .Concat(rows.Where(row =>
+                query.Length > 0
+                && HasConcreteValue(row)
+                && !row.IsSelected
+                && !ReferenceEquals(row, selectedRow)
+                && (row.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || (row.Value?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))))
+            .Take(MaxSearchFilterSuggestions)
+            .ToArray();
+    }
 }

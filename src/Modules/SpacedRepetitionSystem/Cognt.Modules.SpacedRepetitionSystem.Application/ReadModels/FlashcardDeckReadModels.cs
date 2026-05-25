@@ -39,4 +39,8 @@ public sealed record FlashcardCardSummaryReadModel(
     FlashcardReviewRatingReadModel? LastRating,
     DateTimeOffset? LastReviewedUtc,
     bool IsSuspended = false,
-    FlashcardMaterializationStatus MaterializationStatus = FlashcardMaterializationStatus.Ok);
+    FlashcardMaterializationStatus MaterializationStatus = FlashcardMaterializationStatus.Ok,
+    string BackContent = "",
+    string CardType = "",
+    FlashcardContentKind FrontContentKind = FlashcardContentKind.LegacyText,
+    FlashcardContentKind BackContentKind = FlashcardContentKind.LegacyText);
