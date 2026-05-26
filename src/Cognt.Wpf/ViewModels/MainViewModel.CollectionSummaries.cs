@@ -60,6 +60,7 @@ public sealed partial class MainViewModel
             }
         }
 
+        Dictionary<string, string> nextCollectionPathsById = new(StringComparer.OrdinalIgnoreCase);
         AvailableCollections.Clear();
         currentCollectionNoteCount = 0;
         currentCollectionCardCount = 0;
@@ -74,15 +75,18 @@ public sealed partial class MainViewModel
                 currentCollectionCardCount = cardCount;
             }
 
-            AvailableCollections.Add(new Navigation.CollectionOptionViewModel(
+            Navigation.CollectionOptionViewModel collection = new(
                 path,
                 FormatCollectionName(path),
                 path,
                 isSelected,
                 noteCount,
-                cardCount));
+                cardCount);
+            AvailableCollections.Add(collection);
+            nextCollectionPathsById[collection.Id] = collection.Path;
         }
 
+        collectionPathsById = nextCollectionPathsById;
         NotifyCollectionStateChanged();
     }
 

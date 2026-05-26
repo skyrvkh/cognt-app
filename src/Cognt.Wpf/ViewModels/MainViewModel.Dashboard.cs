@@ -38,8 +38,7 @@ public sealed partial class MainViewModel
             }
         }
 
-        IReadOnlyDictionary<DateOnly, int> reviewedByDate = dashboard.ReviewActivity
-            .ToDictionary(activity => activity.Date, activity => activity.CardsReviewed);
+        IReadOnlyDictionary<DateOnly, int> reviewedByDate = CreateReviewedByDateMap(dashboard.ReviewActivity);
 
         if (dashboard.TotalCards == 0)
         {
@@ -94,17 +93,30 @@ public sealed partial class MainViewModel
     {
         const int weekCount = 52;
         const int daysPerWeek = 7;
+        const int heatmapCellCount = weekCount * daysPerWeek;
         DateOnly firstDate = GetWeekStart(today).AddDays(-(weekCount - 1) * daysPerWeek);
 
-        return Enumerable
-            .Range(0, weekCount * daysPerWeek)
-            .Select(offset =>
-            {
-                DateOnly date = firstDate.AddDays(offset);
-                reviewedByDate.TryGetValue(date, out int reviewed);
-                return new DashboardStudyHeatmapCellViewModel(date, reviewed, HeatmapLevel(reviewed));
-            })
-            .ToArray();
+        DashboardStudyHeatmapCellViewModel[] cells = new DashboardStudyHeatmapCellViewModel[heatmapCellCount];
+        for (int offset = 0; offset < heatmapCellCount; offset++)
+        {
+            DateOnly date = firstDate.AddDays(offset);
+            reviewedByDate.TryGetValue(date, out int reviewed);
+            cells[offset] = new DashboardStudyHeatmapCellViewModel(date, reviewed, HeatmapLevel(reviewed));
+        }
+
+        return cells;
+    }
+
+    private static IReadOnlyDictionary<DateOnly, int> CreateReviewedByDateMap(
+        IReadOnlyList<ProgressAnalyticsActivityDayReadModel> reviewActivity)
+    {
+        Dictionary<DateOnly, int> reviewedByDate = new(reviewActivity.Count);
+        foreach (ProgressAnalyticsActivityDayReadModel activity in reviewActivity)
+        {
+            reviewedByDate.Add(activity.Date, activity.CardsReviewed);
+        }
+
+        return reviewedByDate;
     }
 
     private static DateOnly GetWeekStart(DateOnly date)

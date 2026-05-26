@@ -23,12 +23,32 @@ public partial class AllNotesView : UserControl
             return;
         }
 
-        long[] itemIds = AllNotesDataGrid.SelectedItems
-            .OfType<AllNotesListItemViewModel>()
-            .Select(note => note.ItemId)
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
+        long[] itemIds = GetSelectedNoteItemIds();
         viewModel.RequestBulkTagEdit(itemIds, operation);
+    }
+
+    private long[] GetSelectedNoteItemIds()
+    {
+        if (AllNotesDataGrid.SelectedItems.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<long> seenItemIds = [];
+        List<long> itemIds = new(AllNotesDataGrid.SelectedItems.Count);
+        foreach (object? item in AllNotesDataGrid.SelectedItems)
+        {
+            if (item is not AllNotesListItemViewModel note || note.ItemId <= 0)
+            {
+                continue;
+            }
+
+            if (seenItemIds.Add(note.ItemId))
+            {
+                itemIds.Add(note.ItemId);
+            }
+        }
+
+        return itemIds.ToArray();
     }
 }

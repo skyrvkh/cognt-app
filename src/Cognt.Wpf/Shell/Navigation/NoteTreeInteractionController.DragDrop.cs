@@ -144,7 +144,7 @@ internal sealed partial class NoteTreeInteractionController
         long draggedItemId,
         int direction)
     {
-        IReadOnlyList<NoteTreeNodeViewModel>? siblings = FindSiblingList(viewModel.NoteRoots, targetNode);
+        IReadOnlyList<NoteTreeNodeViewModel>? siblings = viewModel.GetLoadedSiblingList(targetNode);
         if (siblings is null)
         {
             return null;
@@ -169,27 +169,6 @@ internal sealed partial class NoteTreeInteractionController
             }
 
             return null;
-        }
-
-        return null;
-    }
-
-    private static IReadOnlyList<NoteTreeNodeViewModel>? FindSiblingList(
-        IReadOnlyList<NoteTreeNodeViewModel> nodes,
-        NoteTreeNodeViewModel targetNode)
-    {
-        if (nodes.Contains(targetNode))
-        {
-            return nodes;
-        }
-
-        foreach (NoteTreeNodeViewModel node in nodes)
-        {
-            IReadOnlyList<NoteTreeNodeViewModel>? childResult = FindSiblingList(node.Children, targetNode);
-            if (childResult is not null)
-            {
-                return childResult;
-            }
         }
 
         return null;

@@ -15,13 +15,12 @@ public sealed partial class MainViewModel
         }
 
         IReadOnlyList<KnowledgeTreeItemReadModel> fullChain = LoadBreadcrumbChain(currentNoteItemId.Value);
-        IReadOnlyList<KnowledgeTreeItemReadModel> visibleChain = fullChain.Count > 3
-            ? fullChain.Skip(fullChain.Count - 3).ToArray()
-            : fullChain;
+        int visibleStartIndex = fullChain.Count > 3 ? fullChain.Count - 3 : 0;
+        int visibleCount = fullChain.Count - visibleStartIndex;
 
-        for (int index = 0; index < visibleChain.Count; index++)
+        for (int index = 0; index < visibleCount; index++)
         {
-            KnowledgeTreeItemReadModel item = visibleChain[index];
+            KnowledgeTreeItemReadModel item = fullChain[visibleStartIndex + index];
             bool isNote = item.Kind == KnowledgeItemKind.Note;
             EditorBreadcrumbItems.Add(new Navigation.EditorBreadcrumbItemViewModel(
                 item.Id,
@@ -29,7 +28,7 @@ public sealed partial class MainViewModel
                 ResolveNotePath(item),
                 isNote,
                 item.Id == currentNoteItemId,
-                index == visibleChain.Count - 1));
+                index == visibleCount - 1));
         }
     }
 

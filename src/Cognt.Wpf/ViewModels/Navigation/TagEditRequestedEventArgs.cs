@@ -12,7 +12,7 @@ internal sealed class TagEditRequestedEventArgs : EventArgs
         ArgumentNullException.ThrowIfNull(itemIds);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
-        ItemIds = itemIds.Where(id => id > 0).Distinct().ToArray();
+        ItemIds = CreateDistinctItemIds(itemIds);
         Operation = operation;
         Title = title;
     }
@@ -22,4 +22,24 @@ internal sealed class TagEditRequestedEventArgs : EventArgs
     internal KnowledgeTagOperationKind Operation { get; }
 
     internal string Title { get; }
+
+    private static long[] CreateDistinctItemIds(IReadOnlyList<long> itemIds)
+    {
+        if (itemIds.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<long> seenItemIds = [];
+        List<long> distinctItemIds = new(itemIds.Count);
+        foreach (long itemId in itemIds)
+        {
+            if (itemId > 0 && seenItemIds.Add(itemId))
+            {
+                distinctItemIds.Add(itemId);
+            }
+        }
+
+        return distinctItemIds.ToArray();
+    }
 }

@@ -4,6 +4,12 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    internal IReadOnlyList<NoteTreeNodeViewModel>? GetLoadedSiblingList(NoteTreeNodeViewModel target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return FindOwningCollection(target);
+    }
+
     private ObservableCollection<NoteTreeNodeViewModel>? FindLoadedSiblingCollection(long? parentId)
     {
         if (parentId is null)
@@ -17,28 +23,17 @@ public sealed partial class MainViewModel
 
     private ObservableCollection<NoteTreeNodeViewModel>? FindOwningCollection(NoteTreeNodeViewModel target)
     {
-        return FindOwningCollection(NoteRoots, target);
-    }
-
-    private static ObservableCollection<NoteTreeNodeViewModel>? FindOwningCollection(
-        ObservableCollection<NoteTreeNodeViewModel> nodes,
-        NoteTreeNodeViewModel target)
-    {
-        if (nodes.Contains(target))
+        if (target.ParentId is null)
         {
-            return nodes;
+            return NoteRoots.Contains(target)
+                ? NoteRoots
+                : null;
         }
 
-        foreach (NoteTreeNodeViewModel node in nodes)
-        {
-            ObservableCollection<NoteTreeNodeViewModel>? result = FindOwningCollection(node.Children, target);
-            if (result is not null)
-            {
-                return result;
-            }
-        }
-
-        return null;
+        return FindTreeNode(target.ParentId.Value) is { AreChildrenLoaded: true } parent
+            && parent.Children.Contains(target)
+                ? parent.Children
+                : null;
     }
 
     private static void RemoveNodeById(ObservableCollection<NoteTreeNodeViewModel> nodes, long id)
@@ -55,26 +50,7 @@ public sealed partial class MainViewModel
 
     private NoteTreeNodeViewModel? FindTreeNode(long id)
     {
-        return FindTreeNode(NoteRoots, id);
-    }
-
-    private static NoteTreeNodeViewModel? FindTreeNode(IEnumerable<NoteTreeNodeViewModel> nodes, long id)
-    {
-        foreach (NoteTreeNodeViewModel node in nodes)
-        {
-            if (!node.IsPlaceholder && node.Id == id)
-            {
-                return node;
-            }
-
-            NoteTreeNodeViewModel? result = FindTreeNode(node.Children, id);
-            if (result is not null)
-            {
-                return result;
-            }
-        }
-
-        return null;
+        return loadedTreeNodesById.GetValueOrDefault(id);
     }
 
     private static int IndexOfNode(IReadOnlyList<NoteTreeNodeViewModel> nodes, long id)

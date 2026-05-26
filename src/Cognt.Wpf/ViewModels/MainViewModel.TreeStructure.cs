@@ -22,6 +22,7 @@ public sealed partial class MainViewModel
         if (siblings is not null)
         {
             InsertNodeBySiblings(siblings, node, previousSiblingId, nextSiblingId);
+            IndexLoadedTreeSubtree(node);
         }
 
         UpdateParentChildCount(item.ParentId, delta: 1);
@@ -37,6 +38,7 @@ public sealed partial class MainViewModel
             siblings.Remove(node);
         }
 
+        UnindexLoadedTreeSubtree(node);
         UpdateParentChildCount(node.ParentId, delta: -1);
         OnPropertyChanged(nameof(ShouldShowNoNotesState));
     }
@@ -136,7 +138,7 @@ public sealed partial class MainViewModel
         }
 
         int childCount = parent.AreChildrenLoaded
-            ? parent.Children.Count(child => !child.IsPlaceholder)
+            ? CountRealChildren(parent.Children)
             : parent.ChildCount + delta;
         parent.UpdateChildCount(childCount);
 
@@ -154,5 +156,19 @@ public sealed partial class MainViewModel
             parent.Children.Clear();
             parent.AreChildrenLoaded = true;
         }
+    }
+
+    private static int CountRealChildren(IEnumerable<NoteTreeNodeViewModel> children)
+    {
+        int count = 0;
+        foreach (NoteTreeNodeViewModel child in children)
+        {
+            if (!child.IsPlaceholder)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 }

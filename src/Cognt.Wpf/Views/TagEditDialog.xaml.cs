@@ -11,6 +11,8 @@ public partial class TagEditDialog : Window
     private readonly ObservableCollection<string> selectedTags = [];
     private readonly ObservableCollection<TagSuggestionViewModel> suggestions = [];
     private readonly List<string> availableTags = [];
+    private readonly HashSet<string> selectedTagSet = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> availableTagSet = new(StringComparer.OrdinalIgnoreCase);
     private readonly string[] initialAssignedTags;
     private bool suppressSearchTextChanged;
 
@@ -31,14 +33,17 @@ public partial class TagEditDialog : Window
         ScopePanel.Visibility = showScope ? Visibility.Visible : Visibility.Collapsed;
         initialAssignedTags = NormalizeTags(assignedTags);
 
-        IReadOnlyList<string> candidateTags = operation == KnowledgeTagOperationKind.Remove
-            ? assignedTags
-            : availableTags.Concat(assignedTags).ToArray();
-        foreach (string tag in NormalizeTags(candidateTags)
-                     .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase))
+        if (operation == KnowledgeTagOperationKind.Remove)
         {
-            this.availableTags.Add(tag);
+            AddAvailableTags(assignedTags);
         }
+        else
+        {
+            AddAvailableTags(availableTags);
+            AddAvailableTags(assignedTags);
+        }
+
+        this.availableTags.Sort(StringComparer.OrdinalIgnoreCase);
 
         if (operation is KnowledgeTagOperationKind.Add or KnowledgeTagOperationKind.Remove)
         {
@@ -100,7 +105,7 @@ public partial class TagEditDialog : Window
 
         if (e.Key == Key.Back && string.IsNullOrWhiteSpace(TagSearchTextBox.Text) && selectedTags.Count > 0)
         {
-            selectedTags.RemoveAt(selectedTags.Count - 1);
+            RemoveLastSelectedTag();
             UpdateSuggestions();
         }
     }
@@ -121,11 +126,8 @@ public partial class TagEditDialog : Window
         }
 
         string normalizedTag = NormalizeTag(tag);
-        string? existing = selectedTags.FirstOrDefault(candidate =>
-            string.Equals(candidate, normalizedTag, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
+        if (TryRemoveSelectedTag(normalizedTag))
         {
-            selectedTags.Remove(existing);
             ValidationText.Text = string.Empty;
             UpdateSuggestions();
         }
@@ -134,15 +136,11 @@ public partial class TagEditDialog : Window
     private void Apply_Click(object sender, RoutedEventArgs e)
     {
         AddSearchTextAsTags();
-        string[] selected = NormalizeTags(selectedTags).ToArray();
+        string[] selected = NormalizeTags(selectedTags);
         if (Operation == KnowledgeTagOperationKind.Add)
         {
-            string[] addedTags = selected
-                .Where(tag => !initialAssignedTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
-                .ToArray();
-            string[] removedTags = initialAssignedTags
-                .Where(tag => !selected.Contains(tag, StringComparer.OrdinalIgnoreCase))
-                .ToArray();
+            string[] addedTags = ExceptTags(selected, initialAssignedTags);
+            string[] removedTags = ExceptTags(initialAssignedTags, selected);
 
             if (addedTags.Length == 0 && removedTags.Length == 0)
             {
@@ -180,7 +178,7 @@ public partial class TagEditDialog : Window
 
     private void AddSearchTextAsTags()
     {
-        string[] tags = NormalizeTags(TagSearchTextBox.Text).ToArray();
+        string[] tags = NormalizeTags(TagSearchTextBox.Text);
         if (tags.Length == 0)
         {
             UpdateSuggestions();
@@ -224,13 +222,13 @@ public partial class TagEditDialog : Window
             return;
         }
 
-        if (!selectedTags.Contains(normalizedTag, StringComparer.OrdinalIgnoreCase))
+        if (selectedTagSet.Add(normalizedTag))
         {
             selectedTags.Add(normalizedTag);
         }
 
         if (Operation == KnowledgeTagOperationKind.Add
-            && !availableTags.Contains(normalizedTag, StringComparer.OrdinalIgnoreCase))
+            && availableTagSet.Add(normalizedTag))
         {
             availableTags.Add(normalizedTag);
             availableTags.Sort(StringComparer.OrdinalIgnoreCase);
@@ -240,23 +238,26 @@ public partial class TagEditDialog : Window
     private void UpdateSuggestions()
     {
         string query = NormalizeTag(GetCurrentSearchTerm());
-        string[] matchingTags = availableTags
-            .Where(tag => !selectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
-            .Where(tag => query.Length == 0
-                || NormalizeTag(tag).Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Take(10)
-            .ToArray();
-
         suggestions.Clear();
-        foreach (string tag in matchingTags)
+        foreach (string tag in availableTags)
         {
+            if (selectedTagSet.Contains(tag)
+                || (query.Length > 0 && !tag.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
             suggestions.Add(new TagSuggestionViewModel(tag, "Existing tag"));
+            if (suggestions.Count >= 10)
+            {
+                break;
+            }
         }
 
         if (Operation == KnowledgeTagOperationKind.Add
             && query.Length > 0
-            && !availableTags.Contains(query, StringComparer.OrdinalIgnoreCase)
-            && !selectedTags.Contains(query, StringComparer.OrdinalIgnoreCase))
+            && !availableTagSet.Contains(query)
+            && !selectedTagSet.Contains(query))
         {
             suggestions.Add(new TagSuggestionViewModel(query, "Create new tag"));
         }
@@ -287,12 +288,43 @@ public partial class TagEditDialog : Window
 
     private static string NormalizeTag(string? value)
     {
-        return string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : string.Concat(value.Trim().Where(character => !char.IsWhiteSpace(character)));
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = value.Trim();
+        int whitespaceCount = 0;
+        foreach (char character in trimmed)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                whitespaceCount++;
+            }
+        }
+
+        if (whitespaceCount == 0)
+        {
+            return trimmed;
+        }
+
+        return string.Create(
+            trimmed.Length - whitespaceCount,
+            trimmed,
+            static (destination, source) =>
+            {
+                int index = 0;
+                foreach (char character in source)
+                {
+                    if (!char.IsWhiteSpace(character))
+                    {
+                        destination[index++] = character;
+                    }
+                }
+            });
     }
 
-    private static IEnumerable<string> NormalizeTags(string? value)
+    private static string[] NormalizeTags(string? value)
     {
         return string.IsNullOrWhiteSpace(value)
             ? []
@@ -301,12 +333,90 @@ public partial class TagEditDialog : Window
 
     private static string[] NormalizeTags(IEnumerable<string> values)
     {
-        return values
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(NormalizeTag)
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        List<string> normalizedTags = [];
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string value in values)
+        {
+            string tag = NormalizeTag(value);
+            if (tag.Length > 0 && seenTags.Add(tag))
+            {
+                normalizedTags.Add(tag);
+            }
+        }
+
+        return normalizedTags.ToArray();
+    }
+
+    private void AddAvailableTags(IEnumerable<string> tags)
+    {
+        foreach (string tag in NormalizeTags(tags))
+        {
+            if (availableTagSet.Add(tag))
+            {
+                availableTags.Add(tag);
+            }
+        }
+    }
+
+    private void RemoveLastSelectedTag()
+    {
+        if (selectedTags.Count == 0)
+        {
+            return;
+        }
+
+        string tag = selectedTags[selectedTags.Count - 1];
+        selectedTags.RemoveAt(selectedTags.Count - 1);
+        selectedTagSet.Remove(tag);
+    }
+
+    private bool TryRemoveSelectedTag(string tag)
+    {
+        if (!selectedTagSet.Contains(tag))
+        {
+            return false;
+        }
+
+        for (int index = 0; index < selectedTags.Count; index++)
+        {
+            if (string.Equals(selectedTags[index], tag, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedTags.RemoveAt(index);
+                selectedTagSet.Remove(tag);
+                return true;
+            }
+        }
+
+        selectedTagSet.Remove(tag);
+        return false;
+    }
+
+    private static string[] ExceptTags(
+        IReadOnlyList<string> source,
+        IReadOnlyList<string> excludedTags)
+    {
+        if (source.Count == 0)
+        {
+            return [];
+        }
+
+        if (excludedTags.Count == 0)
+        {
+            return source.ToArray();
+        }
+
+        HashSet<string> excludedTagSet = new(excludedTags, StringComparer.OrdinalIgnoreCase);
+        List<string>? result = null;
+        foreach (string tag in source)
+        {
+            if (!excludedTagSet.Contains(tag))
+            {
+                result ??= new List<string>(source.Count);
+                result.Add(tag);
+            }
+        }
+
+        return result?.ToArray() ?? [];
     }
 }
 
@@ -314,3 +424,4 @@ public sealed record TagSuggestionViewModel(string TagName, string Description)
 {
     public string DisplayName { get; } = TagName;
 }
+

@@ -196,13 +196,42 @@ public sealed class NoteInspectorViewModel : ObservableObject
 
     private void ApplyOutlineItems(IReadOnlyList<NoteOutlineItemViewModel> items)
     {
-        SetOutlineItems(items);
+        int previousCount = OutlineItems.Count;
+        int sharedCount = Math.Min(previousCount, items.Count);
+
+        for (int index = 0; index < sharedCount; index++)
+        {
+            NoteOutlineItemViewModel current = OutlineItems[index];
+            NoteOutlineItemViewModel next = items[index];
+            if (!AreEquivalentOutlineItems(current, next))
+            {
+                OutlineItems[index] = next;
+            }
+        }
+
+        for (int index = OutlineItems.Count - 1; index >= items.Count; index--)
+        {
+            OutlineItems.RemoveAt(index);
+        }
+
+        for (int index = sharedCount; index < items.Count; index++)
+        {
+            OutlineItems.Add(items[index]);
+        }
+
+        if (previousCount != OutlineItems.Count)
+        {
+            NotifyOutlineChanged();
+        }
     }
 
-    private void SetOutlineItems(IEnumerable<NoteOutlineItemViewModel> items)
+    private static bool AreEquivalentOutlineItems(
+        NoteOutlineItemViewModel left,
+        NoteOutlineItemViewModel right)
     {
-        OutlineItems = new ObservableCollection<NoteOutlineItemViewModel>(items);
-        NotifyOutlineChanged();
+        return left.Level == right.Level
+            && string.Equals(left.Title, right.Title, StringComparison.Ordinal)
+            && string.Equals(left.BlockId, right.BlockId, StringComparison.Ordinal);
     }
 
     private void MainViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -5,6 +5,7 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private Dictionary<string, string> collectionPathsById = new(StringComparer.OrdinalIgnoreCase);
     private void AddCollectionPath(SortedSet<string> paths, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -41,11 +42,9 @@ public sealed partial class MainViewModel
             return null;
         }
 
-        Navigation.CollectionOptionViewModel? collection = AvailableCollections.FirstOrDefault(
-            option => string.Equals(option.Id, collectionId, StringComparison.OrdinalIgnoreCase));
-        if (collection is not null && Directory.Exists(collection.Path))
+        if (collectionPathsById.TryGetValue(collectionId, out string? collectionPath) && Directory.Exists(collectionPath))
         {
-            return collection.Path;
+            return collectionPath;
         }
 
         return Directory.Exists(collectionId)

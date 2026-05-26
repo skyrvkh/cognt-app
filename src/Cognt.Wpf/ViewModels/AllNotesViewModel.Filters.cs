@@ -8,62 +8,109 @@ public sealed partial class AllNotesViewModel
 {
     private void RebuildFilterOptions(IReadOnlyList<KnowledgeNoteListItemReadModel> notes)
     {
-        string[] previousTags = GetSelectedFilterValues(TagOptions, AllTagsValue);
-        string[] previousTypes = GetSelectedFilterValues(TypeOptions, AllTypesValue);
+        HashSet<string> previousTagSet = CreateSelectedTagFilterSnapshot();
+        HashSet<KnowledgeNoteListItemType> previousTypeSet = CreateSelectedTypeFilterSnapshot();
 
-        foreach (AllNotesFilterOptionViewModel option in TagOptions.Concat(TypeOptions))
+        HashSet<string> availableTagSet = new(StringComparer.OrdinalIgnoreCase);
+        List<string> availableTags = [];
+        HashSet<KnowledgeNoteListItemType> availableTypeSet = [];
+        List<KnowledgeNoteListItemType> availableTypes = [];
+        foreach (KnowledgeNoteListItemReadModel note in notes)
         {
-            option.PropertyChanged -= FilterOption_PropertyChanged;
+            if (availableTypeSet.Add(note.Type))
+            {
+                availableTypes.Add(note.Type);
+            }
+
+            foreach (string tag in note.Tags)
+            {
+                if (!string.IsNullOrWhiteSpace(tag) && availableTagSet.Add(tag))
+                {
+                    availableTags.Add(tag);
+                }
+            }
+        }
+
+        availableTags.Sort(StringComparer.OrdinalIgnoreCase);
+        availableTypes.Sort(CompareNoteTypes);
+
+        List<(string Label, string Value, bool IsSelected)> nextTagOptions =
+        [
+            ("All tags", AllTagsValue, previousTagSet.Count == 0)
+        ];
+        foreach (string tag in availableTags)
+        {
+            nextTagOptions.Add((tag, tag, previousTagSet.Contains(tag)));
+        }
+
+        List<(string Label, string Value, bool IsSelected)> nextTypeOptions =
+        [
+            ("All types", AllTypesValue, previousTypeSet.Count == 0)
+        ];
+        foreach (KnowledgeNoteListItemType type in availableTypes)
+        {
+            string typeLabel = GetTypeLabel(type);
+            string typeValue = type.ToString();
+            nextTypeOptions.Add((typeLabel, typeValue, previousTypeSet.Contains(type)));
         }
 
         isUpdatingFilterOptions = true;
         try
         {
-            TagOptions.Clear();
-            AddFilterOption(
-                TagOptions,
-                AllTagsValue,
-                new AllNotesFilterOptionViewModel("All tags", AllTagsValue, previousTags.Length == 0));
-            foreach (string tag in notes
-                         .SelectMany(note => note.Tags)
-                         .Where(tag => !string.IsNullOrWhiteSpace(tag))
-                         .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase))
-            {
-                AddFilterOption(
-                    TagOptions,
-                    AllTagsValue,
-                    new AllNotesFilterOptionViewModel(tag, tag, previousTags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
-            }
-
-            TypeOptions.Clear();
-            AddFilterOption(
-                TypeOptions,
-                AllTypesValue,
-                new AllNotesFilterOptionViewModel("All types", AllTypesValue, previousTypes.Length == 0));
-            foreach (KnowledgeNoteListItemType type in notes
-                         .Select(note => note.Type)
-                         .Distinct()
-                         .OrderBy(type => GetTypeLabel(type), StringComparer.OrdinalIgnoreCase))
-            {
-                AddFilterOption(
-                    TypeOptions,
-                    AllTypesValue,
-                    new AllNotesFilterOptionViewModel(
-                        GetTypeLabel(type),
-                        type.ToString(),
-                        previousTypes.Contains(type.ToString(), StringComparer.OrdinalIgnoreCase)));
-            }
+            SynchronizeFilterOptions(TagOptions, AllTagsValue, nextTagOptions);
+            SynchronizeFilterOptions(TypeOptions, AllTypesValue, nextTypeOptions);
+            EnsureAllOptionSelectedWhenNoConcreteSelection(TagOptions, AllTagsValue);
+            EnsureAllOptionSelectedWhenNoConcreteSelection(TypeOptions, AllTypesValue);
         }
         finally
         {
             isUpdatingFilterOptions = false;
         }
 
-        SelectedTagOption = TagOptions.FirstOrDefault(option => option.IsSelected) ?? TagOptions.FirstOrDefault();
-        SelectedTypeOption = TypeOptions.FirstOrDefault(option => option.IsSelected) ?? TypeOptions.FirstOrDefault();
-        SelectedSortOption ??= SortOptions.FirstOrDefault();
+        SyncTagFilterStateFromOptions();
+        SyncTypeFilterStateFromOptions();
+        SelectedTagOption = FindFirstSelectedOption(TagOptions);
+        SelectedTypeOption = FindFirstSelectedOption(TypeOptions);
+        SelectedSortOption ??= SortOptions.Count > 0 ? SortOptions[0] : null;
         RefreshFilterPresentationState();
+    }
+
+    private void SynchronizeFilterOptions(
+        ObservableCollection<AllNotesFilterOptionViewModel> collection,
+        string allValue,
+        IReadOnlyList<(string Label, string Value, bool IsSelected)> nextOptions)
+    {
+        Dictionary<string, AllNotesFilterOptionViewModel> existingByValue = new(StringComparer.OrdinalIgnoreCase);
+        foreach (AllNotesFilterOptionViewModel option in collection)
+        {
+            existingByValue[option.Value] = option;
+        }
+
+        List<AllNotesFilterOptionViewModel> reordered = [];
+        foreach ((string Label, string Value, bool IsSelected) next in nextOptions)
+        {
+            if (!existingByValue.TryGetValue(next.Value, out AllNotesFilterOptionViewModel? option))
+            {
+                option = new AllNotesFilterOptionViewModel(next.Label, next.Value, next.IsSelected);
+                option.PropertyChanged += FilterOption_PropertyChanged;
+                filterOptionMetadata[option] = (collection, allValue);
+            }
+            else
+            {
+                option.Update(next.Label, next.Value, next.IsSelected);
+                existingByValue.Remove(next.Value);
+            }
+
+            reordered.Add(option);
+        }
+
+        foreach (AllNotesFilterOptionViewModel removed in existingByValue.Values)
+        {
+            removed.PropertyChanged -= FilterOption_PropertyChanged;
+            filterOptionMetadata.Remove(removed);
+        }
+
+        SynchronizeObservableCollection(collection, reordered);
     }
 
     private void UpdateEmptyState(int resultCount)
@@ -119,14 +166,25 @@ public sealed partial class AllNotesViewModel
         };
     }
 
-    private static string[] GetSelectedFilterValues(
-        IEnumerable<AllNotesFilterOptionViewModel> options,
-        string allValue)
+    private static int CompareNoteTypes(
+        KnowledgeNoteListItemType left,
+        KnowledgeNoteListItemType right)
     {
-        return options
-            .Where(option => option.IsSelected && !string.Equals(option.Value, allValue, StringComparison.Ordinal))
-            .Select(option => option.Value)
-            .ToArray();
+        return StringComparer.OrdinalIgnoreCase.Compare(GetTypeLabel(left), GetTypeLabel(right));
+    }
+
+    private static AllNotesFilterOptionViewModel? FindFirstSelectedOption(
+        ObservableCollection<AllNotesFilterOptionViewModel> options)
+    {
+        foreach (AllNotesFilterOptionViewModel option in options)
+        {
+            if (option.IsSelected)
+            {
+                return option;
+            }
+        }
+
+        return options.Count > 0 ? options[0] : null;
     }
 
     private int GetCardCount(string? relativePath)
@@ -258,6 +316,8 @@ public sealed class AllNotesTreeItemViewModel : ObservableObject
 
 public sealed class AllNotesFilterOptionViewModel : ObservableObject
 {
+    private string label;
+    private string optionValue;
     private bool isSelected;
 
     public AllNotesFilterOptionViewModel(string label, string value, bool isSelected = false)
@@ -265,19 +325,34 @@ public sealed class AllNotesFilterOptionViewModel : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
 
-        Label = label;
-        Value = value;
+        this.label = label;
+        optionValue = value;
         this.isSelected = isSelected;
     }
 
-    public string Label { get; }
+    public string Label
+    {
+        get => label;
+        private set => SetProperty(ref label, value);
+    }
 
-    public string Value { get; }
+    public string Value
+    {
+        get => optionValue;
+        private set => SetProperty(ref optionValue, value);
+    }
 
     public bool IsSelected
     {
         get => isSelected;
         set => SetProperty(ref isSelected, value);
+    }
+
+    public void Update(string label, string value, bool isSelected = false)
+    {
+        Label = label;
+        Value = value;
+        IsSelected = isSelected;
     }
 }
 

@@ -122,9 +122,7 @@ public sealed partial class MainViewModel
         }
 
         string deletedPath = Path.GetFullPath(CurrentCollectionPath);
-        string? nextCollectionPath = AvailableCollections
-            .Select(collection => collection.Path)
-            .FirstOrDefault(path => !AreSamePath(path, deletedPath) && Directory.Exists(path));
+        string? nextCollectionPath = FindNextAvailableCollectionPath(deletedPath);
 
         SaveCurrentNoteFromEditor();
         noteService.CloseCurrentCollection();
@@ -140,5 +138,19 @@ public sealed partial class MainViewModel
         RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
         ClearEditorRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string? FindNextAvailableCollectionPath(string deletedPath)
+    {
+        foreach (Navigation.CollectionOptionViewModel collection in AvailableCollections)
+        {
+            string path = collection.Path;
+            if (!AreSamePath(path, deletedPath) && Directory.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return null;
     }
 }

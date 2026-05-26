@@ -104,16 +104,10 @@ public sealed partial class MainViewModel
         SaveCurrentNoteFromEditor();
 
         IReadOnlyList<string> deletedNotePaths = noteService.DeleteItem(openCollectionPath, node.Id);
-        string[] deletedFullNotePaths = deletedNotePaths
-            .Select(path => Path.GetFullPath(ResolveCollectionFilePath(openCollectionPath, path)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        string[] deletedFullNotePaths = CreateDeletedFullNotePaths(deletedNotePaths);
         string? currentNoteRelativePath = TryGetCurrentNoteRelativePath();
         bool deletesCurrentNote = currentNoteRelativePath is not null
-            && deletedNotePaths.Any(path => string.Equals(
-                NormalizeRelativePath(path),
-                currentNoteRelativePath,
-                StringComparison.OrdinalIgnoreCase));
+            && ContainsDeletedRelativePath(deletedNotePaths, currentNoteRelativePath);
         bool deletesCurrentSelection = currentNoteItemId == node.Id;
 
         RemoveLoadedTreeNode(node);
@@ -135,6 +129,40 @@ public sealed partial class MainViewModel
         RefreshDashboardData();
         RefreshAvailableCollections();
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string[] CreateDeletedFullNotePaths(IReadOnlyList<string> deletedNotePaths)
+    {
+        HashSet<string> seenFullPaths = new(StringComparer.OrdinalIgnoreCase);
+        List<string> fullPaths = new(deletedNotePaths.Count);
+        foreach (string notePath in deletedNotePaths)
+        {
+            string fullPath = Path.GetFullPath(ResolveCollectionFilePath(openCollectionPath, notePath));
+            if (seenFullPaths.Add(fullPath))
+            {
+                fullPaths.Add(fullPath);
+            }
+        }
+
+        return fullPaths.ToArray();
+    }
+
+    private static bool ContainsDeletedRelativePath(
+        IReadOnlyList<string> deletedNotePaths,
+        string currentNoteRelativePath)
+    {
+        foreach (string notePath in deletedNotePaths)
+        {
+            if (string.Equals(
+                NormalizeRelativePath(notePath),
+                currentNoteRelativePath,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public string DuplicateNote(NoteTreeNodeViewModel node)

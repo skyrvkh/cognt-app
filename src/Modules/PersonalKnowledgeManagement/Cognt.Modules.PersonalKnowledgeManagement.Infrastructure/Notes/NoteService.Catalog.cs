@@ -9,9 +9,14 @@ internal sealed partial class NoteService
         string collectionId)
     {
         string root = GetExistingCollectionRoot(collectionId);
-        return GetOrBuildNoteCatalogEntries(root)
-            .Select(entry => entry.Item)
-            .ToArray();
+        IReadOnlyList<NoteCatalogEntry> entries = GetOrBuildNoteCatalogEntries(root);
+        KnowledgeNoteListItemReadModel[] items = new KnowledgeNoteListItemReadModel[entries.Count];
+        for (int index = 0; index < items.Length; index++)
+        {
+            items[index] = entries[index].Item;
+        }
+
+        return items;
     }
 
     IReadOnlySet<string> INoteService.SearchNoteCatalog(
@@ -25,10 +30,17 @@ internal sealed partial class NoteService
         }
 
         string root = GetExistingCollectionRoot(collectionId);
-        return GetOrBuildNoteCatalogEntries(root)
-            .Where(entry => entry.SearchText.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
-            .Select(entry => entry.Item.RelativePath)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<NoteCatalogEntry> entries = GetOrBuildNoteCatalogEntries(root);
+        HashSet<string> matches = new(StringComparer.OrdinalIgnoreCase);
+        foreach (NoteCatalogEntry entry in entries)
+        {
+            if (entry.SearchText.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            {
+                matches.Add(entry.Item.RelativePath);
+            }
+        }
+
+        return matches;
     }
 
     private IReadOnlyList<NoteCatalogEntry> GetOrBuildNoteCatalogEntries(string root)
