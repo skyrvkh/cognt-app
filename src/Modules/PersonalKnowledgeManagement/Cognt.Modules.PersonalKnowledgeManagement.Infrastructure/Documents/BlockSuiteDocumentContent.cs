@@ -27,9 +27,7 @@ internal static partial class BlockSuiteDocumentContent
         string normalizedTitle = string.IsNullOrWhiteSpace(title) ? "Untitled" : title.Trim();
         string pageId = NewBlockId();
         string noteId = NewBlockId();
-        object[] children = blocks.Count == 0
-            ? [CreateParagraphBlock(BlockSuiteDocumentBlock.PlainText(string.Empty))]
-            : blocks.Select(CreateParagraphBlock).ToArray();
+        object[] children = CreateParagraphBlocks(blocks);
 
         var snapshot = new
         {
@@ -91,5 +89,20 @@ internal static partial class BlockSuiteDocumentContent
 
         return JsonSerializer.Serialize(snapshot, JsonOptions) + Environment.NewLine;
     }
-}
 
+    private static object[] CreateParagraphBlocks(IReadOnlyList<BlockSuiteDocumentBlock> blocks)
+    {
+        if (blocks.Count == 0)
+        {
+            return [CreateParagraphBlock(BlockSuiteDocumentBlock.PlainText(string.Empty))];
+        }
+
+        object[] children = new object[blocks.Count];
+        for (int index = 0; index < children.Length; index++)
+        {
+            children[index] = CreateParagraphBlock(blocks[index]);
+        }
+
+        return children;
+    }
+}

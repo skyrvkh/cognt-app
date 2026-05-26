@@ -11,11 +11,23 @@ internal sealed partial class NoteService
         string root,
         ITreeRepository repository)
     {
-        return repository.LoadNoteItems()
-            .Where(item => !string.IsNullOrWhiteSpace(item.FileRelPath))
-            .Select(item => TryCreateDocumentLinkNote(root, item))
-            .Where(note => note is not null)
-            .ToDictionary(note => note!.RelativePath, note => note!, StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<KnowledgeTreeItemRow> items = repository.LoadNoteItems();
+        Dictionary<string, DocumentLinkNote> notesByPath = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KnowledgeTreeItemRow item in items)
+        {
+            if (string.IsNullOrWhiteSpace(item.FileRelPath))
+            {
+                continue;
+            }
+
+            DocumentLinkNote? note = TryCreateDocumentLinkNote(root, item);
+            if (note is not null)
+            {
+                notesByPath.Add(note.RelativePath, note);
+            }
+        }
+
+        return notesByPath;
     }
 
     private static DocumentLinkNote? TryCreateDocumentLinkNote(

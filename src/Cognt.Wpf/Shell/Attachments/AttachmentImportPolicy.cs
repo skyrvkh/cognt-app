@@ -49,9 +49,16 @@ internal static class AttachmentImportPolicy
             return [];
         }
 
-        return paths
-            .Where(IsSupportedPath)
-            .ToArray();
+        List<string> supportedPaths = new(paths.Length);
+        foreach (string path in paths)
+        {
+            if (IsSupportedPath(path))
+            {
+                supportedPaths.Add(path);
+            }
+        }
+
+        return supportedPaths;
     }
 
     private static bool IsSupportedPath(string path)
@@ -67,8 +74,16 @@ internal static class AttachmentImportPolicy
         return extension.Equals(supportedExtension, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsSupportedExtension(string extension, IEnumerable<string> supportedExtensions)
+    private static bool IsSupportedExtension(string extension, IReadOnlyList<string> supportedExtensions)
     {
-        return supportedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        for (int index = 0; index < supportedExtensions.Count; index++)
+        {
+            if (extension.Equals(supportedExtensions[index], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -9,10 +9,17 @@ internal sealed partial class NoteService
         internal IReadOnlyList<DocumentMentionRow> MaterializeRows(long now)
         {
             string fullText = Text;
-            return occurrences
-                .Select(occurrence => MaterializeRow(occurrence, fullText, now))
-                .Where(row => !string.IsNullOrWhiteSpace(row.PreviewText))
-                .ToArray();
+            List<DocumentMentionRow> rows = new(occurrences.Count);
+            foreach (DocumentMentionOccurrence occurrence in occurrences)
+            {
+                DocumentMentionRow row = MaterializeRow(occurrence, fullText, now);
+                if (!string.IsNullOrWhiteSpace(row.PreviewText))
+                {
+                    rows.Add(row);
+                }
+            }
+
+            return rows.ToArray();
         }
 
         private DocumentMentionRow MaterializeRow(
