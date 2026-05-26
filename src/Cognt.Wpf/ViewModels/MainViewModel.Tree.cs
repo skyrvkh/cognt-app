@@ -17,6 +17,7 @@ public sealed partial class MainViewModel
         try
         {
             NoteRoots.Clear();
+            ResetLoadedTreeNodeIndex();
 
             if (string.IsNullOrWhiteSpace(openCollectionPath) || !Directory.Exists(openCollectionPath))
             {
@@ -28,7 +29,9 @@ public sealed partial class MainViewModel
 
             foreach (KnowledgeTreeItemReadModel item in noteService.LoadRootItems(openCollectionPath))
             {
-                NoteRoots.Add(CreateTreeNode(item));
+                NoteTreeNodeViewModel node = CreateTreeNode(item);
+                NoteRoots.Add(node);
+                IndexLoadedTreeSubtree(node);
             }
 
             if (expandedItemIds.Count > 0)
@@ -39,6 +42,7 @@ public sealed partial class MainViewModel
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
             NoteRoots.Clear();
+            ResetLoadedTreeNodeIndex();
             RecentNotes.Clear();
             RaiseMessage("Collection Load Failed", $"The collection could not be read: {ex.Message}");
         }
@@ -64,11 +68,18 @@ public sealed partial class MainViewModel
             return;
         }
 
+        foreach (NoteTreeNodeViewModel child in node.Children)
+        {
+            UnindexLoadedTreeSubtree(child);
+        }
+
         node.Children.Clear();
 
         foreach (KnowledgeTreeItemReadModel child in noteService.LoadChildren(openCollectionPath, node.Id))
         {
-            node.Children.Add(CreateTreeNode(child));
+            NoteTreeNodeViewModel childNode = CreateTreeNode(child);
+            node.Children.Add(childNode);
+            IndexLoadedTreeSubtree(childNode);
         }
 
         node.MarkChildrenLoaded();
@@ -100,29 +111,19 @@ public sealed partial class MainViewModel
 
     private HashSet<long> CaptureExpandedItemIds()
     {
-        HashSet<long> expandedItemIds = [];
-        CaptureExpandedItemIds(NoteRoots, expandedItemIds);
-        return expandedItemIds;
-    }
-
-    private static void CaptureExpandedItemIds(
-        IEnumerable<NoteTreeNodeViewModel> nodes,
-        ISet<long> expandedItemIds)
-    {
-        foreach (NoteTreeNodeViewModel node in nodes)
+        HashSet<long>? expandedItemIds = null;
+        foreach (NoteTreeNodeViewModel node in loadedTreeNodesById.Values)
         {
-            if (node.IsPlaceholder)
+            if (!node.IsExpanded)
             {
                 continue;
             }
 
-            if (node.IsExpanded)
-            {
-                expandedItemIds.Add(node.Id);
-            }
-
-            CaptureExpandedItemIds(node.Children, expandedItemIds);
+            expandedItemIds ??= new HashSet<long>(Math.Min(loadedTreeNodesById.Count, 64));
+            expandedItemIds.Add(node.Id);
         }
+
+        return expandedItemIds ?? [];
     }
 
     private void RestoreExpandedNodes(
