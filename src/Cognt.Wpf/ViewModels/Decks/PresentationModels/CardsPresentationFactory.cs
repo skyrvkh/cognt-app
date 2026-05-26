@@ -12,9 +12,13 @@ internal static partial class CardsPresentationFactory
     internal static IReadOnlyList<CardLibraryRow> CreateCardLibraryRows(
         IReadOnlyList<FlashcardCardSummaryReadModel> visibleCards)
     {
-        return visibleCards
-            .Select((card, index) => ToCardLibraryRow(card, index == 0))
-            .ToArray();
+        CardLibraryRow[] rows = new CardLibraryRow[visibleCards.Count];
+        for (int index = 0; index < visibleCards.Count; index++)
+        {
+            rows[index] = ToCardLibraryRow(visibleCards[index], index == 0);
+        }
+
+        return rows;
     }
 
     private static CardLibraryRow ToCardLibraryRow(
@@ -92,12 +96,26 @@ internal static partial class CardsPresentationFactory
 
     private static string[] NormalizeVisibleCardTags(IReadOnlyList<string> tags)
     {
-        return tags
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => tag.Trim())
-            .Where(tag => !tag.StartsWith("source:", StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        List<string> visibleTags = [];
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string tag in tags)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                continue;
+            }
+
+            string normalizedTag = tag.Trim();
+            if (normalizedTag.StartsWith("source:", StringComparison.OrdinalIgnoreCase)
+                || !seenTags.Add(normalizedTag))
+            {
+                continue;
+            }
+
+            visibleTags.Add(normalizedTag);
+        }
+
+        return visibleTags.ToArray();
     }
 
     private static string FormatDue(DateTimeOffset due)

@@ -6,6 +6,12 @@ namespace CogntApp.ViewModels.Decks.PresentationModels;
 
 public sealed class DeckRow : ObservableObject
 {
+    private string name;
+    private string category;
+    private int learningQueueCards;
+    private int dueCards;
+    private int totalCards;
+    private int progress;
     private bool isSelected;
 
     internal DeckRow(
@@ -18,29 +24,62 @@ public sealed class DeckRow : ObservableObject
         int progress,
         bool isSelected)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
         Id = id;
-        Name = name;
-        Category = category;
-        LearningQueueCards = learningQueueCards;
-        DueCards = dueCards;
-        TotalCards = totalCards;
-        Progress = progress;
+        this.name = name;
+        this.category = category;
+        this.learningQueueCards = learningQueueCards;
+        this.dueCards = dueCards;
+        this.totalCards = totalCards;
+        this.progress = progress;
         this.isSelected = isSelected;
     }
 
     public long Id { get; }
 
-    public string Name { get; }
+    public string Name
+    {
+        get => name;
+        private set => SetProperty(ref name, value);
+    }
 
-    public string Category { get; }
+    public string Category
+    {
+        get => category;
+        private set => SetProperty(ref category, value);
+    }
 
-    public int LearningQueueCards { get; }
+    public int LearningQueueCards
+    {
+        get => learningQueueCards;
+        private set => SetProperty(ref learningQueueCards, value);
+    }
 
-    public int DueCards { get; }
+    public int DueCards
+    {
+        get => dueCards;
+        private set => SetProperty(ref dueCards, value);
+    }
 
-    public int TotalCards { get; }
+    public int TotalCards
+    {
+        get => totalCards;
+        private set => SetProperty(ref totalCards, value);
+    }
 
-    public int Progress { get; }
+    public int Progress
+    {
+        get => progress;
+        private set
+        {
+            if (SetProperty(ref progress, value))
+            {
+                OnPropertyChanged(nameof(ProgressLabel));
+            }
+        }
+    }
 
     public bool IsSelected
     {
@@ -49,6 +88,25 @@ public sealed class DeckRow : ObservableObject
     }
 
     public string ProgressLabel => string.Concat(Progress.ToString(CultureInfo.InvariantCulture), "%");
+
+    internal void Update(
+        string name,
+        string category,
+        int learningQueueCards,
+        int dueCards,
+        int totalCards,
+        int progress)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
+        Name = name;
+        Category = category;
+        LearningQueueCards = learningQueueCards;
+        DueCards = dueCards;
+        TotalCards = totalCards;
+        Progress = progress;
+    }
 }
 
 public sealed record CardRow(
@@ -189,6 +247,8 @@ public sealed record CardEditResult(
 
 public sealed class CardFilterDeckRow : ObservableObject
 {
+    private string name;
+    private string count;
     private bool isSelected;
 
     public CardFilterDeckRow(string name, string count, long? id = null, bool isSelected = false)
@@ -196,15 +256,23 @@ public sealed class CardFilterDeckRow : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(count);
 
-        Name = name;
-        Count = count;
+        this.name = name;
+        this.count = count;
         Id = id;
         this.isSelected = isSelected;
     }
 
-    public string Name { get; }
+    public string Name
+    {
+        get => name;
+        private set => SetProperty(ref name, value);
+    }
 
-    public string Count { get; }
+    public string Count
+    {
+        get => count;
+        private set => SetProperty(ref count, value);
+    }
 
     public long? Id { get; }
 
@@ -213,10 +281,21 @@ public sealed class CardFilterDeckRow : ObservableObject
         get => isSelected;
         set => SetProperty(ref isSelected, value);
     }
+
+    internal void Update(string name, string count)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(count);
+
+        Name = name;
+        Count = count;
+    }
 }
 
 public sealed class CardFilterOptionRow : ObservableObject
 {
+    private string name;
+    private string count;
     private bool isSelected;
 
     public CardFilterOptionRow(string name, string count, string? value = null, bool isSelected = false)
@@ -224,15 +303,23 @@ public sealed class CardFilterOptionRow : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(count);
 
-        Name = name;
-        Count = count;
+        this.name = name;
+        this.count = count;
         Value = value;
         this.isSelected = isSelected;
     }
 
-    public string Name { get; }
+    public string Name
+    {
+        get => name;
+        private set => SetProperty(ref name, value);
+    }
 
-    public string Count { get; }
+    public string Count
+    {
+        get => count;
+        private set => SetProperty(ref count, value);
+    }
 
     public string? Value { get; }
 
@@ -240,6 +327,15 @@ public sealed class CardFilterOptionRow : ObservableObject
     {
         get => isSelected;
         set => SetProperty(ref isSelected, value);
+    }
+
+    internal void Update(string name, string count)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(count);
+
+        Name = name;
+        Count = count;
     }
 }
 
