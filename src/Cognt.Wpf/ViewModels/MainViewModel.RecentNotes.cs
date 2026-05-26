@@ -5,6 +5,9 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private const int RecentNotesLimit = 5;
+    private const int RecentMentionRankLimit = 8;
+
     private void AddOrUpdateRecentNote(KnowledgeTreeItemReadModel? item, string? notePath)
     {
         if (item is null
@@ -17,7 +20,7 @@ public sealed partial class MainViewModel
         RemoveRecentNote(notePath);
         RecentNotes.Insert(0, new RecentNoteViewModel(item.Title, Path.GetFullPath(notePath)));
 
-        while (RecentNotes.Count > 5)
+        while (RecentNotes.Count > RecentNotesLimit)
         {
             RecentNotes.RemoveAt(RecentNotes.Count - 1);
         }
@@ -71,23 +74,13 @@ public sealed partial class MainViewModel
     {
         RecentNotes.Clear();
 
-        foreach (KnowledgeNoteListItemReadModel note in notes
-                     .OrderByDescending(item => item.UpdatedAt)
-                     .ThenBy(item => Path.GetFileName(item.RelativePath), StringComparer.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(note.RelativePath))
-            {
-                continue;
-            }
+        List<KnowledgeNoteListItemReadModel> recentNotes = SelectRecentNotes(notes, RecentNotesLimit);
 
+        foreach (KnowledgeNoteListItemReadModel note in recentNotes)
+        {
             RecentNotes.Add(new RecentNoteViewModel(
                 note.Title,
                 ResolveCollectionFilePath(openCollectionPath, note.RelativePath)));
-
-            if (RecentNotes.Count >= 5)
-            {
-                break;
-            }
         }
     }
 
@@ -98,16 +91,67 @@ public sealed partial class MainViewModel
             return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return LoadNoteCatalog(openCollectionPath)
-            .Where(note => !string.IsNullOrWhiteSpace(note.RelativePath))
-            .OrderByDescending(note => note.UpdatedAt)
-            .ThenBy(note => Path.GetFileName(note.RelativePath), StringComparer.OrdinalIgnoreCase)
-            .Take(8)
-            .Select((note, index) => new
+        List<KnowledgeNoteListItemReadModel> recentNotes = SelectRecentNotes(
+            LoadNoteCatalog(openCollectionPath),
+            RecentMentionRankLimit);
+
+        var ranks = new Dictionary<string, int>(recentNotes.Count, StringComparer.OrdinalIgnoreCase);
+        for (int index = 0; index < recentNotes.Count; index++)
+        {
+            ranks.Add(recentNotes[index].RelativePath, index);
+        }
+
+        return ranks;
+    }
+
+    private static List<KnowledgeNoteListItemReadModel> SelectRecentNotes(
+        IEnumerable<KnowledgeNoteListItemReadModel> notes,
+        int limit)
+    {
+        var recentNotes = new List<KnowledgeNoteListItemReadModel>(limit);
+
+        foreach (KnowledgeNoteListItemReadModel note in notes)
+        {
+            if (string.IsNullOrWhiteSpace(note.RelativePath))
             {
-                RelativePath = note.RelativePath,
-                Rank = index,
-            })
-            .ToDictionary(item => item.RelativePath, item => item.Rank, StringComparer.OrdinalIgnoreCase);
+                continue;
+            }
+
+            int insertIndex = 0;
+            while (insertIndex < recentNotes.Count
+                   && CompareRecentNoteOrder(recentNotes[insertIndex], note) <= 0)
+            {
+                insertIndex++;
+            }
+
+            if (insertIndex >= limit)
+            {
+                continue;
+            }
+
+            recentNotes.Insert(insertIndex, note);
+
+            if (recentNotes.Count > limit)
+            {
+                recentNotes.RemoveAt(recentNotes.Count - 1);
+            }
+        }
+
+        return recentNotes;
+    }
+
+    private static int CompareRecentNoteOrder(
+        KnowledgeNoteListItemReadModel left,
+        KnowledgeNoteListItemReadModel right)
+    {
+        int updatedAtComparison = right.UpdatedAt.CompareTo(left.UpdatedAt);
+        if (updatedAtComparison != 0)
+        {
+            return updatedAtComparison;
+        }
+
+        return StringComparer.OrdinalIgnoreCase.Compare(
+            Path.GetFileName(left.RelativePath),
+            Path.GetFileName(right.RelativePath));
     }
 }

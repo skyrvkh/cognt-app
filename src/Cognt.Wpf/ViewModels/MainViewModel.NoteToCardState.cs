@@ -16,6 +16,8 @@ public sealed partial class MainViewModel
     private ImageOcclusionFrontModeOptionViewModel? selectedNoteToCardImageFrontMode;
     private CardBackRevealModeOptionViewModel? selectedNoteToCardBackRevealMode;
     private string noteToCardDeckName = string.Empty;
+    private IReadOnlyList<string> noteToCardDeckNameCatalog = [];
+    private readonly HashSet<string> noteToCardDeckNameSet = new(StringComparer.OrdinalIgnoreCase);
     private string noteToCardPendingTagText = string.Empty;
     private bool isSynchronizingNoteToCardPresentationPreset;
 

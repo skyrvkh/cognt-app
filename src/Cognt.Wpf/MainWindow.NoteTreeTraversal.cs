@@ -16,64 +16,108 @@ public partial class MainWindow
         Dispatcher.BeginInvoke(
             () =>
             {
-                foreach (TreeViewItem item in EnumerateTreeItems(NotesTree))
+                if (!viewModel.TryGetLoadedTreePathById(id, out IReadOnlyList<NoteTreeNodeViewModel>? path)
+                    || path is null)
                 {
-                    if (item.DataContext is NoteTreeNodeViewModel node && node.Id == id)
-                    {
-                        item.IsSelected = true;
-                        item.Focus();
-                        noteTreeCommands.BeginInlineRename(node);
-                        return;
-                    }
+                    return;
                 }
+
+                SelectTreeNodePath(path);
+                noteTreeCommands.BeginInlineRename(path[^1]);
             },
             DispatcherPriority.Background);
     }
 
     private void SelectNote(string notePath)
     {
-        foreach (TreeViewItem item in EnumerateTreeItems(NotesTree))
+        if (viewModel.TryGetLoadedTreePathByNotePath(notePath, out IReadOnlyList<NoteTreeNodeViewModel>? path)
+            && path is not null)
         {
-            if (item.DataContext is NoteTreeNodeViewModel { NotePath: string itemNotePath }
-                && string.Equals(itemNotePath, notePath, StringComparison.OrdinalIgnoreCase))
-            {
-                item.IsSelected = true;
-                item.Focus();
-                return;
-            }
+            SelectTreeNodePath(path);
         }
     }
 
     private void SelectTreeItemById(long itemId)
     {
-        foreach (TreeViewItem item in EnumerateTreeItems(NotesTree))
+        if (viewModel.TryGetLoadedTreePathById(itemId, out IReadOnlyList<NoteTreeNodeViewModel>? path)
+            && path is not null)
         {
-            if (item.DataContext is NoteTreeNodeViewModel node && node.Id == itemId)
-            {
-                item.IsSelected = true;
-                item.Focus();
-                return;
-            }
+            SelectTreeNodePath(path);
         }
     }
 
-    private static IEnumerable<TreeViewItem> EnumerateTreeItems(ItemsControl parent)
+    private void SelectTreeNodePath(IReadOnlyList<NoteTreeNodeViewModel> path)
     {
-        parent.UpdateLayout();
-
-        foreach (object dataItem in parent.Items)
+        if (path.Count == 0)
         {
-            if (parent.ItemContainerGenerator.ContainerFromItem(dataItem) is not TreeViewItem item)
-            {
-                continue;
-            }
-
-            yield return item;
-
-            foreach (TreeViewItem child in EnumerateTreeItems(item))
-            {
-                yield return child;
-            }
+            return;
         }
+
+        for (int index = 0; index < path.Count - 1; index++)
+        {
+            path[index].IsExpanded = true;
+        }
+
+        UpdateTrackedSelectedTreeNode(path[^1]);
+        TryFocusTreeNodePath(path);
+    }
+
+    private void UpdateTrackedSelectedTreeNode(NoteTreeNodeViewModel? node)
+    {
+        if (ReferenceEquals(selectedNoteTreeNode, node))
+        {
+            if (node is not null && !node.IsSelected)
+            {
+                node.IsSelected = true;
+            }
+
+            return;
+        }
+
+        if (selectedNoteTreeNode is not null && selectedNoteTreeNode.IsSelected)
+        {
+            selectedNoteTreeNode.IsSelected = false;
+        }
+
+        selectedNoteTreeNode = node;
+
+        if (selectedNoteTreeNode is not null && !selectedNoteTreeNode.IsSelected)
+        {
+            selectedNoteTreeNode.IsSelected = true;
+        }
+    }
+
+    private void TryFocusTreeNodePath(IReadOnlyList<NoteTreeNodeViewModel> path)
+    {
+        NotesTree.UpdateLayout();
+
+        if (TryResolveTreeItem(NotesTree, path, 0) is not TreeViewItem item)
+        {
+            return;
+        }
+
+        item.BringIntoView();
+        item.Focus();
+    }
+
+    private static TreeViewItem? TryResolveTreeItem(
+        ItemsControl parent,
+        IReadOnlyList<NoteTreeNodeViewModel> path,
+        int depth)
+    {
+        if (depth >= path.Count
+            || parent.ItemContainerGenerator.ContainerFromItem(path[depth]) is not TreeViewItem item)
+        {
+            return null;
+        }
+
+        if (depth == path.Count - 1)
+        {
+            return item;
+        }
+
+        item.IsExpanded = true;
+        item.UpdateLayout();
+        return TryResolveTreeItem(item, path, depth + 1);
     }
 }

@@ -22,6 +22,7 @@ public sealed partial class AllNotesViewModel
             TagOptions.Clear();
             AddFilterOption(
                 TagOptions,
+                AllTagsValue,
                 new AllNotesFilterOptionViewModel("All tags", AllTagsValue, previousTags.Length == 0));
             foreach (string tag in notes
                          .SelectMany(note => note.Tags)
@@ -31,12 +32,14 @@ public sealed partial class AllNotesViewModel
             {
                 AddFilterOption(
                     TagOptions,
+                    AllTagsValue,
                     new AllNotesFilterOptionViewModel(tag, tag, previousTags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
             }
 
             TypeOptions.Clear();
             AddFilterOption(
                 TypeOptions,
+                AllTypesValue,
                 new AllNotesFilterOptionViewModel("All types", AllTypesValue, previousTypes.Length == 0));
             foreach (KnowledgeNoteListItemType type in notes
                          .Select(note => note.Type)
@@ -45,6 +48,7 @@ public sealed partial class AllNotesViewModel
             {
                 AddFilterOption(
                     TypeOptions,
+                    AllTypesValue,
                     new AllNotesFilterOptionViewModel(
                         GetTypeLabel(type),
                         type.ToString(),

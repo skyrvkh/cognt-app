@@ -48,10 +48,14 @@ public sealed partial class MainViewModel
         currentCollectionNoteCount = 0;
         currentCollectionCardCount = 0;
         NoteRoots.Clear();
+        ResetLoadedTreeNodeIndex();
         RecentNotes.Clear();
         DashboardMetrics.Clear();
         DashboardStudyHeatmapCells.Clear();
         NoteToCardDeckNames.Clear();
+        FilteredNoteToCardDeckNames.Clear();
+        noteToCardDeckNameCatalog = [];
+        noteToCardDeckNameSet.Clear();
         ApplyReviewSettings(FlashcardReviewSettingsReadModel.Default);
         ApplyGraphSettings(KnowledgeGraphSettingsReadModel.Default);
         ApplyEditorSettings(EditorSettings.Default, save: false, raiseChanged: true);

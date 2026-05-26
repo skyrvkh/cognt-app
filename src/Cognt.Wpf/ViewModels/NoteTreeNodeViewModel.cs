@@ -6,6 +6,7 @@ namespace CogntApp.ViewModels;
 public sealed class NoteTreeNodeViewModel : ObservableObject
 {
     private bool isExpanded;
+    private bool isSelected;
     private bool areChildrenLoaded;
     private bool isRenaming;
     private string? notePath;
@@ -81,6 +82,12 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     {
         get => isExpanded;
         set => SetProperty(ref isExpanded, value);
+    }
+
+    public bool IsSelected
+    {
+        get => isSelected;
+        set => SetProperty(ref isSelected, value);
     }
 
     public string? NotePath

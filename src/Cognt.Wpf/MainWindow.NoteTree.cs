@@ -10,9 +10,11 @@ namespace CogntApp;
 public partial class MainWindow
 {
     private NoteTreeNodeViewModel? noteTreeContextNode;
+    private NoteTreeNodeViewModel? selectedNoteTreeNode;
 
     private void NotesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
+        UpdateTrackedSelectedTreeNode(e.NewValue as NoteTreeNodeViewModel);
         noteTreeInteractions.HandleSelectedItemChanged(e.NewValue);
     }
 

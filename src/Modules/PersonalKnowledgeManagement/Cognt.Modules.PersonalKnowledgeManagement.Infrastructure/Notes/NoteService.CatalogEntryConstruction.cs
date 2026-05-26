@@ -12,20 +12,37 @@ internal sealed partial class NoteService
     private static IReadOnlyDictionary<long, IReadOnlyList<AttachmentRow>> LoadCatalogAttachmentsByNoteId(
         ITreeRepository repository)
     {
-        IReadOnlyDictionary<string, AttachmentRow> attachmentsById = repository
-            .LoadAttachments()
-            .ToDictionary(row => row.Id, StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
+        Dictionary<string, AttachmentRow> attachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentRow attachment in attachments)
+        {
+            attachmentsById.Add(attachment.Id, attachment);
+        }
 
-        return repository
-            .LoadNoteAttachments()
-            .GroupBy(row => row.NoteItemId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<AttachmentRow>)group
-                    .Select(reference => attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment) ? attachment : null)
-                    .Where(attachment => attachment is not null)
-                    .Cast<AttachmentRow>()
-                    .ToArray());
+        Dictionary<long, List<AttachmentRow>> mutableAttachmentsByNoteId = [];
+        foreach (NoteAttachmentRow reference in repository.LoadNoteAttachments())
+        {
+            if (!attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment))
+            {
+                continue;
+            }
+
+            if (!mutableAttachmentsByNoteId.TryGetValue(reference.NoteItemId, out List<AttachmentRow>? existing))
+            {
+                mutableAttachmentsByNoteId.Add(reference.NoteItemId, new List<AttachmentRow> { attachment });
+                continue;
+            }
+
+            existing.Add(attachment);
+        }
+
+        Dictionary<long, IReadOnlyList<AttachmentRow>> attachmentsByNoteId = new(mutableAttachmentsByNoteId.Count);
+        foreach (KeyValuePair<long, List<AttachmentRow>> pair in mutableAttachmentsByNoteId)
+        {
+            attachmentsByNoteId.Add(pair.Key, pair.Value);
+        }
+
+        return attachmentsByNoteId;
     }
 
     private static NoteCatalogEntry? TryCreateNoteCatalogEntry(
@@ -85,14 +102,33 @@ internal sealed partial class NoteService
         IReadOnlyList<string> assignedTags,
         IReadOnlyList<string> contentTags)
     {
-        return assignedTags
-            .Concat(contentTags)
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => SearchableDocumentText.NormalizeWhitespace(tag))
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> tags = new(assignedTags.Count + contentTags.Count);
+        AddCatalogTags(assignedTags, seenTags, tags);
+        AddCatalogTags(contentTags, seenTags, tags);
+
+        tags.Sort(StringComparer.OrdinalIgnoreCase);
+        return tags.ToArray();
+    }
+
+    private static void AddCatalogTags(
+        IReadOnlyList<string> source,
+        HashSet<string> seenTags,
+        List<string> target)
+    {
+        foreach (string tag in source)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                continue;
+            }
+
+            string normalizedTag = SearchableDocumentText.NormalizeWhitespace(tag);
+            if (normalizedTag.Length > 0 && seenTags.Add(normalizedTag))
+            {
+                target.Add(normalizedTag);
+            }
+        }
     }
 
     private static string? TryReadCatalogNoteContent(string notePath)
