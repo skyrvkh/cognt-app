@@ -18,12 +18,17 @@
         </Style>
 
         <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
@@ -35,21 +40,38 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                                 <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.55" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource DisabledTextBrush}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource DisabledTextBrush}" />
+                                <Setter Property="Opacity" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -58,6 +80,10 @@
         </Style>
 
         <Style x:Key="SecondaryActionButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
@@ -75,9 +101,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -194,6 +225,10 @@
         </Style>
 
         <Style x:Key="FilterActionButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="32" />
             <Setter Property="Padding" Value="10,0" />
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
@@ -211,9 +246,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -250,9 +290,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -292,6 +337,7 @@
                             <StackPanel Margin="{TemplateBinding Padding}"
                                         Orientation="Horizontal">
                                 <ContentPresenter VerticalAlignment="Center"
+                                                  RecognizesAccessKey="True"
                                                   TextElement.Foreground="{TemplateBinding Foreground}" />
                                 <TextBlock Text="x"
                                            Margin="7,0,0,0"
@@ -409,6 +455,10 @@
         </Style>
 
         <Style x:Key="AllNotesTreeButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="MinHeight" Value="48" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -422,7 +472,13 @@
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center"
-                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                                          RecognizesAccessKey="True"
+                                          TextElement.Foreground="{TemplateBinding Foreground}">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -541,7 +597,7 @@
                               Height="16"
                               Data="M12,4 L12,15 M7.5,10.5 L12,15 L16.5,10.5 M5,18.5 L19,18.5"
                               Stretch="Uniform"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                               StrokeThickness="1.8"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round" />
@@ -552,18 +608,21 @@
                 <Button Command="{Binding CreateNoteCommand}"
                         AutomationProperties.Name="New note"
                         Style="{StaticResource PrimaryActionButtonStyle}">
-                    <StackPanel Orientation="Horizontal">
+                                        <StackPanel Orientation="Horizontal"
+                                TextElement.Foreground="{DynamicResource VibrantButtonForegroundBrush}">
                         <Path Width="16"
                               Height="16"
                               Data="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M9,13 L15,13 M12,10 L12,16"
                               Stretch="Uniform"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                               StrokeThickness="1.8"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
                               StrokeLineJoin="Round" />
-                        <TextBlock Text="New note"
-                                   Margin="7,0,0,0" />
+                                            <TextBlock Text="New note"
+                               Foreground="{DynamicResource VibrantButtonForegroundBrush}"
+                               Margin="7,0,0,0"
+                                    />
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -684,16 +743,18 @@
                                             <TextBlock Text="Any" />
                                         </Button>
                                     </Grid>
-                                    <ItemsControl ItemsSource="{Binding TypeOptions}">
-                                        <ItemsControl.ItemTemplate>
+                                    <ListBox MaxHeight="260"
+                                             ItemsSource="{Binding TypeOptions}"
+                                             Style="{StaticResource AppVirtualizedListBoxStyle}">
+                                        <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <CheckBox Content="{Binding Label}"
                                                           IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                           AutomationProperties.Name="{Binding Label}"
                                                           Style="{StaticResource FilterCheckBoxStyle}" />
                                             </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </DockPanel>
                             </Border>
                         </Popup>
@@ -746,20 +807,18 @@
                                             <TextBlock Text="Any" />
                                         </Button>
                                     </Grid>
-                                    <ScrollViewer MaxHeight="260"
-                                                  HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Auto">
-                                        <ItemsControl ItemsSource="{Binding TagOptions}">
-                                            <ItemsControl.ItemTemplate>
+                                    <ListBox MaxHeight="260"
+                                             ItemsSource="{Binding TagOptions}"
+                                             Style="{StaticResource AppVirtualizedListBoxStyle}">
+                                        <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <CheckBox Content="{Binding Label}"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                               AutomationProperties.Name="{Binding Label}"
                                                               Style="{StaticResource FilterCheckBoxStyle}" />
                                                 </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </DockPanel>
                             </Border>
                         </Popup>
@@ -983,7 +1042,8 @@
                                         Command="{Binding CreateNoteCommand}"
                                         AutomationProperties.Name="New note"
                                         Style="{StaticResource PrimaryActionButtonStyle}">
-                                    <TextBlock Text="New note" />
+                                    <TextBlock Text="New note"
+                                                />
                                 </Button>
                                 <Button Command="{Binding ImportDocumentsCommand}"
                                         AutomationProperties.Name="Import"
@@ -1051,8 +1111,11 @@
                                   FontSize="13"
                                   Foreground="{DynamicResource InkBrush}"
                                   ItemsSource="{Binding VisibleTreeNodes}"
+                                  ScrollViewer.CanContentScroll="True"
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
                                   ItemContainerStyle="{StaticResource AllNotesTreeViewItemStyle}">
                             <TreeView.Style>
                                 <Style TargetType="{x:Type TreeView}">
@@ -1064,6 +1127,11 @@
                                     </Style.Triggers>
                                 </Style>
                             </TreeView.Style>
+                            <TreeView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </TreeView.ItemsPanel>
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type viewModels:AllNotesTreeItemViewModel}"
                                                           ItemsSource="{Binding Children}">
@@ -1147,6 +1215,8 @@
                                   CanUserDeleteRows="False"
                                   CanUserReorderColumns="False"
                                   CanUserResizeRows="False"
+                                  EnableColumnVirtualization="True"
+                                  EnableRowVirtualization="True"
                                   GridLinesVisibility="None"
                                   HeadersVisibility="None"
                                   IsReadOnly="True"
@@ -1154,7 +1224,9 @@
                                   RowHeight="46"
                                   SelectionMode="Extended"
                                   SelectionUnit="FullRow"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling">
                             <DataGrid.RowStyle>
                                 <Style TargetType="{x:Type DataGridRow}">
                                     <Setter Property="Tag"
@@ -1241,3 +1313,4 @@
         </Border>
     </Grid>
 </UserControl>
+
