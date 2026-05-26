@@ -15,6 +15,10 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
         <Style x:Key="DocumentImportButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="32" />
             <Setter Property="MinWidth" Value="86" />
             <Setter Property="Padding" Value="12,0" />
@@ -32,9 +36,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="7">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -59,21 +68,32 @@
         <Style x:Key="PrimaryDocumentImportButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource DocumentImportButtonStyle}">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="{DynamicResource DisabledLineBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource DisabledLineBrush}" />
                     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource MutedBrush}" />
                     <Setter Property="Cursor" Value="Arrow" />
                 </Trigger>
             </Style.Triggers>
@@ -145,6 +165,7 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
     </Window.Resources>
 
     <Grid Margin="18">
@@ -195,12 +216,14 @@
                                FontSize="12.5"
                                Foreground="{DynamicResource MutedBrush}" />
 
-                    <Button Content="Import files"
-                            Margin="0,18,0,0"
+                    <Button Margin="0,18,0,0"
                             HorizontalAlignment="Center"
                             AutomationProperties.Name="Import files"
                             Click="AddFilesButton_Click"
-                            Style="{StaticResource PrimaryDocumentImportButtonStyle}" />
+                            Style="{StaticResource PrimaryDocumentImportButtonStyle}">
+                        <TextBlock Text="Import files"
+                                    />
+                    </Button>
                 </StackPanel>
 
                 <Grid>
@@ -272,11 +295,10 @@
                             BorderBrush="{DynamicResource LineSoftBrush}"
                             BorderThickness="1"
                             CornerRadius="10">
-                        <ScrollViewer Padding="10"
-                                      VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Files}">
-                                <ItemsControl.ItemTemplate>
+                        <ListBox Margin="10"
+                                 ItemsSource="{Binding Files}"
+                                 Style="{StaticResource AppVirtualizedListBoxStyle}">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Border Margin="0,0,0,8"
                                                 Padding="10"
@@ -351,7 +373,7 @@
                                                           Width="12"
                                                           Height="12"
                                                           Stretch="Uniform"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
                                                           StrokeThickness="1.8"
                                                           StrokeStartLineCap="Round"
                                                           StrokeEndLineCap="Round" />
@@ -359,9 +381,8 @@
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                                </ListBox.ItemTemplate>
+                        </ListBox>
                     </Border>
                 </Grid>
             </Grid>
@@ -387,11 +408,13 @@
                         IsCancel="True"
                         Style="{StaticResource DocumentImportButtonStyle}" />
                 <Button Grid.Column="3"
-                        Content="{Binding ImportButtonText}"
                         Command="{Binding ImportCommand}"
                         IsDefault="True"
                         AutomationProperties.Name="Import"
-                        Style="{StaticResource PrimaryDocumentImportButtonStyle}" />
+                        Style="{StaticResource PrimaryDocumentImportButtonStyle}">
+                    <TextBlock Text="{Binding ImportButtonText}"
+                                />
+                </Button>
             </Grid>
         </Border>
     </Grid>

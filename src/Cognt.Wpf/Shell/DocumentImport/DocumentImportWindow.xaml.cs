@@ -43,7 +43,7 @@ public partial class DocumentImportWindow : Window
 
     private void DropZone_DragOver(object sender, DragEventArgs e)
     {
-        e.Effects = TryGetDroppedPaths(e, out string[] paths) && paths.Any(DocumentImportPolicy.IsSupportedPath)
+        e.Effects = TryGetDroppedPaths(e, out string[] paths) && ContainsSupportedPath(paths)
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
@@ -91,5 +91,18 @@ public partial class DocumentImportWindow : Window
 
         paths = droppedPaths;
         return paths.Length > 0;
+    }
+
+    private static bool ContainsSupportedPath(string[] paths)
+    {
+        foreach (string path in paths)
+        {
+            if (DocumentImportPolicy.IsSupportedPath(path))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

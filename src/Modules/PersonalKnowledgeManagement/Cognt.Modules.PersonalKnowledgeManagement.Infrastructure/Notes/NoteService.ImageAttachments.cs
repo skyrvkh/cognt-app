@@ -37,28 +37,42 @@ internal sealed partial class NoteService
             return null;
         }
 
-        Dictionary<string, AttachmentRow> attachmentsById = repository
-            .LoadAttachments()
-            .Where(IsImageAttachment)
-            .ToDictionary(row => row.Id, StringComparer.OrdinalIgnoreCase);
-        AttachmentRow[] noteImages = repository
-            .LoadNoteAttachments()
-            .Where(reference => reference.NoteItemId == note.Id)
-            .Select(reference => attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment)
-                ? attachment
-                : null)
-            .Where(attachment => attachment is not null)
-            .Cast<AttachmentRow>()
-            .ToArray();
+        IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
+        Dictionary<string, AttachmentRow> attachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentRow attachment in attachments)
+        {
+            if (IsImageAttachment(attachment))
+            {
+                attachmentsById.Add(attachment.Id, attachment);
+            }
+        }
 
-        AttachmentRow? matched = noteImages.FirstOrDefault(row => ImageSourceMatchesAttachment(normalizedSource, row));
+        int noteImageCount = 0;
+        AttachmentRow? onlyImage = null;
+        AttachmentRow? matched = null;
+        foreach (NoteAttachmentRow reference in repository.LoadNoteAttachments())
+        {
+            if (reference.NoteItemId != note.Id
+                || !attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment))
+            {
+                continue;
+            }
+
+            noteImageCount++;
+            onlyImage = noteImageCount == 1 ? attachment : null;
+            if (matched is null && ImageSourceMatchesAttachment(normalizedSource, attachment))
+            {
+                matched = attachment;
+            }
+        }
+
         if (matched is not null)
         {
             return NormalizeRelativePath(matched.RelativePath);
         }
 
-        return noteImages.Length == 1
-            ? NormalizeRelativePath(noteImages[0].RelativePath)
+        return noteImageCount == 1 && onlyImage is not null
+            ? NormalizeRelativePath(onlyImage.RelativePath)
             : null;
     }
 }

@@ -63,11 +63,9 @@ public sealed partial class MainViewModel
         try
         {
             IReadOnlyDictionary<string, int> recentRanks = CreateRecentMentionRanks();
-            return noteService.ListMentionTargets(openCollectionPath)
-                .OrderBy(target => recentRanks.TryGetValue(target.RelativePath, out int rank) ? rank : int.MaxValue)
-                .ThenBy(target => target.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(target => target.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            List<KnowledgeMentionTargetReadModel> targets = [.. noteService.ListMentionTargets(openCollectionPath)];
+            targets.Sort((left, right) => CompareMentionTargets(left, right, recentRanks));
+            return targets;
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
@@ -92,5 +90,28 @@ public sealed partial class MainViewModel
             RaiseMessage("Mention Search Failed", $"Mentions could not be searched: {ex.Message}");
             return [];
         }
+    }
+
+    private static int CompareMentionTargets(
+        KnowledgeMentionTargetReadModel left,
+        KnowledgeMentionTargetReadModel right,
+        IReadOnlyDictionary<string, int> recentRanks)
+    {
+        int leftRank = recentRanks.TryGetValue(left.RelativePath, out int leftRecentRank)
+            ? leftRecentRank
+            : int.MaxValue;
+        int rightRank = recentRanks.TryGetValue(right.RelativePath, out int rightRecentRank)
+            ? rightRecentRank
+            : int.MaxValue;
+        int rankComparison = leftRank.CompareTo(rightRank);
+        if (rankComparison != 0)
+        {
+            return rankComparison;
+        }
+
+        int titleComparison = string.Compare(left.Title, right.Title, StringComparison.OrdinalIgnoreCase);
+        return titleComparison != 0
+            ? titleComparison
+            : string.Compare(left.RelativePath, right.RelativePath, StringComparison.OrdinalIgnoreCase);
     }
 }

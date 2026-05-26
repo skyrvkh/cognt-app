@@ -60,8 +60,9 @@ public sealed partial class MainViewModel
         }
 
         string normalizedPath = NormalizeRelativePath(relativePath);
-        NoteTreeNodeViewModel? loadedPdfNode = FindPdfTreeNodeByRelativePath(NoteRoots, normalizedPath);
-        if (loadedPdfNode is not null && !string.IsNullOrWhiteSpace(loadedPdfNode.FileRelPath))
+        NoteTreeNodeViewModel? loadedPdfNode = GetLoadedTreeNodeByRelativePath(normalizedPath);
+        if (loadedPdfNode is { Kind: KnowledgeItemKind.PdfDocument }
+            && !string.IsNullOrWhiteSpace(loadedPdfNode.FileRelPath))
         {
             OpenPdfDocumentByRelativePath(loadedPdfNode.FileRelPath, loadedPdfNode.Id, loadedPdfNode.Title);
             return true;
@@ -108,32 +109,6 @@ public sealed partial class MainViewModel
             : item.Title;
         document = new KnowledgePdfDocumentReadModel(normalizedPath, title);
         return true;
-    }
-
-    private static NoteTreeNodeViewModel? FindPdfTreeNodeByRelativePath(
-        IEnumerable<NoteTreeNodeViewModel> nodes,
-        string normalizedRelativePath)
-    {
-        foreach (NoteTreeNodeViewModel node in nodes)
-        {
-            if (node.Kind == KnowledgeItemKind.PdfDocument
-                && !string.IsNullOrWhiteSpace(node.FileRelPath)
-                && string.Equals(
-                    NormalizeRelativePath(node.FileRelPath),
-                    normalizedRelativePath,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return node;
-            }
-
-            NoteTreeNodeViewModel? childMatch = FindPdfTreeNodeByRelativePath(node.Children, normalizedRelativePath);
-            if (childMatch is not null)
-            {
-                return childMatch;
-            }
-        }
-
-        return null;
     }
 
     internal string ResolveDocumentPath(string relativePath)

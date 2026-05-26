@@ -32,9 +32,7 @@ internal sealed partial class NoteService
                         titleIndex,
                         rows,
                         now);
-                    return rows
-                        .DistinctBy(row => row.Id)
-                        .ToArray();
+                    return MaterializeDistinctMentionRows(rows);
                 }
             }
             catch (JsonException)
@@ -52,8 +50,26 @@ internal sealed partial class NoteService
             titleIndex,
             rows,
             now);
-        return rows
-            .DistinctBy(row => row.Id)
-            .ToArray();
+        return MaterializeDistinctMentionRows(rows);
+    }
+
+    private static DocumentMentionRow[] MaterializeDistinctMentionRows(IReadOnlyList<DocumentMentionRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<string> seenIds = new(StringComparer.Ordinal);
+        List<DocumentMentionRow> distinctRows = new(rows.Count);
+        foreach (DocumentMentionRow row in rows)
+        {
+            if (seenIds.Add(row.Id))
+            {
+                distinctRows.Add(row);
+            }
+        }
+
+        return distinctRows.ToArray();
     }
 }

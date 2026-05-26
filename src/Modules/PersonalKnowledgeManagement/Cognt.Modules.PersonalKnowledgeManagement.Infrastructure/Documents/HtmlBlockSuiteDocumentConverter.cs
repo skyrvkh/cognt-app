@@ -88,9 +88,12 @@ internal static partial class HtmlBlockSuiteDocumentConverter
         XElement list,
         string blockType)
     {
-        foreach (XElement item in list.Elements().Where(element => string.Equals(element.Name.LocalName, "li", StringComparison.OrdinalIgnoreCase)))
+        foreach (XElement item in list.Elements())
         {
-            AppendTextBlock(blocks, ReadInlineText(item), blockType);
+            if (string.Equals(item.Name.LocalName, "li", StringComparison.OrdinalIgnoreCase))
+            {
+                AppendTextBlock(blocks, ReadInlineText(item), blockType);
+            }
         }
     }
 
@@ -105,28 +108,60 @@ internal static partial class HtmlBlockSuiteDocumentConverter
 
     private static void AppendTableBlock(List<BlockSuiteDocumentBlock> blocks, XElement table)
     {
-        string[] rows = table
-            .Descendants()
-            .Where(element => string.Equals(element.Name.LocalName, "tr", StringComparison.OrdinalIgnoreCase))
-            .Select(ReadTableRow)
-            .Where(row => !string.IsNullOrWhiteSpace(row))
-            .ToArray();
+        StringBuilder rows = new();
+        foreach (XElement element in table.Descendants())
+        {
+            if (!string.Equals(element.Name.LocalName, "tr", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string row = ReadTableRow(element);
+            if (string.IsNullOrWhiteSpace(row))
+            {
+                continue;
+            }
+
+            if (rows.Length > 0)
+            {
+                rows.AppendLine();
+            }
+
+            rows.Append(row);
+        }
+
         if (rows.Length > 0)
         {
-            blocks.Add(new BlockSuiteDocumentBlock("code", string.Join(Environment.NewLine, rows), Language: "table"));
+            blocks.Add(new BlockSuiteDocumentBlock("code", rows.ToString(), Language: "table"));
         }
     }
 
     private static string ReadTableRow(XElement row)
     {
-        return string.Join(
-            " | ",
-            row.Elements()
-                .Where(cell =>
-                    string.Equals(cell.Name.LocalName, "td", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(cell.Name.LocalName, "th", StringComparison.OrdinalIgnoreCase))
-                .Select(ReadInlineText)
-                .Where(text => !string.IsNullOrWhiteSpace(text)));
+        StringBuilder builder = new();
+        foreach (XElement cell in row.Elements())
+        {
+            if (!string.Equals(cell.Name.LocalName, "td", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(cell.Name.LocalName, "th", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string text = ReadInlineText(cell);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.Append(" | ");
+            }
+
+            builder.Append(text);
+        }
+
+        return builder.ToString();
     }
 
     private static void AppendTextBlock(

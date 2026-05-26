@@ -8,39 +8,63 @@ internal sealed partial class NoteService
 {
     private static IReadOnlyDictionary<string, AttachmentRow> LoadPdfAttachmentsById(ITreeRepository repository)
     {
-        return repository
-            .LoadAttachments()
-            .Where(row => InferAttachmentKind(row.FileExtension, row.ContentType) == KnowledgeAttachmentKind.Pdf)
-            .ToDictionary(row => row.Id, StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
+        Dictionary<string, AttachmentRow> pdfAttachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentRow row in attachments)
+        {
+            if (InferAttachmentKind(row.FileExtension, row.ContentType) == KnowledgeAttachmentKind.Pdf)
+            {
+                pdfAttachmentsById.Add(row.Id, row);
+            }
+        }
+
+        return pdfAttachmentsById;
     }
 
     private static IReadOnlyList<(NoteAttachmentRow Reference, AttachmentRow Attachment)> LoadAttachedPdfTreeSources(
         ITreeRepository repository,
         IReadOnlyDictionary<string, AttachmentRow> pdfAttachmentsById)
     {
-        return repository
-            .LoadNoteAttachments()
-            .Where(reference => pdfAttachmentsById.ContainsKey(reference.AttachmentId))
-            .Where(reference => repository.GetItem(reference.NoteItemId) is not null)
-            .Select(reference => (Reference: reference, Attachment: pdfAttachmentsById[reference.AttachmentId]))
-            .ToArray();
+        IReadOnlyList<NoteAttachmentRow> references = repository.LoadNoteAttachments();
+        List<(NoteAttachmentRow Reference, AttachmentRow Attachment)> attachedSources = [];
+        foreach (NoteAttachmentRow reference in references)
+        {
+            if (!pdfAttachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment)
+                || repository.GetItem(reference.NoteItemId) is null)
+            {
+                continue;
+            }
+
+            attachedSources.Add((reference, attachment));
+        }
+
+        return attachedSources.ToArray();
     }
 
     private static IReadOnlyList<AttachmentRow> LoadNotePdfAttachments(
         ITreeRepository repository,
         long noteItemId)
     {
-        IReadOnlyDictionary<string, AttachmentRow> attachmentsById = repository
-            .LoadAttachments()
-            .ToDictionary(row => row.Id, StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
+        Dictionary<string, AttachmentRow> attachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentRow attachment in attachments)
+        {
+            attachmentsById.Add(attachment.Id, attachment);
+        }
 
-        return repository
-            .LoadNoteAttachments()
-            .Where(reference => reference.NoteItemId == noteItemId)
-            .Select(reference => attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment) ? attachment : null)
-            .Where(attachment => attachment is not null
-                && InferAttachmentKind(attachment.FileExtension, attachment.ContentType) == KnowledgeAttachmentKind.Pdf)
-            .Cast<AttachmentRow>()
-            .ToArray();
+        List<AttachmentRow> noteAttachments = [];
+        foreach (NoteAttachmentRow reference in repository.LoadNoteAttachments())
+        {
+            if (reference.NoteItemId != noteItemId
+                || !attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment)
+                || InferAttachmentKind(attachment.FileExtension, attachment.ContentType) != KnowledgeAttachmentKind.Pdf)
+            {
+                continue;
+            }
+
+            noteAttachments.Add(attachment);
+        }
+
+        return noteAttachments.ToArray();
     }
 }

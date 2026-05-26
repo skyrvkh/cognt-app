@@ -12,6 +12,11 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
     private bool openImportedDocumentAfterImport = true;
     private string message = string.Empty;
     private bool isMessageError;
+    private string queueSummary = "No files selected";
+    private bool canImport;
+    private int importableFileCount;
+    private int importedFileCount;
+    private int failedFileCount;
 
     internal DocumentImportViewModel(MainViewModel target)
     {
@@ -74,12 +79,9 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
 
     public bool HasNoFiles => !HasFiles;
 
-    public string QueueSummary => Files.Count == 0
-        ? "No files selected"
-        : $"{Files.Count:N0} file{(Files.Count == 1 ? string.Empty : "s")} selected";
+    public string QueueSummary => queueSummary;
 
-    public bool CanImport => !IsImporting
-        && Files.Any(file => file.Status is DocumentImportStatus.Ready or DocumentImportStatus.Failed);
+    public bool CanImport => canImport;
 
     public string ImportButtonText => IsImporting ? "Importing..." : "Import";
 
@@ -88,9 +90,7 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(paths);
 
         List<string> rejected = [];
-        HashSet<string> existingPaths = Files
-            .Select(file => Path.GetFullPath(file.FullPath))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> existingPaths = CreateExistingFullPathSet();
 
         foreach (string path in paths)
         {
@@ -109,6 +109,13 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
 
     private void RefreshDerivedState()
     {
+        DocumentImportQueueState state = CreateQueueState(Files, IsImporting);
+        queueSummary = state.QueueSummary;
+        canImport = state.CanImport;
+        importableFileCount = state.ImportableFileCount;
+        importedFileCount = state.ImportedFileCount;
+        failedFileCount = state.FailedFileCount;
+
         OnPropertyChanged(nameof(HasFiles));
         OnPropertyChanged(nameof(HasNoFiles));
         OnPropertyChanged(nameof(QueueSummary));
@@ -125,9 +132,64 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
         }
     }
 
+    private static DocumentImportQueueState CreateQueueState(
+        IReadOnlyCollection<DocumentImportQueueItem> files,
+        bool isImporting)
+    {
+        int importableCount = 0;
+        int importedCount = 0;
+        int failedCount = 0;
+
+        foreach (DocumentImportQueueItem file in files)
+        {
+            switch (file.Status)
+            {
+                case DocumentImportStatus.Ready:
+                    importableCount++;
+                    break;
+                case DocumentImportStatus.Failed:
+                    importableCount++;
+                    failedCount++;
+                    break;
+                case DocumentImportStatus.Success:
+                    importedCount++;
+                    break;
+            }
+        }
+
+        string summary = files.Count == 0
+            ? "No files selected"
+            : $"{files.Count:N0} file{(files.Count == 1 ? string.Empty : "s")} selected";
+
+        return new DocumentImportQueueState(
+            summary,
+            CanImport: !isImporting && importableCount > 0,
+            ImportableFileCount: importableCount,
+            ImportedFileCount: importedCount,
+            FailedFileCount: failedCount);
+    }
+
     private void UpdateMessageState(string value, bool isError)
     {
         IsMessageError = isError;
         Message = value;
     }
+
+    private HashSet<string> CreateExistingFullPathSet()
+    {
+        HashSet<string> existingPaths = new(StringComparer.OrdinalIgnoreCase);
+        foreach (DocumentImportQueueItem file in Files)
+        {
+            existingPaths.Add(Path.GetFullPath(file.FullPath));
+        }
+
+        return existingPaths;
+    }
+
+    private readonly record struct DocumentImportQueueState(
+        string QueueSummary,
+        bool CanImport,
+        int ImportableFileCount,
+        int ImportedFileCount,
+        int FailedFileCount);
 }

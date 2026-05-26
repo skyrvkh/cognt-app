@@ -13,9 +13,7 @@ internal sealed partial class DocumentImportViewModel
 
         IsImporting = true;
         UpdateMessageState(string.Empty, isError: false);
-        DocumentImportQueueItem[] importableFiles = Files
-            .Where(file => file.Status is DocumentImportStatus.Ready or DocumentImportStatus.Failed)
-            .ToArray();
+        DocumentImportQueueItem[] importableFiles = CreateImportableFileSnapshot();
 
         bool openAfterImport = OpenImportedDocumentAfterImport && importableFiles.Length == 1;
 
@@ -26,14 +24,26 @@ internal sealed partial class DocumentImportViewModel
 
         IsImporting = false;
 
-        int imported = Files.Count(file => file.Status == DocumentImportStatus.Success);
-        int failed = Files.Count(file => file.Status == DocumentImportStatus.Failed);
         UpdateMessageState(
-            failed == 0
-                ? $"Imported {imported:N0} document{(imported == 1 ? string.Empty : "s")}."
-                : $"Imported {imported:N0} document{(imported == 1 ? string.Empty : "s")}. {failed:N0} failed.",
-            isError: failed > 0);
+            failedFileCount == 0
+                ? $"Imported {importedFileCount:N0} document{(importedFileCount == 1 ? string.Empty : "s")}."
+                : $"Imported {importedFileCount:N0} document{(importedFileCount == 1 ? string.Empty : "s")}. {failedFileCount:N0} failed.",
+            isError: failedFileCount > 0);
         RefreshDerivedState();
+    }
+
+    private DocumentImportQueueItem[] CreateImportableFileSnapshot()
+    {
+        List<DocumentImportQueueItem> importableFiles = new(importableFileCount > 0 ? importableFileCount : Files.Count);
+        foreach (DocumentImportQueueItem file in Files)
+        {
+            if (file.Status is DocumentImportStatus.Ready or DocumentImportStatus.Failed)
+            {
+                importableFiles.Add(file);
+            }
+        }
+
+        return importableFiles.ToArray();
     }
 
     private async Task ImportQueuedFileAsync(DocumentImportQueueItem file, bool openAfterImport)

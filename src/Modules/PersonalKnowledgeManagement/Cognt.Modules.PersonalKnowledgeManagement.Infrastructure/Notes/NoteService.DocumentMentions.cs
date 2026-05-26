@@ -43,8 +43,7 @@ internal sealed partial class NoteService
             string.IsNullOrWhiteSpace(currentContent) ? File.ReadAllText(currentFullPath, Encoding.UTF8) : currentContent,
             notesByPath);
 
-        Dictionary<string, DocumentLinkNote> notesByDocumentId = notesByPath.Values
-            .ToDictionary(note => note.DocumentId, note => note, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, DocumentLinkNote> notesByDocumentId = CreateNotesByDocumentId(notesByPath);
 
         List<KnowledgeDocumentLinkReadModel> incoming = MaterializeDocumentLinkReadModels(
             "incoming",
@@ -53,18 +52,87 @@ internal sealed partial class NoteService
 
         List<KnowledgeDocumentLinkReadModel> outgoing = MaterializeDocumentLinkReadModels(
             "outgoing",
-            repository.LoadDocumentMentionsBySource(currentNote.DocumentId)
-                .Where(mention => !string.Equals(mention.TargetDocumentId, currentNote.DocumentId, StringComparison.OrdinalIgnoreCase)),
+            FilterSelfDocumentMentions(repository.LoadDocumentMentionsBySource(currentNote.DocumentId), currentNote.DocumentId),
             notesByDocumentId);
 
         return new KnowledgeDocumentLinksReadModel(
-            incoming
-                .OrderByDescending(link => link.UpdatedAt ?? 0)
-                .ThenBy(link => link.DisplayTitle, StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            outgoing
-                .OrderBy(link => link.DisplayTitle, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(link => link.OpenRelativePath, StringComparer.OrdinalIgnoreCase)
-                .ToArray());
+            OrderDocumentLinks(incoming, DocumentLinkSortDirection.Incoming),
+            OrderDocumentLinks(outgoing, DocumentLinkSortDirection.Outgoing));
+    }
+
+    private static IReadOnlyList<DocumentMentionRow> FilterSelfDocumentMentions(
+        IReadOnlyList<DocumentMentionRow> mentions,
+        string currentDocumentId)
+    {
+        List<DocumentMentionRow> filteredMentions = new(mentions.Count);
+        foreach (DocumentMentionRow mention in mentions)
+        {
+            if (!string.Equals(mention.TargetDocumentId, currentDocumentId, StringComparison.OrdinalIgnoreCase))
+            {
+                filteredMentions.Add(mention);
+            }
+        }
+
+        return filteredMentions;
+    }
+
+    private static KnowledgeDocumentLinkReadModel[] OrderDocumentLinks(
+        IReadOnlyList<KnowledgeDocumentLinkReadModel> links,
+        DocumentLinkSortDirection direction)
+    {
+        if (links.Count == 0)
+        {
+            return [];
+        }
+
+        DocumentLinkSortRow[] rows = new DocumentLinkSortRow[links.Count];
+        for (int index = 0; index < rows.Length; index++)
+        {
+            rows[index] = new DocumentLinkSortRow(links[index], index);
+        }
+
+        Array.Sort(rows, (left, right) => CompareDocumentLinks(left, right, direction));
+
+        KnowledgeDocumentLinkReadModel[] orderedLinks = new KnowledgeDocumentLinkReadModel[rows.Length];
+        for (int index = 0; index < orderedLinks.Length; index++)
+        {
+            orderedLinks[index] = rows[index].Link;
+        }
+
+        return orderedLinks;
+    }
+
+    private static int CompareDocumentLinks(
+        DocumentLinkSortRow left,
+        DocumentLinkSortRow right,
+        DocumentLinkSortDirection direction)
+    {
+        int comparison = direction == DocumentLinkSortDirection.Incoming
+            ? (right.Link.UpdatedAt ?? 0).CompareTo(left.Link.UpdatedAt ?? 0)
+            : string.Compare(left.Link.DisplayTitle, right.Link.DisplayTitle, StringComparison.OrdinalIgnoreCase);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = direction == DocumentLinkSortDirection.Incoming
+            ? string.Compare(left.Link.DisplayTitle, right.Link.DisplayTitle, StringComparison.OrdinalIgnoreCase)
+            : string.Compare(left.Link.OpenRelativePath, right.Link.OpenRelativePath, StringComparison.OrdinalIgnoreCase);
+        return comparison != 0
+            ? comparison
+            : left.SequenceIndex.CompareTo(right.SequenceIndex);
+    }
+
+    private readonly struct DocumentLinkSortRow(KnowledgeDocumentLinkReadModel link, int sequenceIndex)
+    {
+        internal KnowledgeDocumentLinkReadModel Link { get; } = link;
+
+        internal int SequenceIndex { get; } = sequenceIndex;
+    }
+
+    private enum DocumentLinkSortDirection
+    {
+        Incoming,
+        Outgoing
     }
 }

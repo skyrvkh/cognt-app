@@ -49,10 +49,7 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
         IReadOnlyList<GlobalSearchCollectionScope> collections =
             request.Collections ?? throw new ArgumentNullException(nameof(request.Collections));
         int limit = Math.Clamp(request.Limit <= 0 ? DefaultLimit : request.Limit, 1, MaximumLimit);
-        string[] queryTerms = query
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        string[] queryTerms = CreateQueryTerms(query);
 
         List<ScoredSearchResult> rankedMatches = [];
         foreach (GlobalSearchCollectionScope collection in collections)
@@ -64,24 +61,25 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
                 continue;
             }
 
-            foreach (SearchCandidate candidate in LoadSearchCandidates(collection, query))
+            foreach (KnowledgeNoteListItemReadModel candidate in LoadSearchCandidates(collection, query))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                string? content = ReadNoteContent(collection.CollectionId, candidate.Note.RelativePath);
+                string? content = ReadNoteContent(collection.CollectionId, candidate.RelativePath);
                 if (content is null)
                 {
                     continue;
                 }
 
-                string bodyText = SearchableDocumentText.ExtractPlainText(candidate.Note.RelativePath, content);
-                DateTimeOffset lastModifiedUtc = candidate.Note.UpdatedAt;
-                MatchScore score = ScoreMatch(candidate.Note.Title, bodyText, query, queryTerms, lastModifiedUtc);
+                string bodyText = SearchableDocumentText.ExtractPlainText(candidate.RelativePath, content);
+                DateTimeOffset lastModifiedUtc = candidate.UpdatedAt;
+                MatchScore score = ScoreMatch(candidate.Title, bodyText, query, queryTerms, lastModifiedUtc);
                 if (!score.IsMatch)
                 {
                     continue;
                 }
 
+                int sequenceIndex = rankedMatches.Count;
                 rankedMatches.Add(CreateRankedMatch(
                     collection,
                     candidate,
@@ -89,10 +87,50 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
                     query,
                     queryTerms,
                     score.Score,
-                    lastModifiedUtc));
+                    lastModifiedUtc,
+                    sequenceIndex));
             }
         }
 
         return OrderSearchResults(rankedMatches, limit);
+    }
+
+    private static string[] CreateQueryTerms(string query)
+    {
+        HashSet<string> seenTerms = new(StringComparer.OrdinalIgnoreCase);
+        List<string> terms = [];
+        int termStart = 0;
+
+        for (int index = 0; index <= query.Length; index++)
+        {
+            if (index < query.Length && query[index] != ' ')
+            {
+                continue;
+            }
+
+            AddQueryTerm(query, termStart, index - termStart, seenTerms, terms);
+            termStart = index + 1;
+        }
+
+        return terms.ToArray();
+    }
+
+    private static void AddQueryTerm(
+        string query,
+        int startIndex,
+        int length,
+        HashSet<string> seenTerms,
+        List<string> terms)
+    {
+        if (length <= 0)
+        {
+            return;
+        }
+
+        string term = query.Substring(startIndex, length);
+        if (seenTerms.Add(term))
+        {
+            terms.Add(term);
+        }
     }
 }

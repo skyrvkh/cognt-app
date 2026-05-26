@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
+using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
 
@@ -40,8 +41,7 @@ public sealed partial class MainViewModel
             }
 
             RefreshAvailableCollections();
-            IReadOnlyList<GlobalSearchCollectionScope> scopes = CreateGlobalSearchScopes();
-            int searchableNoteCount = AvailableCollections.Sum(collection => collection.NoteCount);
+            IReadOnlyList<GlobalSearchCollectionScope> scopes = CreateGlobalSearchScopes(out int searchableNoteCount);
 
             if (searchableNoteCount == 0)
             {
@@ -49,8 +49,6 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            GlobalSearchResults.Clear();
-            NotifyGlobalSearchStateChanged();
             GlobalSearchStateMessage = "Searching...";
             GlobalSearchErrorMessage = string.Empty;
             HasGlobalSearchError = false;
@@ -97,14 +95,24 @@ public sealed partial class MainViewModel
         }
     }
 
-    private IReadOnlyList<GlobalSearchCollectionScope> CreateGlobalSearchScopes()
+    private IReadOnlyList<GlobalSearchCollectionScope> CreateGlobalSearchScopes(out int searchableNoteCount)
     {
-        return AvailableCollections
-            .Where(collection => !string.IsNullOrWhiteSpace(collection.Path) && Directory.Exists(collection.Path))
-            .Select(collection => new GlobalSearchCollectionScope(
-                collection.Id,
-                collection.Name))
-            .ToArray();
+        List<GlobalSearchCollectionScope> scopes = [];
+        searchableNoteCount = 0;
+
+        foreach (Navigation.CollectionOptionViewModel collection in AvailableCollections)
+        {
+            searchableNoteCount += collection.NoteCount;
+
+            if (!string.IsNullOrWhiteSpace(collection.Path) && Directory.Exists(collection.Path))
+            {
+                scopes.Add(new GlobalSearchCollectionScope(
+                    collection.Id,
+                    collection.Name));
+            }
+        }
+
+        return scopes;
     }
 
     private void ClearGlobalSearchResults(string message)

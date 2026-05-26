@@ -6,7 +6,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
 internal sealed partial class GlobalSearchService
 {
-    private IReadOnlyList<SearchCandidate> LoadSearchCandidates(
+    private IReadOnlyList<KnowledgeNoteListItemReadModel> LoadSearchCandidates(
         GlobalSearchCollectionScope collection,
         string query)
     {
@@ -18,10 +18,17 @@ internal sealed partial class GlobalSearchService
                 return [];
             }
 
-            return noteService.LoadNoteCatalog(collection.CollectionId)
-                .Where(note => matchedRelativePaths.Contains(note.RelativePath))
-                .Select(note => new SearchCandidate(note))
-                .ToArray();
+            IReadOnlyList<KnowledgeNoteListItemReadModel> notes = noteService.LoadNoteCatalog(collection.CollectionId);
+            List<KnowledgeNoteListItemReadModel> candidates = new(matchedRelativePaths.Count);
+            foreach (KnowledgeNoteListItemReadModel note in notes)
+            {
+                if (matchedRelativePaths.Contains(note.RelativePath))
+                {
+                    candidates.Add(note);
+                }
+            }
+
+            return candidates;
         }
         catch (Exception ex) when (IsRecoverableSearchException(ex))
         {
@@ -52,13 +59,4 @@ internal sealed partial class GlobalSearchService
             or ArgumentException;
     }
 
-    private sealed class SearchCandidate
-    {
-        internal SearchCandidate(KnowledgeNoteListItemReadModel note)
-        {
-            Note = note;
-        }
-
-        internal KnowledgeNoteListItemReadModel Note { get; }
-    }
 }

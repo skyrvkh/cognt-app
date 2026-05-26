@@ -33,8 +33,7 @@ internal sealed partial class GlobalSearchService
             score += BodyPhraseMatchScore;
         }
 
-        int titleTermMatches = terms.Count(term => Contains(title, term));
-        int bodyTermMatches = terms.Count(term => Contains(bodyText, term));
+        (int titleTermMatches, int bodyTermMatches) = CountTermMatches(title, bodyText, terms);
         if (titleTermMatches > 0 || bodyTermMatches > 0)
         {
             isMatch = true;
@@ -66,14 +65,48 @@ internal sealed partial class GlobalSearchService
         int matchIndex = IndexOf(source, query);
         if (matchIndex < 0)
         {
-            matchIndex = terms
-                .Select(term => IndexOf(source, term))
-                .Where(index => index >= 0)
-                .DefaultIfEmpty(0)
-                .Min();
+            matchIndex = FindEarliestTermMatchIndex(source, terms);
         }
 
         return SearchableDocumentText.CreateBoundedSnippet(source, matchIndex, query.Length, SnippetRadius);
+    }
+
+    private static (int TitleMatches, int BodyMatches) CountTermMatches(
+        string title,
+        string bodyText,
+        IReadOnlyList<string> terms)
+    {
+        int titleMatches = 0;
+        int bodyMatches = 0;
+        foreach (string term in terms)
+        {
+            if (Contains(title, term))
+            {
+                titleMatches++;
+            }
+
+            if (Contains(bodyText, term))
+            {
+                bodyMatches++;
+            }
+        }
+
+        return (titleMatches, bodyMatches);
+    }
+
+    private static int FindEarliestTermMatchIndex(string source, IReadOnlyList<string> terms)
+    {
+        int earliestIndex = -1;
+        foreach (string term in terms)
+        {
+            int index = IndexOf(source, term);
+            if (index >= 0 && (earliestIndex < 0 || index < earliestIndex))
+            {
+                earliestIndex = index;
+            }
+        }
+
+        return earliestIndex >= 0 ? earliestIndex : 0;
     }
 
     private static bool Contains(string value, string query)
