@@ -1,3 +1,4 @@
+using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -9,19 +10,17 @@ internal sealed partial class NoteService
     {
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        string[] assignedTags = repository.LoadTagNames().ToArray();
-        string[] contentTags = GetOrBuildNoteCatalogEntries(root)
-            .SelectMany(entry => entry.Item.ContentTags ?? Array.Empty<string>())
-            .ToArray();
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> availableTags = [];
 
-        return assignedTags
-            .Concat(contentTags)
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(NormalizeTagDisplayName)
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        AddNormalizedTags(repository.LoadTagNames(), seenTags, availableTags);
+        foreach (NoteCatalogEntry entry in GetOrBuildNoteCatalogEntries(root))
+        {
+            AddNormalizedTags(entry.Item.ContentTags, seenTags, availableTags);
+        }
+
+        availableTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return availableTags.ToArray();
     }
 
     IReadOnlyList<string> INoteService.LoadAssignedTags(string collectionId, IReadOnlyList<long> itemIds)
@@ -30,12 +29,18 @@ internal sealed partial class NoteService
 
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        return repository
-            .LoadTagsByItemIds(itemIds)
-            .Select(row => row.DisplayName)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> assignedTags = [];
+        foreach (var row in repository.LoadTagsByItemIds(itemIds))
+        {
+            if (seenTags.Add(row.DisplayName))
+            {
+                assignedTags.Add(row.DisplayName);
+            }
+        }
+
+        assignedTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return assignedTags.ToArray();
     }
 
     KnowledgeTagOperationResult INoteService.AssignTags(
@@ -68,11 +73,7 @@ internal sealed partial class NoteService
 
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        long[] normalizedRoots = rootItemIds
-            .Where(id => id > 0)
-            .Distinct()
-            .OrderBy(id => id)
-            .ToArray();
+        long[] normalizedRoots = NormalizeRootItemIds(rootItemIds);
         string[] normalizedTags = NormalizeTagInputs(tags);
         long[] affectedItemIds = repository.ExpandItemIds(normalizedRoots, includeDescendants).ToArray();
 
@@ -96,19 +97,87 @@ internal sealed partial class NoteService
 
     private static string[] NormalizeTagInputs(IReadOnlyList<string> tags)
     {
-        return tags
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(NormalizeTagDisplayName)
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> normalizedTags = [];
+        AddNormalizedTags(tags, seenTags, normalizedTags);
+        normalizedTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return normalizedTags.ToArray();
+    }
+
+    private static long[] NormalizeRootItemIds(IReadOnlyList<long> rootItemIds)
+    {
+        HashSet<long> seenItemIds = [];
+        List<long> normalizedItemIds = new(rootItemIds.Count);
+        foreach (long itemId in rootItemIds)
+        {
+            if (itemId > 0 && seenItemIds.Add(itemId))
+            {
+                normalizedItemIds.Add(itemId);
+            }
+        }
+
+        normalizedItemIds.Sort();
+        return normalizedItemIds.ToArray();
+    }
+
+    private static void AddNormalizedTags(
+        IEnumerable<string>? source,
+        HashSet<string> seenTags,
+        List<string> normalizedTags)
+    {
+        if (source is null)
+        {
+            return;
+        }
+
+        foreach (string tag in source)
+        {
+            string normalizedTag = NormalizeTagDisplayName(tag);
+            if (normalizedTag.Length > 0 && seenTags.Add(normalizedTag))
+            {
+                normalizedTags.Add(normalizedTag);
+            }
+        }
     }
 
     private static string NormalizeTagDisplayName(string? tag)
     {
-        return string.IsNullOrWhiteSpace(tag)
-            ? string.Empty
-            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return string.Empty;
+        }
+
+        ReadOnlySpan<char> trimmedTag = tag.AsSpan().Trim();
+        int firstWhitespaceIndex = IndexOfWhitespace(trimmedTag);
+        if (firstWhitespaceIndex < 0)
+        {
+            return trimmedTag.ToString();
+        }
+
+        StringBuilder builder = new(trimmedTag.Length);
+        builder.Append(trimmedTag[..firstWhitespaceIndex]);
+        for (int index = firstWhitespaceIndex + 1; index < trimmedTag.Length; index++)
+        {
+            char character = trimmedTag[index];
+            if (!char.IsWhiteSpace(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static int IndexOfWhitespace(ReadOnlySpan<char> value)
+    {
+        for (int index = 0; index < value.Length; index++)
+        {
+            if (char.IsWhiteSpace(value[index]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

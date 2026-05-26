@@ -22,10 +22,11 @@ internal sealed partial class SqliteTreeRepository
             }
 
             List<long> expanded = [];
-            foreach (long[] chunk in ids.Chunk(400))
+            for (int offset = 0; offset < ids.Length; offset += 400)
             {
+                int count = Math.Min(400, ids.Length - offset);
                 using SqliteCommand command = connection.CreateCommand();
-                string[] parameterNames = CreateParameterNames(chunk.Length, "$id");
+                string[] parameterNames = CreateParameterNames(count, "$id");
                 command.CommandText = $"""
                     WITH RECURSIVE selected_items(id) AS (
                       SELECT id
@@ -44,7 +45,7 @@ internal sealed partial class SqliteTreeRepository
                     FROM selected_items
                     ORDER BY id;
                     """;
-                AddIdParameters(command, parameterNames, chunk);
+                AddIdParameters(command, parameterNames, ids, offset, count);
 
                 using SqliteDataReader reader = command.ExecuteReader();
                 while (reader.Read())
@@ -53,7 +54,7 @@ internal sealed partial class SqliteTreeRepository
                 }
             }
 
-            return expanded.Distinct().OrderBy(id => id).ToArray();
+            return SortDistinctIds(expanded);
         });
     }
 
@@ -68,10 +69,11 @@ internal sealed partial class SqliteTreeRepository
         return UseConnection(connection =>
         {
             List<ItemTagRow> rows = [];
-            foreach (long[] chunk in ids.Chunk(400))
+            for (int offset = 0; offset < ids.Length; offset += 400)
             {
+                int count = Math.Min(400, ids.Length - offset);
                 using SqliteCommand command = connection.CreateCommand();
-                string[] parameterNames = CreateParameterNames(chunk.Length, "$id");
+                string[] parameterNames = CreateParameterNames(count, "$id");
                 command.CommandText = $"""
                     SELECT it.item_id, t.display_name, t.normalized_name
                     FROM item_tag it
@@ -81,7 +83,7 @@ internal sealed partial class SqliteTreeRepository
                       AND it.item_id IN ({string.Join(", ", parameterNames)})
                     ORDER BY t.display_name COLLATE NOCASE, t.id;
                     """;
-                AddIdParameters(command, parameterNames, chunk);
+                AddIdParameters(command, parameterNames, ids, offset, count);
 
                 using SqliteDataReader reader = command.ExecuteReader();
                 while (reader.Read())
@@ -134,7 +136,7 @@ internal sealed partial class SqliteTreeRepository
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
             long now = GetCurrentUnixTimeSeconds();
-            long[] existingItemIds = LoadExistingItemIds(connection, ids, transaction).ToArray();
+            IReadOnlyList<long> existingItemIds = LoadExistingItemIds(connection, ids, transaction);
 
             foreach (TagValue tag in normalizedTags)
             {
@@ -155,11 +157,7 @@ internal sealed partial class SqliteTreeRepository
         IReadOnlyList<string> normalizedTags)
     {
         long[] ids = NormalizeItemIds(itemIds);
-        string[] tags = normalizedTags
-            .Select(NormalizeTagIdentity)
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        string[] tags = NormalizeTagIdentities(normalizedTags);
         if (ids.Length == 0 || tags.Length == 0)
         {
             return;
@@ -169,16 +167,18 @@ internal sealed partial class SqliteTreeRepository
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
             long now = GetCurrentUnixTimeSeconds();
-            long[] existingItemIds = LoadExistingItemIds(connection, ids, transaction).ToArray();
+            IReadOnlyList<long> existingItemIds = LoadExistingItemIds(connection, ids, transaction);
 
-            foreach (long[] itemChunk in existingItemIds.Chunk(400))
+            for (int itemOffset = 0; itemOffset < existingItemIds.Count; itemOffset += 400)
             {
-                foreach (string[] tagChunk in tags.Chunk(400))
+                int itemCount = Math.Min(400, existingItemIds.Count - itemOffset);
+                for (int tagOffset = 0; tagOffset < tags.Length; tagOffset += 400)
                 {
+                    int tagCount = Math.Min(400, tags.Length - tagOffset);
                     using SqliteCommand command = connection.CreateCommand();
                     command.Transaction = transaction;
-                    string[] itemParameterNames = CreateParameterNames(itemChunk.Length, "$item");
-                    string[] tagParameterNames = CreateParameterNames(tagChunk.Length, "$tag");
+                    string[] itemParameterNames = CreateParameterNames(itemCount, "$item");
+                    string[] tagParameterNames = CreateParameterNames(tagCount, "$tag");
                     command.CommandText = $"""
                         DELETE FROM item_tag
                         WHERE item_id IN ({string.Join(", ", itemParameterNames)})
@@ -188,11 +188,8 @@ internal sealed partial class SqliteTreeRepository
                             WHERE normalized_name IN ({string.Join(", ", tagParameterNames)})
                           );
                         """;
-                    AddIdParameters(command, itemParameterNames, itemChunk);
-                    for (int i = 0; i < tagChunk.Length; i++)
-                    {
-                        command.Parameters.AddWithValue(tagParameterNames[i], tagChunk[i]);
-                    }
+                    AddIdParameters(command, itemParameterNames, existingItemIds, itemOffset, itemCount);
+                    AddStringParameters(command, tagParameterNames, tags, tagOffset, tagCount);
 
                     command.ExecuteNonQuery();
                 }
@@ -209,11 +206,12 @@ internal sealed partial class SqliteTreeRepository
         SqliteTransaction? transaction = null)
     {
         List<long> existing = [];
-        foreach (long[] chunk in itemIds.Chunk(400))
+        for (int offset = 0; offset < itemIds.Count; offset += 400)
         {
+            int count = Math.Min(400, itemIds.Count - offset);
             using SqliteCommand command = connection.CreateCommand();
             command.Transaction = transaction;
-            string[] parameterNames = CreateParameterNames(chunk.Length, "$id");
+            string[] parameterNames = CreateParameterNames(count, "$id");
             command.CommandText = $"""
                 SELECT id
                 FROM item
@@ -221,7 +219,7 @@ internal sealed partial class SqliteTreeRepository
                   AND id IN ({string.Join(", ", parameterNames)})
                 ORDER BY id;
                 """;
-            AddIdParameters(command, parameterNames, chunk);
+            AddIdParameters(command, parameterNames, itemIds, offset, count);
 
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -230,7 +228,7 @@ internal sealed partial class SqliteTreeRepository
             }
         }
 
-        return existing.Distinct().OrderBy(id => id).ToArray();
+        return SortDistinctIds(existing);
     }
 
     private static long UpsertTag(
@@ -284,34 +282,57 @@ internal sealed partial class SqliteTreeRepository
         IReadOnlyList<long> itemIds,
         long updatedAt)
     {
-        foreach (long[] chunk in itemIds.Chunk(400))
+        for (int offset = 0; offset < itemIds.Count; offset += 400)
         {
+            int count = Math.Min(400, itemIds.Count - offset);
             using SqliteCommand command = connection.CreateCommand();
             command.Transaction = transaction;
-            string[] parameterNames = CreateParameterNames(chunk.Length, "$id");
+            string[] parameterNames = CreateParameterNames(count, "$id");
             command.CommandText = $"""
                 UPDATE item
                 SET updated_at = $updatedAt
                 WHERE id IN ({string.Join(", ", parameterNames)});
                 """;
             command.Parameters.AddWithValue("$updatedAt", updatedAt);
-            AddIdParameters(command, parameterNames, chunk);
+            AddIdParameters(command, parameterNames, itemIds, offset, count);
             command.ExecuteNonQuery();
         }
     }
 
     private static string[] CreateParameterNames(int count, string prefix)
     {
-        return Enumerable.Range(0, count)
-            .Select(index => string.Concat(prefix, index.ToString(System.Globalization.CultureInfo.InvariantCulture)))
-            .ToArray();
+        string[] parameterNames = new string[count];
+        for (int index = 0; index < count; index++)
+        {
+            parameterNames[index] = string.Concat(prefix, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        return parameterNames;
     }
 
-    private static void AddIdParameters(SqliteCommand command, IReadOnlyList<string> parameterNames, IReadOnlyList<long> values)
+    private static void AddIdParameters(
+        SqliteCommand command,
+        IReadOnlyList<string> parameterNames,
+        IReadOnlyList<long> values,
+        int offset,
+        int count)
     {
-        for (int i = 0; i < values.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-            command.Parameters.AddWithValue(parameterNames[i], values[i]);
+            command.Parameters.AddWithValue(parameterNames[i], values[offset + i]);
+        }
+    }
+
+    private static void AddStringParameters(
+        SqliteCommand command,
+        IReadOnlyList<string> parameterNames,
+        IReadOnlyList<string> values,
+        int offset,
+        int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            command.Parameters.AddWithValue(parameterNames[i], values[offset + i]);
         }
     }
 
@@ -319,36 +340,147 @@ internal sealed partial class SqliteTreeRepository
     {
         ArgumentNullException.ThrowIfNull(itemIds);
 
-        return itemIds
-            .Where(id => id > 0)
-            .Distinct()
-            .OrderBy(id => id)
-            .ToArray();
+        if (itemIds.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<long> seenIds = [];
+        List<long> normalizedIds = new(itemIds.Count);
+        for (int index = 0; index < itemIds.Count; index++)
+        {
+            long itemId = itemIds[index];
+            if (itemId > 0 && seenIds.Add(itemId))
+            {
+                normalizedIds.Add(itemId);
+            }
+        }
+
+        normalizedIds.Sort();
+        return normalizedIds.Count == 0 ? [] : normalizedIds.ToArray();
     }
 
     private static TagValue[] NormalizeTags(IReadOnlyList<string> tags)
     {
         ArgumentNullException.ThrowIfNull(tags);
 
-        return tags
-            .Select(tag => new TagValue(NormalizeTagDisplayName(tag), NormalizeTagIdentity(tag)))
-            .Where(tag => tag.DisplayName.Length > 0 && tag.NormalizedName.Length > 0)
-            .GroupBy(tag => tag.NormalizedName, StringComparer.Ordinal)
-            .Select(group => group.First())
-            .OrderBy(tag => tag.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        if (tags.Count == 0)
+        {
+            return [];
+        }
+
+        Dictionary<string, TagValue> normalizedByIdentity = new(StringComparer.Ordinal);
+        for (int index = 0; index < tags.Count; index++)
+        {
+            string displayName = NormalizeTagDisplayName(tags[index]);
+            if (displayName.Length == 0)
+            {
+                continue;
+            }
+
+            string normalizedName = displayName.ToUpperInvariant();
+            normalizedByIdentity.TryAdd(normalizedName, new TagValue(displayName, normalizedName));
+        }
+
+        if (normalizedByIdentity.Count == 0)
+        {
+            return [];
+        }
+
+        TagValue[] normalizedTags = new TagValue[normalizedByIdentity.Count];
+        int tagIndex = 0;
+        foreach (TagValue tag in normalizedByIdentity.Values)
+        {
+            normalizedTags[tagIndex++] = tag;
+        }
+
+        Array.Sort(normalizedTags, static (left, right) =>
+            StringComparer.OrdinalIgnoreCase.Compare(left.DisplayName, right.DisplayName));
+        return normalizedTags;
     }
 
     private static string NormalizeTagDisplayName(string? tag)
     {
-        return string.IsNullOrWhiteSpace(tag)
-            ? string.Empty
-            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return string.Empty;
+        }
+
+        ReadOnlySpan<char> trimmed = tag.AsSpan().Trim();
+        char[] characters = new char[trimmed.Length];
+        int length = 0;
+        for (int index = 0; index < trimmed.Length; index++)
+        {
+            char character = trimmed[index];
+            if (!char.IsWhiteSpace(character))
+            {
+                characters[length++] = character;
+            }
+        }
+
+        return length == 0 ? string.Empty : new string(characters, 0, length);
     }
 
     private static string NormalizeTagIdentity(string? tag)
     {
         return NormalizeTagDisplayName(tag).ToUpperInvariant();
+    }
+
+    private static string[] NormalizeTagIdentities(IReadOnlyList<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+
+        if (tags.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<string> seenTags = new(StringComparer.Ordinal);
+        List<string> normalizedTags = new(tags.Count);
+        for (int index = 0; index < tags.Count; index++)
+        {
+            string normalizedTag = NormalizeTagIdentity(tags[index]);
+            if (normalizedTag.Length > 0 && seenTags.Add(normalizedTag))
+            {
+                normalizedTags.Add(normalizedTag);
+            }
+        }
+
+        return normalizedTags.Count == 0 ? [] : normalizedTags.ToArray();
+    }
+
+    private static long[] SortDistinctIds(List<long> itemIds)
+    {
+        if (itemIds.Count == 0)
+        {
+            return [];
+        }
+
+        itemIds.Sort();
+
+        int distinctCount = 0;
+        long previousId = 0;
+        bool hasPreviousId = false;
+        for (int index = 0; index < itemIds.Count; index++)
+        {
+            long itemId = itemIds[index];
+            if (hasPreviousId && itemId == previousId)
+            {
+                continue;
+            }
+
+            itemIds[distinctCount++] = itemId;
+            previousId = itemId;
+            hasPreviousId = true;
+        }
+
+        long[] distinctIds = new long[distinctCount];
+        for (int index = 0; index < distinctCount; index++)
+        {
+            distinctIds[index] = itemIds[index];
+        }
+
+        return distinctIds;
     }
 
     private sealed record TagValue(string DisplayName, string NormalizedName);

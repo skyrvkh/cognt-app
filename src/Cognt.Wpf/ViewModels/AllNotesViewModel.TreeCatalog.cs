@@ -1,4 +1,3 @@
-using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 
 namespace CogntApp.ViewModels;
@@ -11,36 +10,50 @@ public sealed partial class AllNotesViewModel
             ? noteService.LoadChildren(currentCollectionId, parentId.Value)
             : noteService.LoadRootItems(currentCollectionId);
 
-        return items
-            .Select(item =>
-            {
-                AllNotesTreeItemViewModel[] children = CanTreeItemContainChildren(item.Kind) && item.ChildCount > 0
-                    ? BuildTreeItems(item.Id, depth + 1)
-                    : [];
+        AllNotesTreeItemViewModel[] treeItems = new AllNotesTreeItemViewModel[items.Count];
+        for (int index = 0; index < items.Count; index++)
+        {
+            KnowledgeTreeItemReadModel item = items[index];
+            TreeItemPresentation presentation = CreateTreeItemPresentation(item);
+            AllNotesTreeItemViewModel[] children = CanTreeItemContainChildren(item.Kind) && item.ChildCount > 0
+                ? BuildTreeItems(item.Id, depth + 1)
+                : [];
 
-                return new AllNotesTreeItemViewModel(
-                    item.Id,
-                    item.Kind,
-                    item.Title,
-                    NormalizeTreeItemRelativePath(item.FileRelPath),
-                    GetTreeTypeLabel(item),
-                    GetTreeTagsLabel(item),
-                    GetTreeCardCount(item),
-                    GetTreeCardCountLabel(item),
-                    GetTreeCreatedAtLabel(item),
-                    GetTreeModifiedAtLabel(item),
-                    children)
-                {
-                    IsExpanded = depth == 0
-                };
-            })
-            .ToArray();
+            treeItems[index] = new AllNotesTreeItemViewModel(
+                item.Id,
+                item.Kind,
+                item.Title,
+                presentation.RelativePath,
+                presentation.TypeLabel,
+                presentation.TagsLabel,
+                presentation.CardCount,
+                presentation.CardCountLabel,
+                presentation.CreatedAtLabel,
+                presentation.ModifiedAtLabel,
+                children)
+            {
+                IsExpanded = depth == 0
+            };
+        }
+
+        return treeItems;
     }
 
-    private void ReloadVisibleTreeNodes(IReadOnlySet<string> visibleRelativePaths, bool hasActiveFilters)
+    private void ReloadVisibleTreeNodes(IReadOnlySet<string>? visibleRelativePaths, bool hasActiveFilters)
     {
-        VisibleTreeNodes.Clear();
+        if (!hasActiveFilters)
+        {
+            SynchronizeObservableCollection(VisibleTreeNodes, allTreeRoots);
+            return;
+        }
 
+        if (visibleRelativePaths is null)
+        {
+            SynchronizeObservableCollection(VisibleTreeNodes, []);
+            return;
+        }
+
+        List<AllNotesTreeItemViewModel> visibleRoots = [];
         foreach (AllNotesTreeItemViewModel root in allTreeRoots)
         {
             AllNotesTreeItemViewModel? visibleRoot = CreateVisibleTreeNode(
@@ -50,26 +63,35 @@ public sealed partial class AllNotesViewModel
 
             if (visibleRoot is not null)
             {
-                VisibleTreeNodes.Add(visibleRoot);
+                visibleRoots.Add(visibleRoot);
             }
         }
-    }
 
+        SynchronizeObservableCollection(VisibleTreeNodes, visibleRoots);
+    }
     private static AllNotesTreeItemViewModel? CreateVisibleTreeNode(
         AllNotesTreeItemViewModel node,
         IReadOnlySet<string> visibleRelativePaths,
         bool hasActiveFilters)
     {
-        AllNotesTreeItemViewModel[] children = node.Children
-            .Select(child => CreateVisibleTreeNode(child, visibleRelativePaths, hasActiveFilters))
-            .OfType<AllNotesTreeItemViewModel>()
-            .ToArray();
+        List<AllNotesTreeItemViewModel> children = [];
+        foreach (AllNotesTreeItemViewModel child in node.Children)
+        {
+            AllNotesTreeItemViewModel? visibleChild = CreateVisibleTreeNode(
+                child,
+                visibleRelativePaths,
+                hasActiveFilters);
+            if (visibleChild is not null)
+            {
+                children.Add(visibleChild);
+            }
+        }
 
         bool isMatchingNote = node.CanOpen
             && node.RelativePath is not null
             && visibleRelativePaths.Contains(node.RelativePath);
         bool includeNode = hasActiveFilters
-            ? isMatchingNote || children.Length > 0
+            ? isMatchingNote || children.Count > 0
             : true;
 
         if (!includeNode)
@@ -94,26 +116,44 @@ public sealed partial class AllNotesViewModel
         };
     }
 
-    private string GetTreeCreatedAtLabel(KnowledgeTreeItemReadModel item)
-    {
-        return TryFormatTreeTimestamp(item, static note => note.CreatedAt);
-    }
-
-    private string GetTreeModifiedAtLabel(KnowledgeTreeItemReadModel item)
-    {
-        return TryFormatTreeTimestamp(item, static note => note.UpdatedAt);
-    }
-
-    private string GetTreeTypeLabel(KnowledgeTreeItemReadModel item)
+    private TreeItemPresentation CreateTreeItemPresentation(KnowledgeTreeItemReadModel item)
     {
         string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        if (relativePath is not null
-            && noteLookupByRelativePath.TryGetValue(relativePath, out KnowledgeNoteListItemReadModel? note))
+        KnowledgeNoteListItemReadModel? note = TryGetTreeNote(relativePath);
+        int cardCount = GetCardCount(relativePath);
+
+        return new TreeItemPresentation(
+            relativePath,
+            note is null ? GetTreeFallbackTypeLabel(item.Kind) : GetTypeLabel(note.Type),
+            CreateTreeTagsLabel(note),
+            cardCount,
+            FormatCardCount(cardCount),
+            note is null ? string.Empty : FormatTimestamp(note.CreatedAt),
+            note is null ? string.Empty : FormatTimestamp(note.UpdatedAt));
+    }
+
+    private KnowledgeNoteListItemReadModel? TryGetTreeNote(string? relativePath)
+    {
+        if (relativePath is null)
         {
-            return GetTypeLabel(note.Type);
+            return null;
         }
 
-        return item.Kind switch
+        return noteLookupByRelativePath.TryGetValue(relativePath, out KnowledgeNoteListItemReadModel? note)
+            ? note
+            : null;
+    }
+
+    private static string CreateTreeTagsLabel(KnowledgeNoteListItemReadModel? note)
+    {
+        return note is null || note.Tags.Count == 0
+            ? string.Empty
+            : string.Join(", ", note.Tags);
+    }
+
+    private static string GetTreeFallbackTypeLabel(KnowledgeItemKind kind)
+    {
+        return kind switch
         {
             KnowledgeItemKind.Folder => "Folder",
             KnowledgeItemKind.PdfDocument => "PDF",
@@ -121,43 +161,6 @@ public sealed partial class AllNotesViewModel
             KnowledgeItemKind.Root => "Workspace",
             _ => "Note"
         };
-    }
-
-    private string GetTreeTagsLabel(KnowledgeTreeItemReadModel item)
-    {
-        string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        if (relativePath is null || !noteLookupByRelativePath.TryGetValue(relativePath, out KnowledgeNoteListItemReadModel? note))
-        {
-            return string.Empty;
-        }
-
-        return note.Tags.Count == 0
-            ? string.Empty
-            : string.Join(", ", note.Tags);
-    }
-
-    private string GetTreeCardCountLabel(KnowledgeTreeItemReadModel item)
-    {
-        return FormatCardCount(GetTreeCardCount(item));
-    }
-
-    private int GetTreeCardCount(KnowledgeTreeItemReadModel item)
-    {
-        string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        return GetCardCount(relativePath);
-    }
-
-    private string TryFormatTreeTimestamp(
-        KnowledgeTreeItemReadModel item,
-        Func<KnowledgeNoteListItemReadModel, DateTimeOffset> selector)
-    {
-        string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
-        if (relativePath is null || !noteLookupByRelativePath.TryGetValue(relativePath, out KnowledgeNoteListItemReadModel? note))
-        {
-            return string.Empty;
-        }
-
-        return FormatTimestamp(selector(note));
     }
 
     private static bool CanTreeItemContainChildren(KnowledgeItemKind kind)
@@ -174,4 +177,13 @@ public sealed partial class AllNotesViewModel
             ? null
             : relativePath.Replace('\\', '/').Trim('/');
     }
+
+    private readonly record struct TreeItemPresentation(
+        string? RelativePath,
+        string TypeLabel,
+        string TagsLabel,
+        int CardCount,
+        string CardCountLabel,
+        string CreatedAtLabel,
+        string ModifiedAtLabel);
 }

@@ -128,12 +128,15 @@
                     Width="88"
                     IsCancel="True"
                     Style="{StaticResource OutlineButtonStyle}" />
-            <Button Content="Apply"
-                    Width="88"
+            <Button Width="88"
                     Margin="10,0,0,0"
                     IsDefault="True"
                     Click="Apply_Click"
-                    Style="{StaticResource PrimaryButtonStyle}" />
+                    Style="{StaticResource PrimaryButtonStyle}">
+                <TextBlock Text="Apply"
+                            Foreground="{DynamicResource VibrantButtonForegroundBrush}"
+                            />
+            </Button>
         </StackPanel>
     </Grid>
 </Window>
