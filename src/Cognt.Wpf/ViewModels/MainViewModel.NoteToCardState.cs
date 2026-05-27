@@ -10,6 +10,8 @@ namespace CogntApp.ViewModels;
 public sealed partial class MainViewModel
 {
     private NoteToCardQueueReadModel? currentNoteToCardQueue;
+    private Dictionary<(string ContextId, string SlotId), CardCandidateReadModel> noteCardCandidatesByContextAndSlot = [];
+    private IReadOnlyList<CardCandidateReadModel> visibleNoteCardCandidates = Array.Empty<CardCandidateReadModel>();
     private CardCandidateReadModel? selectedCardCandidate;
     private CardPresentationPresetOptionViewModel? selectedNoteToCardPresentationPreset;
     private TextClozeFrontModeOptionViewModel? selectedNoteToCardTextFrontMode;
@@ -20,6 +22,7 @@ public sealed partial class MainViewModel
     private readonly HashSet<string> noteToCardDeckNameSet = new(StringComparer.OrdinalIgnoreCase);
     private string noteToCardPendingTagText = string.Empty;
     private bool isSynchronizingNoteToCardPresentationPreset;
+    private bool isUpdatingNoteToCardDeckCatalog;
 
     public ObservableCollection<string> NoteToCardDeckNames { get; } = [];
 
@@ -42,10 +45,12 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref currentNoteToCardQueue, value))
             {
+                (noteCardCandidatesByContextAndSlot, visibleNoteCardCandidates) = CreateNoteCardQueueState(value);
                 OnPropertyChanged(nameof(HasNoteCardCandidates));
                 OnPropertyChanged(nameof(NoteCardCandidates));
                 OnPropertyChanged(nameof(HasVisibleNoteCardCandidates));
                 OnPropertyChanged(nameof(VisibleNoteCardCandidates));
+                OnPropertyChanged(nameof(CanEditNoteToCardPresentation));
             }
         }
     }
@@ -55,12 +60,9 @@ public sealed partial class MainViewModel
     public IReadOnlyList<CardCandidateReadModel> NoteCardCandidates =>
         CurrentNoteToCardQueue?.Items ?? Array.Empty<CardCandidateReadModel>();
 
-    public bool HasVisibleNoteCardCandidates => VisibleNoteCardCandidates.Count > 0;
+    public bool HasVisibleNoteCardCandidates => visibleNoteCardCandidates.Count > 0;
 
-    public IReadOnlyList<CardCandidateReadModel> VisibleNoteCardCandidates =>
-        NoteCardCandidates
-            .Where(candidate => candidate.Status != CardCandidateStatus.Disabled)
-            .ToArray();
+    public IReadOnlyList<CardCandidateReadModel> VisibleNoteCardCandidates => visibleNoteCardCandidates;
 
     public bool HasSelectedCardCandidate => SelectedCardCandidate is not null;
 
@@ -155,7 +157,8 @@ public sealed partial class MainViewModel
         get => noteToCardDeckName;
         set
         {
-            if (SetProperty(ref noteToCardDeckName, value?.Trim() ?? string.Empty))
+            if (SetProperty(ref noteToCardDeckName, value?.Trim() ?? string.Empty)
+                && !isUpdatingNoteToCardDeckCatalog)
             {
                 RefreshNoteToCardDeckSearchResults();
             }
@@ -168,5 +171,55 @@ public sealed partial class MainViewModel
     {
         get => noteToCardPendingTagText;
         set => SetProperty(ref noteToCardPendingTagText, value);
+    }
+
+    private CardCandidateReadModel? FindCurrentNoteCardCandidate(string contextId, string slotId)
+    {
+        return noteCardCandidatesByContextAndSlot.TryGetValue((contextId, slotId), out CardCandidateReadModel? candidate)
+            ? candidate
+            : null;
+    }
+
+    private static (
+        Dictionary<(string ContextId, string SlotId), CardCandidateReadModel> Lookup,
+        IReadOnlyList<CardCandidateReadModel> VisibleCandidates) CreateNoteCardQueueState(NoteToCardQueueReadModel? queue)
+    {
+        if (queue is null || queue.Items.Count == 0)
+        {
+            return ([], Array.Empty<CardCandidateReadModel>());
+        }
+
+        Dictionary<(string ContextId, string SlotId), CardCandidateReadModel> lookup = new(queue.Items.Count);
+        List<CardCandidateReadModel>? visibleCandidates = null;
+
+        for (int index = 0; index < queue.Items.Count; index++)
+        {
+            CardCandidateReadModel candidate = queue.Items[index];
+            lookup[(candidate.ContextId, candidate.SlotId)] = candidate;
+
+            if (candidate.Status == CardCandidateStatus.Disabled)
+            {
+                visibleCandidates ??= CopyCandidatesBeforeDisabledItem(queue.Items, index);
+                continue;
+            }
+
+            visibleCandidates?.Add(candidate);
+        }
+
+        return (lookup, visibleCandidates ?? queue.Items);
+    }
+
+    private static List<CardCandidateReadModel> CopyCandidatesBeforeDisabledItem(
+        IReadOnlyList<CardCandidateReadModel> candidates,
+        int disabledItemIndex)
+    {
+        var visibleCandidates = new List<CardCandidateReadModel>(candidates.Count - 1);
+
+        for (int index = 0; index < disabledItemIndex; index++)
+        {
+            visibleCandidates.Add(candidates[index]);
+        }
+
+        return visibleCandidates;
     }
 }

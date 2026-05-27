@@ -36,6 +36,7 @@ public sealed partial class ImageMaskOverlayCanvas : Canvas
     private Rect resizeStartRect;
     private double resizeTotalDx;
     private double resizeTotalDy;
+    private readonly List<Point> polygonSegmentBuffer = [];
 
     public ImageMaskOverlayCanvas()
     {

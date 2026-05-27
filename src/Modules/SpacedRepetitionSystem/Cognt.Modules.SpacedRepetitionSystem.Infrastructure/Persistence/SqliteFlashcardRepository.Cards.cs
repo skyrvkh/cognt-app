@@ -12,10 +12,7 @@ internal sealed partial class SqliteFlashcardRepository
 
     internal IReadOnlyList<FlashcardRecord> LoadCardsByIds(IReadOnlyList<long> cardIds)
     {
-        long[] distinctIds = cardIds
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
+        long[] distinctIds = CreateDistinctPositiveIds(cardIds);
         if (distinctIds.Length == 0)
         {
             return [];
@@ -23,10 +20,11 @@ internal sealed partial class SqliteFlashcardRepository
 
         return UseConnection(connection =>
         {
-            List<FlashcardRecord> records = [];
-            foreach (long[] chunk in distinctIds.Chunk(400))
+            List<FlashcardRecord> records = new(distinctIds.Length);
+            for (int offset = 0; offset < distinctIds.Length; offset += 400)
             {
-                using SqliteCommand command = CreateLoadCardsByIdsCommand(connection, chunk);
+                int count = Math.Min(400, distinctIds.Length - offset);
+                using SqliteCommand command = CreateLoadCardsByIdsCommand(connection, distinctIds, offset, count);
                 records.AddRange(ReadCards(command));
             }
 
@@ -34,14 +32,35 @@ internal sealed partial class SqliteFlashcardRepository
         });
     }
 
+    private static long[] CreateDistinctPositiveIds(IReadOnlyList<long> cardIds)
+    {
+        if (cardIds.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<long> seenIds = [];
+        List<long> distinctIds = new(cardIds.Count);
+        for (int index = 0; index < cardIds.Count; index++)
+        {
+            long cardId = cardIds[index];
+            if (cardId > 0 && seenIds.Add(cardId))
+            {
+                distinctIds.Add(cardId);
+            }
+        }
+
+        return distinctIds.Count == 0 ? [] : distinctIds.ToArray();
+    }
+
     private static SqliteCommand CreateLoadCardsByIdsCommand(
         SqliteConnection connection,
-        IReadOnlyList<long> cardIds)
+        IReadOnlyList<long> cardIds,
+        int offset,
+        int count)
     {
         SqliteCommand command = connection.CreateCommand();
-        string[] parameterNames = cardIds
-            .Select((_, index) => string.Concat("$id", index.ToString(System.Globalization.CultureInfo.InvariantCulture)))
-            .ToArray();
+        string[] parameterNames = CreateParameterNames(count);
         command.CommandText = $"""
             SELECT {FlashcardRecordProjection}
             FROM flashcard_card
@@ -50,12 +69,23 @@ internal sealed partial class SqliteFlashcardRepository
               AND id IN ({string.Join(", ", parameterNames)});
             """;
 
-        for (int i = 0; i < cardIds.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-            command.Parameters.AddWithValue(parameterNames[i], cardIds[i]);
+            command.Parameters.AddWithValue(parameterNames[i], cardIds[offset + i]);
         }
 
         return command;
+    }
+
+    private static string[] CreateParameterNames(int count)
+    {
+        string[] parameterNames = new string[count];
+        for (int index = 0; index < count; index++)
+        {
+            parameterNames[index] = string.Concat("$id", index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        return parameterNames;
     }
 
     private static FlashcardRecord GetCard(
@@ -85,8 +115,13 @@ internal sealed partial class SqliteFlashcardRepository
 
     private static FlashcardRecord ReadRequiredCard(SqliteCommand command, long cardId)
     {
-        return ReadCards(command).FirstOrDefault()
-            ?? throw new InvalidOperationException($"Flashcard {cardId} does not exist.");
+        using SqliteDataReader reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            return ReadCard(reader);
+        }
+
+        throw new InvalidOperationException($"Flashcard {cardId} does not exist.");
     }
 
     private static IReadOnlyList<FlashcardRecord> ReadCards(SqliteCommand command)

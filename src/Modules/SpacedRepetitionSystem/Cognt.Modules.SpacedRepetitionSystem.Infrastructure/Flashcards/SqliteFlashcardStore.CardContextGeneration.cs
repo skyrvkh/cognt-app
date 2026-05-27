@@ -22,17 +22,14 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
         IReadOnlyList<ExpandedCardContextCard> expandedCards = CardContextCardExpansion.Expand(context);
-        IReadOnlyList<string> cardTags = tags
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        string[] cardTags = CreateDistinctCardTags(tags);
 
         using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
         long deckId = repository.EnsureDeck(deckName);
-        Dictionary<string, GeneratedFlashcardSourceRecord> existingBySlotId = repository
-            .LoadActiveGeneratedCardsForContext(sourceRelPath, context.Id)
-            .Where(record => !string.IsNullOrWhiteSpace(record.SourceSlotId))
-            .GroupBy(record => record.SourceSlotId!, StringComparer.Ordinal)
-            .ToDictionary(grouping => grouping.Key, grouping => grouping.First(), StringComparer.Ordinal);
+        Dictionary<string, GeneratedFlashcardSourceRecord> existingBySlotId = LoadFirstGeneratedCardsBySlotId(
+            repository,
+            sourceRelPath,
+            context.Id);
 
         List<long> affectedCardIds = [];
         HashSet<string> currentSlotIds = new(StringComparer.Ordinal);
@@ -45,7 +42,7 @@ internal sealed partial class SqliteFlashcardStore
             currentSlotIds.Add(card.CurrentSlotId);
 
             string document = FlashcardCardContentCodec.CreateMultimodalClozeDocument(card, cardTags);
-            string? sourceTargetId = card.CurrentTargetIds.FirstOrDefault();
+            string? sourceTargetId = card.CurrentTargetIds.Count > 0 ? card.CurrentTargetIds[0] : null;
 
             if (existingBySlotId.TryGetValue(card.CurrentSlotId, out GeneratedFlashcardSourceRecord? existing))
             {
@@ -82,19 +79,64 @@ internal sealed partial class SqliteFlashcardStore
             createdCards++;
         }
 
-        IReadOnlyList<GeneratedFlashcardSourceRecord> orphanedCards = existingBySlotId
-            .Where(pair => !currentSlotIds.Contains(pair.Key))
-            .Select(pair => pair.Value)
-            .ToArray();
+        string[] orphanedSlotIds = CreateOrphanedSlotIds(existingBySlotId, currentSlotIds);
 
         return new CreateCardsFromCardContextResult(
             createdCards,
             updatedCards,
             affectedCardIds,
-            orphanedCards
-                .Select(card => card.SourceSlotId)
-                .Where(slotId => !string.IsNullOrWhiteSpace(slotId))
-                .Select(slotId => slotId!)
-                .ToArray());
+            orphanedSlotIds);
+    }
+
+    private static string[] CreateDistinctCardTags(IReadOnlyList<string> tags)
+    {
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> distinctTags = new(tags.Count);
+        foreach (string tag in tags)
+        {
+            if (seenTags.Add(tag))
+            {
+                distinctTags.Add(tag);
+            }
+        }
+
+        return distinctTags.ToArray();
+    }
+
+    private static Dictionary<string, GeneratedFlashcardSourceRecord> LoadFirstGeneratedCardsBySlotId(
+        SqliteFlashcardRepository repository,
+        string sourceRelPath,
+        string sourceContextId)
+    {
+        IReadOnlyList<GeneratedFlashcardSourceRecord> records = repository.LoadActiveGeneratedCardsForContext(
+            sourceRelPath,
+            sourceContextId);
+        Dictionary<string, GeneratedFlashcardSourceRecord> existingBySlotId = new(StringComparer.Ordinal);
+        foreach (GeneratedFlashcardSourceRecord record in records)
+        {
+            if (!string.IsNullOrWhiteSpace(record.SourceSlotId))
+            {
+                existingBySlotId.TryAdd(record.SourceSlotId, record);
+            }
+        }
+
+        return existingBySlotId;
+    }
+
+    private static string[] CreateOrphanedSlotIds(
+        IReadOnlyDictionary<string, GeneratedFlashcardSourceRecord> existingBySlotId,
+        IReadOnlySet<string> currentSlotIds)
+    {
+        List<string> orphanedSlotIds = [];
+        foreach (KeyValuePair<string, GeneratedFlashcardSourceRecord> pair in existingBySlotId)
+        {
+            if (!currentSlotIds.Contains(pair.Key)
+                && !string.IsNullOrWhiteSpace(pair.Value.SourceSlotId))
+            {
+                orphanedSlotIds.Add(pair.Value.SourceSlotId);
+            }
+        }
+
+        return orphanedSlotIds.ToArray();
     }
 }

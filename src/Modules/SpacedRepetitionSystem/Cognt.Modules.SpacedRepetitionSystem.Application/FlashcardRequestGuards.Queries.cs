@@ -1,3 +1,4 @@
+using System.Text;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
@@ -68,13 +69,64 @@ internal static partial class FlashcardRequestGuards
 
     private static IReadOnlyList<string> NormalizeStrings(IEnumerable<string>? values)
     {
-        return values?
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => string.Concat(value.Trim().Where(character => !char.IsWhiteSpace(character))))
-            .Where(value => value.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-            .ToArray()
-            ?? [];
+        if (values is null)
+        {
+            return [];
+        }
+
+        HashSet<string> seenValues = new(StringComparer.OrdinalIgnoreCase);
+        List<string> normalizedValues = [];
+        foreach (string value in values)
+        {
+            string normalizedValue = NormalizeFilterValue(value);
+            if (normalizedValue.Length > 0 && seenValues.Add(normalizedValue))
+            {
+                normalizedValues.Add(normalizedValue);
+            }
+        }
+
+        normalizedValues.Sort(StringComparer.OrdinalIgnoreCase);
+        return normalizedValues.ToArray();
+    }
+
+    private static string NormalizeFilterValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        ReadOnlySpan<char> trimmedValue = value.AsSpan().Trim();
+        int firstWhitespaceIndex = IndexOfWhitespace(trimmedValue);
+        if (firstWhitespaceIndex < 0)
+        {
+            return trimmedValue.ToString();
+        }
+
+        StringBuilder builder = new(trimmedValue.Length);
+        builder.Append(trimmedValue[..firstWhitespaceIndex]);
+        for (int index = firstWhitespaceIndex + 1; index < trimmedValue.Length; index++)
+        {
+            char character = trimmedValue[index];
+            if (!char.IsWhiteSpace(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static int IndexOfWhitespace(ReadOnlySpan<char> value)
+    {
+        for (int index = 0; index < value.Length; index++)
+        {
+            if (char.IsWhiteSpace(value[index]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

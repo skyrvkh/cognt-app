@@ -142,12 +142,56 @@ public partial class EditCardDialog : Window
 
     private static string[] ParseTags(string? value)
     {
-        return (value ?? string.Empty)
-            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(tag => string.Concat(tag.Where(character => !char.IsWhiteSpace(character))))
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        if (string.IsNullOrEmpty(value))
+        {
+            return [];
+        }
+
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> tags = [];
+        char[] tagBuffer = new char[value.Length];
+        int tagLength = 0;
+
+        foreach (char character in value)
+        {
+            if (IsTagDelimiter(character))
+            {
+                AddBufferedTag(tagBuffer, tagLength, seenTags, tags);
+                tagLength = 0;
+                continue;
+            }
+
+            if (!char.IsWhiteSpace(character))
+            {
+                tagBuffer[tagLength++] = character;
+            }
+        }
+
+        AddBufferedTag(tagBuffer, tagLength, seenTags, tags);
+        tags.Sort(StringComparer.OrdinalIgnoreCase);
+        return tags.ToArray();
+    }
+
+    private static bool IsTagDelimiter(char character)
+    {
+        return character is ',' or ';' or '\r' or '\n';
+    }
+
+    private static void AddBufferedTag(
+        char[] tagBuffer,
+        int tagLength,
+        HashSet<string> seenTags,
+        List<string> tags)
+    {
+        if (tagLength == 0)
+        {
+            return;
+        }
+
+        string tag = new(tagBuffer, 0, tagLength);
+        if (seenTags.Add(tag))
+        {
+            tags.Add(tag);
+        }
     }
 }

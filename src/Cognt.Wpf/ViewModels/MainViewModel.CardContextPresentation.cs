@@ -35,6 +35,29 @@ public sealed partial class MainViewModel
     {
         IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
         bool hasTargets = targets.Count > 0;
+        bool allTargetsHaveTextAnchors = hasTargets;
+        bool allTargetsHaveImageAnchors = hasTargets;
+
+        if (hasTargets)
+        {
+            foreach (CardCandidateReadModel candidate in targets)
+            {
+                if (allTargetsHaveTextAnchors && candidate.TextAnchors.Count == 0)
+                {
+                    allTargetsHaveTextAnchors = false;
+                }
+
+                if (allTargetsHaveImageAnchors && candidate.ImageAnchors.Count == 0)
+                {
+                    allTargetsHaveImageAnchors = false;
+                }
+
+                if (!allTargetsHaveTextAnchors && !allTargetsHaveImageAnchors)
+                {
+                    break;
+                }
+            }
+        }
 
         foreach (CardPresentationPresetOptionViewModel option in NoteToCardPresentationPresets)
         {
@@ -52,10 +75,9 @@ public sealed partial class MainViewModel
 
             CardPresentationPolicy policy = CardPresentationPolicies.ForPreset(option.Preset);
             bool needsImage = policy.ImageFrontMode != ImageOcclusionFrontMode.None;
-            bool canUse = targets.All(candidate =>
-                needsImage
-                    ? candidate.ImageAnchors.Count > 0
-                    : candidate.TextAnchors.Count > 0);
+            bool canUse = needsImage
+                ? allTargetsHaveImageAnchors
+                : allTargetsHaveTextAnchors;
             option.SetAvailability(
                 canUse,
                 needsImage
@@ -85,16 +107,25 @@ public sealed partial class MainViewModel
                 return null;
             }
 
+            Dictionary<string, CardContext> contextsById = CreateCardContextLookup(document.Contexts);
+            Dictionary<string, Dictionary<string, CardSlot>> slotLookupsByContextId = new(StringComparer.Ordinal);
             CardPresentationPolicy? sharedPolicy = null;
+
             foreach (CardCandidateReadModel candidate in targets)
             {
-                CardContext? context = document.Contexts.FirstOrDefault(item =>
-                    string.Equals(item.Id, candidate.ContextId, StringComparison.Ordinal));
-                CardSlot? slot = context?.Slots.FirstOrDefault(item =>
-                    string.Equals(item.Id, candidate.SlotId, StringComparison.Ordinal));
-                CardPresentationPolicy? policy = context is null
-                    ? null
-                    : CardPresentationPolicies.Resolve(context, slot);
+                if (!contextsById.TryGetValue(candidate.ContextId, out CardContext? context))
+                {
+                    return null;
+                }
+
+                if (!slotLookupsByContextId.TryGetValue(context.Id, out Dictionary<string, CardSlot>? slotsById))
+                {
+                    slotsById = CreateCardSlotLookup(context.Slots);
+                    slotLookupsByContextId.Add(context.Id, slotsById);
+                }
+
+                slotsById.TryGetValue(candidate.SlotId, out CardSlot? slot);
+                CardPresentationPolicy? policy = CardPresentationPolicies.Resolve(context, slot);
                 if (policy is null)
                 {
                     return null;
@@ -118,6 +149,28 @@ public sealed partial class MainViewModel
         {
             return null;
         }
+    }
+
+    private static Dictionary<string, CardContext> CreateCardContextLookup(IReadOnlyList<CardContext> contexts)
+    {
+        Dictionary<string, CardContext> lookup = new(contexts.Count, StringComparer.Ordinal);
+        foreach (CardContext context in contexts)
+        {
+            lookup[context.Id] = context;
+        }
+
+        return lookup;
+    }
+
+    private static Dictionary<string, CardSlot> CreateCardSlotLookup(IReadOnlyList<CardSlot> slots)
+    {
+        Dictionary<string, CardSlot> lookup = new(slots.Count, StringComparer.Ordinal);
+        foreach (CardSlot slot in slots)
+        {
+            lookup[slot.Id] = slot;
+        }
+
+        return lookup;
     }
 
     private void ApplySelectedNoteToCardPresentationPreset(CardPresentationPreset? preset)
@@ -253,9 +306,7 @@ public sealed partial class MainViewModel
             ReloadCurrentNoteToCardQueue(relativePath, noteContent);
             if (selected is not null)
             {
-                SelectedCardCandidate = CurrentNoteToCardQueue?.Items.FirstOrDefault(item =>
-                    string.Equals(item.ContextId, selected.ContextId, StringComparison.Ordinal)
-                    && string.Equals(item.SlotId, selected.SlotId, StringComparison.Ordinal));
+                SelectedCardCandidate = FindCurrentNoteCardCandidate(selected.ContextId, selected.SlotId);
             }
             else
             {
