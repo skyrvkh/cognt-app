@@ -22,10 +22,7 @@ public static partial class CardContextAuthoring
             {
                 images[imageIndex] = image with
                 {
-                    Masks = image.Masks
-                        .Where(mask => !string.Equals(mask.Id, maskId, StringComparison.Ordinal))
-                        .Concat([currentMask with { TargetId = string.Empty }])
-                        .ToArray(),
+                    Masks = ReplaceImageMaskById(image.Masks, currentMask with { TargetId = string.Empty }),
                 };
             }
         }
@@ -48,9 +45,7 @@ public static partial class CardContextAuthoring
         if (imageIndex >= 0)
         {
             CardContextImageSurface image = images[imageIndex];
-            ImageOcclusionMask[] remainingMasks = image.Masks
-                .Where(mask => !string.Equals(mask.Id, maskId, StringComparison.Ordinal))
-                .ToArray();
+            ImageOcclusionMask[] remainingMasks = RemoveImageMasksById(image.Masks, maskId);
 
             if (remainingMasks.Length == 0)
             {
@@ -73,11 +68,7 @@ public static partial class CardContextAuthoring
         for (int index = 0; index < targets.Count; index++)
         {
             CardTarget target = targets[index];
-            ImageMaskAnchor[] anchors = target.ImageAnchors
-                .Where(anchor =>
-                    !string.Equals(anchor.ImageBlockId, imageBlockId, StringComparison.Ordinal)
-                    || !string.Equals(anchor.MaskId, maskId, StringComparison.Ordinal))
-                .ToArray();
+            ImageMaskAnchor[] anchors = RemoveImageMaskAnchors(target.ImageAnchors, imageBlockId, maskId);
 
             if (anchors.Length != target.ImageAnchors.Count)
             {
@@ -86,5 +77,51 @@ public static partial class CardContextAuthoring
         }
 
         return targets;
+    }
+
+    private static ImageOcclusionMask[] RemoveImageMasksById(
+        IReadOnlyList<ImageOcclusionMask> masks,
+        string maskId)
+    {
+        ImageOcclusionMask[] remainingMasks = new ImageOcclusionMask[masks.Count];
+        int count = 0;
+        foreach (ImageOcclusionMask mask in masks)
+        {
+            if (!string.Equals(mask.Id, maskId, StringComparison.Ordinal))
+            {
+                remainingMasks[count++] = mask;
+            }
+        }
+
+        if (count != remainingMasks.Length)
+        {
+            Array.Resize(ref remainingMasks, count);
+        }
+
+        return remainingMasks;
+    }
+
+    private static ImageMaskAnchor[] RemoveImageMaskAnchors(
+        IReadOnlyList<ImageMaskAnchor> anchors,
+        string imageBlockId,
+        string maskId)
+    {
+        ImageMaskAnchor[] remainingAnchors = new ImageMaskAnchor[anchors.Count];
+        int count = 0;
+        foreach (ImageMaskAnchor anchor in anchors)
+        {
+            if (!string.Equals(anchor.ImageBlockId, imageBlockId, StringComparison.Ordinal)
+                || !string.Equals(anchor.MaskId, maskId, StringComparison.Ordinal))
+            {
+                remainingAnchors[count++] = anchor;
+            }
+        }
+
+        if (count != remainingAnchors.Length)
+        {
+            Array.Resize(ref remainingAnchors, count);
+        }
+
+        return remainingAnchors;
     }
 }

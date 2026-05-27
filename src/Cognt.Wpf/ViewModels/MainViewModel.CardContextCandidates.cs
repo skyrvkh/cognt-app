@@ -16,9 +16,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        CardCandidateReadModel[] candidates = CurrentNoteToCardQueue.Items
-            .Where(CanGenerateCandidate)
-            .ToArray();
+        IReadOnlyList<CardCandidateReadModel> candidates = CreateGeneratableCandidateList(CurrentNoteToCardQueue.Items);
 
         await GenerateCardsFromCandidatesAsync(
             candidates,
@@ -96,17 +94,13 @@ public sealed partial class MainViewModel
             SaveNoteIfChanged(noteContent);
 
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-            CardContext context = document.Contexts.FirstOrDefault(item =>
-                    string.Equals(item.Id, selected.ContextId, StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("The selected card context no longer exists.");
+            CardContext context = ResolveRequestedDraftContext(document, selected.ContextId);
 
             context = CardContextAuthoring.SetCardSlotDisabled(context, selected.SlotId, isDisabled: true);
             PersistCardContextDraftDocument(relativePath, noteContent, ReplaceDraftContext(document, context));
             ReloadCurrentNoteToCardQueue(relativePath, noteContent);
 
-            SelectedCardCandidate = CurrentNoteToCardQueue?.Items.FirstOrDefault(item =>
-                    string.Equals(item.ContextId, selected.ContextId, StringComparison.Ordinal)
-                    && string.Equals(item.SlotId, selected.SlotId, StringComparison.Ordinal));
+            SelectedCardCandidate = FindCurrentNoteCardCandidate(selected.ContextId, selected.SlotId);
             RaiseMessage("Note Cards", $"Disabled c{selected.DisplayClozeIndex} {selected.AnswerPreview}.");
         }
         catch (Exception ex)
@@ -140,12 +134,7 @@ public sealed partial class MainViewModel
             }
 
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-            Dictionary<string, HashSet<string>> slotIdsByContextId = candidates
-                .GroupBy(candidate => candidate.ContextId, StringComparer.Ordinal)
-                .ToDictionary(
-                    grouping => grouping.Key,
-                    grouping => grouping.Select(candidate => candidate.SlotId).ToHashSet(StringComparer.Ordinal),
-                    StringComparer.Ordinal);
+            Dictionary<string, HashSet<string>> slotIdsByContextId = CreateSlotIdsByContextId(candidates);
 
             int created = 0;
             int updated = 0;
@@ -190,5 +179,40 @@ public sealed partial class MainViewModel
     private static bool CanGenerateCandidate(CardCandidateReadModel candidate)
     {
         return candidate.Status is CardCandidateStatus.Ready or CardCandidateStatus.Outdated;
+    }
+
+    private static IReadOnlyList<CardCandidateReadModel> CreateGeneratableCandidateList(
+        IReadOnlyList<CardCandidateReadModel> candidates)
+    {
+        var generatableCandidates = new List<CardCandidateReadModel>();
+
+        foreach (CardCandidateReadModel candidate in candidates)
+        {
+            if (CanGenerateCandidate(candidate))
+            {
+                generatableCandidates.Add(candidate);
+            }
+        }
+
+        return generatableCandidates;
+    }
+
+    private static Dictionary<string, HashSet<string>> CreateSlotIdsByContextId(
+        IReadOnlyList<CardCandidateReadModel> candidates)
+    {
+        var slotIdsByContextId = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (CardCandidateReadModel candidate in candidates)
+        {
+            if (!slotIdsByContextId.TryGetValue(candidate.ContextId, out HashSet<string>? slotIds))
+            {
+                slotIds = new HashSet<string>(StringComparer.Ordinal);
+                slotIdsByContextId.Add(candidate.ContextId, slotIds);
+            }
+
+            slotIds.Add(candidate.SlotId);
+        }
+
+        return slotIdsByContextId;
     }
 }

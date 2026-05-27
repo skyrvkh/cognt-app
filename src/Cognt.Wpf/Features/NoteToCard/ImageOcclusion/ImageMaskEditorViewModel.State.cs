@@ -74,28 +74,58 @@ public sealed partial class ImageMaskEditorViewModel
 
     private void ReloadTargetOptions()
     {
-        ImageMaskTargetOptionViewModel[] options = currentContext.Slots
+        Dictionary<string, ImageMaskTargetOptionViewModel> existingByTargetId = TargetOptions
+            .ToDictionary(option => option.TargetId, StringComparer.Ordinal);
+        ImageMaskTargetOptionViewModel[] nextOptions = currentContext.Slots
             .OrderBy(slot => slot.DisplayClozeIndex)
             .ThenBy(slot => slot.Id, StringComparer.Ordinal)
             .SelectMany(slot => GetTargetsForSlot(slot)
-                .Select(target => new ImageMaskTargetOptionViewModel(
-                    target.Id,
-                    slot.Id,
-                    slot.DisplayClozeIndex,
-                    target.Answer)))
+                .Select(target => CreateOrUpdateTargetOption(existingByTargetId, target.Id, slot.Id, slot.DisplayClozeIndex, target.Answer)))
             .ToArray();
 
-        TargetOptions.Clear();
-        foreach (ImageMaskTargetOptionViewModel option in options)
+        SynchronizeTargetOptions(nextOptions);
+
+        string? selectedTargetId = selectedTargetOption?.TargetId;
+        SelectedTargetOption = string.IsNullOrWhiteSpace(selectedTargetId)
+            ? null
+            : TargetOptions.FirstOrDefault(option => string.Equals(option.TargetId, selectedTargetId, StringComparison.Ordinal));
+    }
+
+    private ImageMaskTargetOptionViewModel CreateOrUpdateTargetOption(
+        IReadOnlyDictionary<string, ImageMaskTargetOptionViewModel> existingByTargetId,
+        string targetId,
+        string slotId,
+        int displayClozeIndex,
+        string answer)
+    {
+        if (!existingByTargetId.TryGetValue(targetId, out ImageMaskTargetOptionViewModel? existing))
         {
-            TargetOptions.Add(option);
+            return new ImageMaskTargetOptionViewModel(targetId, slotId, displayClozeIndex, answer);
         }
 
-        if (selectedTargetOption is not null)
+        existing.Update(slotId, displayClozeIndex, answer);
+        return existing;
+    }
+
+    private void SynchronizeTargetOptions(IReadOnlyList<ImageMaskTargetOptionViewModel> nextOptions)
+    {
+        int sharedCount = Math.Min(TargetOptions.Count, nextOptions.Count);
+        for (int index = 0; index < sharedCount; index++)
         {
-            selectedTargetOption = TargetOptions.FirstOrDefault(option =>
-                string.Equals(option.TargetId, selectedTargetOption.TargetId, StringComparison.Ordinal));
-            OnPropertyChanged(nameof(SelectedTargetOption));
+            if (!ReferenceEquals(TargetOptions[index], nextOptions[index]))
+            {
+                TargetOptions[index] = nextOptions[index];
+            }
+        }
+
+        for (int index = TargetOptions.Count - 1; index >= nextOptions.Count; index--)
+        {
+            TargetOptions.RemoveAt(index);
+        }
+
+        for (int index = sharedCount; index < nextOptions.Count; index++)
+        {
+            TargetOptions.Add(nextOptions[index]);
         }
     }
 

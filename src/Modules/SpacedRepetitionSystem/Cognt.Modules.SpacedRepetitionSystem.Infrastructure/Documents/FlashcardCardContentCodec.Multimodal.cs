@@ -1,3 +1,4 @@
+using System.Text;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
@@ -70,14 +71,8 @@ internal static partial class FlashcardCardContentCodec
         bool isAnswerVisible,
         out bool missingMedia)
     {
-        Dictionary<int, CardSlot> slotsByDisplayIndex = slots
-            .Where(slot => slot.DisplayClozeIndex > 0 && !slot.IsDisabled)
-            .GroupBy(slot => slot.DisplayClozeIndex)
-            .Select(grouping => grouping.First())
-            .ToDictionary(slot => slot.DisplayClozeIndex, slot => slot);
-        Dictionary<string, string> targetSlots = targets
-            .Where(target => !target.IsDisabled)
-            .ToDictionary(target => target.Id, target => target.SlotId, StringComparer.Ordinal);
+        Dictionary<int, CardSlot> slotsByDisplayIndex = CreateSlotsByDisplayIndex(slots);
+        Dictionary<string, string> targetSlots = CreateTargetSlots(targets);
 
         IReadOnlyList<MultimodalTextSegmentReadModel> textSegments = BuildClozeAwareTextSegments(
             contextText,
@@ -85,7 +80,7 @@ internal static partial class FlashcardCardContentCodec
             currentSlotId,
             presentation,
             isAnswerVisible);
-        string renderedContextText = string.Concat(textSegments.Select(segment => segment.Text));
+        string renderedContextText = RenderContextText(textSegments);
         ImageOcclusionReadModel? imageOcclusion = BuildImageOcclusionReadModel(
             images,
             targetSlots,
@@ -103,4 +98,49 @@ internal static partial class FlashcardCardContentCodec
             currentSlotId);
     }
 
+    private static Dictionary<int, CardSlot> CreateSlotsByDisplayIndex(IReadOnlyList<CardSlot> slots)
+    {
+        Dictionary<int, CardSlot> slotsByDisplayIndex = [];
+        for (int index = 0; index < slots.Count; index++)
+        {
+            CardSlot slot = slots[index];
+            if (slot.DisplayClozeIndex > 0 && !slot.IsDisabled)
+            {
+                slotsByDisplayIndex.TryAdd(slot.DisplayClozeIndex, slot);
+            }
+        }
+
+        return slotsByDisplayIndex;
+    }
+
+    private static Dictionary<string, string> CreateTargetSlots(IReadOnlyList<CardTarget> targets)
+    {
+        Dictionary<string, string> targetSlots = new(StringComparer.Ordinal);
+        for (int index = 0; index < targets.Count; index++)
+        {
+            CardTarget target = targets[index];
+            if (!target.IsDisabled)
+            {
+                targetSlots.Add(target.Id, target.SlotId);
+            }
+        }
+
+        return targetSlots;
+    }
+
+    private static string RenderContextText(IReadOnlyList<MultimodalTextSegmentReadModel> textSegments)
+    {
+        if (textSegments.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new();
+        for (int index = 0; index < textSegments.Count; index++)
+        {
+            builder.Append(textSegments[index].Text);
+        }
+
+        return builder.ToString();
+    }
 }

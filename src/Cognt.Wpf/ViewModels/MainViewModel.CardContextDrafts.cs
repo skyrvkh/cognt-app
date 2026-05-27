@@ -193,18 +193,43 @@ public sealed partial class MainViewModel
         CardContextDraftNoteDocument document,
         CardContext updatedContext)
     {
-        CardContext[] contexts = document.Contexts.ToArray();
-        int contextIndex = Array.FindIndex(
-            contexts,
-            context => string.Equals(context.Id, updatedContext.Id, StringComparison.Ordinal));
+        int contextIndex = FindDraftContextIndexById(document.Contexts, updatedContext.Id);
 
         if (contextIndex < 0)
         {
-            return document with { Contexts = contexts.Concat([updatedContext]).ToArray() };
+            return document with { Contexts = AppendDraftContext(document.Contexts, updatedContext) };
         }
 
+        CardContext[] contexts = document.Contexts.ToArray();
         contexts[contextIndex] = updatedContext;
         return document with { Contexts = contexts };
+    }
+
+    private static CardContext[] AppendDraftContext(
+        IReadOnlyList<CardContext> contexts,
+        CardContext context)
+    {
+        CardContext[] nextContexts = new CardContext[contexts.Count + 1];
+        for (int index = 0; index < contexts.Count; index++)
+        {
+            nextContexts[index] = contexts[index];
+        }
+
+        nextContexts[^1] = context;
+        return nextContexts;
+    }
+
+    private static int FindDraftContextIndexById(IReadOnlyList<CardContext> contexts, string contextId)
+    {
+        for (int index = 0; index < contexts.Count; index++)
+        {
+            if (string.Equals(contexts[index].Id, contextId, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static CardContext ResolveRequestedDraftContext(
@@ -216,8 +241,12 @@ public sealed partial class MainViewModel
             return document.Contexts[0];
         }
 
-        return document.Contexts.FirstOrDefault(context =>
-                string.Equals(context.Id, cardContextId, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("The selected card context no longer exists.");
+        int contextIndex = FindDraftContextIndexById(document.Contexts, cardContextId);
+        if (contextIndex < 0)
+        {
+            throw new InvalidOperationException("The selected card context no longer exists.");
+        }
+
+        return document.Contexts[contextIndex];
     }
 }

@@ -25,9 +25,7 @@ public static partial class CardContextAuthoring
         ArgumentException.ThrowIfNullOrWhiteSpace(slotId);
         ArgumentNullException.ThrowIfNull(target);
 
-        int slotIndex = context.Slots
-            .ToList()
-            .FindIndex(slot => string.Equals(slot.Id, slotId, StringComparison.Ordinal));
+        int slotIndex = FindSlotIndexById(context.Slots, slotId);
 
         if (slotIndex < 0 || slotIndex >= context.Slots.Count)
         {
@@ -38,14 +36,11 @@ public static partial class CardContextAuthoring
         CardSlot currentSlot = slots[slotIndex];
         slots[slotIndex] = currentSlot with
         {
-            TargetIds = currentSlot.TargetIds
-                .Concat([target.Id])
-                .Distinct(StringComparer.Ordinal)
-                .ToArray(),
+            TargetIds = AppendDistinctOrdinal(currentSlot.TargetIds, target.Id),
         };
 
         List<CardTarget> targets = [..context.Targets];
-        if (targets.All(existing => !string.Equals(existing.Id, target.Id, StringComparison.Ordinal)))
+        if (!ContainsTargetId(targets, target.Id))
         {
             targets.Add(target);
         }
@@ -99,19 +94,55 @@ public static partial class CardContextAuthoring
         CardTarget target = targets[targetIndex];
         targets[targetIndex] = target with
         {
-            TextAnchors = target.TextAnchors
-                .Concat([anchor])
-                .DistinctBy(candidate => candidate.Id, StringComparer.Ordinal)
-                .ToArray(),
+            TextAnchors = AppendTextAnchorById(target.TextAnchors, anchor),
         };
 
         return context with
         {
             Targets = targets,
-            ContextBlockIds = context.ContextBlockIds
-                .Concat([anchor.BlockId])
-                .Distinct(StringComparer.Ordinal)
-                .ToArray(),
+            ContextBlockIds = AppendDistinctOrdinal(context.ContextBlockIds, anchor.BlockId),
         };
+    }
+
+    private static bool ContainsTargetId(IReadOnlyList<CardTarget> targets, string targetId)
+    {
+        foreach (CardTarget target in targets)
+        {
+            if (string.Equals(target.Id, targetId, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static TextAnchor[] AppendTextAnchorById(
+        IReadOnlyList<TextAnchor> anchors,
+        TextAnchor anchor)
+    {
+        HashSet<string> seenAnchorIds = new(StringComparer.Ordinal);
+        TextAnchor[] nextAnchors = new TextAnchor[anchors.Count + 1];
+        int count = 0;
+
+        foreach (TextAnchor existing in anchors)
+        {
+            if (seenAnchorIds.Add(existing.Id))
+            {
+                nextAnchors[count++] = existing;
+            }
+        }
+
+        if (seenAnchorIds.Add(anchor.Id))
+        {
+            nextAnchors[count++] = anchor;
+        }
+
+        if (count != nextAnchors.Length)
+        {
+            Array.Resize(ref nextAnchors, count);
+        }
+
+        return nextAnchors;
     }
 }

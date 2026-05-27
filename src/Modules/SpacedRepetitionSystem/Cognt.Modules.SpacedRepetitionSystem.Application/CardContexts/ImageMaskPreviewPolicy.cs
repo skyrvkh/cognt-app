@@ -33,8 +33,13 @@ public static class ImageMaskPreviewPolicy
         ArgumentException.ThrowIfNullOrWhiteSpace(currentSlotId);
 
         List<ImageMaskPreviewState> states = [];
-        foreach (ImageOcclusionMask mask in masks.Where(candidate => !candidate.IsDisabled))
+        foreach (ImageOcclusionMask mask in masks)
         {
+            if (mask.IsDisabled)
+            {
+                continue;
+            }
+
             slotIdsByTargetId.TryGetValue(mask.TargetId, out string? slotId);
             bool isCurrent = string.Equals(slotId, currentSlotId, StringComparison.Ordinal);
 

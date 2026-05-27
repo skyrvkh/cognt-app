@@ -25,20 +25,14 @@ public static partial class CardContextAuthoring
             images[imageIndex] = image with
             {
                 ImageRelPath = CardContextDraftNoteDocument.NormalizeRelPath(imageRelPath),
-                Masks = image.Masks
-                    .Where(existing => !string.Equals(existing.Id, mask.Id, StringComparison.Ordinal))
-                    .Concat([mask])
-                    .ToArray(),
+                Masks = ReplaceImageMaskById(image.Masks, mask),
             };
         }
 
         return context with
         {
             Images = images,
-            ContextBlockIds = context.ContextBlockIds
-                .Concat([imageBlockId.Trim()])
-                .Distinct(StringComparer.Ordinal)
-                .ToArray(),
+            ContextBlockIds = AppendDistinctOrdinal(context.ContextBlockIds, imageBlockId.Trim()),
         };
     }
 
@@ -60,13 +54,50 @@ public static partial class CardContextAuthoring
         CardContextImageSurface image = images[imageIndex];
         images[imageIndex] = image with
         {
-            Masks = image.Masks
-                .Select(mask => string.Equals(mask.Id, maskId, StringComparison.Ordinal)
-                    ? mask with { IsDisabled = isDisabled }
-                    : mask)
-                .ToArray(),
+            Masks = SetImageMaskDisabled(image.Masks, maskId, isDisabled),
         };
 
         return context with { Images = images };
+    }
+
+    private static ImageOcclusionMask[] ReplaceImageMaskById(
+        IReadOnlyList<ImageOcclusionMask> masks,
+        ImageOcclusionMask replacement)
+    {
+        ImageOcclusionMask[] nextMasks = new ImageOcclusionMask[masks.Count + 1];
+        int count = 0;
+
+        foreach (ImageOcclusionMask existing in masks)
+        {
+            if (!string.Equals(existing.Id, replacement.Id, StringComparison.Ordinal))
+            {
+                nextMasks[count++] = existing;
+            }
+        }
+
+        nextMasks[count++] = replacement;
+        if (count != nextMasks.Length)
+        {
+            Array.Resize(ref nextMasks, count);
+        }
+
+        return nextMasks;
+    }
+
+    private static ImageOcclusionMask[] SetImageMaskDisabled(
+        IReadOnlyList<ImageOcclusionMask> masks,
+        string maskId,
+        bool isDisabled)
+    {
+        ImageOcclusionMask[] nextMasks = new ImageOcclusionMask[masks.Count];
+        for (int index = 0; index < masks.Count; index++)
+        {
+            ImageOcclusionMask mask = masks[index];
+            nextMasks[index] = string.Equals(mask.Id, maskId, StringComparison.Ordinal)
+                ? mask with { IsDisabled = isDisabled }
+                : mask;
+        }
+
+        return nextMasks;
     }
 }

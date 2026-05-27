@@ -9,11 +9,7 @@ public static partial class CardContextAuthoring
     {
         ArgumentNullException.ThrowIfNull(contextBlockIds);
 
-        string[] normalizedBlockIds = contextBlockIds
-            .Where(blockId => !string.IsNullOrWhiteSpace(blockId))
-            .Select(blockId => blockId.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        string[] normalizedBlockIds = NormalizeSelectedBlockIds(contextBlockIds);
 
         if (normalizedBlockIds.Length == 0)
         {
@@ -31,6 +27,28 @@ public static partial class CardContextAuthoring
             CardContextStatus.Draft,
             null,
             order);
+    }
+
+    private static string[] NormalizeSelectedBlockIds(IReadOnlyList<string> contextBlockIds)
+    {
+        HashSet<string> seenBlockIds = new(StringComparer.Ordinal);
+        List<string> normalizedBlockIds = new(contextBlockIds.Count);
+
+        foreach (string blockId in contextBlockIds)
+        {
+            if (string.IsNullOrWhiteSpace(blockId))
+            {
+                continue;
+            }
+
+            string normalizedBlockId = blockId.Trim();
+            if (seenBlockIds.Add(normalizedBlockId))
+            {
+                normalizedBlockIds.Add(normalizedBlockId);
+            }
+        }
+
+        return normalizedBlockIds.ToArray();
     }
 
     public static CardContextDraftNoteDocument EnsureDefaultContext(CardContextDraftNoteDocument document)
@@ -58,5 +76,26 @@ public static partial class CardContextAuthoring
                     null)
             ],
         };
+    }
+
+    private static IReadOnlyList<string> AppendDistinctOrdinal(IReadOnlyList<string> values, string value)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        List<string> result = new(values.Count + 1);
+
+        foreach (string existing in values)
+        {
+            if (seen.Add(existing))
+            {
+                result.Add(existing);
+            }
+        }
+
+        if (seen.Add(value))
+        {
+            result.Add(value);
+        }
+
+        return result.ToArray();
     }
 }
