@@ -9,6 +9,7 @@ public sealed partial class CardsSubviewViewModel
     private string? requestedSourceFilter;
     private bool resetFiltersForRequestedSource;
     private bool isConfiguringSingleSelectFilters;
+    private bool isConfiguringTagFilters;
 
     internal void RequestSourceFilter(string? sourceRelPath)
     {
@@ -31,11 +32,7 @@ public sealed partial class CardsSubviewViewModel
             SearchText: SearchText);
     }
 
-    private void ConfigureFilterOptions(
-        IReadOnlyList<FlashcardCardSummaryReadModel> cards,
-        IReadOnlyList<FlashcardDeckSummaryReadModel> decks,
-        DateTimeOffset nowUtc,
-        IReadOnlyDictionary<string, string> sourceTitlesByRelPath)
+    private void ConfigureFilterOptions(CardsFilterOptionsState options)
     {
         long? previousDeckId = SelectedDeckFilter?.Id;
         string? previousStatus = resetFiltersForRequestedSource
@@ -46,34 +43,49 @@ public sealed partial class CardsSubviewViewModel
             ? []
             : GetSelectedTags();
 
-        CardsFilterOptionsState options = CardsPresentationFactory.CreateFilterOptions(
-            cards,
-            decks,
-            nowUtc,
-            sourceTitlesByRelPath);
-        CardFilterDeckRows = options.DeckRows;
-        CardFilterStatusRows = options.StatusRows;
-        CardFilterSourceRows = options.SourceRows;
-        CardFilterTagRows = options.TagRows;
+        isUpdatingFilterConfiguration = true;
+        try
+        {
+            SynchronizeCardFilterDeckRows(options.DeckRows);
+            SynchronizeCardFilterStatusRows(options.StatusRows);
+            SynchronizeCardFilterSourceRows(options.SourceRows);
+            SynchronizeCardFilterTagRows(options.TagRows);
 
-        ConfigureSelectedDeckFilter(previousDeckId);
-        ConfigureSelectedStatusFilter(previousStatus);
-        ConfigureSelectedSourceFilter(previousSource);
-        ConfigureSelectedTagFilters(previousTags);
-        requestedSourceFilter = null;
-        resetFiltersForRequestedSource = false;
+            ConfigureSelectedDeckFilter(previousDeckId);
+            ConfigureSelectedStatusFilter(previousStatus);
+            ConfigureSelectedSourceFilter(previousSource);
+            ConfigureSelectedTagFilters(previousTags);
+            requestedSourceFilter = null;
+            resetFiltersForRequestedSource = false;
+        }
+        finally
+        {
+            isUpdatingFilterConfiguration = false;
+        }
+
+        RefreshAllFilterPresentationState();
     }
 
     private void ResetFilterSelections()
     {
-        ConfigureSelectedDeckFilter(null);
-        ConfigureSelectedStatusFilter(CardFilterStatusRows.FirstOrDefault()?.Value);
-        ConfigureSelectedSourceFilter(CardFilterSourceRows.FirstOrDefault()?.Value);
-        SearchText = string.Empty;
-        DeckFilterSearchText = string.Empty;
-        SourceFilterSearchText = string.Empty;
-        TagFilterSearchText = string.Empty;
-        ConfigureSelectedTagFilters([]);
+        isUpdatingFilterConfiguration = true;
+        try
+        {
+            ConfigureSelectedDeckFilter(null);
+            ConfigureSelectedStatusFilter(CardFilterStatusRows.FirstOrDefault()?.Value);
+            ConfigureSelectedSourceFilter(CardFilterSourceRows.FirstOrDefault()?.Value);
+            SearchText = string.Empty;
+            DeckFilterSearchText = string.Empty;
+            SourceFilterSearchText = string.Empty;
+            TagFilterSearchText = string.Empty;
+            ConfigureSelectedTagFilters([]);
+        }
+        finally
+        {
+            isUpdatingFilterConfiguration = false;
+        }
+
+        RefreshAllFilterPresentationState();
     }
 
     private FlashcardCardsFilterKind GetSelectedFilterKind()
@@ -92,12 +104,7 @@ public sealed partial class CardsSubviewViewModel
 
     private string[] GetSelectedTags()
     {
-        return CardFilterTagRows
-            .Where(row => row.IsSelected && !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
-            .Select(row => row.Value)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!)
-            .ToArray();
+        return selectedFilterTags;
     }
 
     private void UpdateActiveFilterSummary()
@@ -114,25 +121,119 @@ public sealed partial class CardsSubviewViewModel
 
     private void ConfigureSelectedTagFilters(IReadOnlyList<string> selectedTags)
     {
-        bool hasSelectedTags = selectedTags.Count > 0;
-        foreach (CardFilterOptionRow row in CardFilterTagRows)
+        SetSelectedTags(selectedTags);
+        bool hasSelectedTags = selectedFilterTagSet.Count > 0;
+        isConfiguringTagFilters = true;
+        try
         {
-            row.PropertyChanged -= CardFilterTagRow_PropertyChanged;
-            row.IsSelected = string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal)
-                ? !hasSelectedTags
-                : row.Value is not null && selectedTags.Contains(row.Value, StringComparer.OrdinalIgnoreCase);
-            row.PropertyChanged += CardFilterTagRow_PropertyChanged;
+            foreach (CardFilterOptionRow row in CardFilterTagRows)
+            {
+                row.PropertyChanged -= CardFilterTagRow_PropertyChanged;
+                row.IsSelected = string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal)
+                    ? !hasSelectedTags
+                    : IsSelectedTagValue(row.Value);
+                row.PropertyChanged += CardFilterTagRow_PropertyChanged;
+            }
+        }
+        finally
+        {
+            isConfiguringTagFilters = false;
         }
 
-        UpdateActiveFilterSummary();
+        if (!isUpdatingFilterConfiguration)
+        {
+            RefreshTagFilterPresentationState();
+        }
+    }
+
+    private static string? NormalizeTagValue(string? tag)
+    {
+        return string.IsNullOrWhiteSpace(tag) ? null : tag.Trim();
+    }
+
+    private void SetSelectedTags(IReadOnlyList<string> selectedTags)
+    {
+        selectedFilterTagSet.Clear();
+        if (selectedTags.Count == 0)
+        {
+            selectedFilterTags = [];
+            return;
+        }
+
+        List<string>? normalizedTags = null;
+        foreach (string tag in selectedTags)
+        {
+            string? normalizedTag = NormalizeTagValue(tag);
+            if (normalizedTag is null || !selectedFilterTagSet.Add(normalizedTag))
+            {
+                continue;
+            }
+
+            normalizedTags ??= new List<string>(selectedTags.Count);
+            normalizedTags.Add(normalizedTag);
+        }
+
+        selectedFilterTags = normalizedTags?.ToArray() ?? [];
+    }
+
+    private bool IsSelectedTagValue(string? tag)
+    {
+        string? normalizedTag = NormalizeTagValue(tag);
+        return normalizedTag is not null && selectedFilterTagSet.Contains(normalizedTag);
+    }
+
+    private void AddSelectedTag(string? tag)
+    {
+        string? normalizedTag = NormalizeTagValue(tag);
+        if (normalizedTag is null || !selectedFilterTagSet.Add(normalizedTag))
+        {
+            return;
+        }
+
+        string[] currentTags = selectedFilterTags;
+        string[] updatedTags = new string[currentTags.Length + 1];
+        Array.Copy(currentTags, updatedTags, currentTags.Length);
+        updatedTags[currentTags.Length] = normalizedTag;
+        selectedFilterTags = updatedTags;
+    }
+
+    private void RemoveSelectedTag(string? tag)
+    {
+        string? normalizedTag = NormalizeTagValue(tag);
+        if (normalizedTag is null || !selectedFilterTagSet.Remove(normalizedTag))
+        {
+            return;
+        }
+
+        if (selectedFilterTags.Length == 0)
+        {
+            return;
+        }
+
+        List<string>? remainingTags = null;
+        foreach (string selectedTag in selectedFilterTags)
+        {
+            if (string.Equals(selectedTag, normalizedTag, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            remainingTags ??= new List<string>(selectedFilterTags.Length - 1);
+            remainingTags.Add(selectedTag);
+        }
+
+        selectedFilterTags = remainingTags?.ToArray() ?? [];
+    }
+
+    private void ClearSelectedTags()
+    {
+        selectedFilterTagSet.Clear();
+        selectedFilterTags = [];
     }
 
     private void ConfigureSelectedDeckFilter(long? selectedDeckId)
     {
-        CardFilterDeckRow? selected = selectedDeckId.HasValue
-            ? CardFilterDeckRows.FirstOrDefault(row => row.Id == selectedDeckId.Value)
-            : CardFilterDeckRows.FirstOrDefault(row => !row.Id.HasValue);
-        selected ??= CardFilterDeckRows.FirstOrDefault();
+        CardFilterDeckRow? selected = FindDeckRow(CardFilterDeckRows, selectedDeckId);
 
         isConfiguringSingleSelectFilters = true;
         try
@@ -150,9 +251,6 @@ public sealed partial class CardsSubviewViewModel
         {
             isConfiguringSingleSelectFilters = false;
         }
-
-        OnPropertyChanged(nameof(VisibleCardFilterDeckRows));
-        UpdateActiveFilterSummary();
     }
 
     private void CardFilterDeckRow_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -170,7 +268,7 @@ public sealed partial class CardsSubviewViewModel
             return;
         }
 
-        if (!CardFilterDeckRows.Any(row => row.IsSelected))
+        if (SelectedDeckFilter is null || !SelectedDeckFilter.IsSelected)
         {
             ConfigureSelectedDeckFilter(null);
         }
@@ -178,8 +276,7 @@ public sealed partial class CardsSubviewViewModel
 
     private void ConfigureSelectedStatusFilter(string? selectedValue)
     {
-        CardFilterOptionRow? selected = FindOption(CardFilterStatusRows, selectedValue)
-            ?? CardFilterStatusRows.FirstOrDefault();
+        CardFilterOptionRow? selected = FindOption(CardFilterStatusRows, selectedValue);
         isConfiguringSingleSelectFilters = true;
         try
         {
@@ -196,14 +293,11 @@ public sealed partial class CardsSubviewViewModel
         {
             isConfiguringSingleSelectFilters = false;
         }
-
-        UpdateActiveFilterSummary();
     }
 
     private void ConfigureSelectedSourceFilter(string? selectedValue)
     {
-        CardFilterOptionRow? selected = FindOption(CardFilterSourceRows, selectedValue)
-            ?? CardFilterSourceRows.FirstOrDefault();
+        CardFilterOptionRow? selected = FindOption(CardFilterSourceRows, selectedValue);
         isConfiguringSingleSelectFilters = true;
         try
         {
@@ -220,9 +314,6 @@ public sealed partial class CardsSubviewViewModel
         {
             isConfiguringSingleSelectFilters = false;
         }
-
-        OnPropertyChanged(nameof(VisibleCardFilterSourceRows));
-        UpdateActiveFilterSummary();
     }
 
     private void CardFilterStatusRow_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -240,9 +331,9 @@ public sealed partial class CardsSubviewViewModel
             return;
         }
 
-        if (!CardFilterStatusRows.Any(row => row.IsSelected))
+        if (SelectedStatusFilter is null || !SelectedStatusFilter.IsSelected)
         {
-            ConfigureSelectedStatusFilter(CardFilterStatusRows.FirstOrDefault()?.Value);
+            ConfigureSelectedStatusFilter(null);
         }
     }
 
@@ -261,60 +352,117 @@ public sealed partial class CardsSubviewViewModel
             return;
         }
 
-        if (!CardFilterSourceRows.Any(row => row.IsSelected))
+        if (SelectedSourceFilter is null || !SelectedSourceFilter.IsSelected)
         {
-            ConfigureSelectedSourceFilter(CardFilterSourceRows.FirstOrDefault()?.Value);
+            ConfigureSelectedSourceFilter(null);
         }
     }
 
     private void CardFilterTagRow_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(CardFilterOptionRow.IsSelected)
+        if (isConfiguringTagFilters
+            || e.PropertyName != nameof(CardFilterOptionRow.IsSelected)
             || sender is not CardFilterOptionRow changed)
         {
             return;
         }
 
-        if (string.Equals(changed.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
+        isConfiguringTagFilters = true;
+        try
         {
-            if (changed.IsSelected)
+            if (string.Equals(changed.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
             {
-                foreach (CardFilterOptionRow row in CardFilterTagRows.Where(row => row != changed))
+                if (changed.IsSelected)
                 {
-                    row.IsSelected = false;
+                    ClearSelectedTags();
+                    foreach (CardFilterOptionRow row in CardFilterTagRows)
+                    {
+                        if (!ReferenceEquals(row, changed) && row.IsSelected)
+                        {
+                            row.IsSelected = false;
+                        }
+                    }
+                }
+                else if (selectedFilterTagSet.Count == 0)
+                {
+                    changed.IsSelected = true;
                 }
             }
-            else if (!CardFilterTagRows.Any(row => row.IsSelected))
+            else
             {
-                changed.IsSelected = true;
+                CardFilterOptionRow? allTags = FindOption(CardFilterTagRows, CardsPresentationFactory.AllTagsValue);
+                if (changed.IsSelected)
+                {
+                    AddSelectedTag(changed.Value);
+                    if (allTags is not null)
+                    {
+                        allTags.IsSelected = false;
+                    }
+                }
+                else
+                {
+                    RemoveSelectedTag(changed.Value);
+                    if (selectedFilterTagSet.Count == 0 && allTags is not null)
+                    {
+                        allTags.IsSelected = true;
+                    }
+                }
             }
-
-            OnPropertyChanged(nameof(VisibleCardFilterTagRows));
-            UpdateActiveFilterSummary();
-            return;
         }
-
-        CardFilterOptionRow? allTags = FindOption(CardFilterTagRows, CardsPresentationFactory.AllTagsValue);
-        if (changed.IsSelected && allTags is not null)
+        finally
         {
-            allTags.IsSelected = false;
-        }
-        else if (!CardFilterTagRows.Any(row =>
-                     row.IsSelected
-                     && !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
-                 && allTags is not null)
-        {
-            allTags.IsSelected = true;
+            isConfiguringTagFilters = false;
         }
 
-        OnPropertyChanged(nameof(VisibleCardFilterTagRows));
-        UpdateActiveFilterSummary();
+        RefreshTagFilterPresentationState();
     }
 
     private static CardFilterOptionRow? FindOption(
-        IEnumerable<CardFilterOptionRow> rows,
+        IReadOnlyList<CardFilterOptionRow> rows,
         string? value)
     {
-        return rows.FirstOrDefault(row => string.Equals(row.Value, value, StringComparison.OrdinalIgnoreCase));
+        CardFilterOptionRow? firstRow = null;
+        foreach (CardFilterOptionRow row in rows)
+        {
+            firstRow ??= row;
+            if (string.Equals(row.Value, value, StringComparison.OrdinalIgnoreCase))
+            {
+                return row;
+            }
+        }
+
+        return firstRow;
     }
+
+    private static CardFilterDeckRow? FindDeckRow(
+        IReadOnlyList<CardFilterDeckRow> rows,
+        long? selectedDeckId)
+    {
+        CardFilterDeckRow? firstRow = null;
+        CardFilterDeckRow? allDecksRow = null;
+        foreach (CardFilterDeckRow row in rows)
+        {
+            firstRow ??= row;
+            if (!row.Id.HasValue)
+            {
+                allDecksRow ??= row;
+            }
+
+            if (selectedDeckId.HasValue)
+            {
+                if (row.Id == selectedDeckId.Value)
+                {
+                    return row;
+                }
+            }
+            else if (!row.Id.HasValue)
+            {
+                return row;
+            }
+        }
+
+        return allDecksRow ?? firstRow;
+    }
+
+
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
@@ -8,7 +9,9 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed class DecksSubviewViewModel : ObservableObject
 {
-    private IReadOnlyList<DeckRow> deckRows = [];
+    private readonly Dictionary<long, string> selectedDeckNamesById = [];
+    private readonly ObservableCollection<DeckRow> deckRows = [];
+    private HashSet<long> selectedDeckIds = [];
     private string deckCountSummary = "0";
     private string decksShowingSummary = "Showing 0 decks";
     private string selectedDeckSummary = "All decks";
@@ -42,11 +45,7 @@ public sealed class DecksSubviewViewModel : ObservableObject
 
     public StatisticsSubviewViewModel Statistics { get; }
 
-    public IReadOnlyList<DeckRow> DeckRows
-    {
-        get => deckRows;
-        private set => SetProperty(ref deckRows, value);
-    }
+    public IReadOnlyList<DeckRow> DeckRows => deckRows;
 
     public string DeckCountSummary
     {
@@ -68,31 +67,33 @@ public sealed class DecksSubviewViewModel : ObservableObject
 
     public bool HasDecks => DeckRows.Count > 0;
 
-    public bool HasSelectedDecks => DeckRows.Any(deck => deck.IsSelected);
+    public bool HasSelectedDecks => selectedDeckIds.Count > 0;
 
     public bool ShouldShowNoDecksState => !HasDecks;
 
-    internal IReadOnlyCollection<long> SelectedDeckIds => DeckRows
-        .Where(deck => deck.IsSelected)
-        .Select(deck => deck.Id)
-        .ToArray();
+    internal IReadOnlySet<long> SelectedDeckIds => selectedDeckIds;
 
     public void LoadDecks(IReadOnlyList<FlashcardDeckSummaryReadModel> decks)
     {
         ArgumentNullException.ThrowIfNull(decks);
 
-        HashSet<long> selectedDeckIds = SelectedDeckIds.ToHashSet();
+        IReadOnlySet<long> currentSelectedDeckIds = SelectedDeckIds;
         UnsubscribeDeckRows();
 
         suppressDeckSelectionChanged = true;
-        DeckRows = decks
-            .Select(deck => ToDeckRow(deck, selectedDeckIds.Contains(deck.Id)))
-            .ToArray();
-        SubscribeDeckRows();
-        suppressDeckSelectionChanged = false;
+        try
+        {
+            DeckLoadState loadState = CreateDeckLoadState(decks, currentSelectedDeckIds, deckRows);
+            SynchronizeDeckRows(loadState.Rows);
+            ApplySelectedDeckState(loadState.SelectionState);
+        }
+        finally
+        {
+            SubscribeDeckRows();
+            suppressDeckSelectionChanged = false;
+        }
 
-        UpdateDeckSummaries(decks.Count, decks.Count);
-        UpdateSelectedDeckSummary();
+        UpdateDeckSummaries(deckRows.Count, decks.Count);
         NotifyDeckStateChanged();
     }
 
@@ -110,7 +111,31 @@ public sealed class DecksSubviewViewModel : ObservableObject
         }
 
         suppressDeckSelectionChanged = false;
-        OnDeckSelectionChanged();
+        ApplySelectedDeckState(CreateSelectedDeckState(DeckRows));
+        OnPropertyChanged(nameof(HasSelectedDecks));
+        SelectedDecksChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SynchronizeDeckRows(IReadOnlyList<DeckRow> nextRows)
+    {
+        int sharedCount = Math.Min(deckRows.Count, nextRows.Count);
+        for (int index = 0; index < sharedCount; index++)
+        {
+            if (!ReferenceEquals(deckRows[index], nextRows[index]))
+            {
+                deckRows[index] = nextRows[index];
+            }
+        }
+
+        for (int index = deckRows.Count - 1; index >= nextRows.Count; index--)
+        {
+            deckRows.RemoveAt(index);
+        }
+
+        for (int index = sharedCount; index < nextRows.Count; index++)
+        {
+            deckRows.Add(nextRows[index]);
+        }
     }
 
     private void SubscribeDeckRows()
@@ -132,33 +157,157 @@ public sealed class DecksSubviewViewModel : ObservableObject
     private void DeckRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (suppressDeckSelectionChanged
-            || !string.Equals(e.PropertyName, nameof(DeckRow.IsSelected), StringComparison.Ordinal))
+            || !string.Equals(e.PropertyName, nameof(DeckRow.IsSelected), StringComparison.Ordinal)
+            || sender is not DeckRow row)
         {
             return;
         }
 
-        OnDeckSelectionChanged();
+        OnDeckSelectionChanged(row);
     }
 
-    private void OnDeckSelectionChanged()
+    private void OnDeckSelectionChanged(DeckRow row)
     {
-        UpdateSelectedDeckSummary();
+        if (row.IsSelected)
+        {
+            selectedDeckIds.Add(row.Id);
+            selectedDeckNamesById[row.Id] = row.Name;
+        }
+        else
+        {
+            selectedDeckIds.Remove(row.Id);
+            selectedDeckNamesById.Remove(row.Id);
+        }
+
+        SelectedDeckSummary = CreateSelectedDeckSummary(selectedDeckNamesById);
         OnPropertyChanged(nameof(HasSelectedDecks));
         SelectedDecksChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void UpdateSelectedDeckSummary()
+    private void ApplySelectedDeckState(DeckSelectionState state)
     {
-        IReadOnlyList<DeckRow> selectedDecks = DeckRows
-            .Where(deck => deck.IsSelected)
-            .ToArray();
+        selectedDeckIds = state.Ids;
+        selectedDeckNamesById.Clear();
+        foreach ((long id, string name) in state.NamesById)
+        {
+            selectedDeckNamesById.Add(id, name);
+        }
 
-        SelectedDeckSummary = selectedDecks.Count switch
+        SelectedDeckSummary = state.Summary;
+    }
+
+    private static DeckLoadState CreateDeckLoadState(
+        IReadOnlyList<FlashcardDeckSummaryReadModel> decks,
+        IReadOnlySet<long> selectedDeckIds,
+        IReadOnlyList<DeckRow> existingRows)
+    {
+        DeckRow[] rows = new DeckRow[decks.Count];
+        Dictionary<long, DeckRow>? existingRowsById = existingRows.Count == 0
+            ? null
+            : CreateDeckRowLookup(existingRows);
+        Dictionary<long, string>? selectedNamesById = null;
+        HashSet<long>? selectedIds = null;
+
+        for (int index = 0; index < decks.Count; index++)
+        {
+            FlashcardDeckSummaryReadModel deck = decks[index];
+            bool isSelected = selectedDeckIds.Contains(deck.Id);
+            DeckRow row = existingRowsById is not null
+                && existingRowsById.TryGetValue(deck.Id, out DeckRow? existingRow)
+                ? UpdateDeckRow(existingRow, deck, isSelected)
+                : ToDeckRow(deck, isSelected);
+            rows[index] = row;
+
+            if (!isSelected)
+            {
+                continue;
+            }
+
+            selectedNamesById ??= new(selectedDeckIds.Count);
+            selectedIds ??= new(selectedDeckIds.Count);
+            selectedNamesById[row.Id] = row.Name;
+            selectedIds.Add(row.Id);
+        }
+
+        return new DeckLoadState(
+            rows,
+            CreateDeckSelectionState(selectedNamesById, selectedIds));
+    }
+
+    private static DeckSelectionState CreateSelectedDeckState(IReadOnlyList<DeckRow> decks)
+    {
+        Dictionary<long, string>? selectedNamesById = null;
+        HashSet<long>? selectedIds = null;
+        foreach (DeckRow deck in decks)
+        {
+            if (!deck.IsSelected)
+            {
+                continue;
+            }
+
+            selectedNamesById ??= [];
+            selectedIds ??= [];
+            selectedNamesById[deck.Id] = deck.Name;
+            selectedIds.Add(deck.Id);
+        }
+
+        return CreateDeckSelectionState(selectedNamesById, selectedIds);
+    }
+
+    private static DeckSelectionState CreateDeckSelectionState(
+        Dictionary<long, string>? selectedNamesById,
+        HashSet<long>? selectedIds)
+    {
+        Dictionary<long, string> namesById = selectedNamesById ?? [];
+        HashSet<long> ids = selectedIds ?? [];
+        return new DeckSelectionState(
+            ids,
+            namesById,
+            CreateSelectedDeckSummary(namesById));
+    }
+
+    private static string CreateSelectedDeckSummary(IReadOnlyDictionary<long, string> selectedNamesById)
+    {
+        return selectedNamesById.Count switch
         {
             0 => "All decks",
-            1 => selectedDecks[0].Name,
-            _ => string.Concat(NumericTextFormatter.Format(selectedDecks.Count), " decks selected")
+            1 => GetOnlySelectedDeckName(selectedNamesById),
+            _ => string.Concat(NumericTextFormatter.Format(selectedNamesById.Count), " decks selected")
         };
+    }
+
+    private static string GetOnlySelectedDeckName(IReadOnlyDictionary<long, string> selectedNamesById)
+    {
+        foreach (string name in selectedNamesById.Values)
+        {
+            return name;
+        }
+
+        return "All decks";
+    }
+
+    private static Dictionary<long, DeckRow> CreateDeckRowLookup(IReadOnlyList<DeckRow> rows)
+    {
+        Dictionary<long, DeckRow> lookup = new(rows.Count);
+        foreach (DeckRow row in rows)
+        {
+            lookup[row.Id] = row;
+        }
+
+        return lookup;
+    }
+
+    private static DeckRow UpdateDeckRow(DeckRow row, FlashcardDeckSummaryReadModel deck, bool isSelected)
+    {
+        row.Update(
+            deck.Name,
+            "Deck",
+            deck.NewCards + deck.LearningCards,
+            deck.DueCards,
+            deck.TotalCards,
+            deck.ProgressPercent);
+        row.IsSelected = isSelected;
+        return row;
     }
 
     private static DeckRow ToDeckRow(FlashcardDeckSummaryReadModel deck, bool isSelected)
@@ -190,4 +339,13 @@ public sealed class DecksSubviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSelectedDecks));
         OnPropertyChanged(nameof(ShouldShowNoDecksState));
     }
+
+    private readonly record struct DeckLoadState(
+        DeckRow[] Rows,
+        DeckSelectionState SelectionState);
+
+    private readonly record struct DeckSelectionState(
+        HashSet<long> Ids,
+        Dictionary<long, string> NamesById,
+        string Summary);
 }

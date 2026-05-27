@@ -135,7 +135,7 @@ public partial class CardsSubview : UserControl
         }
 
         CardLibraryRow[] cards = GetContextSchedulableCards(card);
-        PostponeCardDialog dialog = new(cards.Select(item => item.DueUtc).ToArray())
+        PostponeCardDialog dialog = new(CreateDueDateArray(cards))
         {
             Owner = Window.GetWindow(this)
         };
@@ -232,12 +232,7 @@ public partial class CardsSubview : UserControl
         }
 
         string title = cards.Count == 1 ? "Selected card" : $"{cards.Count} selected cards";
-        string[] assignedTags = cards
-            .SelectMany(card => card.Tags)
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        string[] assignedTags = CreateAssignedTagsArray(cards);
         TagEditDialog dialog = new(
             title,
             KnowledgeTagOperationKind.Add,
@@ -296,26 +291,16 @@ public partial class CardsSubview : UserControl
 
     private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard, bool requireSchedulable)
     {
-        CardLibraryRow[] selectedCards = CardsDataGrid.SelectedItems
-            .OfType<CardLibraryRow>()
-            .Where(card => card.Id > 0 && (!requireSchedulable || card.CanSchedule))
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] selectedCards = GetSelectedGridCards(requireSchedulable);
 
-        return selectedCards.Any(card => card.Id == contextCard.Id)
+        return ContainsCard(selectedCards, contextCard.Id)
             ? selectedCards
             : [contextCard];
     }
 
     private CardLibraryRow[] GetSelectedCards()
     {
-        CardLibraryRow[] selectedCards = CardsDataGrid.SelectedItems
-            .OfType<CardLibraryRow>()
-            .Where(card => card.Id > 0)
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] selectedCards = GetSelectedGridCards(requireSchedulable: false);
 
         if (selectedCards.Length > 0)
         {
@@ -325,5 +310,77 @@ public partial class CardsSubview : UserControl
         return CardsDataGrid.SelectedItem is CardLibraryRow selectedCard && selectedCard.Id > 0
             ? [selectedCard]
             : [];
+    }
+
+    private CardLibraryRow[] GetSelectedGridCards(bool requireSchedulable)
+    {
+        if (CardsDataGrid.SelectedItems.Count == 0)
+        {
+            return [];
+        }
+
+        List<CardLibraryRow>? selectedCards = null;
+        foreach (object? item in CardsDataGrid.SelectedItems)
+        {
+            if (item is not CardLibraryRow card)
+            {
+                continue;
+            }
+
+            selectedCards ??= new List<CardLibraryRow>(CardsDataGrid.SelectedItems.Count);
+            selectedCards.Add(card);
+        }
+
+        if (selectedCards is null)
+        {
+            return [];
+        }
+
+        return requireSchedulable
+            ? CardLibraryRowSelection.DistinctSchedulable(selectedCards)
+            : CardLibraryRowSelection.DistinctPersisted(selectedCards);
+    }
+
+    private static bool ContainsCard(IReadOnlyList<CardLibraryRow> cards, long cardId)
+    {
+        foreach (CardLibraryRow card in cards)
+        {
+            if (card.Id == cardId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DateTimeOffset[] CreateDueDateArray(IReadOnlyList<CardLibraryRow> cards)
+    {
+        DateTimeOffset[] dueDates = new DateTimeOffset[cards.Count];
+        for (int index = 0; index < cards.Count; index++)
+        {
+            dueDates[index] = cards[index].DueUtc;
+        }
+
+        return dueDates;
+    }
+
+    private static string[] CreateAssignedTagsArray(IReadOnlyList<CardLibraryRow> cards)
+    {
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> assignedTags = [];
+        foreach (CardLibraryRow card in cards)
+        {
+            foreach (string tag in card.Tags)
+            {
+                if (!string.IsNullOrWhiteSpace(tag) && seenTags.Add(tag))
+                {
+                    assignedTags.Add(tag);
+                }
+            }
+        }
+
+        assignedTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return assignedTags.ToArray();
     }
 }

@@ -16,7 +16,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     private readonly Func<IReadOnlyList<string>> loadAvailableTagNames;
     private readonly Func<EditorView> createEditorView;
     private IReadOnlyList<CardLibraryRow> cardLibraryRows = [];
-    private IReadOnlyList<FlashcardDeckSummaryReadModel> deckRows = [];
+    private IReadOnlyList<string> deckNames = [];
     private IReadOnlyList<CardEmptyStateRow> cardEmptyStates = [];
     private string showingSummary = "Showing 0 cards";
     private string totalCards = "0";
@@ -145,26 +145,27 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(sourceTitlesByRelPath);
 
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        CardsFilterOptionsState filterOptions = CardsPresentationFactory.CreateFilterOptions(
+            filterSourceCards,
+            decks,
+            nowUtc,
+            sourceTitlesByRelPath);
 
         CardLibraryRows = CardsPresentationFactory.CreateCardLibraryRows(visibleCards);
-        deckRows = decks;
+        deckNames = filterOptions.DeckNames;
 
-        ConfigureFilterOptions(filterSourceCards, decks, nowUtc, sourceTitlesByRelPath);
+        ConfigureFilterOptions(filterOptions);
         ShowingSummary = string.Concat(
             "Showing ",
             NumericTextFormatter.Format(CardLibraryRows.Count),
             " cards");
 
-        int totalCardCount = decks.Sum(deck => deck.TotalCards);
-        TotalCards = NumericTextFormatter.Format(totalCardCount);
-        LearningCards = NumericTextFormatter.Format(filterSourceCards
-            .Count(card => card.State is FlashcardCardStateReadModel.New or FlashcardCardStateReadModel.Learning));
-        RelearningCards = NumericTextFormatter.Format(filterSourceCards
-            .Count(card => card.State == FlashcardCardStateReadModel.Relearning));
-        DueCards = NumericTextFormatter.Format(filterSourceCards
-            .Count(card => card.DueUtc <= nowUtc));
+        TotalCards = NumericTextFormatter.Format(filterOptions.TotalCardCount);
+        LearningCards = NumericTextFormatter.Format(filterOptions.SummaryCounts.LearningCards);
+        RelearningCards = NumericTextFormatter.Format(filterOptions.SummaryCounts.RelearningCards);
+        DueCards = NumericTextFormatter.Format(filterOptions.SummaryCounts.DueCards);
         CardEmptyStates = CardsPresentationFactory.CreateEmptyStates(
-            totalCardCount,
+            filterOptions.TotalCardCount,
             CardLibraryRows.Count,
             GetSelectedFilterKind(),
             isDeckScopeSelected,
@@ -176,11 +177,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(cards);
 
-        CardLibraryRow[] schedulableCards = cards
-            .Where(card => card.CanSchedule)
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] schedulableCards = CardLibraryRowSelection.DistinctSchedulable(cards);
         return schedulableCards.Length == 0
             ? Task.CompletedTask
             : postponeCards(schedulableCards, days);
@@ -190,11 +187,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(cards);
 
-        CardLibraryRow[] distinctCards = cards
-            .Where(card => card.Id > 0)
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
         return distinctCards.Length == 0
             ? Task.CompletedTask
             : deleteCards(distinctCards);
@@ -217,12 +210,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
 
     internal IReadOnlyList<string> GetDeckNames()
     {
-        return deckRows
-            .Select(deck => deck.Name)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        return deckNames;
     }
 
     internal Task AddTagsToCardsAsync(
@@ -232,11 +220,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(cards);
         ArgumentNullException.ThrowIfNull(tags);
 
-        CardLibraryRow[] distinctCards = cards
-            .Where(card => card.Id > 0)
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
         return distinctCards.Length == 0 || tags.Count == 0
             ? Task.CompletedTask
             : addTagsToCards(distinctCards, tags);
@@ -249,11 +233,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(cards);
         ArgumentNullException.ThrowIfNull(tags);
 
-        CardLibraryRow[] distinctCards = cards
-            .Where(card => card.Id > 0)
-            .GroupBy(card => card.Id)
-            .Select(group => group.First())
-            .ToArray();
+        CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
         return distinctCards.Length == 0 || tags.Count == 0
             ? Task.CompletedTask
             : removeTagsFromCards(distinctCards, tags);
@@ -261,15 +241,31 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
 
     internal IReadOnlyList<string> GetAvailableTagNames()
     {
-        return loadAvailableTagNames()
-            .Concat(CardFilterTagRows
-                .Where(row => !string.Equals(row.Value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal))
-                .Select(row => row.Value)
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value!))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        IReadOnlyList<string> storedTags = loadAvailableTagNames();
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> tags = new(storedTags.Count + CardFilterTagRows.Count);
+
+        foreach (string tag in storedTags)
+        {
+            if (seenTags.Add(tag))
+            {
+                tags.Add(tag);
+            }
+        }
+
+        foreach (CardFilterOptionRow row in CardFilterTagRows)
+        {
+            string? value = row.Value;
+            if (!string.Equals(value, CardsPresentationFactory.AllTagsValue, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(value)
+                && seenTags.Add(value))
+            {
+                tags.Add(value);
+            }
+        }
+
+        tags.Sort(StringComparer.OrdinalIgnoreCase);
+        return tags.ToArray();
     }
 
     private static Task PostponeAsync(
@@ -282,3 +278,4 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
             : Task.CompletedTask;
     }
 }
+

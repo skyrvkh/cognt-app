@@ -48,6 +48,10 @@
         </Style>
 
         <Style x:Key="OutlineButtonStyle" TargetType="Button">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="14,0" />
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
@@ -62,9 +66,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                     </ControlTemplate>
@@ -81,44 +90,59 @@
         <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}" />
 
         <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Background" Value="{DynamicResource PrimaryGradientBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
                     <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource DimBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="PracticeButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlineButtonStyle}">
+            <Style.Resources>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
+                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
+            </Style.Resources>
             <Setter Property="Background" Value="{DynamicResource PrimaryGradientBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </Trigger>
                 <Trigger Property="IsKeyboardFocused" Value="True">
                     <Setter Property="BorderBrush" Value="{DynamicResource InkBrush}" />
@@ -127,6 +151,7 @@
                     <Setter Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
                     <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+                    <Setter Property="TextElement.Foreground" Value="{DynamicResource DimBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -150,7 +175,7 @@
         </Style>
 
         <Style x:Key="PracticeCountTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
@@ -158,7 +183,7 @@
                     <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsPressed, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}" Value="False">
                     <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
@@ -336,7 +361,12 @@
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           RecognizesAccessKey="True"
-                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                                          TextElement.Foreground="{TemplateBinding Foreground}">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
