@@ -11,11 +11,7 @@ public static partial class CardContextSnapshotFactory
             return string.Empty;
         }
 
-        HashSet<string> contextIds = context.ContextBlockIds
-            .Concat(context.Targets.SelectMany(target => target.TextAnchors).Select(anchor => anchor.BlockId))
-            .Concat(context.Images.Select(image => image.ImageBlockId))
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> contextIds = BuildContextIdSet(context);
 
         if (contextIds.Count == 0)
         {
@@ -39,13 +35,16 @@ public static partial class CardContextSnapshotFactory
                 return string.Empty;
             }
 
-            JsonNode[] filteredChildren = children
-                .OfType<JsonObject>()
-                .Where(child => ContainsSelectedContextBlock(child, contextIds))
-                .Select(child => child.DeepClone())
-                .ToArray();
+            List<JsonNode> filteredChildren = [];
+            foreach (JsonNode? childNode in children)
+            {
+                if (childNode is JsonObject child && ContainsSelectedContextBlock(child, contextIds))
+                {
+                    filteredChildren.Add(child.DeepClone());
+                }
+            }
 
-            if (filteredChildren.Length == 0)
+            if (filteredChildren.Count == 0)
             {
                 return string.Empty;
             }
@@ -75,6 +74,44 @@ public static partial class CardContextSnapshotFactory
         }
     }
 
+    private static HashSet<string> BuildContextIdSet(CardContext context)
+    {
+        HashSet<string> contextIds = new(StringComparer.Ordinal);
+        AddNonWhiteSpaceIds(contextIds, context.ContextBlockIds);
+
+        foreach (CardTarget target in context.Targets)
+        {
+            foreach (TextAnchor anchor in target.TextAnchors)
+            {
+                if (!string.IsNullOrWhiteSpace(anchor.BlockId))
+                {
+                    contextIds.Add(anchor.BlockId);
+                }
+            }
+        }
+
+        foreach (CardContextImageSurface image in context.Images)
+        {
+            if (!string.IsNullOrWhiteSpace(image.ImageBlockId))
+            {
+                contextIds.Add(image.ImageBlockId);
+            }
+        }
+
+        return contextIds;
+    }
+
+    private static void AddNonWhiteSpaceIds(HashSet<string> contextIds, IReadOnlyList<string> ids)
+    {
+        foreach (string id in ids)
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                contextIds.Add(id);
+            }
+        }
+    }
+
     private static JsonObject? FindFirstBlockByFlavour(JsonObject? block, string flavour)
     {
         if (block is null)
@@ -92,12 +129,15 @@ public static partial class CardContextSnapshotFactory
             return null;
         }
 
-        foreach (JsonObject child in children.OfType<JsonObject>())
+        foreach (JsonNode? childNode in children)
         {
-            JsonObject? match = FindFirstBlockByFlavour(child, flavour);
-            if (match is not null)
+            if (childNode is JsonObject child)
             {
-                return match;
+                JsonObject? match = FindFirstBlockByFlavour(child, flavour);
+                if (match is not null)
+                {
+                    return match;
+                }
             }
         }
 
@@ -117,8 +157,14 @@ public static partial class CardContextSnapshotFactory
             return false;
         }
 
-        return children
-            .OfType<JsonObject>()
-            .Any(child => ContainsSelectedContextBlock(child, contextIds));
+        foreach (JsonNode? childNode in children)
+        {
+            if (childNode is JsonObject child && ContainsSelectedContextBlock(child, contextIds))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

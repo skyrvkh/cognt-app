@@ -2,67 +2,99 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
 public static partial class CardContextQueueBuilder
 {
-    private static IReadOnlyList<CardTarget> ResolveTargets(
+    private static IReadOnlyList<CardTarget> ResolveEnabledTargets(
         CardSlot slot,
-        IReadOnlyList<CardTarget> allTargets)
+        IReadOnlyDictionary<string, CardTarget> targetsById,
+        IReadOnlyDictionary<string, List<CardTarget>> targetsBySlotId)
     {
+        var targets = new List<CardTarget>();
+
         if (slot.TargetIds.Count == 0)
         {
-            return allTargets
-                .Where(target => string.Equals(target.SlotId, slot.Id, StringComparison.Ordinal))
-                .ToArray();
+            if (targetsBySlotId.TryGetValue(slot.Id, out List<CardTarget>? slotTargets))
+            {
+                foreach (CardTarget target in slotTargets)
+                {
+                    if (!target.IsDisabled)
+                    {
+                        targets.Add(target);
+                    }
+                }
+            }
+
+            return targets;
         }
 
-        Dictionary<string, CardTarget> targetsById = allTargets
-            .ToDictionary(target => target.Id, StringComparer.Ordinal);
+        foreach (string targetId in slot.TargetIds)
+        {
+            if (targetsById.TryGetValue(targetId, out CardTarget? target)
+                && !target.IsDisabled)
+            {
+                targets.Add(target);
+            }
+        }
 
-        return slot.TargetIds
-            .Select(targetId => targetsById.TryGetValue(targetId, out CardTarget? target) ? target : null)
-            .Where(target => target is not null)
-            .Select(target => target!)
-            .ToArray();
+        return targets;
     }
 
     private static IReadOnlyList<TextAnchorPreviewReadModel> BuildTextAnchorPreviews(IReadOnlyList<CardTarget> targets)
     {
-        return targets
-            .SelectMany(target => target.TextAnchors.Select(anchor =>
-                new TextAnchorPreviewReadModel(target.Id, anchor.Id, anchor.BlockId, anchor.MarkId)))
-            .ToArray();
+        var previews = new List<TextAnchorPreviewReadModel>();
+
+        foreach (CardTarget target in targets)
+        {
+            foreach (TextAnchor anchor in target.TextAnchors)
+            {
+                previews.Add(new TextAnchorPreviewReadModel(target.Id, anchor.Id, anchor.BlockId, anchor.MarkId));
+            }
+        }
+
+        return previews;
     }
 
     private static IReadOnlyList<ImageMaskPreviewReadModel> BuildImageAnchorPreviews(
-        CardContext context,
+        IReadOnlyDictionary<string, CardContextImageSurface> imagesByBlockId,
+        IReadOnlyDictionary<(string ImageBlockId, string MaskId), ImageOcclusionMask> masksByImageAndId,
         IReadOnlyList<CardTarget> targets)
     {
-        Dictionary<string, CardContextImageSurface> imagesByBlockId = context.Images
-            .ToDictionary(image => image.ImageBlockId, StringComparer.Ordinal);
+        var previews = new List<ImageMaskPreviewReadModel>();
 
-        return targets
-            .SelectMany(target => target.ImageAnchors.Select(anchor =>
+        foreach (CardTarget target in targets)
+        {
+            foreach (ImageMaskAnchor anchor in target.ImageAnchors)
             {
                 imagesByBlockId.TryGetValue(anchor.ImageBlockId, out CardContextImageSurface? image);
-                ImageOcclusionMask? mask = image?.Masks.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Id, anchor.MaskId, StringComparison.Ordinal));
+                masksByImageAndId.TryGetValue((anchor.ImageBlockId, anchor.MaskId), out ImageOcclusionMask? mask);
 
-                return new ImageMaskPreviewReadModel(
+                previews.Add(new ImageMaskPreviewReadModel(
                     target.Id,
                     anchor.Id,
                     anchor.ImageBlockId,
                     anchor.MaskId,
                     image?.ImageRelPath,
-                    mask?.Label);
-            }))
-            .ToArray();
+                    mask?.Label));
+            }
+        }
+
+        return previews;
     }
 
     private static string BuildAnswerPreview(IReadOnlyList<CardTarget> targets)
     {
-        return string.Join(
-            ", ",
-            targets
-                .Select(target => target.Answer)
-                .Where(answer => !string.IsNullOrWhiteSpace(answer))
-                .Distinct(StringComparer.OrdinalIgnoreCase));
+        var answers = new List<string>();
+        var seenAnswers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (CardTarget target in targets)
+        {
+            if (string.IsNullOrWhiteSpace(target.Answer)
+                || !seenAnswers.Add(target.Answer))
+            {
+                continue;
+            }
+
+            answers.Add(target.Answer);
+        }
+
+        return string.Join(", ", answers);
     }
 }

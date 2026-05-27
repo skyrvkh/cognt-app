@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
@@ -35,21 +36,87 @@ internal static partial class FlashcardCardContentCodec
 
     private static string[] NormalizeTags(IEnumerable<string>? tags)
     {
-        return tags?
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(NormalizeTagDisplayName)
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray()
-            ?? [];
+        if (tags is null)
+        {
+            return [];
+        }
+
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> normalizedTags = [];
+        AddNormalizedTags(tags, seenTags, normalizedTags);
+        normalizedTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return normalizedTags.ToArray();
+    }
+
+    private static string[] NormalizeTags(IEnumerable<string>? first, IEnumerable<string>? second)
+    {
+        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+        List<string> normalizedTags = [];
+        AddNormalizedTags(first, seenTags, normalizedTags);
+        AddNormalizedTags(second, seenTags, normalizedTags);
+        normalizedTags.Sort(StringComparer.OrdinalIgnoreCase);
+        return normalizedTags.ToArray();
+    }
+
+    private static void AddNormalizedTags(
+        IEnumerable<string>? source,
+        HashSet<string> seenTags,
+        List<string> normalizedTags)
+    {
+        if (source is null)
+        {
+            return;
+        }
+
+        foreach (string tag in source)
+        {
+            string normalizedTag = NormalizeTagDisplayName(tag);
+            if (normalizedTag.Length > 0 && seenTags.Add(normalizedTag))
+            {
+                normalizedTags.Add(normalizedTag);
+            }
+        }
     }
 
     private static string NormalizeTagDisplayName(string? tag)
     {
-        return string.IsNullOrWhiteSpace(tag)
-            ? string.Empty
-            : string.Concat(tag.Trim().Where(character => !char.IsWhiteSpace(character)));
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return string.Empty;
+        }
+
+        ReadOnlySpan<char> trimmedTag = tag.AsSpan().Trim();
+        int firstWhitespaceIndex = IndexOfWhitespace(trimmedTag);
+        if (firstWhitespaceIndex < 0)
+        {
+            return trimmedTag.ToString();
+        }
+
+        StringBuilder builder = new(trimmedTag.Length);
+        builder.Append(trimmedTag[..firstWhitespaceIndex]);
+        for (int index = firstWhitespaceIndex + 1; index < trimmedTag.Length; index++)
+        {
+            char character = trimmedTag[index];
+            if (!char.IsWhiteSpace(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static int IndexOfWhitespace(ReadOnlySpan<char> value)
+    {
+        for (int index = 0; index < value.Length; index++)
+        {
+            if (char.IsWhiteSpace(value[index]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private sealed record FlashcardCardDocument(
