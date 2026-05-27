@@ -23,17 +23,9 @@ public sealed class CramSessionEngine : ICramSessionEngine
         ArgumentNullException.ThrowIfNull(settings);
 
         settings = settings.EnsureValid();
-        long[] distinctCardIds = cardIds
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
-
-        Dictionary<long, CramCardProgress> progress = distinctCardIds.ToDictionary(
-            id => id,
-            id => new CramCardProgress(id, 0, 0, 0, null, false));
-        Dictionary<long, int> nextEligibleTransitionByCardId = distinctCardIds.ToDictionary(
-            id => id,
-            _ => 0);
+        long[] distinctCardIds = CreateDistinctPositiveCardIds(cardIds);
+        Dictionary<long, CramCardProgress> progress = CreateInitialProgress(distinctCardIds);
+        Dictionary<long, int> nextEligibleTransitionByCardId = CreateInitialEligibility(distinctCardIds);
         IReadOnlyList<long> queue = BuildQueue(
             progress,
             nextEligibleTransitionByCardId,
@@ -48,7 +40,7 @@ public sealed class CramSessionEngine : ICramSessionEngine
             Math.Max(cardsSelected, distinctCardIds.Length),
             Math.Max(0, cardsSkippedInvalid),
             queue.Count == 0 ? null : queue[0],
-            queue.Skip(1).ToArray(),
+            CreatePendingCardIds(queue),
             nextEligibleTransitionByCardId,
             progress,
             TotalAttempts: 0,
@@ -91,17 +83,15 @@ public sealed class CramSessionEngine : ICramSessionEngine
             IsMastered = mastered,
         };
 
-        Dictionary<long, CramCardProgress> nextProgressByCardId = state.ProgressByCardId
-            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        Dictionary<long, CramCardProgress> nextProgressByCardId = CopyProgressByCardId(state.ProgressByCardId);
         nextProgressByCardId[cardId] = nextProgress;
 
         int nextTransitionCount = state.TransitionCount + 1;
-        Dictionary<long, int> nextEligibleTransitionByCardId = state.NextEligibleTransitionByCardId
-            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        Dictionary<long, int> nextEligibleTransitionByCardId =
+            CopyNextEligibleTransitionByCardId(state.NextEligibleTransitionByCardId);
         if (!mastered)
         {
-            int otherUnmasteredCardCount = nextProgressByCardId.Values
-                .Count(progress => progress.CardId != cardId && !progress.IsMastered);
+            int otherUnmasteredCardCount = CountOtherUnmasteredCards(nextProgressByCardId, cardId);
             int retrySpacing = Math.Min(state.Settings.RetryAfterOtherCards, otherUnmasteredCardCount);
             nextEligibleTransitionByCardId[cardId] = nextTransitionCount + retrySpacing;
         }
@@ -121,7 +111,7 @@ public sealed class CramSessionEngine : ICramSessionEngine
         CramSessionState nextState = state with
         {
             CurrentCardId = nextQueue.Count == 0 ? null : nextQueue[0],
-            PendingCardIds = nextQueue.Skip(1).ToArray(),
+            PendingCardIds = CreatePendingCardIds(nextQueue),
             NextEligibleTransitionByCardId = nextEligibleTransitionByCardId,
             ProgressByCardId = nextProgressByCardId,
             TotalAttempts = state.TotalAttempts + 1,
@@ -139,6 +129,30 @@ public sealed class CramSessionEngine : ICramSessionEngine
         return new CramRatingResult(nextState, nextProgress, accepted, mastered, summary);
     }
 
+    private static Dictionary<long, CramCardProgress> CopyProgressByCardId(
+        IReadOnlyDictionary<long, CramCardProgress> progressByCardId)
+    {
+        Dictionary<long, CramCardProgress> copy = new(progressByCardId.Count);
+        foreach (KeyValuePair<long, CramCardProgress> pair in progressByCardId)
+        {
+            copy.Add(pair.Key, pair.Value);
+        }
+
+        return copy;
+    }
+
+    private static Dictionary<long, int> CopyNextEligibleTransitionByCardId(
+        IReadOnlyDictionary<long, int> nextEligibleTransitionByCardId)
+    {
+        Dictionary<long, int> copy = new(nextEligibleTransitionByCardId.Count);
+        foreach (KeyValuePair<long, int> pair in nextEligibleTransitionByCardId)
+        {
+            copy.Add(pair.Key, pair.Value);
+        }
+
+        return copy;
+    }
+
     private static int EffectivePasses(
         CramPassCountingMode mode,
         int acceptedPasses,
@@ -149,6 +163,38 @@ public sealed class CramSessionEngine : ICramSessionEngine
             : acceptedPasses;
     }
 
+    private static int CountOtherUnmasteredCards(
+        IReadOnlyDictionary<long, CramCardProgress> progressByCardId,
+        long excludedCardId)
+    {
+        int count = 0;
+        foreach (CramCardProgress progress in progressByCardId.Values)
+        {
+            if (progress.CardId != excludedCardId && !progress.IsMastered)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static long[] CreatePendingCardIds(IReadOnlyList<long> queue)
+    {
+        if (queue.Count <= 1)
+        {
+            return [];
+        }
+
+        long[] pendingCardIds = new long[queue.Count - 1];
+        for (int index = 1; index < queue.Count; index++)
+        {
+            pendingCardIds[index - 1] = queue[index];
+        }
+
+        return pendingCardIds;
+    }
+
     private static IReadOnlyList<long> BuildQueue(
         IReadOnlyDictionary<long, CramCardProgress> progressByCardId,
         IReadOnlyDictionary<long, int> nextEligibleTransitionByCardId,
@@ -157,59 +203,129 @@ public sealed class CramSessionEngine : ICramSessionEngine
         int transitionCount,
         IReadOnlyList<long> previousOrder)
     {
-        CramCardProgress[] activeCards = progressByCardId.Values
-            .Where(progress => !progress.IsMastered)
-            .ToArray();
-        if (activeCards.Length == 0)
+        List<CramCardProgress> activeCards = CreateActiveCards(progressByCardId);
+        if (activeCards.Count == 0)
         {
             return [];
         }
 
-        Dictionary<long, int> previousOrderByCardId = previousOrder
-            .Select((cardId, index) => new { cardId, index })
-            .GroupBy(item => item.cardId)
-            .ToDictionary(group => group.Key, group => group.First().index);
+        Dictionary<long, int> previousOrderByCardId = CreatePreviousOrderIndex(previousOrder);
+        (List<CramCardProgress> eligibleCards, List<CramCardProgress> waitingCards) =
+            PartitionActiveCards(activeCards, nextEligibleTransitionByCardId, transitionCount);
 
-        CramCardProgress[] eligibleCards = activeCards
-            .Where(progress => GetNextEligibleTransition(
-                nextEligibleTransitionByCardId,
-                progress.CardId) <= transitionCount)
-            .ToArray();
-
-        if (eligibleCards.Length == 0)
+        if (eligibleCards.Count == 0)
         {
-            return OrderWaitingCards(
+            return CreateCardIdQueue(
+                OrderWaitingCards(
                     activeCards,
                     nextEligibleTransitionByCardId,
                     settings,
                     randomSeed,
                     transitionCount,
-                    previousOrderByCardId)
-                .Select(progress => progress.CardId)
-                .ToArray();
+                    previousOrderByCardId),
+                activeCards.Count);
         }
 
-        CramCardProgress[] waitingCards = activeCards
-            .Where(progress => GetNextEligibleTransition(
-                nextEligibleTransitionByCardId,
-                progress.CardId) > transitionCount)
-            .ToArray();
-
-        return OrderEligibleCards(
+        return CreateCardIdQueue(
+            OrderEligibleCards(
                 eligibleCards,
                 settings,
                 randomSeed,
                 transitionCount,
-                previousOrderByCardId)
-            .Concat(OrderWaitingCards(
+                previousOrderByCardId),
+            OrderWaitingCards(
                 waitingCards,
                 nextEligibleTransitionByCardId,
                 settings,
                 randomSeed,
                 transitionCount,
-                previousOrderByCardId))
-            .Select(progress => progress.CardId)
-            .ToArray();
+                previousOrderByCardId),
+            activeCards.Count);
+    }
+
+    private static List<CramCardProgress> CreateActiveCards(
+        IReadOnlyDictionary<long, CramCardProgress> progressByCardId)
+    {
+        List<CramCardProgress> activeCards = new(progressByCardId.Count);
+        foreach (CramCardProgress progress in progressByCardId.Values)
+        {
+            if (!progress.IsMastered)
+            {
+                activeCards.Add(progress);
+            }
+        }
+
+        return activeCards;
+    }
+
+    private static Dictionary<long, int> CreatePreviousOrderIndex(IReadOnlyList<long> previousOrder)
+    {
+        Dictionary<long, int> previousOrderByCardId = new(previousOrder.Count);
+        for (int index = 0; index < previousOrder.Count; index++)
+        {
+            previousOrderByCardId.TryAdd(previousOrder[index], index);
+        }
+
+        return previousOrderByCardId;
+    }
+
+    private static (List<CramCardProgress> EligibleCards, List<CramCardProgress> WaitingCards) PartitionActiveCards(
+        IReadOnlyList<CramCardProgress> activeCards,
+        IReadOnlyDictionary<long, int> nextEligibleTransitionByCardId,
+        int transitionCount)
+    {
+        List<CramCardProgress> eligibleCards = [];
+        List<CramCardProgress> waitingCards = [];
+        foreach (CramCardProgress progress in activeCards)
+        {
+            if (GetNextEligibleTransition(nextEligibleTransitionByCardId, progress.CardId) <= transitionCount)
+            {
+                eligibleCards.Add(progress);
+            }
+            else
+            {
+                waitingCards.Add(progress);
+            }
+        }
+
+        return (eligibleCards, waitingCards);
+    }
+
+    private static long[] CreateCardIdQueue(IEnumerable<CramCardProgress> orderedCards, int count)
+    {
+        long[] cardIds = new long[count];
+        int index = 0;
+        foreach (CramCardProgress progress in orderedCards)
+        {
+            cardIds[index++] = progress.CardId;
+        }
+
+        return cardIds;
+    }
+
+    private static long[] CreateCardIdQueue(
+        IEnumerable<CramCardProgress> firstOrderedCards,
+        IEnumerable<CramCardProgress> secondOrderedCards,
+        int count)
+    {
+        long[] cardIds = new long[count];
+        int index = CopyCardIds(firstOrderedCards, cardIds, startIndex: 0);
+        CopyCardIds(secondOrderedCards, cardIds, index);
+        return cardIds;
+    }
+
+    private static int CopyCardIds(
+        IEnumerable<CramCardProgress> source,
+        long[] destination,
+        int startIndex)
+    {
+        int index = startIndex;
+        foreach (CramCardProgress progress in source)
+        {
+            destination[index++] = progress.CardId;
+        }
+
+        return index;
     }
 
     private static IOrderedEnumerable<CramCardProgress> OrderEligibleCards(
@@ -315,5 +431,42 @@ public sealed class CramSessionEngine : ICramSessionEngine
             value ^= value >> 31;
             return value;
         }
+    }
+
+    private static long[] CreateDistinctPositiveCardIds(IReadOnlyList<long> cardIds)
+    {
+        List<long> distinctCardIds = new(cardIds.Count);
+        HashSet<long> seenCardIds = new();
+        foreach (long cardId in cardIds)
+        {
+            if (cardId > 0 && seenCardIds.Add(cardId))
+            {
+                distinctCardIds.Add(cardId);
+            }
+        }
+
+        return distinctCardIds.ToArray();
+    }
+
+    private static Dictionary<long, CramCardProgress> CreateInitialProgress(IReadOnlyList<long> cardIds)
+    {
+        Dictionary<long, CramCardProgress> progressByCardId = new(cardIds.Count);
+        foreach (long cardId in cardIds)
+        {
+            progressByCardId.Add(cardId, new CramCardProgress(cardId, 0, 0, 0, null, false));
+        }
+
+        return progressByCardId;
+    }
+
+    private static Dictionary<long, int> CreateInitialEligibility(IReadOnlyList<long> cardIds)
+    {
+        Dictionary<long, int> nextEligibleTransitionByCardId = new(cardIds.Count);
+        foreach (long cardId in cardIds)
+        {
+            nextEligibleTransitionByCardId.Add(cardId, 0);
+        }
+
+        return nextEligibleTransitionByCardId;
     }
 }
