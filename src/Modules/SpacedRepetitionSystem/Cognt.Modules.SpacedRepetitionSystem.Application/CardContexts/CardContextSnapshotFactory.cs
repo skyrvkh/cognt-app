@@ -33,18 +33,19 @@ public static partial class CardContextSnapshotFactory
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        CardContext[] contexts = document.Contexts
-            .Select(context =>
+        CardContext[] contexts = new CardContext[document.Contexts.Count];
+        for (int index = 0; index < document.Contexts.Count; index++)
+        {
+            CardContext context = document.Contexts[index];
+            if (context.Status == CardContextStatus.Disabled)
             {
-                if (context.Status == CardContextStatus.Disabled)
-                {
-                    return context;
-                }
+                contexts[index] = context;
+                continue;
+            }
 
-                CardContextSnapshot snapshot = CreateSnapshot(sourceRelPath, noteContent, context);
-                return context with { Status = snapshot.Status };
-            })
-            .ToArray();
+            CardContextSnapshot snapshot = CreateSnapshot(sourceRelPath, noteContent, context);
+            contexts[index] = context with { Status = snapshot.Status };
+        }
 
         return document with
         {

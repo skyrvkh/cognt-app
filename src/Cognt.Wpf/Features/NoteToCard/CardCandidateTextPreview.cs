@@ -60,11 +60,7 @@ internal static class CardCandidateTextPreview
                 : text;
         }
 
-        Dictionary<int, CardSlot> slotsByDisplayIndex = slots
-            .Where(slot => slot.DisplayClozeIndex > 0)
-            .GroupBy(slot => slot.DisplayClozeIndex)
-            .Select(grouping => grouping.First())
-            .ToDictionary(slot => slot.DisplayClozeIndex, slot => slot);
+        Dictionary<int, CardSlot> slotsByDisplayIndex = CreateSlotsByDisplayIndex(slots);
 
         StringBuilder builder = new();
         int position = 0;
@@ -99,6 +95,21 @@ internal static class CardCandidateTextPreview
 
         builder.Append(text, position, text.Length - position);
         return builder.ToString();
+    }
+
+    private static Dictionary<int, CardSlot> CreateSlotsByDisplayIndex(IReadOnlyList<CardSlot> slots)
+    {
+        Dictionary<int, CardSlot> slotsByDisplayIndex = [];
+        for (int index = 0; index < slots.Count; index++)
+        {
+            CardSlot slot = slots[index];
+            if (slot.DisplayClozeIndex > 0)
+            {
+                slotsByDisplayIndex.TryAdd(slot.DisplayClozeIndex, slot);
+            }
+        }
+
+        return slotsByDisplayIndex;
     }
 
     private static string RenderFrontCloze(

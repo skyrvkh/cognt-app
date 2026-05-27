@@ -7,7 +7,9 @@ public static partial class CardContextQueueBuilder
         CardSlot slot,
         IReadOnlyList<CardTarget> targets,
         IReadOnlySet<string> availableBlockIds,
-        IReadOnlySet<int> duplicateDisplayIndexes)
+        IReadOnlySet<int> duplicateDisplayIndexes,
+        IReadOnlyDictionary<string, CardContextImageSurface> imagesByBlockId,
+        IReadOnlyDictionary<(string ImageBlockId, string MaskId), ImageOcclusionMask> masksByImageAndId)
     {
         if (context.Status == CardContextStatus.Disabled)
         {
@@ -61,16 +63,12 @@ public static partial class CardContextQueueBuilder
                     return CandidateValidation.Invalid("An image anchor points to an image block that no longer exists.");
                 }
 
-                CardContextImageSurface? image = context.Images.FirstOrDefault(surface =>
-                    string.Equals(surface.ImageBlockId, anchor.ImageBlockId, StringComparison.Ordinal));
-                if (image is null)
+                if (!imagesByBlockId.TryGetValue(anchor.ImageBlockId, out CardContextImageSurface? image))
                 {
                     return CandidateValidation.Invalid("An image anchor refers to a missing image surface.");
                 }
 
-                ImageOcclusionMask? mask = image.Masks.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Id, anchor.MaskId, StringComparison.Ordinal));
-                if (mask is null)
+                if (!masksByImageAndId.TryGetValue((anchor.ImageBlockId, anchor.MaskId), out ImageOcclusionMask? mask))
                 {
                     return CandidateValidation.Invalid("An image anchor refers to a missing mask.");
                 }

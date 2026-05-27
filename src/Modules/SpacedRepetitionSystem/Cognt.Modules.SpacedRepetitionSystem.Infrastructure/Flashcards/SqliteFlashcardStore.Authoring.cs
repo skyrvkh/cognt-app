@@ -107,9 +107,9 @@ internal sealed partial class SqliteFlashcardStore
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
         using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
-        FlashcardRecord[] activeCards = repository.LoadCardsByIds(cardIds).ToArray();
-        repository.MarkCardsDeleted(activeCards.Select(card => card.Id).ToArray());
-        return Task.FromResult(activeCards.Length);
+        IReadOnlyList<FlashcardRecord> activeCards = repository.LoadCardsByIds(cardIds);
+        repository.MarkCardsDeleted(CreateCardIds(activeCards));
+        return Task.FromResult(activeCards.Count);
     }
 
     public Task<int> AddTagsToCardsAsync(

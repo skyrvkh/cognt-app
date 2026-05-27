@@ -28,11 +28,7 @@ public static partial class CardContextAuthoring
         CardTarget target = targets[targetIndex];
         targets[targetIndex] = target with
         {
-            ImageAnchors = target.ImageAnchors
-                .Where(existing => !string.Equals(existing.MaskId, anchor.MaskId, StringComparison.Ordinal))
-                .Concat([anchor])
-                .DistinctBy(candidate => candidate.Id, StringComparer.Ordinal)
-                .ToArray(),
+            ImageAnchors = ReplaceImageAnchorForMask(target.ImageAnchors, anchor),
         };
 
         CardContext updated = context with { Targets = targets };
@@ -40,4 +36,37 @@ public static partial class CardContextAuthoring
         return updated;
     }
 
+    private static ImageMaskAnchor[] ReplaceImageAnchorForMask(
+        IReadOnlyList<ImageMaskAnchor> anchors,
+        ImageMaskAnchor replacement)
+    {
+        HashSet<string> seenAnchorIds = new(StringComparer.Ordinal);
+        ImageMaskAnchor[] nextAnchors = new ImageMaskAnchor[anchors.Count + 1];
+        int count = 0;
+
+        foreach (ImageMaskAnchor existing in anchors)
+        {
+            if (string.Equals(existing.MaskId, replacement.MaskId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (seenAnchorIds.Add(existing.Id))
+            {
+                nextAnchors[count++] = existing;
+            }
+        }
+
+        if (seenAnchorIds.Add(replacement.Id))
+        {
+            nextAnchors[count++] = replacement;
+        }
+
+        if (count != nextAnchors.Length)
+        {
+            Array.Resize(ref nextAnchors, count);
+        }
+
+        return nextAnchors;
+    }
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
@@ -71,12 +72,15 @@ public static partial class CardContextContentSanitizer
             return null;
         }
 
-        foreach (JsonObject child in children.OfType<JsonObject>())
+        foreach (JsonNode? childNode in children)
         {
-            JsonObject? match = FindFirstBlockByFlavour(child, flavour);
-            if (match is not null)
+            if (childNode is JsonObject child)
             {
-                return match;
+                JsonObject? match = FindFirstBlockByFlavour(child, flavour);
+                if (match is not null)
+                {
+                    return match;
+                }
             }
         }
 
@@ -92,12 +96,20 @@ public static partial class CardContextContentSanitizer
             return false;
         }
 
-        string value = string.Concat(delta
-            .OfType<JsonObject>()
-            .Select(operation => ReadString(operation["insert"]))
-            .Where(insert => insert is not null));
+        StringBuilder value = new();
+        foreach (JsonNode? operationNode in delta)
+        {
+            if (operationNode is JsonObject operation)
+            {
+                string? insert = ReadString(operation["insert"]);
+                if (insert is not null)
+                {
+                    value.Append(insert);
+                }
+            }
+        }
 
-        return string.Equals(value.Trim(), expectedText, StringComparison.Ordinal);
+        return string.Equals(value.ToString().Trim(), expectedText, StringComparison.Ordinal);
     }
 
     private static string? ReadString(JsonNode? node)

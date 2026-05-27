@@ -17,7 +17,7 @@ public static partial class CardContextAuthoring
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(slot);
 
-        if (context.Slots.Any(existing => string.Equals(existing.Id, slot.Id, StringComparison.Ordinal)))
+        if (FindSlotIndexById(context.Slots, slot.Id) >= 0)
         {
             return context;
         }
@@ -46,5 +46,18 @@ public static partial class CardContextAuthoring
 
         slots[slotIndex] = slots[slotIndex] with { IsDisabled = isDisabled };
         return context with { Slots = slots };
+    }
+
+    private static int FindSlotIndexById(IReadOnlyList<CardSlot> slots, string slotId)
+    {
+        for (int index = 0; index < slots.Count; index++)
+        {
+            if (string.Equals(slots[index].Id, slotId, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

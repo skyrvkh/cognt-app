@@ -18,11 +18,9 @@ public static partial class CardContextAuthoring
 
     internal static CardContextStatus DetermineStatus(CardContext context, string currentSnapshotHash)
     {
-        bool hasAnySlots = context.Slots.Count > 0
-            && context.Targets.Count > 0
-            && context.Slots.Any(slot => slot.TargetIds.Count > 0);
-
-        if (!hasAnySlots)
+        if (context.Slots.Count == 0
+            || context.Targets.Count == 0
+            || !HasSlotWithTargets(context.Slots))
         {
             return CardContextStatus.Draft;
         }
@@ -35,5 +33,18 @@ public static partial class CardContextAuthoring
         return string.Equals(context.LastGeneratedSnapshotHash, currentSnapshotHash, StringComparison.Ordinal)
             ? CardContextStatus.Generated
             : CardContextStatus.Outdated;
+    }
+
+    private static bool HasSlotWithTargets(IReadOnlyList<CardSlot> slots)
+    {
+        foreach (CardSlot slot in slots)
+        {
+            if (slot.TargetIds.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -33,12 +33,8 @@ public sealed partial class MainViewModel
         string relativePath = GetRequiredCurrentNoteRelativePath();
         string noteContent = GetCurrentEditorContent?.Invoke() ?? lastSavedContent;
         CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-        CardContext context = document.Contexts.FirstOrDefault(item =>
-                string.Equals(item.Id, candidate.ContextId, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("The selected card context no longer exists.");
-        CardSlot slot = context.Slots.FirstOrDefault(item =>
-                string.Equals(item.Id, candidate.SlotId, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("The selected card slot no longer exists.");
+        CardContext context = ResolveRequestedDraftContext(document, candidate.ContextId);
+        CardSlot slot = ResolveRequiredCardSlot(context.Slots, candidate.SlotId);
         CardPresentationPolicy presentation = CardPresentationPolicies.Resolve(context, slot);
         CardContextSnapshot snapshot = CardContextSnapshotFactory.CreateSnapshot(
             relativePath,
@@ -78,9 +74,12 @@ public sealed partial class MainViewModel
         CardSlot slot)
     {
         List<CardCandidateImagePreviewViewModel> imagePreviews = [];
-        foreach (CardContextImageSurface image in context.Images.Where(image => image.Masks.Count > 0))
+        foreach (CardContextImageSurface image in context.Images)
         {
-            imagePreviews.Add(BuildCardCandidateImagePreview(relativePath, context, slot, image));
+            if (image.Masks.Count > 0)
+            {
+                imagePreviews.Add(BuildCardCandidateImagePreview(relativePath, context, slot, image));
+            }
         }
 
         return imagePreviews;

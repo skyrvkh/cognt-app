@@ -68,9 +68,19 @@ public sealed partial class ImageMaskOverlayCanvas
         StreamGeometry geometry = new();
         using StreamGeometryContext context = geometry.Open();
         context.BeginFigure(points[0], isFilled: isCovered, isClosed: true);
-        context.PolyLineTo(points.Skip(1).ToArray(), isStroked: true, isSmoothJoin: true);
+        FillPolygonSegmentBuffer(points);
+        context.PolyLineTo(polygonSegmentBuffer, isStroked: true, isSmoothJoin: true);
         geometry.Freeze();
         drawingContext.DrawGeometry(fill, stroke, geometry);
+    }
+
+    private void FillPolygonSegmentBuffer(PointCollection points)
+    {
+        polygonSegmentBuffer.Clear();
+        for (int index = 1; index < points.Count; index++)
+        {
+            polygonSegmentBuffer.Add(points[index]);
+        }
     }
 
     private void DrawMaskLabel(DrawingContext drawingContext, ImageMaskItemViewModel item, Rect rect)

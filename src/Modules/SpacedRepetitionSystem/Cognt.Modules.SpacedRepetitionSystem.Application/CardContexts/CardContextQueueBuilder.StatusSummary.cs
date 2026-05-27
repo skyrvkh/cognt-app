@@ -38,13 +38,45 @@ public static partial class CardContextQueueBuilder
 
     private static NoteToCardQueueSummaryReadModel BuildSummary(IReadOnlyList<CardCandidateReadModel> items)
     {
+        int draftCount = 0;
+        int readyCount = 0;
+        int invalidCount = 0;
+        int generatedCount = 0;
+        int outdatedCount = 0;
+        int disabledCount = 0;
+
+        foreach (CardCandidateReadModel item in items)
+        {
+            switch (item.Status)
+            {
+                case CardCandidateStatus.Draft:
+                    draftCount++;
+                    break;
+                case CardCandidateStatus.Ready:
+                    readyCount++;
+                    break;
+                case CardCandidateStatus.Invalid:
+                    invalidCount++;
+                    break;
+                case CardCandidateStatus.Generated:
+                    generatedCount++;
+                    break;
+                case CardCandidateStatus.Outdated:
+                    outdatedCount++;
+                    break;
+                case CardCandidateStatus.Disabled:
+                    disabledCount++;
+                    break;
+            }
+        }
+
         return new NoteToCardQueueSummaryReadModel(
             items.Count,
-            items.Count(item => item.Status == CardCandidateStatus.Draft),
-            items.Count(item => item.Status == CardCandidateStatus.Ready),
-            items.Count(item => item.Status == CardCandidateStatus.Invalid),
-            items.Count(item => item.Status == CardCandidateStatus.Generated),
-            items.Count(item => item.Status == CardCandidateStatus.Outdated),
-            items.Count(item => item.Status == CardCandidateStatus.Disabled));
+            draftCount,
+            readyCount,
+            invalidCount,
+            generatedCount,
+            outdatedCount,
+            disabledCount);
     }
 }

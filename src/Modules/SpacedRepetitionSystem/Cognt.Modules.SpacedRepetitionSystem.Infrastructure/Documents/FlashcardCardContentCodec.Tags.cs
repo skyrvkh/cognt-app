@@ -16,8 +16,8 @@ internal static partial class FlashcardCardContentCodec
         }
 
         string[] existingTags = NormalizeTags(document.Tags);
-        string[] mergedTags = NormalizeTags(existingTags.Concat(tags));
-        if (existingTags.SequenceEqual(mergedTags, StringComparer.OrdinalIgnoreCase))
+        string[] mergedTags = NormalizeTags(existingTags, tags);
+        if (TagsEqual(existingTags, mergedTags))
         {
             return false;
         }
@@ -46,15 +46,46 @@ internal static partial class FlashcardCardContentCodec
         }
 
         string[] existingTags = NormalizeTags(document.Tags);
-        string[] remainingTags = existingTags
-            .Where(tag => !tagsToRemove.Contains(tag, StringComparer.OrdinalIgnoreCase))
-            .ToArray();
-        if (existingTags.SequenceEqual(remainingTags, StringComparer.OrdinalIgnoreCase))
+        string[] remainingTags = RemoveTags(existingTags, tagsToRemove);
+        if (TagsEqual(existingTags, remainingTags))
         {
             return false;
         }
 
         updatedContent = SerializeDocument(document with { Tags = remainingTags });
+        return true;
+    }
+
+    private static string[] RemoveTags(IReadOnlyList<string> existingTags, IReadOnlyList<string> tagsToRemove)
+    {
+        HashSet<string> tagsToRemoveSet = new(tagsToRemove, StringComparer.OrdinalIgnoreCase);
+        List<string> remainingTags = new(existingTags.Count);
+        foreach (string tag in existingTags)
+        {
+            if (!tagsToRemoveSet.Contains(tag))
+            {
+                remainingTags.Add(tag);
+            }
+        }
+
+        return remainingTags.ToArray();
+    }
+
+    private static bool TagsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index], right[index], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 }
