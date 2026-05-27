@@ -9,12 +9,32 @@ public static partial class FlashcardReviewQueuePlanner
         Func<FlashcardReviewQueueCategory, bool> isIncludedCategory,
         int? limit = null)
     {
-        IOrderedEnumerable<FlashcardReviewQueueCandidate> orderedCandidates = OrderByQueuePosition(candidates
-            .Where(candidate => isIncludedCategory(candidate.Category)));
+        List<FlashcardReviewQueueCandidate> selectedCandidates = [];
+        foreach (FlashcardReviewQueueCandidate candidate in candidates)
+        {
+            if (isIncludedCategory(candidate.Category))
+            {
+                selectedCandidates.Add(candidate);
+            }
+        }
 
-        return limit.HasValue
-            ? orderedCandidates.Take(limit.Value).ToArray()
-            : orderedCandidates.ToArray();
+        selectedCandidates.Sort(CompareQueuePosition);
+
+        int selectedCount = limit.HasValue
+            ? Math.Min(limit.Value, selectedCandidates.Count)
+            : selectedCandidates.Count;
+        if (selectedCount == 0)
+        {
+            return [];
+        }
+
+        FlashcardReviewQueueCandidate[] result = new FlashcardReviewQueueCandidate[selectedCount];
+        for (int index = 0; index < selectedCount; index++)
+        {
+            result[index] = selectedCandidates[index];
+        }
+
+        return result;
     }
 
     private static int RemainingDailyLimit(int limit, int used)
@@ -43,13 +63,49 @@ public static partial class FlashcardReviewQueuePlanner
             queuedCards);
     }
 
-    private static IOrderedEnumerable<FlashcardReviewQueueCandidate> OrderByQueuePosition(
-        IEnumerable<FlashcardReviewQueueCandidate> candidates)
+    private static long[] CreateCardIdQueue(
+        IReadOnlyList<FlashcardReviewQueueCandidate> inProgressCandidates,
+        IReadOnlyList<FlashcardReviewQueueCandidate> limitedReviewCandidates,
+        IReadOnlyList<FlashcardReviewQueueCandidate> limitedNewCandidates)
     {
-        return candidates
-            .OrderBy(candidate => candidate.Category)
-            .ThenBy(candidate => candidate.DueUtc)
-            .ThenBy(candidate => candidate.CardId);
+        long[] cardIds = new long[
+            inProgressCandidates.Count
+            + limitedReviewCandidates.Count
+            + limitedNewCandidates.Count];
+        int index = CopyCardIds(inProgressCandidates, cardIds, startIndex: 0);
+        index = CopyCardIds(limitedReviewCandidates, cardIds, index);
+        CopyCardIds(limitedNewCandidates, cardIds, index);
+        return cardIds;
+    }
+
+    private static int CopyCardIds(
+        IReadOnlyList<FlashcardReviewQueueCandidate> candidates,
+        long[] cardIds,
+        int startIndex)
+    {
+        int index = startIndex;
+        for (int candidateIndex = 0; candidateIndex < candidates.Count; candidateIndex++)
+        {
+            cardIds[index++] = candidates[candidateIndex].CardId;
+        }
+
+        return index;
+    }
+
+    private static int CompareQueuePosition(
+        FlashcardReviewQueueCandidate left,
+        FlashcardReviewQueueCandidate right)
+    {
+        int categoryComparison = left.Category.CompareTo(right.Category);
+        if (categoryComparison != 0)
+        {
+            return categoryComparison;
+        }
+
+        int dueComparison = left.DueUtc.CompareTo(right.DueUtc);
+        return dueComparison != 0
+            ? dueComparison
+            : left.CardId.CompareTo(right.CardId);
     }
 
     private static bool IsInProgressCategory(FlashcardReviewQueueCategory category)

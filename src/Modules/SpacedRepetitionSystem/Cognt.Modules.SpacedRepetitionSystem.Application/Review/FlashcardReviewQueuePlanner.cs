@@ -69,11 +69,10 @@ public static partial class FlashcardReviewQueuePlanner
             IsNewCategory,
             remainingNewCards);
 
-        IReadOnlyList<long> cardIds = inProgressCandidates
-            .Concat(limitedReviewCandidates)
-            .Concat(limitedNewCandidates)
-            .Select(candidate => candidate.CardId)
-            .ToArray();
+        IReadOnlyList<long> cardIds = CreateCardIdQueue(
+            inProgressCandidates,
+            limitedReviewCandidates,
+            limitedNewCandidates);
 
         FlashcardReviewQueueSummaryReadModel summary = CreateSummary(
             counts,

@@ -56,15 +56,13 @@ internal sealed partial class SqliteFlashcardStore
             counts.OverdueCards + counts.DueCards,
             counts.NewCards);
         FlashcardReviewQueuePlan plan = FlashcardReviewQueuePlanner.CreatePlan(
-            candidates.Select(ToReadModel).ToArray(),
+            CreateReviewQueueCandidates(candidates),
             ToReadModel(counts),
             settings,
             ToReadModel(usage));
         DateTimeOffset? nextDueUtc = repository.LoadNextFutureDueUtc(nowUtc);
         DateTimeOffset? nextIntradayDueUtc = repository.LoadNextFutureIntradayDueUtc(nowUtc);
-        Dictionary<long, FlashcardRecord> cardsById = repository
-            .LoadCardsByIds(plan.CardIds)
-            .ToDictionary(card => card.Id);
+        Dictionary<long, FlashcardRecord> cardsById = CreateCardsById(repository.LoadCardsByIds(plan.CardIds));
 
         ReviewQueueCards loadedCards = LoadReviewCardsForPlan(collectionPath, plan.CardIds, cardsById);
         repository.MarkCardsDeleted(loadedCards.StaleCardIds);
@@ -95,26 +93,14 @@ internal sealed partial class SqliteFlashcardStore
             todayStartUtc,
             tomorrowStartUtc,
             scope);
-        HashSet<long> schedulerEligibleCardIds = candidates
-            .Where(candidate => candidate.Category != PersistenceQueueCategory.New
-                && candidate.DueUtc <= nowUtc)
-            .Select(candidate => candidate.CardId)
-            .ToHashSet();
-        long[] cardIds = candidates
-            .Select(candidate => candidate.CardId)
-            .ToArray();
-        Dictionary<long, FlashcardRecord> cardsById = repository
-            .LoadCardsByIds(cardIds)
-            .ToDictionary(card => card.Id);
+        HashSet<long> schedulerEligibleCardIds = CreateSchedulerEligibleCardIds(candidates, nowUtc);
+        long[] cardIds = CreateCardIds(candidates);
+        Dictionary<long, FlashcardRecord> cardsById = CreateCardsById(repository.LoadCardsByIds(cardIds));
 
         ReviewQueueCards loadedCards = LoadReviewCardsForPlan(collectionPath, cardIds, cardsById);
         repository.MarkCardsDeleted(loadedCards.StaleCardIds);
-        AppReadModels.FlashcardReviewCardReadModel[] reviewCards = loadedCards.ReviewCards
-            .Select(card => card with
-            {
-                WasDueAtQueueStart = schedulerEligibleCardIds.Contains(card.Id),
-            })
-            .ToArray();
+        AppReadModels.FlashcardReviewCardReadModel[] reviewCards =
+            ApplyQueueStartDueFlags(loadedCards.ReviewCards, schedulerEligibleCardIds);
 
         return new AppReadModels.FlashcardReviewQueueReadModel(
             reviewCards,
@@ -126,6 +112,86 @@ internal sealed partial class SqliteFlashcardStore
         {
             Mode = AppReadModels.FlashcardReviewQueueMode.Cram,
         };
+    }
+
+    private static AppQueueCandidate[] CreateReviewQueueCandidates(IReadOnlyList<PersistenceQueueCandidate> candidates)
+    {
+        AppQueueCandidate[] queueCandidates = new AppQueueCandidate[candidates.Count];
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            queueCandidates[index] = ToReadModel(candidates[index]);
+        }
+
+        return queueCandidates;
+    }
+
+    private static HashSet<long> CreateSchedulerEligibleCardIds(
+        IReadOnlyList<PersistenceQueueCandidate> candidates,
+        DateTimeOffset nowUtc)
+    {
+        HashSet<long> cardIds = [];
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            PersistenceQueueCandidate candidate = candidates[index];
+            if (candidate.Category != PersistenceQueueCategory.New
+                && candidate.DueUtc <= nowUtc)
+            {
+                cardIds.Add(candidate.CardId);
+            }
+        }
+
+        return cardIds;
+    }
+
+    private static long[] CreateCardIds(IReadOnlyList<PersistenceQueueCandidate> candidates)
+    {
+        long[] cardIds = new long[candidates.Count];
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            cardIds[index] = candidates[index].CardId;
+        }
+
+        return cardIds;
+    }
+
+    private static long[] CreateCardIds(IReadOnlyList<FlashcardRecord> cards)
+    {
+        long[] cardIds = new long[cards.Count];
+        for (int index = 0; index < cards.Count; index++)
+        {
+            cardIds[index] = cards[index].Id;
+        }
+
+        return cardIds;
+    }
+
+    private static Dictionary<long, FlashcardRecord> CreateCardsById(IReadOnlyList<FlashcardRecord> cards)
+    {
+        Dictionary<long, FlashcardRecord> cardsById = new(cards.Count);
+        for (int index = 0; index < cards.Count; index++)
+        {
+            FlashcardRecord card = cards[index];
+            cardsById[card.Id] = card;
+        }
+
+        return cardsById;
+    }
+
+    private static AppReadModels.FlashcardReviewCardReadModel[] ApplyQueueStartDueFlags(
+        IReadOnlyList<AppReadModels.FlashcardReviewCardReadModel> cards,
+        HashSet<long> schedulerEligibleCardIds)
+    {
+        AppReadModels.FlashcardReviewCardReadModel[] reviewCards = new AppReadModels.FlashcardReviewCardReadModel[cards.Count];
+        for (int index = 0; index < cards.Count; index++)
+        {
+            AppReadModels.FlashcardReviewCardReadModel card = cards[index];
+            reviewCards[index] = card with
+            {
+                WasDueAtQueueStart = schedulerEligibleCardIds.Contains(card.Id),
+            };
+        }
+
+        return reviewCards;
     }
 
     private static AppReadModels.FlashcardReviewSettingsReadModel ToReadModel(

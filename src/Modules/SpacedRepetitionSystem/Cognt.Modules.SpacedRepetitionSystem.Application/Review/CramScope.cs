@@ -22,20 +22,40 @@ public sealed record CramScope
     {
         return this with
         {
-            DeckIds = DeckIds
-                .Where(id => id > 0)
-                .ToHashSet(),
+            DeckIds = NormalizeDeckIds(DeckIds),
             DocumentIds = NormalizeStrings(DocumentIds),
             BlockIds = NormalizeStrings(BlockIds),
             TagIds = NormalizeStrings(TagIds),
         };
     }
 
+    private static IReadOnlySet<long> NormalizeDeckIds(IEnumerable<long> values)
+    {
+        HashSet<long> normalized = [];
+        foreach (long value in values)
+        {
+            if (value > 0)
+            {
+                normalized.Add(value);
+            }
+        }
+
+        return normalized;
+    }
+
     private static IReadOnlySet<string> NormalizeStrings(IEnumerable<string> values)
     {
-        return values
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> normalized = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            normalized.Add(value.Trim());
+        }
+
+        return normalized;
     }
 }

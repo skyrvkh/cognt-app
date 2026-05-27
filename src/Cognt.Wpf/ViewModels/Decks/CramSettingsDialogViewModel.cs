@@ -184,7 +184,7 @@ public sealed class CramSettingsDialogViewModel : ObservableObject
         errors.AddRange(settings.Validate());
         if (errors.Count > 0)
         {
-            ValidationMessage = string.Join(Environment.NewLine, errors.Distinct());
+            ValidationMessage = CreateValidationMessage(errors);
             return false;
         }
 
@@ -203,6 +203,21 @@ public sealed class CramSettingsDialogViewModel : ObservableObject
     private void ClearValidation()
     {
         ValidationMessage = string.Empty;
+    }
+
+    private static string CreateValidationMessage(IReadOnlyList<string> errors)
+    {
+        HashSet<string> seenErrors = new(StringComparer.Ordinal);
+        List<string> distinctErrors = [];
+        foreach (string error in errors)
+        {
+            if (seenErrors.Add(error))
+            {
+                distinctErrors.Add(error);
+            }
+        }
+
+        return string.Join(Environment.NewLine, distinctErrors);
     }
 }
 

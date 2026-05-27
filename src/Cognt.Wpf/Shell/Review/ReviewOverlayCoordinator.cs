@@ -181,14 +181,29 @@ internal sealed partial class ReviewOverlayCoordinator
         int cardsSelected = Math.Max(
             reviewQueue.Summary.SelectedCards,
             reviewQueue.Cards.Count + reviewQueue.Summary.SkippedInvalidCards);
-        activeCramCardsById = reviewQueue.Cards.ToDictionary(card => card.Id);
+        (activeCramCardsById, long[] cardIds) = MaterializeCramCards(reviewQueue.Cards);
         activeCramSummary = reviewQueue.Summary;
         activeCramState = cramSessionEngine.Start(
-            reviewQueue.Cards.Select(card => card.Id).ToArray(),
+            cardIds,
             settings,
             cardsSelected,
             reviewQueue.Summary.SkippedInvalidCards);
         activeCramSchedulerRecordedCardIds = [];
+    }
+
+    private static (Dictionary<long, FlashcardReviewCardReadModel> CardsById, long[] CardIds) MaterializeCramCards(
+        IReadOnlyList<FlashcardReviewCardReadModel> cards)
+    {
+        Dictionary<long, FlashcardReviewCardReadModel> cardsById = new(cards.Count);
+        long[] cardIds = new long[cards.Count];
+        for (int index = 0; index < cards.Count; index++)
+        {
+            FlashcardReviewCardReadModel card = cards[index];
+            cardsById.Add(card.Id, card);
+            cardIds[index] = card.Id;
+        }
+
+        return (cardsById, cardIds);
     }
 
     private void ClearCramSession()

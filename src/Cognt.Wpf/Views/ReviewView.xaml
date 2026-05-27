@@ -33,8 +33,13 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
+                            <Border.Resources>
+                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
+                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
+                            </Border.Resources>
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
                                               TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -325,7 +330,9 @@
                                                 Command="{Binding RevealAnswerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 Style="{StaticResource PrimaryButtonStyle}">
                                             <TextBlock Text="Reveal (Space)"
-                                                       HorizontalAlignment="Center" />
+                                                        Foreground="{DynamicResource VibrantButtonForegroundBrush}"
+                                                       HorizontalAlignment="Center"
+                                                        />
                                         </Button>
                                     </StackPanel>
 
@@ -662,7 +669,9 @@
                             Click="ExitReview_Click"
                             Style="{StaticResource PrimaryButtonStyle}">
                         <TextBlock Text="Close"
-                                   HorizontalAlignment="Center" />
+                                    Foreground="{DynamicResource VibrantButtonForegroundBrush}"
+                                   HorizontalAlignment="Center"
+                                    />
                     </Button>
                 </Grid>
             </Border>

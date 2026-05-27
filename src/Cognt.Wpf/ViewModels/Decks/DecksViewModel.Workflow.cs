@@ -62,11 +62,7 @@ public sealed partial class DecksViewModel
             async () =>
             {
                 EnsureCollectionOpen();
-                CardLibraryRow[] distinctCards = cards
-                    .Where(card => card.CanSchedule)
-                    .GroupBy(card => card.Id)
-                    .Select(group => group.First())
-                    .ToArray();
+                CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctSchedulable(cards);
                 foreach (CardLibraryRow card in distinctCards)
                 {
                     await updateFlashcardSchedulingCommand.PostponeDueDateAsync(
@@ -190,69 +186,124 @@ public sealed partial class DecksViewModel
             Cards.CreateCardsRequest(collectionId));
 
         Decks.LoadDecks(workspace.Decks);
-        IReadOnlyList<FlashcardDeckSummaryReadModel> selectedDecks = GetSelectedDecks(workspace.Decks, Decks.SelectedDeckIds);
+        DeckSelectionScope deckScope = CreateDeckSelectionScope(workspace.Decks, Decks.SelectedDeckIds);
         IReadOnlyList<FlashcardCardSummaryReadModel> selectedAllCards = FilterCardsForSelectedDecks(
             workspace.AllCards,
-            selectedDecks);
+            deckScope.SelectedDeckNameSet);
         IReadOnlyList<FlashcardCardSummaryReadModel> selectedVisibleCards = FilterCardsForSelectedDecks(
             workspace.VisibleCards,
-            selectedDecks);
-        IReadOnlyList<FlashcardDeckSummaryReadModel> cardsScopeDecks = selectedDecks.Count == 0
-            ? workspace.Decks
-            : selectedDecks;
+            deckScope.SelectedDeckNameSet);
 
         Cards.LoadFlashcards(
             selectedVisibleCards,
-            cardsScopeDecks,
+            deckScope.Decks,
             selectedAllCards,
             workspace.SourceTitlesByRelPath,
-            selectedDecks.Count > 0);
+            deckScope.HasSelection);
         Statistics.LoadCollection(
             collectionId,
-            selectedDecks.Select(deck => deck.Name).ToArray());
+            deckScope.DeckNames);
         PracticeDueCount = workspace.PracticeDueCount;
-        CramCardCount = NumericTextFormatter.Format(cardsScopeDecks.Sum(deck => deck.TotalCards));
+        CramCardCount = NumericTextFormatter.Format(deckScope.TotalCards);
     }
 
-    private static IReadOnlyList<FlashcardDeckSummaryReadModel> GetSelectedDecks(
+    private static DeckSelectionScope CreateDeckSelectionScope(
         IReadOnlyList<FlashcardDeckSummaryReadModel> decks,
-        IReadOnlyCollection<long> selectedDeckIds)
+        IReadOnlySet<long> selectedDeckIds)
     {
         if (selectedDeckIds.Count == 0)
         {
-            return [];
+            return new DeckSelectionScope(
+                decks,
+                [],
+                SelectedDeckNameSet: null,
+                TotalCards: CountTotalCards(decks),
+                HasSelection: false);
         }
 
-        return decks
-            .Where(deck => selectedDeckIds.Contains(deck.Id))
-            .ToArray();
+        List<FlashcardDeckSummaryReadModel> selectedDecks = new(Math.Min(decks.Count, selectedDeckIds.Count));
+        List<string>? selectedDeckNames = null;
+        HashSet<string> selectedDeckNameSet = new(Math.Min(decks.Count, selectedDeckIds.Count), StringComparer.OrdinalIgnoreCase);
+        int allDeckTotalCards = 0;
+        int selectedDeckTotalCards = 0;
+
+        foreach (FlashcardDeckSummaryReadModel deck in decks)
+        {
+            allDeckTotalCards += deck.TotalCards;
+            if (!selectedDeckIds.Contains(deck.Id))
+            {
+                continue;
+            }
+
+            selectedDecks.Add(deck);
+            selectedDeckTotalCards += deck.TotalCards;
+            if (selectedDeckNameSet.Add(deck.Name))
+            {
+                selectedDeckNames ??= new(selectedDeckIds.Count);
+                selectedDeckNames.Add(deck.Name);
+            }
+        }
+
+        if (selectedDecks.Count == 0)
+        {
+            return new DeckSelectionScope(
+                decks,
+                [],
+                SelectedDeckNameSet: null,
+                TotalCards: allDeckTotalCards,
+                HasSelection: false);
+        }
+
+        return new DeckSelectionScope(
+            selectedDecks.ToArray(),
+            selectedDeckNames?.ToArray() ?? [],
+            selectedDeckNameSet,
+            selectedDeckTotalCards,
+            HasSelection: true);
     }
 
     private static IReadOnlyList<FlashcardCardSummaryReadModel> FilterCardsForSelectedDecks(
         IReadOnlyList<FlashcardCardSummaryReadModel> cards,
-        IReadOnlyList<FlashcardDeckSummaryReadModel> selectedDecks)
+        HashSet<string>? selectedDeckNames)
     {
-        if (selectedDecks.Count == 0)
+        if (selectedDeckNames is null)
         {
             return cards;
         }
 
-        HashSet<string> selectedDeckNames = selectedDecks
-            .Select(deck => deck.Name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<FlashcardCardSummaryReadModel> filteredCards = new(cards.Count);
+        foreach (FlashcardCardSummaryReadModel card in cards)
+        {
+            if (selectedDeckNames.Contains(card.DeckName))
+            {
+                filteredCards.Add(card);
+            }
+        }
 
-        return cards
-            .Where(card => selectedDeckNames.Contains(card.DeckName))
-            .ToArray();
+        return filteredCards.ToArray();
     }
+
+    private static int CountTotalCards(IReadOnlyList<FlashcardDeckSummaryReadModel> decks)
+    {
+        int totalCards = 0;
+        foreach (FlashcardDeckSummaryReadModel deck in decks)
+        {
+            totalCards += deck.TotalCards;
+        }
+
+        return totalCards;
+    }
+
+    private readonly record struct DeckSelectionScope(
+        IReadOnlyList<FlashcardDeckSummaryReadModel> Decks,
+        string[] DeckNames,
+        HashSet<string>? SelectedDeckNameSet,
+        int TotalCards,
+        bool HasSelection);
 
     private static long[] GetDistinctCardIds(IReadOnlyList<CardLibraryRow> cards)
     {
-        return cards
-            .Select(card => card.Id)
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
+        return CardLibraryRowSelection.DistinctPersistedIds(cards);
     }
 
     private async Task RunFlashcardsMutationAsync(
@@ -298,3 +349,4 @@ public sealed partial class DecksViewModel
         WarningMessageRequested?.Invoke(this, new UserMessageRequestedEventArgs(title, message));
     }
 }
+

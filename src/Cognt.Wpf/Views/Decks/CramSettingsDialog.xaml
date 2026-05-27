@@ -121,11 +121,13 @@
                         HorizontalAlignment="Left"
                         Command="{Binding CancelCommand}"
                         Style="{StaticResource OutlineButtonStyle}" />
-                <Button Content="Start Cramming"
-                        Width="142"
+                <Button Width="142"
                         HorizontalAlignment="Right"
                         Command="{Binding StartCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}" />
+                        Style="{StaticResource PrimaryButtonStyle}">
+                    <TextBlock Text="Start Cramming"
+                                />
+                </Button>
             </Grid>
         </Grid>
     </Border>

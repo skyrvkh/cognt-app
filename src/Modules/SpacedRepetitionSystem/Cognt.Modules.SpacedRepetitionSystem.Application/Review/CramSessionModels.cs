@@ -50,7 +50,22 @@ public sealed record CramSessionState(
 {
     public int ValidCardCount => ProgressByCardId.Count;
 
-    public int MasteredCardCount => ProgressByCardId.Values.Count(progress => progress.IsMastered);
+    public int MasteredCardCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (CramCardProgress progress in ProgressByCardId.Values)
+            {
+                if (progress.IsMastered)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+    }
 
     public int RemainingCardCount => ValidCardCount - MasteredCardCount;
 
@@ -65,8 +80,8 @@ public sealed record CramSessionState(
 
     public IReadOnlyList<long> ActiveCardIds =>
         CurrentCardId.HasValue
-            ? new[] { CurrentCardId.Value }.Concat(PendingCardIds).ToArray()
-            : PendingCardIds.ToArray();
+            ? CreateActiveCardIds(CurrentCardId.Value, PendingCardIds)
+            : CopyCardIds(PendingCardIds);
 
     public CramCompletionSummary CreateCompletionSummary(DateTimeOffset completedAt)
     {
@@ -82,6 +97,32 @@ public sealed record CramSessionState(
             completedAt - StartedAt,
             Settings.RequiredPassCount,
             Settings.PassCountingMode);
+    }
+
+    private static long[] CreateActiveCardIds(long currentCardId, IReadOnlyList<long> pendingCardIds)
+    {
+        long[] activeCardIds = new long[pendingCardIds.Count + 1];
+        activeCardIds[0] = currentCardId;
+        CopyCardIds(pendingCardIds, activeCardIds, destinationStartIndex: 1);
+        return activeCardIds;
+    }
+
+    private static long[] CopyCardIds(IReadOnlyList<long> cardIds)
+    {
+        long[] copy = new long[cardIds.Count];
+        CopyCardIds(cardIds, copy, destinationStartIndex: 0);
+        return copy;
+    }
+
+    private static void CopyCardIds(
+        IReadOnlyList<long> source,
+        long[] destination,
+        int destinationStartIndex)
+    {
+        for (int index = 0; index < source.Count; index++)
+        {
+            destination[destinationStartIndex + index] = source[index];
+        }
     }
 }
 

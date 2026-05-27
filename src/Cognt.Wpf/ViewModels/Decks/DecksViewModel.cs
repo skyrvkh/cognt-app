@@ -94,7 +94,7 @@ public sealed partial class DecksViewModel : ObservableObject
     {
         return new CramScope
         {
-            DeckIds = Decks.SelectedDeckIds.ToHashSet(),
+            DeckIds = Decks.SelectedDeckIds,
             IncludeSubdecks = true,
             ExcludeSuspendedCards = true,
         };

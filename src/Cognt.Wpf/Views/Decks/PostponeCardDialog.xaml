@@ -83,12 +83,14 @@
                     IsCancel="True"
                     Style="{StaticResource OutlineButtonStyle}" />
             <Button x:Name="ConfirmButton"
-                    Content="Confirm"
                     Width="88"
                     Margin="10,0,0,0"
                     IsDefault="True"
                     Click="Confirm_Click"
-                    Style="{StaticResource PrimaryButtonStyle}" />
+                    Style="{StaticResource PrimaryButtonStyle}">
+                <TextBlock Text="Confirm"
+                            />
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

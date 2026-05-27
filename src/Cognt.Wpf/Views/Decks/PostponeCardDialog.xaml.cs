@@ -14,9 +14,7 @@ public partial class PostponeCardDialog : Window
     {
         ArgumentNullException.ThrowIfNull(dueDates);
 
-        this.dueDates = dueDates.Count == 0
-            ? [DateTimeOffset.UtcNow]
-            : dueDates.ToArray();
+        this.dueDates = CopyDueDates(dueDates);
 
         InitializeComponent();
         DaysTextBox.Text = "1";
@@ -54,7 +52,7 @@ public partial class PostponeCardDialog : Window
             ? string.Empty
             : $"Enter a whole number from {MinimumDays} to {MaximumDays}.";
         CalculatedDueText.Text = isValid
-            ? FormatDueRange(dueDates.Select(due => due.AddDays(days)).ToArray())
+            ? FormatDueRange(dueDates, days)
             : "-";
     }
 
@@ -67,16 +65,50 @@ public partial class PostponeCardDialog : Window
 
     private static string FormatDueRange(IReadOnlyList<DateTimeOffset> values)
     {
+        return FormatDueRange(values, daysOffset: 0);
+    }
+
+    private static string FormatDueRange(IReadOnlyList<DateTimeOffset> values, int daysOffset)
+    {
         if (values.Count == 0)
         {
             return "-";
         }
 
-        DateTimeOffset min = values.Min();
-        DateTimeOffset max = values.Max();
+        DateTimeOffset min = values[0].AddDays(daysOffset);
+        DateTimeOffset max = min;
+        for (int index = 1; index < values.Count; index++)
+        {
+            DateTimeOffset due = values[index].AddDays(daysOffset);
+            if (due < min)
+            {
+                min = due;
+            }
+            else if (due > max)
+            {
+                max = due;
+            }
+        }
+
         return min == max
             ? FormatDue(min)
             : $"{FormatDue(min)} to {FormatDue(max)}";
+    }
+
+    private static DateTimeOffset[] CopyDueDates(IReadOnlyList<DateTimeOffset> values)
+    {
+        if (values.Count == 0)
+        {
+            return [DateTimeOffset.UtcNow];
+        }
+
+        DateTimeOffset[] copy = new DateTimeOffset[values.Count];
+        for (int index = 0; index < values.Count; index++)
+        {
+            copy[index] = values[index];
+        }
+
+        return copy;
     }
 
     private static string FormatDue(DateTimeOffset value)

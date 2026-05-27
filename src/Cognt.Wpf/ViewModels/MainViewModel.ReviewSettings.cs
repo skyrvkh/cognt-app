@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Text;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace CogntApp.ViewModels;
@@ -309,15 +310,49 @@ public sealed partial class MainViewModel
 
     private static string FormatReviewSteps(IReadOnlyList<TimeSpan>? steps)
     {
-        return string.Join(", ", (steps ?? [])
-            .Where(step => step > TimeSpan.Zero)
-            .Select(FormatReviewStep));
+        if (steps is null || steps.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new();
+        foreach (TimeSpan step in steps)
+        {
+            if (step <= TimeSpan.Zero)
+            {
+                continue;
+            }
+
+            AppendDelimitedValue(builder, FormatReviewStep(step));
+        }
+
+        return builder.ToString();
     }
 
     private static string FormatFsrsParameters(IReadOnlyList<double>? parameters)
     {
-        return string.Join(", ", (parameters ?? [])
-            .Select(parameter => parameter.ToString("G17", CultureInfo.InvariantCulture)));
+        if (parameters is null || parameters.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new();
+        foreach (double parameter in parameters)
+        {
+            AppendDelimitedValue(builder, parameter.ToString("G17", CultureInfo.InvariantCulture));
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendDelimitedValue(StringBuilder builder, string value)
+    {
+        if (builder.Length > 0)
+        {
+            builder.Append(", ");
+        }
+
+        builder.Append(value);
     }
 
     private static string FormatReviewStep(TimeSpan step)
