@@ -46,21 +46,40 @@ internal sealed class DecksWorkspaceDataProvider : IDecksWorkspaceDataProvider
             decks,
             allCards,
             visibleCards,
-            NumericTextFormatter.Format(allCards.Count(card => card.DueUtc <= DateTimeOffset.UtcNow)),
+            NumericTextFormatter.Format(CountDueCards(allCards, DateTimeOffset.UtcNow)),
             sourceTitles);
+    }
+
+    private static int CountDueCards(
+        IReadOnlyList<Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels.FlashcardCardSummaryReadModel> cards,
+        DateTimeOffset nowUtc)
+    {
+        int dueCards = 0;
+        foreach (var card in cards)
+        {
+            if (card.DueUtc <= nowUtc)
+            {
+                dueCards++;
+            }
+        }
+
+        return dueCards;
     }
 
     private IReadOnlyDictionary<string, string> LoadSourceTitles(string collectionId)
     {
         try
         {
-            return noteService.LoadNoteCatalog(collectionId)
-                .Where(note => !string.IsNullOrWhiteSpace(note.RelativePath))
-                .GroupBy(note => note.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.First().Title,
-                    StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> sourceTitles = new(StringComparer.OrdinalIgnoreCase);
+            foreach (KnowledgeNoteListItemReadModel note in noteService.LoadNoteCatalog(collectionId))
+            {
+                if (!string.IsNullOrWhiteSpace(note.RelativePath))
+                {
+                    sourceTitles.TryAdd(note.RelativePath, note.Title);
+                }
+            }
+
+            return sourceTitles;
         }
         catch (Exception ex) when (ex is IOException
             or UnauthorizedAccessException

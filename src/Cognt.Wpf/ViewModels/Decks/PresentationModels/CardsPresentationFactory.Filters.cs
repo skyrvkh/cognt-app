@@ -7,24 +7,29 @@ namespace CogntApp.ViewModels.Decks.PresentationModels;
 
 internal static partial class CardsPresentationFactory
 {
+    private static readonly IReadOnlyDictionary<string, string> EmptySourceTitlesByRelPath =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     internal static CardsFilterOptionsState CreateFilterOptions(
         IReadOnlyList<FlashcardCardSummaryReadModel> cards,
         IReadOnlyList<FlashcardDeckSummaryReadModel> decks,
         DateTimeOffset nowUtc,
         IReadOnlyDictionary<string, string>? sourceTitlesByRelPath = null)
     {
-        int totalCardCount = decks.Sum(deck => deck.TotalCards);
+        DeckFilterState deckState = CreateDeckFilterState(decks);
+        CardFilterCounts counts = CreateCardFilterCounts(
+            cards,
+            nowUtc,
+            DateOnly.FromDateTime(DateTime.Today));
 
         return new CardsFilterOptionsState(
-            new[] { new CardFilterDeckRow("All Decks", NumericTextFormatter.Format(totalCardCount)) }
-                .Concat(decks.Select(deck => new CardFilterDeckRow(
-                    deck.Name,
-                    NumericTextFormatter.Format(deck.TotalCards),
-                    deck.Id)))
-                .ToArray(),
-            CreateStatusFilters(cards, nowUtc),
-            CreateSourceFilters(cards, sourceTitlesByRelPath ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
-            CreateTagFilters(cards));
+            deckState.Rows,
+            CreateStatusFilters(cards.Count, counts.Status),
+            CreateSourceFilters(cards.Count, counts.SourceCounts, sourceTitlesByRelPath ?? EmptySourceTitlesByRelPath),
+            CreateTagFilters(cards.Count, counts.TagCounts),
+            deckState.DeckNames,
+            deckState.TotalCardCount,
+            counts.Summary);
     }
 
     internal static IReadOnlyList<CardEmptyStateRow> CreateEmptyStates(
@@ -116,51 +121,261 @@ internal static partial class CardsPresentationFactory
     }
 
     private static CardFilterOptionRow[] CreateStatusFilters(
-        IReadOnlyList<FlashcardCardSummaryReadModel> cards,
-        DateTimeOffset nowUtc)
+        int totalCards,
+        CardStatusFilterCounts counts)
     {
-        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
         return
         [
-            new("All cards", NumericTextFormatter.Format(cards.Count), FlashcardCardsFilterKind.All.ToString()),
-            new("Due cards", NumericTextFormatter.Format(cards.Count(card => card.DueUtc <= nowUtc && !card.IsSuspended)), FlashcardCardsFilterKind.Due.ToString()),
-            new("New cards", NumericTextFormatter.Format(cards.Count(card => card.State == FlashcardCardStateReadModel.New)), FlashcardCardsFilterKind.New.ToString()),
-            new("Learning/relearning", NumericTextFormatter.Format(cards.Count(card => card.State is FlashcardCardStateReadModel.Learning or FlashcardCardStateReadModel.Relearning)), FlashcardCardsFilterKind.LearningOrRelearning.ToString()),
-            new("Reviewed today", NumericTextFormatter.Format(cards.Count(card => ToLocalDate(card.LastReviewedUtc) == today)), FlashcardCardsFilterKind.ReviewedToday.ToString()),
-            new("Suspended", NumericTextFormatter.Format(cards.Count(card => card.IsSuspended)), FlashcardCardsFilterKind.Suspended.ToString())
+            new("All cards", NumericTextFormatter.Format(totalCards), FlashcardCardsFilterKind.All.ToString()),
+            new("Due cards", NumericTextFormatter.Format(counts.DueCards), FlashcardCardsFilterKind.Due.ToString()),
+            new("New cards", NumericTextFormatter.Format(counts.NewCards), FlashcardCardsFilterKind.New.ToString()),
+            new("Learning/relearning", NumericTextFormatter.Format(counts.LearningOrRelearningCards), FlashcardCardsFilterKind.LearningOrRelearning.ToString()),
+            new("Reviewed today", NumericTextFormatter.Format(counts.ReviewedTodayCards), FlashcardCardsFilterKind.ReviewedToday.ToString()),
+            new("Suspended", NumericTextFormatter.Format(counts.SuspendedCards), FlashcardCardsFilterKind.Suspended.ToString())
         ];
     }
 
-    private static CardFilterOptionRow[] CreateSourceFilters(
+    private static CardFilterCounts CreateCardFilterCounts(
         IReadOnlyList<FlashcardCardSummaryReadModel> cards,
-        IReadOnlyDictionary<string, string> sourceTitlesByRelPath)
+        DateTimeOffset nowUtc,
+        DateOnly today)
     {
-        return new[] { new CardFilterOptionRow("All Sources", NumericTextFormatter.Format(cards.Count), AllSourcesValue) }
-            .Concat(cards
-                .Where(card => !string.IsNullOrWhiteSpace(card.SourceRelPath))
-                .GroupBy(card => card.SourceRelPath!, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new CardFilterOptionRow(
-                    FormatSource(group.Key, sourceTitlesByRelPath),
-                    NumericTextFormatter.Format(group.Count()),
-                    group.Key)))
-            .ToArray();
+        int dueCards = 0;
+        int summaryDueCards = 0;
+        int newCards = 0;
+        int summaryLearningCards = 0;
+        int learningOrRelearningCards = 0;
+        int summaryRelearningCards = 0;
+        int reviewedTodayCards = 0;
+        int suspendedCards = 0;
+        Dictionary<string, int> sourceCounts = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> tagCounts = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (FlashcardCardSummaryReadModel card in cards)
+        {
+            if (card.DueUtc <= nowUtc)
+            {
+                summaryDueCards++;
+                if (!card.IsSuspended)
+                {
+                    dueCards++;
+                }
+            }
+
+            if (card.State == FlashcardCardStateReadModel.New)
+            {
+                newCards++;
+                summaryLearningCards++;
+            }
+
+            if (card.State == FlashcardCardStateReadModel.Learning)
+            {
+                summaryLearningCards++;
+                learningOrRelearningCards++;
+            }
+
+            if (card.State == FlashcardCardStateReadModel.Relearning)
+            {
+                summaryRelearningCards++;
+                learningOrRelearningCards++;
+            }
+
+            if (ToLocalDate(card.LastReviewedUtc) == today)
+            {
+                reviewedTodayCards++;
+            }
+
+            if (card.IsSuspended)
+            {
+                suspendedCards++;
+            }
+
+            CountSource(card, sourceCounts);
+            CountTags(card, tagCounts);
+        }
+
+        return new CardFilterCounts(
+            new CardStatusFilterCounts(
+                dueCards,
+                newCards,
+                learningOrRelearningCards,
+                reviewedTodayCards,
+                suspendedCards),
+            new CardsSummaryCounts(
+                summaryLearningCards,
+                summaryRelearningCards,
+                summaryDueCards),
+            sourceCounts,
+            tagCounts);
     }
 
-    private static CardFilterOptionRow[] CreateTagFilters(IReadOnlyList<FlashcardCardSummaryReadModel> cards)
+    private readonly record struct CardFilterCounts(
+        CardStatusFilterCounts Status,
+        CardsSummaryCounts Summary,
+        Dictionary<string, int> SourceCounts,
+        Dictionary<string, int> TagCounts);
+
+    private readonly record struct CardStatusFilterCounts(
+        int DueCards,
+        int NewCards,
+        int LearningOrRelearningCards,
+        int ReviewedTodayCards,
+        int SuspendedCards);
+
+    private static DeckFilterState CreateDeckFilterState(IReadOnlyList<FlashcardDeckSummaryReadModel> decks)
     {
-        return new[] { new CardFilterOptionRow("All Tags", NumericTextFormatter.Format(cards.Count), AllTagsValue) }
-            .Concat(cards
-                .SelectMany(card => card.Tags)
-                .Where(tag => !string.IsNullOrWhiteSpace(tag))
-                .GroupBy(tag => tag.Trim(), StringComparer.OrdinalIgnoreCase)
-                .Where(group => !group.Key.StartsWith("source:", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new CardFilterOptionRow(
-                    group.Key,
-                    NumericTextFormatter.Format(group.Count()),
-                    group.Key)))
-            .ToArray();
+        int totalCardCount = 0;
+        CardFilterDeckRow[] rows = new CardFilterDeckRow[decks.Count + 1];
+        HashSet<string> seenDeckNames = new(StringComparer.OrdinalIgnoreCase);
+        List<string> deckNames = new(decks.Count);
+
+        for (int index = 0; index < decks.Count; index++)
+        {
+            FlashcardDeckSummaryReadModel deck = decks[index];
+            totalCardCount += deck.TotalCards;
+            rows[index + 1] = new CardFilterDeckRow(
+                deck.Name,
+                NumericTextFormatter.Format(deck.TotalCards),
+                deck.Id);
+
+            string name = deck.Name;
+            if (!string.IsNullOrWhiteSpace(name) && seenDeckNames.Add(name))
+            {
+                deckNames.Add(name);
+            }
+        }
+
+        deckNames.Sort(StringComparer.OrdinalIgnoreCase);
+        rows[0] = new CardFilterDeckRow("All Decks", NumericTextFormatter.Format(totalCardCount));
+
+        return new DeckFilterState(
+            rows,
+            deckNames.ToArray(),
+            totalCardCount);
+    }
+
+    private readonly record struct DeckFilterState(
+        CardFilterDeckRow[] Rows,
+        string[] DeckNames,
+        int TotalCardCount);
+
+    private static CardFilterOptionRow[] CreateSourceFilters(
+        int totalCards,
+        Dictionary<string, int> sourceCounts,
+        IReadOnlyDictionary<string, string> sourceTitlesByRelPath)
+    {
+        CardFilterOptionRow[] sourceRows = CreateSortedSourceRows(sourceCounts, sourceTitlesByRelPath);
+
+        return CreateOptionRows("All Sources", AllSourcesValue, totalCards, sourceRows);
+    }
+
+    private static CardFilterOptionRow[] CreateTagFilters(
+        int totalCards,
+        Dictionary<string, int> tagCounts)
+    {
+        CardFilterOptionRow[] tagRows = CreateSortedTagRows(tagCounts);
+
+        return CreateOptionRows("All Tags", AllTagsValue, totalCards, tagRows);
+    }
+
+    private static void CountSource(
+        FlashcardCardSummaryReadModel card,
+        Dictionary<string, int> sourceCounts)
+    {
+        if (string.IsNullOrWhiteSpace(card.SourceRelPath))
+        {
+            return;
+        }
+
+        string sourceRelPath = card.SourceRelPath!;
+        sourceCounts[sourceRelPath] = sourceCounts.TryGetValue(sourceRelPath, out int count)
+            ? count + 1
+            : 1;
+    }
+
+    private static void CountTags(
+        FlashcardCardSummaryReadModel card,
+        Dictionary<string, int> tagCounts)
+    {
+        foreach (string tag in card.Tags)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                continue;
+            }
+
+            string normalizedTag = tag.Trim();
+            if (normalizedTag.StartsWith("source:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            tagCounts[normalizedTag] = tagCounts.TryGetValue(normalizedTag, out int count)
+                ? count + 1
+                : 1;
+        }
+    }
+
+    private static CardFilterOptionRow[] CreateSortedSourceRows(
+        Dictionary<string, int> sourceCounts,
+        IReadOnlyDictionary<string, string> sourceTitlesByRelPath)
+    {
+        List<KeyValuePair<string, int>> sources = new(sourceCounts);
+        sources.Sort(CompareCountEntriesByKey);
+
+        CardFilterOptionRow[] rows = new CardFilterOptionRow[sources.Count];
+        for (int index = 0; index < sources.Count; index++)
+        {
+            KeyValuePair<string, int> source = sources[index];
+            rows[index] = new CardFilterOptionRow(
+                FormatSource(source.Key, sourceTitlesByRelPath),
+                NumericTextFormatter.Format(source.Value),
+                source.Key);
+        }
+
+        return rows;
+    }
+
+    private static CardFilterOptionRow[] CreateSortedTagRows(Dictionary<string, int> tagCounts)
+    {
+        List<KeyValuePair<string, int>> tags = new(tagCounts);
+        tags.Sort(CompareCountEntriesByKey);
+
+        CardFilterOptionRow[] rows = new CardFilterOptionRow[tags.Count];
+        for (int index = 0; index < tags.Count; index++)
+        {
+            KeyValuePair<string, int> tag = tags[index];
+            rows[index] = new CardFilterOptionRow(
+                tag.Key,
+                NumericTextFormatter.Format(tag.Value),
+                tag.Key);
+        }
+
+        return rows;
+    }
+
+    private static int CompareCountEntriesByKey(
+        KeyValuePair<string, int> left,
+        KeyValuePair<string, int> right)
+    {
+        return StringComparer.OrdinalIgnoreCase.Compare(left.Key, right.Key);
+    }
+
+    private static CardFilterOptionRow[] CreateOptionRows(
+        string allLabel,
+        string allValue,
+        int totalCards,
+        IReadOnlyList<CardFilterOptionRow> optionRows)
+    {
+        CardFilterOptionRow[] rows = new CardFilterOptionRow[optionRows.Count + 1];
+        rows[0] = new CardFilterOptionRow(allLabel, NumericTextFormatter.Format(totalCards), allValue);
+
+        for (int index = 0; index < optionRows.Count; index++)
+        {
+            rows[index + 1] = optionRows[index];
+        }
+
+        return rows;
     }
 
     private static string FormatSource(
@@ -206,3 +421,5 @@ internal static partial class CardsPresentationFactory
         return DateOnly.FromDateTime(value.LocalDateTime);
     }
 }
+
+

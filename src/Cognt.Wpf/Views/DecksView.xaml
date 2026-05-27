@@ -53,7 +53,7 @@
                             ToolTip="Cram cards from the selected decks">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Cram"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        />
                             <Border Style="{StaticResource PracticeCountBadgeStyle}">
                                 <TextBlock Text="{Binding CramCardCount}"
                                            Style="{StaticResource PracticeCountTextStyle}" />
@@ -63,9 +63,10 @@
                     <Button Click="PracticeButton_Click"
                             Margin="10,0,0,0"
                             Style="{StaticResource PracticeButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
+                                                <StackPanel Orientation="Horizontal"
+                                    TextElement.Foreground="{DynamicResource VibrantButtonForegroundBrush}">
                             <TextBlock Text="Practice"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                       Foreground="{DynamicResource VibrantButtonForegroundBrush}" />
                             <Border Style="{StaticResource PracticeCountBadgeStyle}">
                                 <TextBlock Text="{Binding PracticeDueCount}"
                                            Style="{StaticResource PracticeCountTextStyle}" />
