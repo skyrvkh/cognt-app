@@ -8,7 +8,6 @@
              d:DesignHeight="860"
              d:DesignWidth="1292"
              HorizontalAlignment="Stretch"
-             Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}, FallbackValue=1292}"
              MaxWidth="1292"
              Loaded="StatisticsSubview_Loaded"
              SizeChanged="StatisticsSubview_SizeChanged">

@@ -209,11 +209,28 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
 
     private static string[] NormalizeDeckNames(IReadOnlyList<string>? deckNames)
     {
-        return deckNames?
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(name => name.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? [];
+        if (deckNames is null || deckNames.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<string> distinctDeckNames = new(StringComparer.OrdinalIgnoreCase);
+        List<string> normalizedDeckNames = [];
+        foreach (string name in deckNames)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            string normalizedName = name.Trim();
+            if (distinctDeckNames.Add(normalizedName))
+            {
+                normalizedDeckNames.Add(normalizedName);
+            }
+        }
+
+        return normalizedDeckNames.ToArray();
     }
 
     private static string FormatScopeLabel(IReadOnlyList<string> deckNames)

@@ -8,11 +8,16 @@ internal static class SpacedRepetitionSystemDeckSnapshotFactory
     internal static ProgressAnalyticsDeckSummary[] Create(
         IReadOnlyList<FlashcardDeckSummaryReadModel> decks)
     {
-        return decks
-            .Select(deck => new ProgressAnalyticsDeckSummary(
+        ProgressAnalyticsDeckSummary[] snapshots = new ProgressAnalyticsDeckSummary[decks.Count];
+        for (int index = 0; index < decks.Count; index++)
+        {
+            FlashcardDeckSummaryReadModel deck = decks[index];
+            snapshots[index] = new ProgressAnalyticsDeckSummary(
                 deck.Name,
                 deck.DueCards,
-                deck.ProgressPercent))
-            .ToArray();
+                deck.ProgressPercent);
+        }
+
+        return snapshots;
     }
 }

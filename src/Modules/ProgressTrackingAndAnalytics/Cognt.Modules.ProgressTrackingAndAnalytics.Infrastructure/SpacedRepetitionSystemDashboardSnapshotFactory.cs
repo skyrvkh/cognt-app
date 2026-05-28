@@ -9,6 +9,8 @@ internal static class SpacedRepetitionSystemDashboardSnapshotFactory
     internal static ProgressAnalyticsDashboardSnapshot Create(
         FlashcardDashboardSummaryReadModel dashboard)
     {
+        ProgressAnalyticsActivityDayReadModel[] reviewActivity = CreateReviewActivity(dashboard.ReviewActivity);
+
         return new ProgressAnalyticsDashboardSnapshot(
             dashboard.TotalCards,
             dashboard.DueCards,
@@ -16,10 +18,21 @@ internal static class SpacedRepetitionSystemDashboardSnapshotFactory
             dashboard.ReviewedTodayCards,
             dashboard.DifficultCards,
             dashboard.ReviewHistoryCount,
-            dashboard.ReviewActivity
-                .Select(activity => new ProgressAnalyticsActivityDayReadModel(
-                    activity.Date,
-                    activity.ReviewCount))
-                .ToArray());
+            reviewActivity);
+    }
+
+    private static ProgressAnalyticsActivityDayReadModel[] CreateReviewActivity(
+        IReadOnlyList<FlashcardReviewActivityReadModel> reviewActivity)
+    {
+        ProgressAnalyticsActivityDayReadModel[] snapshots = new ProgressAnalyticsActivityDayReadModel[reviewActivity.Count];
+        for (int index = 0; index < reviewActivity.Count; index++)
+        {
+            FlashcardReviewActivityReadModel activity = reviewActivity[index];
+            snapshots[index] = new ProgressAnalyticsActivityDayReadModel(
+                activity.Date,
+                activity.ReviewCount);
+        }
+
+        return snapshots;
     }
 }

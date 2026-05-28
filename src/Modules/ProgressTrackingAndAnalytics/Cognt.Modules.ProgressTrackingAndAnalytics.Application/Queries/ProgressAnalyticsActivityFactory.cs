@@ -7,7 +7,13 @@ internal static class ProgressAnalyticsActivityFactory
     internal static IReadOnlyDictionary<DateOnly, int> CreateReviewedByDate(
         IReadOnlyList<ProgressAnalyticsActivityDayReadModel> reviewActivity)
     {
-        return reviewActivity.ToDictionary(activity => activity.Date, activity => activity.CardsReviewed);
+        Dictionary<DateOnly, int> reviewedByDate = new(reviewActivity.Count);
+        foreach (ProgressAnalyticsActivityDayReadModel activity in reviewActivity)
+        {
+            reviewedByDate.Add(activity.Date, activity.CardsReviewed);
+        }
+
+        return reviewedByDate;
     }
 
     internal static ProgressAnalyticsActivityDayReadModel[] CreateDailyStudyActivity(
@@ -15,15 +21,15 @@ internal static class ProgressAnalyticsActivityFactory
         IReadOnlyDictionary<DateOnly, int> reviewedByDate,
         int activityWindowDays)
     {
-        return Enumerable
-            .Range(0, activityWindowDays)
-            .Select(index =>
-            {
-                DateOnly date = today.AddDays(index - (activityWindowDays - 1));
-                reviewedByDate.TryGetValue(date, out int reviewed);
-                return new ProgressAnalyticsActivityDayReadModel(date, reviewed);
-            })
-            .ToArray();
+        ProgressAnalyticsActivityDayReadModel[] rows = new ProgressAnalyticsActivityDayReadModel[activityWindowDays];
+        for (int index = 0; index < rows.Length; index++)
+        {
+            DateOnly date = today.AddDays(index - (activityWindowDays - 1));
+            reviewedByDate.TryGetValue(date, out int reviewed);
+            rows[index] = new ProgressAnalyticsActivityDayReadModel(date, reviewed);
+        }
+
+        return rows;
     }
 
     internal static ProgressAnalyticsActivityDayReadModel[] CreateStudyStreak(
@@ -31,15 +37,21 @@ internal static class ProgressAnalyticsActivityFactory
         IReadOnlyDictionary<DateOnly, int> reviewedByDate)
     {
         DateOnly firstDate = GetFirstActivityDate(today, reviewedByDate);
-        List<ProgressAnalyticsActivityDayReadModel> rows = [];
-
-        for (DateOnly date = firstDate; date <= today; date = date.AddDays(1))
+        if (firstDate > today)
         {
-            reviewedByDate.TryGetValue(date, out int reviewed);
-            rows.Add(new ProgressAnalyticsActivityDayReadModel(date, reviewed));
+            return [];
         }
 
-        return [.. rows];
+        int dayCount = today.DayNumber - firstDate.DayNumber + 1;
+        ProgressAnalyticsActivityDayReadModel[] rows = new ProgressAnalyticsActivityDayReadModel[dayCount];
+        for (int index = 0; index < rows.Length; index++)
+        {
+            DateOnly date = firstDate.AddDays(index);
+            reviewedByDate.TryGetValue(date, out int reviewed);
+            rows[index] = new ProgressAnalyticsActivityDayReadModel(date, reviewed);
+        }
+
+        return rows;
     }
 
     internal static DateOnly GetFirstActivityDate(

@@ -16,18 +16,9 @@ internal static partial class StatisticsPresentationFactory
 
     internal static StatisticsPresentationState Create(ProgressAnalyticsReport report, DateOnly today)
     {
-        IReadOnlyDictionary<DateOnly, int> reviewedByDate = report.StudyStreak
-            .ToDictionary(day => day.Date, day => day.CardsReviewed);
-
-        string[] dailyLabels = report.DailyStudyActivity
-            .Select(row => FormatShortDate(row.Date))
-            .ToArray();
-        int[] dailyCardsReviewed = report.DailyStudyActivity
-            .Select(row => row.CardsReviewed)
-            .ToArray();
-        string[] weeklyLabels = report.WeeklyReviewOutcomes
-            .Select(row => FormatWeekRange(row.WeekStart, row.WeekEnd).Replace(" - ", "\n"))
-            .ToArray();
+        IReadOnlyDictionary<DateOnly, int> reviewedByDate = CreateReviewedByDateMap(report.StudyStreak);
+        DailyStudyChartData dailyChartData = CreateDailyStudyChartData(report.DailyStudyActivity);
+        WeeklyReviewChartData weeklyChartData = CreateWeeklyReviewChartData(report.WeeklyReviewOutcomes);
 
         return new StatisticsPresentationState(
             report.Summary.CardsReviewed.ToString("N0", CultureInfo.InvariantCulture),
@@ -40,14 +31,12 @@ internal static partial class StatisticsPresentationFactory
             "Good/Easy review share",
             report.Summary.DueTomorrowCards.ToString("N0", CultureInfo.InvariantCulture),
             $"Across {FormatDeckCount(report.Summary.DueTomorrowDecks)}",
-            report.DeckPerformance
-                .Select(row => new DeckPerformanceRow(row.Deck, row.CardsReviewed, row.Retention, row.Due, row.Progress))
-                .ToArray(),
+            CreateDeckPerformanceRows(report.DeckPerformance),
             [
-                CreateColumnSeries("Cards Reviewed", dailyCardsReviewed, ThemeResourceLookup.ColorHex("AccentBrush", "#2563EB"), 12),
-                CreateMovingAverageSeries("Cards Reviewed 7-day avg", dailyCardsReviewed, ThemeResourceLookup.ColorHex("GreenBrush", "#0F766E"))
+                CreateColumnSeries("Cards Reviewed", dailyChartData.CardsReviewed, ThemeResourceLookup.ColorHex("AccentBrush", "#2563EB"), 12),
+                CreateMovingAverageSeries("Cards Reviewed 7-day avg", dailyChartData.CardsReviewed, ThemeResourceLookup.ColorHex("GreenBrush", "#0F766E"))
             ],
-            [CreateCategoryAxis(dailyLabels)],
+            [CreateCategoryAxis(dailyChartData.Labels)],
             [CreateValueAxis()],
             CreateRecallPieSeries(report.RecallDistribution),
             [
@@ -68,14 +57,88 @@ internal static partial class StatisticsPresentationFactory
             [CreateHeatmapXAxis(today)],
             [CreateHeatmapYAxis()],
             [
-                CreateStackedColumnSeries("Again", report.WeeklyReviewOutcomes.Select(row => row.Again), ThemeResourceLookup.ColorHex("RedBrush", "#DC2626")),
-                CreateStackedColumnSeries("Hard", report.WeeklyReviewOutcomes.Select(row => row.Hard), ThemeResourceLookup.ColorHex("OrangeBrush", "#D97706")),
-                CreateStackedColumnSeries("Good", report.WeeklyReviewOutcomes.Select(row => row.Good), ThemeResourceLookup.ColorHex("BlueBrush", "#2563EB")),
-                CreateStackedColumnSeries("Easy", report.WeeklyReviewOutcomes.Select(row => row.Easy), ThemeResourceLookup.ColorHex("GreenBrush", "#16A34A"))
+                CreateStackedColumnSeries("Again", weeklyChartData.Again, ThemeResourceLookup.ColorHex("RedBrush", "#DC2626")),
+                CreateStackedColumnSeries("Hard", weeklyChartData.Hard, ThemeResourceLookup.ColorHex("OrangeBrush", "#D97706")),
+                CreateStackedColumnSeries("Good", weeklyChartData.Good, ThemeResourceLookup.ColorHex("BlueBrush", "#2563EB")),
+                CreateStackedColumnSeries("Easy", weeklyChartData.Easy, ThemeResourceLookup.ColorHex("GreenBrush", "#16A34A"))
             ],
-            [CreateCategoryAxis(weeklyLabels)],
+            [CreateCategoryAxis(weeklyChartData.Labels)],
             [CreateValueAxis()]);
     }
+
+    private static IReadOnlyDictionary<DateOnly, int> CreateReviewedByDateMap(
+        IReadOnlyList<ProgressAnalyticsActivityDayReadModel> studyStreak)
+    {
+        Dictionary<DateOnly, int> reviewedByDate = new(studyStreak.Count);
+        for (int index = 0; index < studyStreak.Count; index++)
+        {
+            ProgressAnalyticsActivityDayReadModel day = studyStreak[index];
+            reviewedByDate.Add(day.Date, day.CardsReviewed);
+        }
+
+        return reviewedByDate;
+    }
+
+    private static DeckPerformanceRow[] CreateDeckPerformanceRows(
+        IReadOnlyList<DeckPerformanceReadModel> deckPerformance)
+    {
+        DeckPerformanceRow[] rows = new DeckPerformanceRow[deckPerformance.Count];
+        for (int index = 0; index < deckPerformance.Count; index++)
+        {
+            DeckPerformanceReadModel row = deckPerformance[index];
+            rows[index] = new DeckPerformanceRow(row.Deck, row.CardsReviewed, row.Retention, row.Due, row.Progress);
+        }
+
+        return rows;
+    }
+
+    private static DailyStudyChartData CreateDailyStudyChartData(
+        IReadOnlyList<ProgressAnalyticsActivityDayReadModel> dailyStudyActivity)
+    {
+        string[] labels = new string[dailyStudyActivity.Count];
+        int[] cardsReviewed = new int[dailyStudyActivity.Count];
+        for (int index = 0; index < dailyStudyActivity.Count; index++)
+        {
+            ProgressAnalyticsActivityDayReadModel row = dailyStudyActivity[index];
+            labels[index] = FormatShortDate(row.Date);
+            cardsReviewed[index] = row.CardsReviewed;
+        }
+
+        return new DailyStudyChartData(labels, cardsReviewed);
+    }
+
+    private static WeeklyReviewChartData CreateWeeklyReviewChartData(
+        IReadOnlyList<WeeklyReviewOutcomeReadModel> weeklyReviewOutcomes)
+    {
+        string[] labels = new string[weeklyReviewOutcomes.Count];
+        int[] again = new int[weeklyReviewOutcomes.Count];
+        int[] hard = new int[weeklyReviewOutcomes.Count];
+        int[] good = new int[weeklyReviewOutcomes.Count];
+        int[] easy = new int[weeklyReviewOutcomes.Count];
+
+        for (int index = 0; index < weeklyReviewOutcomes.Count; index++)
+        {
+            WeeklyReviewOutcomeReadModel row = weeklyReviewOutcomes[index];
+            labels[index] = FormatWeekRange(row.WeekStart, row.WeekEnd).Replace(" - ", "\n");
+            again[index] = row.Again;
+            hard[index] = row.Hard;
+            good[index] = row.Good;
+            easy[index] = row.Easy;
+        }
+
+        return new WeeklyReviewChartData(labels, again, hard, good, easy);
+    }
+
+    private readonly record struct DailyStudyChartData(
+        string[] Labels,
+        int[] CardsReviewed);
+
+    private readonly record struct WeeklyReviewChartData(
+        string[] Labels,
+        int[] Again,
+        int[] Hard,
+        int[] Good,
+        int[] Easy);
 
     private static string FormatDays(int days)
     {

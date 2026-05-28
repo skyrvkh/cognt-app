@@ -9,12 +9,21 @@ internal static class ProgressAnalyticsDeckPerformanceFactory
         IReadOnlyList<ProgressAnalyticsDeckSummary> decks,
         IReadOnlyList<ProgressAnalyticsDeckReviewHistory> deckReviewHistory)
     {
-        IReadOnlyDictionary<string, ProgressAnalyticsDeckReviewHistory> reviewHistoryByDeck = deckReviewHistory
-            .ToDictionary(deck => deck.DeckName, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ProgressAnalyticsDeckReviewHistory> reviewHistoryByDeck = new(
+            deckReviewHistory.Count,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (ProgressAnalyticsDeckReviewHistory deck in deckReviewHistory)
+        {
+            reviewHistoryByDeck.Add(deck.DeckName, deck);
+        }
 
-        return decks
-            .Select(deck => CreateRow(deck, reviewHistoryByDeck))
-            .ToArray();
+        DeckPerformanceReadModel[] rows = new DeckPerformanceReadModel[decks.Count];
+        for (int index = 0; index < rows.Length; index++)
+        {
+            rows[index] = CreateRow(decks[index], reviewHistoryByDeck);
+        }
+
+        return rows;
     }
 
     private static DeckPerformanceReadModel CreateRow(

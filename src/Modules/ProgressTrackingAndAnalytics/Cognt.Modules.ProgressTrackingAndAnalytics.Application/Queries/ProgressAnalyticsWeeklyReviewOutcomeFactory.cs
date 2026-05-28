@@ -8,14 +8,19 @@ internal static class ProgressAnalyticsWeeklyReviewOutcomeFactory
     internal static WeeklyReviewOutcomeReadModel[] CreateRows(
         IReadOnlyList<ProgressAnalyticsWeeklyReviewOutcome> weeklyReviewOutcomes)
     {
-        return weeklyReviewOutcomes
-            .Select(week => new WeeklyReviewOutcomeReadModel(
+        WeeklyReviewOutcomeReadModel[] rows = new WeeklyReviewOutcomeReadModel[weeklyReviewOutcomes.Count];
+        for (int index = 0; index < rows.Length; index++)
+        {
+            ProgressAnalyticsWeeklyReviewOutcome week = weeklyReviewOutcomes[index];
+            rows[index] = new WeeklyReviewOutcomeReadModel(
                 week.WeekStart,
                 week.WeekEnd,
                 week.Again,
                 week.Hard,
                 week.Good,
-                week.Easy))
-            .ToArray();
+                week.Easy);
+        }
+
+        return rows;
     }
 }

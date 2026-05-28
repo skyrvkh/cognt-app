@@ -7,15 +7,22 @@ internal static class ProgressAnalyticsMetrics
 {
     internal static int CalculateAverageRecall(IReadOnlyList<ProgressAnalyticsRecallCount> ratingCounts)
     {
-        int reviewed = ratingCounts.Sum(count => count.Count);
+        int reviewed = 0;
+        int retained = 0;
+        foreach (ProgressAnalyticsRecallCount count in ratingCounts)
+        {
+            reviewed += count.Count;
+            if (IsRetainedRating(count.Rating))
+            {
+                retained += count.Count;
+            }
+        }
+
         if (reviewed == 0)
         {
             return 0;
         }
 
-        int retained = ratingCounts
-            .Where(count => IsRetainedRating(count.Rating))
-            .Sum(count => count.Count);
         return CalculatePercent(retained, reviewed);
     }
 

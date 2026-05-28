@@ -19,35 +19,50 @@ internal static class SpacedRepetitionSystemDetailSnapshotFactory
     private static ProgressAnalyticsDeckReviewHistory[] CreateDeckReviewHistory(
         IReadOnlyList<FlashcardDeckReviewHistoryReadModel> deckReviewHistory)
     {
-        return deckReviewHistory
-            .Select(history => new ProgressAnalyticsDeckReviewHistory(
+        ProgressAnalyticsDeckReviewHistory[] snapshots = new ProgressAnalyticsDeckReviewHistory[deckReviewHistory.Count];
+        for (int index = 0; index < deckReviewHistory.Count; index++)
+        {
+            FlashcardDeckReviewHistoryReadModel history = deckReviewHistory[index];
+            snapshots[index] = new ProgressAnalyticsDeckReviewHistory(
                 history.DeckName,
                 history.ReviewedCount,
-                history.RetainedCount))
-            .ToArray();
+                history.RetainedCount);
+        }
+
+        return snapshots;
     }
 
     private static ProgressAnalyticsRecallCount[] CreateRecallDistribution(
         IReadOnlyList<FlashcardReviewRatingCountReadModel> recallDistribution)
     {
-        return recallDistribution
-            .Select(count => new ProgressAnalyticsRecallCount(
+        ProgressAnalyticsRecallCount[] snapshots = new ProgressAnalyticsRecallCount[recallDistribution.Count];
+        for (int index = 0; index < recallDistribution.Count; index++)
+        {
+            FlashcardReviewRatingCountReadModel count = recallDistribution[index];
+            snapshots[index] = new ProgressAnalyticsRecallCount(
                 SpacedRepetitionSystemRecallRatingMapper.Map(count.Rating),
-                count.Count))
-            .ToArray();
+                count.Count);
+        }
+
+        return snapshots;
     }
 
     private static ProgressAnalyticsWeeklyReviewOutcome[] CreateWeeklyReviewOutcomes(
         IReadOnlyList<FlashcardWeeklyReviewOutcomeReadModel> weeklyReviewOutcomes)
     {
-        return weeklyReviewOutcomes
-            .Select(week => new ProgressAnalyticsWeeklyReviewOutcome(
+        ProgressAnalyticsWeeklyReviewOutcome[] snapshots = new ProgressAnalyticsWeeklyReviewOutcome[weeklyReviewOutcomes.Count];
+        for (int index = 0; index < weeklyReviewOutcomes.Count; index++)
+        {
+            FlashcardWeeklyReviewOutcomeReadModel week = weeklyReviewOutcomes[index];
+            snapshots[index] = new ProgressAnalyticsWeeklyReviewOutcome(
                 week.WeekStart,
                 week.WeekEnd,
                 week.Again,
                 week.Hard,
                 week.Good,
-                week.Easy))
-            .ToArray();
+                week.Easy);
+        }
+
+        return snapshots;
     }
 }

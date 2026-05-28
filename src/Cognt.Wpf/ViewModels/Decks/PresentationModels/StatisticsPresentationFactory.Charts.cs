@@ -12,14 +12,19 @@ internal static partial class StatisticsPresentationFactory
 {
     private static ISeries[] CreateRecallPieSeries(IReadOnlyList<RecallDistributionReadModel> recallRows)
     {
-        return recallRows
-            .Select(row => new PieSeries<int>
+        ISeries[] series = new ISeries[recallRows.Count];
+        for (int index = 0; index < recallRows.Count; index++)
+        {
+            RecallDistributionReadModel row = recallRows[index];
+            series[index] = new PieSeries<int>
             {
                 Name = $"{FormatRecallLabel(row.Rating)} {row.Percent.ToString(CultureInfo.InvariantCulture)}%",
                 Values = [row.Count],
                 Fill = ChartPaint(RecallBarColor(row.Rating))
-            })
-            .ToArray<ISeries>();
+            };
+        }
+
+        return series;
     }
 
     private static Axis CreateCategoryAxis(string[] labels)
@@ -46,14 +51,14 @@ internal static partial class StatisticsPresentationFactory
 
     private static ColumnSeries<int> CreateColumnSeries(
         string name,
-        IEnumerable<int> values,
+        int[] values,
         string color,
         double maxBarWidth)
     {
         return new ColumnSeries<int>
         {
             Name = name,
-            Values = values.ToArray(),
+            Values = values,
             Fill = ChartPaint(color),
             Stroke = null,
             MaxBarWidth = maxBarWidth,
@@ -65,7 +70,7 @@ internal static partial class StatisticsPresentationFactory
 
     private static LineSeries<double> CreateMovingAverageSeries(
         string name,
-        IEnumerable<int> values,
+        IReadOnlyList<int> values,
         string color)
     {
         SolidColorPaint stroke = ChartPaint(color);
@@ -84,19 +89,18 @@ internal static partial class StatisticsPresentationFactory
         };
     }
 
-    private static double[] CalculateMovingAverage(IEnumerable<int> values, int windowSize)
+    private static double[] CalculateMovingAverage(IReadOnlyList<int> values, int windowSize)
     {
-        int[] source = values.ToArray();
-        var averages = new double[source.Length];
+        var averages = new double[values.Count];
         double rollingTotal = 0;
 
-        for (int index = 0; index < source.Length; index++)
+        for (int index = 0; index < values.Count; index++)
         {
-            rollingTotal += source[index];
+            rollingTotal += values[index];
 
             if (index >= windowSize)
             {
-                rollingTotal -= source[index - windowSize];
+                rollingTotal -= values[index - windowSize];
             }
 
             int divisor = Math.Min(index + 1, windowSize);
@@ -108,13 +112,13 @@ internal static partial class StatisticsPresentationFactory
 
     private static StackedColumnSeries<int> CreateStackedColumnSeries(
         string name,
-        IEnumerable<int> values,
+        int[] values,
         string color)
     {
         return new StackedColumnSeries<int>
         {
             Name = name,
-            Values = values.ToArray(),
+            Values = values,
             Fill = ChartPaint(color),
             Stroke = null,
             MaxBarWidth = 46,
