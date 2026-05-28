@@ -1,21 +1,28 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
 
-internal sealed class KnowledgeDocumentContentFactory : IKnowledgeDocumentContentFactory
+internal sealed class KnowledgeDocumentContentFactory(ILogger<KnowledgeDocumentContentFactory>? logger = null) : IKnowledgeDocumentContentFactory
 {
     string IKnowledgeDocumentContentFactory.FromPlainText(string text, string title)
     {
-        return BlockSuiteDocumentContent.FromPlainText(text, title);
+        string normalizedText = text ?? string.Empty;
+        string normalizedTitle = title ?? string.Empty;
+        return BlockSuiteDocumentContent.FromPlainText(normalizedText, normalizedTitle);
     }
 
     string IKnowledgeDocumentContentFactory.FromMarkdown(string markdown, string title)
     {
-        return MarkdownBlockSuiteDocumentConverter.Convert(markdown, title);
+        string normalizedMarkdown = markdown ?? string.Empty;
+        string normalizedTitle = title ?? string.Empty;
+        return MarkdownBlockSuiteDocumentConverter.Convert(normalizedMarkdown, normalizedTitle, logger);
     }
 
     string IKnowledgeDocumentContentFactory.FromDocx(Stream docxContent, string title)
     {
-        return DocxBlockSuiteDocumentConverter.Convert(docxContent, title);
+        ArgumentNullException.ThrowIfNull(docxContent);
+        string normalizedTitle = title ?? string.Empty;
+        return DocxBlockSuiteDocumentConverter.Convert(docxContent, normalizedTitle, logger);
     }
 }
