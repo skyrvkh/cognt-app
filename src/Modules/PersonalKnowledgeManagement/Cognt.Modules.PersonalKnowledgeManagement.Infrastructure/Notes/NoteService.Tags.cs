@@ -1,6 +1,6 @@
-using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Tags;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -13,10 +13,10 @@ internal sealed partial class NoteService
         HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
         List<string> availableTags = [];
 
-        AddNormalizedTags(repository.LoadTagNames(), seenTags, availableTags);
+        KnowledgeTagNormalizer.AddDisplayNames(repository.LoadTagNames(), seenTags, availableTags);
         foreach (NoteCatalogEntry entry in GetOrBuildNoteCatalogEntries(root))
         {
-            AddNormalizedTags(entry.Item.ContentTags, seenTags, availableTags);
+            KnowledgeTagNormalizer.AddDisplayNames(entry.Item.ContentTags, seenTags, availableTags);
         }
 
         availableTags.Sort(StringComparer.OrdinalIgnoreCase);
@@ -74,7 +74,7 @@ internal sealed partial class NoteService
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
         long[] normalizedRoots = NormalizeRootItemIds(rootItemIds);
-        string[] normalizedTags = NormalizeTagInputs(tags);
+        string[] normalizedTags = KnowledgeTagNormalizer.NormalizeDisplayNames(tags);
         long[] affectedItemIds = repository.ExpandItemIds(normalizedRoots, includeDescendants).ToArray();
 
         if (operation == KnowledgeTagOperationKind.Add)
@@ -87,21 +87,13 @@ internal sealed partial class NoteService
         }
 
         InvalidateNoteCatalogCache(root);
-        return new KnowledgeTagOperationResult(
+        KnowledgeTagOperationResult result = new(
             normalizedRoots.Length,
             affectedItemIds.Length,
             normalizedTags,
             includeDescendants,
             operation);
-    }
-
-    private static string[] NormalizeTagInputs(IReadOnlyList<string> tags)
-    {
-        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
-        List<string> normalizedTags = [];
-        AddNormalizedTags(tags, seenTags, normalizedTags);
-        normalizedTags.Sort(StringComparer.OrdinalIgnoreCase);
-        return normalizedTags.ToArray();
+        return result;
     }
 
     private static long[] NormalizeRootItemIds(IReadOnlyList<long> rootItemIds)
@@ -118,66 +110,5 @@ internal sealed partial class NoteService
 
         normalizedItemIds.Sort();
         return normalizedItemIds.ToArray();
-    }
-
-    private static void AddNormalizedTags(
-        IEnumerable<string>? source,
-        HashSet<string> seenTags,
-        List<string> normalizedTags)
-    {
-        if (source is null)
-        {
-            return;
-        }
-
-        foreach (string tag in source)
-        {
-            string normalizedTag = NormalizeTagDisplayName(tag);
-            if (normalizedTag.Length > 0 && seenTags.Add(normalizedTag))
-            {
-                normalizedTags.Add(normalizedTag);
-            }
-        }
-    }
-
-    private static string NormalizeTagDisplayName(string? tag)
-    {
-        if (string.IsNullOrWhiteSpace(tag))
-        {
-            return string.Empty;
-        }
-
-        ReadOnlySpan<char> trimmedTag = tag.AsSpan().Trim();
-        int firstWhitespaceIndex = IndexOfWhitespace(trimmedTag);
-        if (firstWhitespaceIndex < 0)
-        {
-            return trimmedTag.ToString();
-        }
-
-        StringBuilder builder = new(trimmedTag.Length);
-        builder.Append(trimmedTag[..firstWhitespaceIndex]);
-        for (int index = firstWhitespaceIndex + 1; index < trimmedTag.Length; index++)
-        {
-            char character = trimmedTag[index];
-            if (!char.IsWhiteSpace(character))
-            {
-                builder.Append(character);
-            }
-        }
-
-        return builder.ToString();
-    }
-
-    private static int IndexOfWhitespace(ReadOnlySpan<char> value)
-    {
-        for (int index = 0; index < value.Length; index++)
-        {
-            if (char.IsWhiteSpace(value[index]))
-            {
-                return index;
-            }
-        }
-
-        return -1;
     }
 }

@@ -2,12 +2,16 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static IReadOnlyList<string> ExtractNoteTags(string notePath, string content)
+    private static IReadOnlyList<string> ExtractNoteTags(
+        string notePath,
+        string content,
+        ILogger<NoteService>? logger = null)
     {
         if (!string.Equals(Path.GetExtension(notePath), BlockSuiteNoteExtension, StringComparison.OrdinalIgnoreCase)
             || string.IsNullOrWhiteSpace(content))
@@ -25,8 +29,12 @@ internal sealed partial class NoteService
                 .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            logger?.LogWarning(
+                ex,
+                "Note tag extraction skipped malformed BlockSuite JSON. NotePath={NotePath}",
+                notePath);
             return [];
         }
     }
