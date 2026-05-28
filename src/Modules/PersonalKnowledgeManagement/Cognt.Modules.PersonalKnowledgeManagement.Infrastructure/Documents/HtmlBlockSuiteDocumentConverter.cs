@@ -1,17 +1,31 @@
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
 
 internal static partial class HtmlBlockSuiteDocumentConverter
 {
-    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
-
-    internal static string Convert(string html, string title)
+    internal static string Convert(string html, string title, ILogger? logger = null)
     {
-        List<BlockSuiteDocumentBlock> blocks = ParseBlocks(html ?? string.Empty);
-        return BlockSuiteDocumentContent.FromBlocks(blocks, title);
+        string normalizedHtml = html ?? string.Empty;
+        string normalizedTitle = title ?? string.Empty;
+
+        try
+        {
+            List<BlockSuiteDocumentBlock> blocks = ParseBlocks(normalizedHtml);
+            string content = BlockSuiteDocumentContent.FromBlocks(blocks, normalizedTitle);
+
+            return content;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(
+                ex,
+                "HTML to BlockSuite conversion failed. TitleLength={TitleLength} HtmlLength={HtmlLength}",
+                normalizedTitle.Length,
+                normalizedHtml.Length);
+            throw;
+        }
     }
 
     private static List<BlockSuiteDocumentBlock> ParseBlocks(string html)
@@ -102,132 +116,18 @@ internal static partial class HtmlBlockSuiteDocumentConverter
         string text = ReadText(element).Trim('\r', '\n');
         if (!string.IsNullOrWhiteSpace(text))
         {
-            blocks.Add(new BlockSuiteDocumentBlock("code", text));
+            BlockSuiteDocumentBlockBuilder.AppendCodeBlock(blocks, text);
         }
     }
 
-    private static void AppendTableBlock(List<BlockSuiteDocumentBlock> blocks, XElement table)
+    private static string CreateBlockTypeSummary(IReadOnlyList<BlockSuiteDocumentBlock> blocks)
     {
-        StringBuilder rows = new();
-        foreach (XElement element in table.Descendants())
-        {
-            if (!string.Equals(element.Name.LocalName, "tr", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string row = ReadTableRow(element);
-            if (string.IsNullOrWhiteSpace(row))
-            {
-                continue;
-            }
-
-            if (rows.Length > 0)
-            {
-                rows.AppendLine();
-            }
-
-            rows.Append(row);
-        }
-
-        if (rows.Length > 0)
-        {
-            blocks.Add(new BlockSuiteDocumentBlock("code", rows.ToString(), Language: "table"));
-        }
+        return string.Join(
+            ",",
+            blocks
+                .GroupBy(static block => block.Type, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static group => $"{group.Key}:{group.Count()}"));
     }
 
-    private static string ReadTableRow(XElement row)
-    {
-        StringBuilder builder = new();
-        foreach (XElement cell in row.Elements())
-        {
-            if (!string.Equals(cell.Name.LocalName, "td", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(cell.Name.LocalName, "th", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string text = ReadInlineText(cell);
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                continue;
-            }
-
-            if (builder.Length > 0)
-            {
-                builder.Append(" | ");
-            }
-
-            builder.Append(text);
-        }
-
-        return builder.ToString();
-    }
-
-    private static void AppendTextBlock(
-        List<BlockSuiteDocumentBlock> blocks,
-        string text,
-        string blockType = "text")
-    {
-        string normalizedText = NormalizeText(text);
-        if (!string.IsNullOrWhiteSpace(normalizedText))
-        {
-            blocks.Add(new BlockSuiteDocumentBlock(blockType, normalizedText));
-        }
-    }
-
-    private static string ReadInlineText(XElement element)
-    {
-        return NormalizeText(ReadText(element));
-    }
-
-    private static string ReadText(XElement element)
-    {
-        StringBuilder builder = new();
-        AppendText(element, builder);
-        return builder.ToString();
-    }
-
-    private static void AppendText(XNode node, StringBuilder builder)
-    {
-        switch (node)
-        {
-            case XText text:
-                builder.Append(text.Value);
-                return;
-            case XElement { Name.LocalName: "br" }:
-                builder.AppendLine();
-                return;
-            case XElement { Name.LocalName: "img" } image:
-                string? alt = image.Attribute("alt")?.Value;
-                if (!string.IsNullOrWhiteSpace(alt))
-                {
-                    builder.Append(alt);
-                }
-
-                return;
-            case XElement element:
-                foreach (XNode child in element.Nodes())
-                {
-                    AppendText(child, builder);
-                }
-
-                return;
-        }
-    }
-
-    private static string NormalizeText(string value)
-    {
-        return WhitespaceRegex
-            .Replace(value.Replace('\u00A0', ' '), " ")
-            .Trim();
-    }
-
-    private static string NormalizeHtmlEntities(string html)
-    {
-        return html
-            .Replace("&nbsp;", "&#160;", StringComparison.OrdinalIgnoreCase)
-            .Replace("&emsp;", "&#8195;", StringComparison.OrdinalIgnoreCase)
-            .Replace("&ensp;", "&#8194;", StringComparison.OrdinalIgnoreCase);
-    }
 }
