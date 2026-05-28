@@ -9,8 +9,9 @@ internal sealed partial class NoteService
         string title,
         string initialContent)
     {
+        string relativePath = CreateUniqueMetadataNoteRelPath(root);
         return new PendingNoteCreation(
-            CreateUniqueMetadataNoteRelPath(root),
+            relativePath,
             title,
             initialContent);
     }

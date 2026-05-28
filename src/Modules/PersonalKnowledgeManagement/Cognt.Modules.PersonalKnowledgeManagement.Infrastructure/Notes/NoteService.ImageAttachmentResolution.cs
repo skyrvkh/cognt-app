@@ -21,13 +21,16 @@ internal sealed partial class NoteService
             .TrimStart('/');
     }
 
-    private static bool ImageSourceMatchesAttachment(string normalizedSource, AttachmentRow row)
+    private static bool ImageSourceMatchesAttachment(
+        string normalizedSource,
+        string? decodedSha256Source,
+        AttachmentRow row)
     {
         return string.Equals(normalizedSource, row.RelativePath.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedSource, row.Id, StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedSource, row.Sha256, StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedSource, row.StoredFileName, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(TryDecodeSha256SourceToken(normalizedSource), row.Sha256, StringComparison.OrdinalIgnoreCase);
+            || string.Equals(decodedSha256Source, row.Sha256, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? TryGetCollectionRelativeImagePath(string root, string normalizedSource)

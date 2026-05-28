@@ -14,7 +14,12 @@ internal sealed partial class NoteService
         Stream sourceContent,
         CancellationToken cancellationToken)
     {
-        return await ImportAttachmentIntoCollectionStorageAsync(collectionId, sourceFileName, sourceContent, cancellationToken);
+        KnowledgeAttachmentReadModel attachment = await ImportAttachmentIntoCollectionStorageAsync(
+            collectionId,
+            sourceFileName,
+            sourceContent,
+            cancellationToken);
+        return attachment;
     }
 
     private async Task<ImportedAttachmentContext> ImportAttachmentIntoCollectionAsync(
@@ -44,31 +49,28 @@ internal sealed partial class NoteService
             sourceFileName,
             sourceContent,
             cancellationToken);
+        return await StorePreparedAttachmentImportAsync(preparedImport, sourceContent, cancellationToken);
+    }
+
+    private async Task<KnowledgeAttachmentReadModel> StorePreparedAttachmentImportAsync(
+        PreparedAttachmentImport preparedImport,
+        Stream sourceContent,
+        CancellationToken cancellationToken)
+    {
         if (preparedImport.ExistingAttachment is not null)
         {
             return await ReuseStoredAttachmentAsync(
-                preparedImport.Root,
-                preparedImport.Repository,
-                preparedImport.ExistingAttachment,
+                preparedImport,
                 sourceContent,
-                preparedImport.Sha256,
-                preparedImport.ImportedAtUnixTime,
-                cancellationToken);
+                cancellationToken,
+                logger);
         }
 
         return await PersistImportedAttachmentAsync(
-            preparedImport.Root,
-            preparedImport.Repository,
+            preparedImport,
             sourceContent,
-            preparedImport.Sha256,
-            preparedImport.OriginalFileName,
-            preparedImport.StoredFileRelativePath,
-            preparedImport.StoredFilePath,
-            preparedImport.ContentType,
-            preparedImport.FileExtension,
-            preparedImport.SizeBytes,
-            preparedImport.ImportedAtUnixTime,
-            cancellationToken);
+            cancellationToken,
+            logger);
     }
 
     private sealed class ImportedAttachmentContext

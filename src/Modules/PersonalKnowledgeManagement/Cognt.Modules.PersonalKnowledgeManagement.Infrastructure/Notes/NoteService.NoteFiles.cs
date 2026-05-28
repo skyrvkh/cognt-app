@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -65,7 +66,10 @@ internal sealed partial class NoteService
         return fileName;
     }
 
-    private static bool TryWriteNewFile(string path, string content)
+    private static bool TryWriteNewFile(
+        string path,
+        string content,
+        ILogger<NoteService>? logger = null)
     {
         try
         {
@@ -74,26 +78,36 @@ internal sealed partial class NoteService
             writer.Write(content);
             return true;
         }
-        catch (IOException) when (File.Exists(path))
+        catch (IOException ex) when (File.Exists(path))
         {
+            logger?.LogWarning(
+                ex,
+                "NoteService.TryWriteNewFile skipped because file already exists. Path={Path} ContentLength={ContentLength}",
+                path,
+                content.Length);
             return false;
         }
     }
 
-    private static void TryDeleteFile(string path)
+    private static void TryDeleteFile(string path, ILogger<NoteService>? logger = null)
     {
         try
         {
-            if (File.Exists(path))
+            bool existsBeforeDelete = File.Exists(path);
+
+            if (existsBeforeDelete)
             {
                 File.Delete(path);
             }
+
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            logger?.LogWarning(ex, "NoteService.TryDeleteFile failed with IO error. Path={Path}", path);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            logger?.LogWarning(ex, "NoteService.TryDeleteFile failed with unauthorized access. Path={Path}", path);
         }
     }
 

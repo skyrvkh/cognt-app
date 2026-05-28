@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -10,14 +11,16 @@ internal sealed partial class SqliteTreeRepository : ITreeRepository
 
     private readonly object connectionLock = new();
     private readonly string databasePath;
+    private readonly ILogger? logger;
     private SqliteConnection? connection;
     private bool disposed;
 
-    internal SqliteTreeRepository(string databasePath)
+    internal SqliteTreeRepository(string databasePath, ILogger? logger = null)
     {
         this.databasePath = string.IsNullOrWhiteSpace(databasePath)
             ? throw new ArgumentException("Database path is required.", nameof(databasePath))
             : databasePath;
+        this.logger = logger;
     }
 
     private bool WouldCreateCycle(
@@ -33,6 +36,9 @@ internal sealed partial class SqliteTreeRepository : ITreeRepository
 
         if (newParentId.Value == movingItemId)
         {
+            logger?.LogWarning(
+                "Tree move cycle detected because item was moved under itself. MovingItemId={MovingItemId}",
+                movingItemId);
             return true;
         }
 
@@ -65,14 +71,15 @@ internal sealed partial class SqliteTreeRepository : ITreeRepository
     private static void EnsureValidParent(
         long? parentId,
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        ILogger? logger = null)
     {
         if (!parentId.HasValue)
         {
             return;
         }
 
-        _ = GetRequiredItem(parentId.Value, connection, transaction);
+        _ = GetRequiredItem(parentId.Value, connection, transaction, logger);
     }
 
     private static void RecalculateChildCount(

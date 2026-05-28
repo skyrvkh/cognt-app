@@ -43,14 +43,21 @@ internal sealed partial class SqliteTreeRepository
         SqliteCommand command,
         AttachmentRow attachment)
     {
-        command.Parameters.AddWithValue("$id", NormalizeRequiredText(attachment.Id, nameof(attachment.Id)));
+        string attachmentId = NormalizeRequiredText(attachment.Id, nameof(attachment.Id));
+        string sha256 = NormalizeRequiredText(attachment.Sha256, nameof(attachment.Sha256));
+        string originalFileName = NormalizeRequiredText(attachment.OriginalFileName, nameof(attachment.OriginalFileName));
+        string storedFileName = NormalizeRequiredText(attachment.StoredFileName, nameof(attachment.StoredFileName));
+        string relativePath = NormalizeFileRelPath(attachment.RelativePath);
+        string contentType = NormalizeRequiredText(attachment.ContentType, nameof(attachment.ContentType));
+        string fileExtension = NormalizeRequiredText(attachment.FileExtension, nameof(attachment.FileExtension));
+        command.Parameters.AddWithValue("$id", attachmentId);
         command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-        command.Parameters.AddWithValue("$sha256", NormalizeRequiredText(attachment.Sha256, nameof(attachment.Sha256)));
-        command.Parameters.AddWithValue("$originalFileName", NormalizeRequiredText(attachment.OriginalFileName, nameof(attachment.OriginalFileName)));
-        command.Parameters.AddWithValue("$storedFileName", NormalizeRequiredText(attachment.StoredFileName, nameof(attachment.StoredFileName)));
-        command.Parameters.AddWithValue("$relativePath", NormalizeFileRelPath(attachment.RelativePath));
-        command.Parameters.AddWithValue("$contentType", NormalizeRequiredText(attachment.ContentType, nameof(attachment.ContentType)));
-        command.Parameters.AddWithValue("$fileExtension", NormalizeRequiredText(attachment.FileExtension, nameof(attachment.FileExtension)));
+        command.Parameters.AddWithValue("$sha256", sha256);
+        command.Parameters.AddWithValue("$originalFileName", originalFileName);
+        command.Parameters.AddWithValue("$storedFileName", storedFileName);
+        command.Parameters.AddWithValue("$relativePath", relativePath);
+        command.Parameters.AddWithValue("$contentType", contentType);
+        command.Parameters.AddWithValue("$fileExtension", fileExtension);
         command.Parameters.AddWithValue("$sizeBytes", Math.Max(0, attachment.SizeBytes));
         command.Parameters.AddWithValue("$createdAt", attachment.CreatedAt);
         command.Parameters.AddWithValue("$lastReferencedAt", attachment.LastReferencedAt);
@@ -60,12 +67,16 @@ internal sealed partial class SqliteTreeRepository
         SqliteCommand command,
         NoteAttachmentRow noteAttachment)
     {
-        command.Parameters.AddWithValue("$id", NormalizeRequiredText(noteAttachment.Id, nameof(noteAttachment.Id)));
+        string noteAttachmentId = NormalizeRequiredText(noteAttachment.Id, nameof(noteAttachment.Id));
+        string noteDocumentId = NormalizeRequiredText(noteAttachment.NoteDocumentId, nameof(noteAttachment.NoteDocumentId));
+        string attachmentId = NormalizeRequiredText(noteAttachment.AttachmentId, nameof(noteAttachment.AttachmentId));
+        string displayName = NormalizeRequiredText(noteAttachment.DisplayName, nameof(noteAttachment.DisplayName));
+        command.Parameters.AddWithValue("$id", noteAttachmentId);
         command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
         command.Parameters.AddWithValue("$noteItemId", noteAttachment.NoteItemId);
-        command.Parameters.AddWithValue("$noteDocumentId", NormalizeRequiredText(noteAttachment.NoteDocumentId, nameof(noteAttachment.NoteDocumentId)));
-        command.Parameters.AddWithValue("$attachmentId", NormalizeRequiredText(noteAttachment.AttachmentId, nameof(noteAttachment.AttachmentId)));
-        command.Parameters.AddWithValue("$displayName", NormalizeRequiredText(noteAttachment.DisplayName, nameof(noteAttachment.DisplayName)));
+        command.Parameters.AddWithValue("$noteDocumentId", noteDocumentId);
+        command.Parameters.AddWithValue("$attachmentId", attachmentId);
+        command.Parameters.AddWithValue("$displayName", displayName);
         command.Parameters.AddWithValue("$createdAt", noteAttachment.CreatedAt);
     }
 }

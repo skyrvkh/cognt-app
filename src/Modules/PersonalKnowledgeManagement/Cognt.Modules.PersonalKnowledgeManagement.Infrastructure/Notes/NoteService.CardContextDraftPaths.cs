@@ -5,7 +5,9 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static string GetCardContextDraftSidecarPath(string root, string relativePath)
+    private static string GetCardContextDraftSidecarPath(
+        string root,
+        string relativePath)
     {
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
         return Path.Combine(

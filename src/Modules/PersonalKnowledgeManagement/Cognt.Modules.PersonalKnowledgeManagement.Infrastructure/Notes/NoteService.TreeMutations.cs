@@ -15,7 +15,8 @@ internal sealed partial class NoteService
         long? nextSiblingId)
     {
         ITreeRepository repository = OpenTreeRepositoryForCollectionId(collectionId);
-        return repository.CreateFolder(parentId, title, previousSiblingId, nextSiblingId);
+        long itemId = repository.CreateFolder(parentId, title, previousSiblingId, nextSiblingId);
+        return itemId;
     }
 
     void INoteService.MoveItem(
@@ -42,6 +43,8 @@ internal sealed partial class NoteService
     void INoteService.RenameItem(string collectionId, long itemId, string title)
     {
         ITreeRepository repository = OpenTreeRepositoryForCollectionId(collectionId);
+        _ = repository.GetItem(itemId)
+            ?? throw new InvalidOperationException($"Tree item {itemId} does not exist.");
         repository.RenameItem(itemId, title);
         InvalidateNoteCatalogCache(GetExistingCollectionRoot(collectionId));
     }
@@ -50,13 +53,15 @@ internal sealed partial class NoteService
     {
         string root = GetExistingCollectionRoot(collectionId);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
+        _ = repository.GetItem(itemId)
+            ?? throw new InvalidOperationException($"Tree item {itemId} does not exist.");
         IReadOnlyList<string> deletedNotePaths = CollectDeletedNotePaths(root, repository, itemId);
 
         repository.DeleteItem(itemId);
 
         foreach (string notePath in deletedNotePaths)
         {
-            TryDeleteFile(notePath);
+            TryDeleteFile(notePath, logger);
         }
 
         DeleteCardContextDrafts(
@@ -70,6 +75,15 @@ internal sealed partial class NoteService
             .ToArray();
     }
 
+    IReadOnlyList<string> INoteService.PreviewDeleteItemNotePaths(string collectionId, long itemId)
+    {
+        string root = GetExistingCollectionRoot(collectionId);
+        ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
+        return CollectDeletedNotePaths(root, repository, itemId)
+            .Select(path => NormalizeRelativePath(Path.GetRelativePath(root, path)))
+            .ToArray();
+    }
+
     void INoteService.SaveNote(string collectionId, string relativePath, string content)
     {
         if (string.IsNullOrWhiteSpace(collectionId) || string.IsNullOrWhiteSpace(relativePath))
@@ -77,8 +91,9 @@ internal sealed partial class NoteService
             return;
         }
 
+        string normalizedRelativePath = NormalizeRelativePath(relativePath);
         string root = GetExistingCollectionRoot(collectionId);
-        string notePath = ResolveExistingRelativeNotePathInRoot(root, relativePath);
+        string notePath = ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
         File.WriteAllText(notePath, content, Encoding.UTF8);
         InvalidateNoteCatalogCache(root);
         TryRefreshSavedNoteMentionIndex(notePath, content);

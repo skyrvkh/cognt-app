@@ -26,12 +26,13 @@ internal sealed partial class NoteService
 
             CloseTreeRepository();
             treeRepositoryRoot = root;
-            treeRepository = new SqliteTreeRepository(Path.Combine(root, MetadataDatabaseFileName));
-            MigrateLegacyFilesDirectory(root, treeRepository);
+            string databasePath = Path.Combine(root, MetadataDatabaseFileName);
+            treeRepository = new SqliteTreeRepository(databasePath, logger);
+            MigrateLegacyFilesDirectory(root, treeRepository, logger);
 
             if (!treeRepository.HasAnyItems())
             {
-                BootstrapTreeMetadata(root, treeRepository);
+                BootstrapTreeMetadata(root, treeRepository, logger);
             }
 
             return treeRepository;

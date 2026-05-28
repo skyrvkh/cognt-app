@@ -43,6 +43,7 @@ internal sealed partial class SqliteTreeRepository
 
     AttachmentRow? ITreeRepository.GetAttachment(string attachmentId)
     {
+        string normalizedAttachmentId = NormalizeRequiredText(attachmentId, nameof(attachmentId));
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -54,9 +55,9 @@ internal sealed partial class SqliteTreeRepository
                 WHERE collection_id = $collectionId
                   AND id = $id
                 LIMIT 1;
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-            command.Parameters.AddWithValue("$id", NormalizeRequiredText(attachmentId, nameof(attachmentId)));
+            command.Parameters.AddWithValue("$id", normalizedAttachmentId);
 
             return ReadSingleAttachmentRow(command);
         });
@@ -64,6 +65,7 @@ internal sealed partial class SqliteTreeRepository
 
     AttachmentRow? ITreeRepository.FindAttachmentBySha256(string sha256)
     {
+        string normalizedSha256 = NormalizeRequiredText(sha256, nameof(sha256));
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -75,9 +77,9 @@ internal sealed partial class SqliteTreeRepository
                 WHERE collection_id = $collectionId
                   AND sha256 = $sha256
                 LIMIT 1;
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-            command.Parameters.AddWithValue("$sha256", NormalizeRequiredText(sha256, nameof(sha256)));
+            command.Parameters.AddWithValue("$sha256", normalizedSha256);
 
             return ReadSingleAttachmentRow(command);
         });

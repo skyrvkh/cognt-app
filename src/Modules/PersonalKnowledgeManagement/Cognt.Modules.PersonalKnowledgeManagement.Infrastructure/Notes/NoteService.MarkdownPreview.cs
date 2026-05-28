@@ -8,7 +8,13 @@ internal sealed partial class NoteService
 {
     private static string ExtractTitle(string markdown, string fileName)
     {
-        return TryExtractHeadingTitle(markdown) ?? Path.GetFileNameWithoutExtension(fileName);
+        string? title = TryExtractHeadingTitle(markdown);
+        if (title is not null)
+        {
+            return title;
+        }
+
+        return Path.GetFileNameWithoutExtension(fileName);
     }
 
     private static string? TryExtractHeadingTitle(string markdown)

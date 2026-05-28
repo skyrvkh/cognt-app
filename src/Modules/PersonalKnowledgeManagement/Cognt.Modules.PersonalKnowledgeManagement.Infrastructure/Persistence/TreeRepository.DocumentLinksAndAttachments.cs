@@ -16,7 +16,7 @@ internal sealed partial class SqliteTreeRepository
                   WHERE collection_id = $collectionId
                   LIMIT 1
                 );
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
             return Convert.ToInt64(command.ExecuteScalar()) != 0;
         });
@@ -24,6 +24,7 @@ internal sealed partial class SqliteTreeRepository
 
     IReadOnlyList<DocumentMentionRow> ITreeRepository.LoadDocumentMentionsBySource(string sourceDocumentId)
     {
+        string normalizedSourceDocumentId = NormalizeDocumentId(sourceDocumentId);
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -36,9 +37,9 @@ internal sealed partial class SqliteTreeRepository
                 WHERE collection_id = $collectionId
                   AND source_document_id = $sourceDocumentId
                 ORDER BY source_block_id, start_offset, id;
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-            command.Parameters.AddWithValue("$sourceDocumentId", NormalizeDocumentId(sourceDocumentId));
+            command.Parameters.AddWithValue("$sourceDocumentId", normalizedSourceDocumentId);
 
             return ReadDocumentMentionRows(command);
         });
@@ -46,6 +47,7 @@ internal sealed partial class SqliteTreeRepository
 
     IReadOnlyList<DocumentMentionRow> ITreeRepository.LoadDocumentMentionsByTarget(string targetDocumentId)
     {
+        string normalizedTargetDocumentId = NormalizeDocumentId(targetDocumentId);
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -58,9 +60,9 @@ internal sealed partial class SqliteTreeRepository
                 WHERE collection_id = $collectionId
                   AND target_document_id = $targetDocumentId
                 ORDER BY updated_at DESC, source_document_id, source_block_id, start_offset, id;
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-            command.Parameters.AddWithValue("$targetDocumentId", NormalizeDocumentId(targetDocumentId));
+            command.Parameters.AddWithValue("$targetDocumentId", normalizedTargetDocumentId);
 
             return ReadDocumentMentionRows(command);
         });
@@ -68,6 +70,7 @@ internal sealed partial class SqliteTreeRepository
 
     IReadOnlyList<DocumentMentionRow> ITreeRepository.LoadResolvedDocumentMentionsByDocument(string documentId)
     {
+        string normalizedDocumentId = NormalizeDocumentId(documentId);
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -85,9 +88,9 @@ internal sealed partial class SqliteTreeRepository
                     OR target_document_id = $documentId
                   )
                 ORDER BY updated_at DESC, source_document_id, target_document_id, source_block_id, start_offset, id;
-                """;
+            """;
             command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
-            command.Parameters.AddWithValue("$documentId", NormalizeDocumentId(documentId));
+            command.Parameters.AddWithValue("$documentId", normalizedDocumentId);
 
             return ReadDocumentMentionRows(command);
         });

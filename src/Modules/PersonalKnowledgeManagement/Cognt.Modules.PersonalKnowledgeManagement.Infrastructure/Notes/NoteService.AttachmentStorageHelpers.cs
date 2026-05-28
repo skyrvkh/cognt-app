@@ -58,7 +58,9 @@ internal sealed partial class NoteService
         return normalized;
     }
 
-    private static string GetStoredAttachmentPath(string root, string relativePath)
+    private static string GetStoredAttachmentPath(
+        string root,
+        string relativePath)
     {
         string fullPath = Path.GetFullPath(Path.Combine(root, ToPlatformPath(relativePath)));
         if (!IsPathInsideRoot(fullPath, root))
@@ -73,11 +75,12 @@ internal sealed partial class NoteService
         string root,
         AttachmentRow row)
     {
+        KnowledgeAttachmentKind kind = InferAttachmentKind(row.FileExtension, row.ContentType);
         return new KnowledgeAttachmentReadModel(
             row.Id,
             row.OriginalFileName,
             NormalizeRelativePath(row.RelativePath),
-            InferAttachmentKind(row.FileExtension, row.ContentType));
+            kind);
     }
 
 }

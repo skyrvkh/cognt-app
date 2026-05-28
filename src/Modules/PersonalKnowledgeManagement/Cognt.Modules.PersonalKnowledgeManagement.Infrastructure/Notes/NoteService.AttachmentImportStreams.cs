@@ -5,7 +5,9 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static void EnsureImportSource(string sourceFileName, Stream sourceContent)
+    private static void EnsureImportSource(
+        string sourceFileName,
+        Stream sourceContent)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceFileName);
         ArgumentNullException.ThrowIfNull(sourceContent);
@@ -21,19 +23,22 @@ internal sealed partial class NoteService
         }
     }
 
-    private static async Task<bool> HasPdfHeaderAsync(Stream sourceContent, CancellationToken cancellationToken)
+    private static async Task<bool> HasPdfHeaderAsync(
+        Stream sourceContent,
+        CancellationToken cancellationToken)
     {
         ResetSourceStream(sourceContent);
         byte[] header = new byte[5];
         int read = await sourceContent.ReadAsync(header, cancellationToken);
         ResetSourceStream(sourceContent);
 
-        return read == header.Length
+        bool hasPdfHeader = read == header.Length
             && header[0] == (byte)'%'
             && header[1] == (byte)'P'
             && header[2] == (byte)'D'
             && header[3] == (byte)'F'
             && header[4] == (byte)'-';
+        return hasPdfHeader;
     }
 
     private static async Task<string> ComputeFileHashAsync(

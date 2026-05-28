@@ -7,6 +7,7 @@ internal sealed partial class SqliteTreeRepository
 {
     KnowledgeTreeItemRow? ITreeRepository.FindNoteByFileRelPath(string fileRelPath)
     {
+        string normalizedFileRelPath = NormalizeFileRelPath(fileRelPath);
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -18,8 +19,8 @@ internal sealed partial class SqliteTreeRepository
                   AND file_rel_path = $fileRelPath
                   AND is_deleted = 0
                 LIMIT 1;
-                """;
-            command.Parameters.AddWithValue("$fileRelPath", NormalizeFileRelPath(fileRelPath));
+            """;
+            command.Parameters.AddWithValue("$fileRelPath", normalizedFileRelPath);
 
             return ReadSingleRow(command);
         });
@@ -31,6 +32,7 @@ internal sealed partial class SqliteTreeRepository
         KnowledgeTreeItemKind kind,
         bool includeDeleted)
     {
+        string normalizedFileRelPath = NormalizeFileRelPath(fileRelPath);
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -46,7 +48,7 @@ internal sealed partial class SqliteTreeRepository
                 LIMIT 1;
                 """;
             command.Parameters.AddWithValue("$kind", (int)kind);
-            command.Parameters.AddWithValue("$fileRelPath", NormalizeFileRelPath(fileRelPath));
+            command.Parameters.AddWithValue("$fileRelPath", normalizedFileRelPath);
             command.Parameters.AddWithValue("$parentId", ToDbParameterValue(parentId));
             command.Parameters.AddWithValue("$includeDeleted", includeDeleted ? 1 : 0);
 

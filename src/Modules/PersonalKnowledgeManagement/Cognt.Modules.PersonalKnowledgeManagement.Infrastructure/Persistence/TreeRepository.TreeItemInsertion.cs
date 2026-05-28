@@ -15,6 +15,7 @@ internal sealed partial class SqliteTreeRepository
         SqliteConnection connection,
         SqliteTransaction transaction)
     {
+        string normalizedTitle = NormalizeTitle(title);
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
@@ -31,7 +32,7 @@ internal sealed partial class SqliteTreeRepository
         command.Parameters.AddWithValue("$uid", Guid.NewGuid().ToString("N"));
         command.Parameters.AddWithValue("$parentId", ToDbParameterValue(parentId));
         command.Parameters.AddWithValue("$kind", (int)kind);
-        command.Parameters.AddWithValue("$title", NormalizeTitle(title));
+        command.Parameters.AddWithValue("$title", normalizedTitle);
         command.Parameters.AddWithValue("$position", position);
         command.Parameters.AddWithValue("$fileRelPath", ToDbParameterValue(fileRelPath));
         command.Parameters.AddWithValue("$createdAt", now);

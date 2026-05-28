@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -8,7 +9,8 @@ internal sealed partial class SqliteTreeRepository
         long siblingId,
         long? parentId,
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        ILogger? logger = null)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -25,10 +27,15 @@ internal sealed partial class SqliteTreeRepository
         object? value = command.ExecuteScalar();
         if (value is null || value == DBNull.Value)
         {
+            logger?.LogWarning(
+                "Tree sibling position lookup failed because the sibling was not under the target parent. SiblingId={SiblingId} ParentId={ParentId}",
+                siblingId,
+                parentId);
             throw new InvalidOperationException("The drop sibling is not under the target parent.");
         }
 
-        return Convert.ToInt64(value);
+        long position = Convert.ToInt64(value);
+        return position;
     }
 
     private static long? GetMaxSiblingPosition(
@@ -56,7 +63,8 @@ internal sealed partial class SqliteTreeRepository
     private static void RenumberSiblings(
         long? parentId,
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        ILogger? logger = null)
     {
         List<long> itemIds = [];
 
@@ -98,5 +106,6 @@ internal sealed partial class SqliteTreeRepository
             updateCommand.ExecuteNonQuery();
             position += PositionGap;
         }
+
     }
 }

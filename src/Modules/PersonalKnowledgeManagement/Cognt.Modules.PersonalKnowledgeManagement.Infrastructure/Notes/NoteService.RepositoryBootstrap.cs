@@ -1,25 +1,34 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static void BootstrapTreeMetadata(string root, ITreeRepository repository)
+    private static void BootstrapTreeMetadata(string root, ITreeRepository repository, ILogger<NoteService>? logger = null)
     {
-        BootstrapFolderTreeItems(root, root, parentId: null, repository);
+        int createdItemCount = BootstrapFolderTreeItems(root, root, parentId: null, repository);
 
         foreach (string noteFilesDirectoryName in GetKnownLooseNoteDirectoryNames())
         {
             string filesDirectory = Path.Combine(root, noteFilesDirectoryName);
             if (Directory.Exists(filesDirectory))
             {
-                BootstrapLooseCollectionNotes(root, filesDirectory, repository);
+                createdItemCount += BootstrapLooseCollectionNotes(root, filesDirectory, repository);
             }
+        }
+
+        if (createdItemCount > 0)
+        {
+            logger?.LogInformation(
+                "Tree metadata bootstrap completed. Root={Root} CreatedItemCount={CreatedItemCount}",
+                root,
+                createdItemCount);
         }
     }
 
-    private static void BootstrapFolderTreeItems(
+    private static int BootstrapFolderTreeItems(
         string root,
         string folderPath,
         long? parentId,
@@ -30,29 +39,45 @@ internal sealed partial class NoteService
             .Where(path => !IsRepositoryMetadataDirectory(path))
             .Concat(EnumerateSupportedNoteFiles(folderPath, SearchOption.TopDirectoryOnly));
 
+        int createdItemCount = 0;
         foreach (string childPath in childPaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
             if (Directory.Exists(childPath))
             {
                 long folderId = repository.CreateFolder(parentId, Path.GetFileName(childPath));
-                BootstrapFolderTreeItems(root, childPath, folderId, repository);
+                createdItemCount++;
+                createdItemCount += BootstrapFolderTreeItems(root, childPath, folderId, repository);
                 continue;
             }
 
-            TryCreateBootstrappedNote(root, childPath, parentId, repository);
+            if (TryCreateBootstrappedNote(root, childPath, parentId, repository))
+            {
+                createdItemCount++;
+            }
         }
+
+        return createdItemCount;
     }
 
-    private static void BootstrapLooseCollectionNotes(string root, string folderPath, ITreeRepository repository)
+    private static int BootstrapLooseCollectionNotes(
+        string root,
+        string folderPath,
+        ITreeRepository repository)
     {
+        int createdItemCount = 0;
         foreach (string filePath in EnumerateSupportedNoteFiles(folderPath, SearchOption.AllDirectories)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
-            TryCreateBootstrappedNote(root, filePath, parentId: null, repository);
+            if (TryCreateBootstrappedNote(root, filePath, parentId: null, repository))
+            {
+                createdItemCount++;
+            }
         }
+
+        return createdItemCount;
     }
 
-    private static void TryCreateBootstrappedNote(
+    private static bool TryCreateBootstrappedNote(
         string root,
         string filePath,
         long? parentId,
@@ -61,9 +86,10 @@ internal sealed partial class NoteService
         string fileRelPath = NormalizeRelativePath(Path.GetRelativePath(root, filePath));
         if (repository.FindNoteByFileRelPath(fileRelPath) is not null)
         {
-            return;
+            return false;
         }
 
         repository.CreateNote(parentId, Path.GetFileNameWithoutExtension(filePath), fileRelPath);
+        return true;
     }
 }

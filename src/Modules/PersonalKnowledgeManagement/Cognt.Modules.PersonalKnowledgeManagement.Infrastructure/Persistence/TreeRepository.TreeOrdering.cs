@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -11,14 +12,18 @@ internal sealed partial class SqliteTreeRepository
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
 
-            KnowledgeTreeItemRow item = GetRequiredItem(itemId, connection, transaction);
+            KnowledgeTreeItemRow item = GetRequiredItem(itemId, connection, transaction, logger);
 
             if (WouldCreateCycle(itemId, newParentId, connection, transaction))
             {
+                logger?.LogWarning(
+                    "Rejected tree item move because it would create a cycle. ItemId={ItemId} NewParentId={NewParentId}",
+                    itemId,
+                    newParentId);
                 throw new InvalidOperationException("A tree item cannot be moved under itself or one of its descendants.");
             }
 
-            EnsureValidParent(newParentId, connection, transaction);
+            EnsureValidParent(newParentId, connection, transaction, logger);
             long newPosition = AllocatePosition(
                 newParentId,
                 previousSiblingId,
@@ -59,7 +64,7 @@ internal sealed partial class SqliteTreeRepository
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
 
-            KnowledgeTreeItemRow item = GetRequiredItem(itemId, connection, transaction);
+            KnowledgeTreeItemRow item = GetRequiredItem(itemId, connection, transaction, logger);
             long position = AllocatePosition(
                 item.ParentId,
                 previousSiblingId,

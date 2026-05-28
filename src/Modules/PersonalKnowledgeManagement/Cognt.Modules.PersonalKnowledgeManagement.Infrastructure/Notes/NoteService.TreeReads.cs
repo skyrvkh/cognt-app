@@ -60,7 +60,8 @@ internal sealed partial class NoteService
     KnowledgeTreeItemReadModel? INoteService.FindNoteByRelativePath(string collectionId, string relativePath)
     {
         string root = GetExistingCollectionRoot(collectionId);
+        string normalizedRelativePath = NormalizeRelativePath(relativePath);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        return ToTreeItemReadModelOrNull(repository.FindNoteByFileRelPath(NormalizeRelativePath(relativePath)));
+        return ToTreeItemReadModelOrNull(repository.FindNoteByFileRelPath(normalizedRelativePath));
     }
 }

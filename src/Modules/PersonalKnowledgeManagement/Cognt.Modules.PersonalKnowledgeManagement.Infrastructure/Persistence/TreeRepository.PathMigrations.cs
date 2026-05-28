@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -10,6 +11,10 @@ internal sealed partial class SqliteTreeRepository
         string normalizedNewPrefix = NormalizeFileRelPath(newPrefix);
         if (normalizedOldPrefix.Length == 0 || normalizedNewPrefix.Length == 0)
         {
+            logger?.LogWarning(
+                "Rejected tree item file path prefix rewrite because a prefix was empty. OldPrefixLength={OldPrefixLength} NewPrefixLength={NewPrefixLength}",
+                normalizedOldPrefix.Length,
+                normalizedNewPrefix.Length);
             throw new ArgumentException("Path prefixes must not be empty.");
         }
 
@@ -27,7 +32,12 @@ internal sealed partial class SqliteTreeRepository
             command.Parameters.AddWithValue("$newPrefix", normalizedNewPrefix);
             command.Parameters.AddWithValue("$oldPrefixLike", $"{EscapeLikePattern(normalizedOldPrefix)}%");
             command.Parameters.AddWithValue("$updatedAt", GetCurrentUnixTimeSeconds());
-            command.ExecuteNonQuery();
+            int affectedRows = command.ExecuteNonQuery();
+            logger?.LogInformation(
+                "Rewrote tree item file path prefix. OldPrefix={OldPrefix} NewPrefix={NewPrefix} AffectedRows={AffectedRows}",
+                normalizedOldPrefix,
+                normalizedNewPrefix,
+                affectedRows);
         });
     }
 }

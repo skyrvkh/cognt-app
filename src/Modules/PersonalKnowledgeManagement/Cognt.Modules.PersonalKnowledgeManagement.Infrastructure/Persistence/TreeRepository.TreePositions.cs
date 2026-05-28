@@ -14,10 +14,10 @@ internal sealed partial class SqliteTreeRepository
         bool retried = false)
     {
         long? previousPosition = previousSiblingId.HasValue && previousSiblingId != excludedItemId
-            ? GetSiblingPosition(previousSiblingId.Value, parentId, connection, transaction)
+            ? GetSiblingPosition(previousSiblingId.Value, parentId, connection, transaction, logger)
             : null;
         long? nextPosition = nextSiblingId.HasValue && nextSiblingId != excludedItemId
-            ? GetSiblingPosition(nextSiblingId.Value, parentId, connection, transaction)
+            ? GetSiblingPosition(nextSiblingId.Value, parentId, connection, transaction, logger)
             : null;
 
         if (previousPosition.HasValue && nextPosition.HasValue)
@@ -33,7 +33,7 @@ internal sealed partial class SqliteTreeRepository
                 throw new InvalidOperationException("Could not allocate a tree position between the selected siblings.");
             }
 
-            RenumberSiblings(parentId, connection, transaction);
+            RenumberSiblings(parentId, connection, transaction, logger);
             return AllocatePosition(
                 parentId,
                 previousSiblingId,
@@ -61,7 +61,7 @@ internal sealed partial class SqliteTreeRepository
                 throw new InvalidOperationException("Could not allocate a tree position before the selected sibling.");
             }
 
-            RenumberSiblings(parentId, connection, transaction);
+            RenumberSiblings(parentId, connection, transaction, logger);
             return AllocatePosition(
                 parentId,
                 previousSiblingId,

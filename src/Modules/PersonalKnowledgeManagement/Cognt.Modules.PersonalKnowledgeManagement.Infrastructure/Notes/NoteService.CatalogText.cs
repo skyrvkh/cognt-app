@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -10,7 +11,8 @@ internal sealed partial class NoteService
         string relativePath,
         string pathText,
         string plainText,
-        IReadOnlyList<string> tags)
+        IReadOnlyList<string> tags,
+        ILogger<NoteService>? logger = null)
     {
         return SearchableDocumentText.NormalizeWhitespace(string.Join(
             ' ',

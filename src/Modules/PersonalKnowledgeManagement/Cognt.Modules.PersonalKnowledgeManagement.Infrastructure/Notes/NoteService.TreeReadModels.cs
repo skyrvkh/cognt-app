@@ -7,7 +7,8 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static KnowledgeTreeItemReadModel? ToTreeItemReadModelOrNull(KnowledgeTreeItemRow? row)
+    private static KnowledgeTreeItemReadModel? ToTreeItemReadModelOrNull(
+        KnowledgeTreeItemRow? row)
     {
         return row is null
             ? null
@@ -53,9 +54,10 @@ internal sealed partial class NoteService
         }
 
         string extension = Path.GetExtension(notePath);
-        return string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase)
+        KnowledgeNoteListItemType itemType = string.Equals(extension, MarkdownNoteExtension, StringComparison.OrdinalIgnoreCase)
             || string.Equals(extension, MarkdownImportExtension, StringComparison.OrdinalIgnoreCase)
                 ? KnowledgeNoteListItemType.Markdown
                 : KnowledgeNoteListItemType.Note;
+        return itemType;
     }
 }

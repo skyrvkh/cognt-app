@@ -4,7 +4,9 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static string ResolveExistingRelativeNotePathInRoot(string root, string relativePath)
+    private static string ResolveExistingRelativeNotePathInRoot(
+        string root,
+        string relativePath)
     {
         return ResolveExistingPathInRoot(
             root,

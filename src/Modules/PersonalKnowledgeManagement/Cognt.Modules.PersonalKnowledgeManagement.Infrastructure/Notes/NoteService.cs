@@ -5,6 +5,7 @@ using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -60,28 +61,36 @@ internal sealed partial class NoteService : INoteService
     private string? cachedNoteCatalogRoot;
     private IReadOnlyList<NoteCatalogEntry>? cachedNoteCatalogEntries;
     private bool disposed;
+    private readonly ILogger<NoteService>? logger;
 
-    private static string GetExistingCollectionRoot(string collectionId)
+    internal NoteService(ILogger<NoteService>? logger = null)
+    {
+        this.logger = logger;
+    }
+
+    private string GetExistingCollectionRoot(string collectionId)
     {
         return ResolveExistingCollectionRoot(collectionId);
     }
 
     string INoteService.ReadNoteFile(string collectionId, string relativePath)
     {
+        string normalizedRelativePath = NormalizeRelativePath(relativePath);
+
         string root = GetExistingCollectionRoot(collectionId);
-        string fullPath = ResolveExistingRelativeNotePathInRoot(root, relativePath);
+        string fullPath = ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
         return File.ReadAllText(fullPath, Encoding.UTF8);
     }
 
     KnowledgeOpenedNoteReadModel INoteService.ReadNoteForOpen(string collectionId, string relativePath)
     {
-        string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
+
+        string root = GetExistingCollectionRoot(collectionId);
         string fullPath = ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
         KnowledgeTreeItemRow? note = repository.FindNoteByFileRelPath(normalizedRelativePath);
         string content = File.ReadAllText(fullPath, Encoding.UTF8);
-
         return new KnowledgeOpenedNoteReadModel(
             normalizedRelativePath,
             note?.Title ?? Path.GetFileNameWithoutExtension(fullPath),

@@ -1,5 +1,8 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -20,19 +23,53 @@ internal sealed partial class SqliteTreeRepository
         }
     }
 
-    private T UseConnection<T>(Func<SqliteConnection, T> action)
+    private T UseConnection<T>(
+        Func<SqliteConnection, T> action,
+        [CallerMemberName] string? operation = null)
     {
         lock (connectionLock)
         {
-            return action(GetConnection());
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return action(GetConnection());
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                logger?.LogError(
+                    ex,
+                    "SQLite tree repository operation failed. Operation={Operation} DatabasePath={DatabasePath} ElapsedMs={ElapsedMs}",
+                    operation,
+                    databasePath,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
         }
     }
 
-    private void UseConnection(Action<SqliteConnection> action)
+    private void UseConnection(
+        Action<SqliteConnection> action,
+        [CallerMemberName] string? operation = null)
     {
         lock (connectionLock)
         {
-            action(GetConnection());
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            try
+            {
+                action(GetConnection());
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                logger?.LogError(
+                    ex,
+                    "SQLite tree repository operation failed. Operation={Operation} DatabasePath={DatabasePath} ElapsedMs={ElapsedMs}",
+                    operation,
+                    databasePath,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
         }
     }
 
@@ -40,10 +77,17 @@ internal sealed partial class SqliteTreeRepository
     {
         if (disposed)
         {
+            logger?.LogWarning(
+                "SQLite tree repository connection requested after disposal. DatabasePath={DatabasePath}",
+                databasePath);
             throw new ObjectDisposedException(nameof(SqliteTreeRepository));
         }
 
-        connection ??= OpenConnection();
+        if (connection is null)
+        {
+            connection = OpenConnection();
+        }
+
         return connection;
     }
 

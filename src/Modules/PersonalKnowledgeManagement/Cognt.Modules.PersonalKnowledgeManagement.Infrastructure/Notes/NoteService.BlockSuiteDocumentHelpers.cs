@@ -6,7 +6,9 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static string ApplyBlockSuiteDocumentTitle(string content, string title)
+    private static string ApplyBlockSuiteDocumentTitle(
+        string content,
+        string title)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -48,7 +50,8 @@ internal sealed partial class NoteService
         }
     }
 
-    private static bool IsBlockSuiteDocumentContent(string content)
+    private static bool IsBlockSuiteDocumentContent(
+        string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {

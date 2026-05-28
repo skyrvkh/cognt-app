@@ -9,8 +9,9 @@ internal sealed partial class NoteService
 
     string? INoteService.ReadCardContextDrafts(string collectionId, string relativePath)
     {
-        string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
+
+        string root = GetExistingCollectionRoot(collectionId);
         ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
 
         string sidecarPath = GetCardContextDraftSidecarPath(root, normalizedRelativePath);
@@ -21,14 +22,15 @@ internal sealed partial class NoteService
 
     void INoteService.SaveCardContextDrafts(string collectionId, string relativePath, string? content)
     {
-        string root = GetExistingCollectionRoot(collectionId);
         string normalizedRelativePath = NormalizeRelativePath(relativePath);
+
+        string root = GetExistingCollectionRoot(collectionId);
         ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
 
         string sidecarPath = GetCardContextDraftSidecarPath(root, normalizedRelativePath);
         if (string.IsNullOrWhiteSpace(content))
         {
-            TryDeleteFile(sidecarPath);
+            TryDeleteFile(sidecarPath, logger);
             return;
         }
 
@@ -37,14 +39,14 @@ internal sealed partial class NoteService
         File.WriteAllText(sidecarPath, EnsureTrailingNewline(content), Encoding.UTF8);
     }
 
-    private static void DeleteCardContextDrafts(string root, IEnumerable<string> noteRelativePaths)
+    private void DeleteCardContextDrafts(string root, IEnumerable<string> noteRelativePaths)
     {
         foreach (string relativePath in noteRelativePaths
                      .Where(path => !string.IsNullOrWhiteSpace(path))
                      .Select(NormalizeRelativePath)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            TryDeleteFile(GetCardContextDraftSidecarPath(root, relativePath));
+            TryDeleteFile(GetCardContextDraftSidecarPath(root, relativePath), logger);
         }
     }
 }

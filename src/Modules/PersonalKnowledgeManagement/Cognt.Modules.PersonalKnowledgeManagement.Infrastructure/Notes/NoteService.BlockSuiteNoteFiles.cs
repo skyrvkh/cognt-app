@@ -24,7 +24,9 @@ internal sealed partial class NoteService
         return fileRelPath;
     }
 
-    private static string CreateUniqueExtractNoteRelPath(string root, string sourceNotePath)
+    private static string CreateUniqueExtractNoteRelPath(
+        string root,
+        string sourceNotePath)
     {
         string filesDirectory = Path.Combine(root, FilesDirectoryName);
         Directory.CreateDirectory(filesDirectory);

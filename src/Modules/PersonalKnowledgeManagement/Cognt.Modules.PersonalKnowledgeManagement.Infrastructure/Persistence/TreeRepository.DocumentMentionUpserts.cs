@@ -8,10 +8,10 @@ internal sealed partial class SqliteTreeRepository
         string sourceDocumentId,
         IReadOnlyList<DocumentMentionRow> mentions)
     {
+        string normalizedSourceDocumentId = NormalizeDocumentId(sourceDocumentId);
         UseConnection(connection =>
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
-            string normalizedSourceDocumentId = NormalizeDocumentId(sourceDocumentId);
 
             using (SqliteCommand deleteCommand = connection.CreateCommand())
             {
@@ -21,6 +21,8 @@ internal sealed partial class SqliteTreeRepository
                 deleteCommand.ExecuteNonQuery();
             }
 
+            int insertedCount = 0;
+            int resolvedCount = 0;
             foreach (DocumentMentionRow mention in mentions)
             {
                 using SqliteCommand insertCommand = connection.CreateCommand();
@@ -28,6 +30,11 @@ internal sealed partial class SqliteTreeRepository
                 insertCommand.CommandText = InsertDocumentMentionSql;
                 AddDocumentMentionInsertParameters(insertCommand, normalizedSourceDocumentId, mention);
                 insertCommand.ExecuteNonQuery();
+                insertedCount++;
+                if (mention.TargetDocumentId is not null)
+                {
+                    resolvedCount++;
+                }
             }
 
             transaction.Commit();

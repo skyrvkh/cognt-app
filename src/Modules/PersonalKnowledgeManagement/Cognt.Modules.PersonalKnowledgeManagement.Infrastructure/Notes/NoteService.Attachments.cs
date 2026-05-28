@@ -31,7 +31,8 @@ internal sealed partial class NoteService
             parentId: null,
             imported.Root);
 
-        return ToPdfReadModel(imported.Attachment);
+        KnowledgePdfDocumentReadModel pdfDocument = ToPdfReadModel(imported.Attachment);
+        return pdfDocument;
     }
 
     async Task<string> INoteService.AttachFileToNoteAsync(
@@ -69,6 +70,7 @@ internal sealed partial class NoteService
         AttachmentRow row = OpenTreeRepositoryForCollectionPath(root).GetAttachment(reference.AttachmentId)
             ?? throw new InvalidOperationException("The attached file could not be found after import.");
 
-        return ToAttachmentReadModel(root, row);
+        KnowledgeAttachmentReadModel attachment = ToAttachmentReadModel(root, row);
+        return attachment;
     }
 }

@@ -37,6 +37,7 @@ internal sealed partial class NoteService
             return null;
         }
 
+        string? decodedSha256Source = TryDecodeSha256SourceToken(normalizedSource);
         IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
         Dictionary<string, AttachmentRow> attachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
         foreach (AttachmentRow attachment in attachments)
@@ -60,7 +61,7 @@ internal sealed partial class NoteService
 
             noteImageCount++;
             onlyImage = noteImageCount == 1 ? attachment : null;
-            if (matched is null && ImageSourceMatchesAttachment(normalizedSource, attachment))
+            if (matched is null && ImageSourceMatchesAttachment(normalizedSource, decodedSha256Source, attachment))
             {
                 matched = attachment;
             }
@@ -71,8 +72,11 @@ internal sealed partial class NoteService
             return NormalizeRelativePath(matched.RelativePath);
         }
 
-        return noteImageCount == 1 && onlyImage is not null
-            ? NormalizeRelativePath(onlyImage.RelativePath)
-            : null;
+        if (noteImageCount == 1 && onlyImage is not null)
+        {
+            return NormalizeRelativePath(onlyImage.RelativePath);
+        }
+
+        return null;
     }
 }

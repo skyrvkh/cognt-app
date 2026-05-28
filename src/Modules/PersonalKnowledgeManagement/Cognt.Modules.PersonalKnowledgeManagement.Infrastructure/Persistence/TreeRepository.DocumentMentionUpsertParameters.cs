@@ -38,20 +38,27 @@ internal sealed partial class SqliteTreeRepository
         string normalizedSourceDocumentId,
         DocumentMentionRow mention)
     {
-        command.Parameters.AddWithValue("$id", NormalizeMentionId(mention.Id));
+        string mentionId = NormalizeMentionId(mention.Id);
+        string sourceBlockId = NormalizeSourceBlockId(mention.SourceBlockId);
+        string mentionType = NormalizeRequiredText(mention.MentionType, nameof(mention.MentionType));
+        string mentionText = NormalizeRequiredText(mention.MentionText, nameof(mention.MentionText));
+        string normalizedMentionText = NormalizeRequiredText(mention.NormalizedMentionText, nameof(mention.NormalizedMentionText));
+        string previewText = NormalizeRequiredText(mention.PreviewText, nameof(mention.PreviewText));
+        string status = NormalizeRequiredText(mention.Status, nameof(mention.Status));
+        command.Parameters.AddWithValue("$id", mentionId);
         command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
         command.Parameters.AddWithValue("$sourceDocumentId", normalizedSourceDocumentId);
-        command.Parameters.AddWithValue("$sourceBlockId", NormalizeSourceBlockId(mention.SourceBlockId));
+        command.Parameters.AddWithValue("$sourceBlockId", sourceBlockId);
         command.Parameters.AddWithValue("$targetDocumentId", ToDbParameterValue(mention.TargetDocumentId));
-        command.Parameters.AddWithValue("$mentionType", NormalizeRequiredText(mention.MentionType, nameof(mention.MentionType)));
-        command.Parameters.AddWithValue("$mentionText", NormalizeRequiredText(mention.MentionText, nameof(mention.MentionText)));
-        command.Parameters.AddWithValue("$normalizedMentionText", NormalizeRequiredText(mention.NormalizedMentionText, nameof(mention.NormalizedMentionText)));
+        command.Parameters.AddWithValue("$mentionType", mentionType);
+        command.Parameters.AddWithValue("$mentionText", mentionText);
+        command.Parameters.AddWithValue("$normalizedMentionText", normalizedMentionText);
         command.Parameters.AddWithValue("$startOffset", Math.Max(0, mention.StartOffset));
         command.Parameters.AddWithValue("$endOffset", Math.Max(Math.Max(0, mention.StartOffset), mention.EndOffset));
-        command.Parameters.AddWithValue("$previewText", NormalizeRequiredText(mention.PreviewText, nameof(mention.PreviewText)));
+        command.Parameters.AddWithValue("$previewText", previewText);
         command.Parameters.AddWithValue("$contextBefore", ToDbParameterValue(mention.ContextBefore));
         command.Parameters.AddWithValue("$contextAfter", ToDbParameterValue(mention.ContextAfter));
-        command.Parameters.AddWithValue("$status", NormalizeRequiredText(mention.Status, nameof(mention.Status)));
+        command.Parameters.AddWithValue("$status", status);
         command.Parameters.AddWithValue("$createdAt", mention.CreatedAt);
         command.Parameters.AddWithValue("$updatedAt", mention.UpdatedAt);
     }

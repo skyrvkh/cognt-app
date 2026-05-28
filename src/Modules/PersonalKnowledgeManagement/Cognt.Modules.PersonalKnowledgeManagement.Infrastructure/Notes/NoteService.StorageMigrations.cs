@@ -1,11 +1,15 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static void MigrateLegacyFilesDirectory(string root, ITreeRepository repository)
+    private static void MigrateLegacyFilesDirectory(
+        string root,
+        ITreeRepository repository,
+        ILogger<NoteService>? logger)
     {
         string legacyDirectory = Path.Combine(root, LegacyFilesDirectoryName);
         string currentDirectory = Path.Combine(root, FilesDirectoryName);
@@ -14,11 +18,23 @@ internal sealed partial class NoteService
             return;
         }
 
+        logger?.LogInformation(
+            "Migrating legacy Files directory. Root={Root} LegacyDirectory={LegacyDirectory} CurrentDirectory={CurrentDirectory}",
+            root,
+            legacyDirectory,
+            currentDirectory);
         Directory.Move(legacyDirectory, currentDirectory);
-        MoveMigratedCardContextDrafts(root, EnumerateMigratedNotePathPairs(root).ToArray());
+        int movedDraftCount = MoveMigratedCardContextDrafts(
+            root,
+            EnumerateMigratedNotePathPairs(root).ToArray(),
+            logger);
         repository.RewriteFileRelPathPrefix(
             $"{LegacyFilesDirectoryName}/",
             $"{FilesDirectoryName}/");
+        logger?.LogInformation(
+            "Legacy Files directory migration completed. Root={Root} MovedDraftCount={MovedDraftCount}",
+            root,
+            movedDraftCount);
     }
 
     private static IEnumerable<(string OldRelPath, string NewRelPath)> EnumerateMigratedNotePathPairs(string root)
@@ -48,10 +64,12 @@ internal sealed partial class NoteService
         }
     }
 
-    private static void MoveMigratedCardContextDrafts(
+    private static int MoveMigratedCardContextDrafts(
         string root,
-        IEnumerable<(string OldRelPath, string NewRelPath)> migratedNotePaths)
+        IEnumerable<(string OldRelPath, string NewRelPath)> migratedNotePaths,
+        ILogger<NoteService>? logger)
     {
+        int movedDraftCount = 0;
         foreach ((string oldRelPath, string newRelPath) in migratedNotePaths)
         {
             string oldDraftPath = GetCardContextDraftMigrationPath(
@@ -75,7 +93,18 @@ internal sealed partial class NoteService
             Directory.CreateDirectory(Path.GetDirectoryName(newDraftPath)
                 ?? throw new InvalidOperationException("The card-context sidecar path is invalid."));
             File.Move(oldDraftPath, newDraftPath);
+            movedDraftCount++;
         }
+
+        if (movedDraftCount > 0)
+        {
+            logger?.LogInformation(
+                "Migrated card-context draft files. Root={Root} DraftCount={DraftCount}",
+                root,
+                movedDraftCount);
+        }
+
+        return movedDraftCount;
     }
 
     private static bool IsCardContextDraftPath(string normalizedRelativePath)

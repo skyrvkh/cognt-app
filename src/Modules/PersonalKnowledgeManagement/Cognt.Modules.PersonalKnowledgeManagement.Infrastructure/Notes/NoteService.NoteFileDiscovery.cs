@@ -21,7 +21,9 @@ internal sealed partial class NoteService
             .ToArray();
     }
 
-    private static IEnumerable<string> EnumerateSupportedNoteFiles(string directoryPath, SearchOption searchOption)
+    private static IEnumerable<string> EnumerateSupportedNoteFiles(
+        string directoryPath,
+        SearchOption searchOption)
     {
         return Directory
             .EnumerateFiles(directoryPath, $"*{BlockSuiteNoteExtension}", searchOption)

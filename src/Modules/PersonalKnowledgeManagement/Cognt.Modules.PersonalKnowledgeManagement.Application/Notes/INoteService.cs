@@ -61,6 +61,10 @@ public interface INoteService : IDisposable
         string collectionId,
         long itemId);
 
+    IReadOnlyList<string> PreviewDeleteItemNotePaths(
+        string collectionId,
+        long itemId);
+
     Task<KnowledgeAttachmentReadModel> ImportAttachmentAsync(
         string collectionId,
         string sourceFileName,

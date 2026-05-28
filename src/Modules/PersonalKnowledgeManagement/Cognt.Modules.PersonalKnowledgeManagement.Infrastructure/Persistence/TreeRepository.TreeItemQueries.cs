@@ -52,6 +52,9 @@ internal sealed partial class SqliteTreeRepository
 
     KnowledgeTreeItemRow? ITreeRepository.GetItem(long itemId)
     {
-        return UseConnection(connection => GetItem(itemId, connection, transaction: null));
+        return UseConnection(connection =>
+        {
+            return GetItem(itemId, connection, transaction: null);
+        });
     }
 }

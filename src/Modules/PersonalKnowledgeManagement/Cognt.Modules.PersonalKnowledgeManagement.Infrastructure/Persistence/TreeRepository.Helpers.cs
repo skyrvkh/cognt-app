@@ -1,5 +1,6 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
 
@@ -8,9 +9,17 @@ internal sealed partial class SqliteTreeRepository
     private static KnowledgeTreeItemRow GetRequiredItem(
         long itemId,
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        ILogger? logger = null)
     {
         KnowledgeTreeItemRow? item = GetItem(itemId, connection, transaction);
+        if (item is null)
+        {
+            logger?.LogWarning(
+                "Required tree item was not found. ItemId={ItemId}",
+                itemId);
+        }
+
         return item ?? throw new InvalidOperationException($"Tree item {itemId} does not exist.");
     }
 

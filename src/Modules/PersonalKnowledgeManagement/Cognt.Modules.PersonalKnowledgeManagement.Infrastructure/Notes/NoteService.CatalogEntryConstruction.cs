@@ -4,55 +4,25 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Domain;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static IReadOnlyDictionary<long, IReadOnlyList<AttachmentRow>> LoadCatalogAttachmentsByNoteId(
-        ITreeRepository repository)
-    {
-        IReadOnlyList<AttachmentRow> attachments = repository.LoadAttachments();
-        Dictionary<string, AttachmentRow> attachmentsById = new(attachments.Count, StringComparer.OrdinalIgnoreCase);
-        foreach (AttachmentRow attachment in attachments)
-        {
-            attachmentsById.Add(attachment.Id, attachment);
-        }
-
-        Dictionary<long, List<AttachmentRow>> mutableAttachmentsByNoteId = [];
-        foreach (NoteAttachmentRow reference in repository.LoadNoteAttachments())
-        {
-            if (!attachmentsById.TryGetValue(reference.AttachmentId, out AttachmentRow? attachment))
-            {
-                continue;
-            }
-
-            if (!mutableAttachmentsByNoteId.TryGetValue(reference.NoteItemId, out List<AttachmentRow>? existing))
-            {
-                mutableAttachmentsByNoteId.Add(reference.NoteItemId, new List<AttachmentRow> { attachment });
-                continue;
-            }
-
-            existing.Add(attachment);
-        }
-
-        Dictionary<long, IReadOnlyList<AttachmentRow>> attachmentsByNoteId = new(mutableAttachmentsByNoteId.Count);
-        foreach (KeyValuePair<long, List<AttachmentRow>> pair in mutableAttachmentsByNoteId)
-        {
-            attachmentsByNoteId.Add(pair.Key, pair.Value);
-        }
-
-        return attachmentsByNoteId;
-    }
-
     private static NoteCatalogEntry? TryCreateNoteCatalogEntry(
         string root,
         KnowledgeTreeItemRow row,
         IReadOnlyDictionary<long, IReadOnlyList<AttachmentRow>> attachmentsByNoteId,
-        IReadOnlyDictionary<long, IReadOnlyList<string>> assignedTagsByItemId)
+        IReadOnlyDictionary<long, IReadOnlyList<string>> assignedTagsByItemId,
+        ILogger<NoteService>? logger = null)
     {
         if (string.IsNullOrWhiteSpace(row.FileRelPath))
         {
+            logger?.LogWarning(
+                "Catalog entry skipped because note row has no file path. NoteItemId={NoteItemId} Title={Title}",
+                row.Id,
+                row.Title);
             return null;
         }
 
@@ -60,10 +30,15 @@ internal sealed partial class NoteService
         string notePath = Path.Combine(root, ToPlatformPath(relativePath));
         if (!File.Exists(notePath))
         {
+            logger?.LogWarning(
+                "Catalog entry skipped because note file is missing. NoteItemId={NoteItemId} RelativePath={RelativePath} NotePath={NotePath}",
+                row.Id,
+                relativePath,
+                notePath);
             return null;
         }
 
-        string? content = TryReadCatalogNoteContent(notePath);
+        string? content = TryReadCatalogNoteContent(notePath, row.Id, relativePath, logger);
         if (content is null)
         {
             return null;
@@ -77,12 +52,12 @@ internal sealed partial class NoteService
             : row.Title;
         string plainText = SearchableDocumentText.ExtractPlainText(notePath, content);
         string pathText = Path.GetDirectoryName(relativePath)?.Replace('\\', '/') ?? string.Empty;
-        IReadOnlyList<string> contentTags = ExtractNoteTags(notePath, content);
+        IReadOnlyList<string> contentTags = ExtractNoteTags(notePath, content, logger);
         IReadOnlyList<string> assignedTags = assignedTagsByItemId.TryGetValue(row.Id, out IReadOnlyList<string>? existingTags)
             ? existingTags
             : [];
         IReadOnlyList<string> tags = MergeTags(assignedTags, contentTags);
-        string searchText = NormalizeSearchText(title, relativePath, pathText, plainText, tags);
+        string searchText = NormalizeSearchText(title, relativePath, pathText, plainText, tags, logger);
 
         return new NoteCatalogEntry(
             new KnowledgeNoteListItemReadModel(
@@ -131,7 +106,11 @@ internal sealed partial class NoteService
         }
     }
 
-    private static string? TryReadCatalogNoteContent(string notePath)
+    private static string? TryReadCatalogNoteContent(
+        string notePath,
+        long noteItemId,
+        string relativePath,
+        ILogger<NoteService>? logger = null)
     {
         try
         {
@@ -139,6 +118,12 @@ internal sealed partial class NoteService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException or FileNotFoundException)
         {
+            logger?.LogWarning(
+                ex,
+                "Catalog entry skipped because note content could not be read. NoteItemId={NoteItemId} RelativePath={RelativePath} NotePath={NotePath}",
+                noteItemId,
+                relativePath,
+                notePath);
             return null;
         }
     }
