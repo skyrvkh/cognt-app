@@ -4,11 +4,17 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static string GetStableBlockSuiteBlockId(JsonObject block)
+    private static string GetStableBlockSuiteBlockId(
+        JsonObject block)
     {
-        return GetTrimmedJsonStringProperty(block, "id")
-            ?? GetTrimmedJsonStringProperty(block["props"] as JsonObject, "id")
-            ?? CreateShortHash(block.ToJsonString());
+        string? blockId = GetTrimmedJsonStringProperty(block, "id")
+            ?? GetTrimmedJsonStringProperty(block["props"] as JsonObject, "id");
+        if (blockId is not null)
+        {
+            return blockId;
+        }
+
+        return CreateShortHash(block.ToJsonString());
     }
 
     private static JsonObject? GetBlockSuiteSnapshotBlocksRoot(JsonNode? rootNode)

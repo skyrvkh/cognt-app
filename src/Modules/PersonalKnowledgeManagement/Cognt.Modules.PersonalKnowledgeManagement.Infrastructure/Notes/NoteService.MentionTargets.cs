@@ -19,7 +19,7 @@ internal sealed partial class NoteService
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
         EnsureAllPdfAttachmentTreeItems(repository, preserveDeletedTreeItems: true);
 
-        return LoadMentionableTreeItems(repository)
+        KnowledgeMentionTargetReadModel[] targets = LoadMentionableTreeItems(repository)
             .OrderBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.FileRelPath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Id)
@@ -27,6 +27,7 @@ internal sealed partial class NoteService
             .OfType<KnowledgeMentionTargetReadModel>()
             .DistinctBy(target => NormalizeRelativePath(target.RelativePath), StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        return targets;
     }
 
     IReadOnlyList<KnowledgeMentionTargetReadModel> INoteService.SearchMentionTargets(
@@ -40,12 +41,12 @@ internal sealed partial class NoteService
         }
 
         string root = NormalizeRoot(collectionId);
-        ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        EnsureAllPdfAttachmentTreeItems(repository, preserveDeletedTreeItems: true);
         string normalizedQuery = query.Trim();
         int boundedLimit = Math.Clamp(limit, 1, 64);
+        ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
+        EnsureAllPdfAttachmentTreeItems(repository, preserveDeletedTreeItems: true);
 
-        return LoadMentionableTreeItems(repository)
+        IReadOnlyList<KnowledgeMentionTargetReadModel> targets = LoadMentionableTreeItems(repository)
             .Where(item => MatchesMentionSearch(item, normalizedQuery))
             .OrderBy(item => GetMentionSearchRank(item, normalizedQuery))
             .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
@@ -56,6 +57,7 @@ internal sealed partial class NoteService
             .DistinctBy(target => NormalizeRelativePath(target.RelativePath), StringComparer.OrdinalIgnoreCase)
             .Take(boundedLimit)
             .ToArray();
+        return targets;
     }
 
     private static IEnumerable<KnowledgeTreeItemRow> LoadMentionableTreeItems(ITreeRepository repository)

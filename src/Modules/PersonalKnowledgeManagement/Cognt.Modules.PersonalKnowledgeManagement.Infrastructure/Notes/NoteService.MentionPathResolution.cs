@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -18,13 +19,24 @@ internal sealed partial class NoteService
                 "Mention path is outside the open collection root.",
                 "The mentioned file does not exist.");
         }
-        catch (FileNotFoundException) when (TryResolveRelocatedMentionPath(root, normalizedRelativePath) is { } resolvedPath)
+        catch (FileNotFoundException ex)
         {
-            return resolvedPath;
+            if (TryResolveRelocatedMentionPath(root, normalizedRelativePath) is { } resolvedPath)
+            {
+                logger?.LogDebug(
+                    ex,
+                    "Mention path resolved through relocated-note fallback. Root={Root} RequestedRelativePath={RequestedRelativePath} ResolvedPath={ResolvedPath}",
+                    root,
+                    normalizedRelativePath,
+                    resolvedPath);
+                return resolvedPath;
+            }
+
+            throw;
         }
     }
 
-    private static string NormalizeMentionLookupPath(string relativePath)
+    private string NormalizeMentionLookupPath(string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {

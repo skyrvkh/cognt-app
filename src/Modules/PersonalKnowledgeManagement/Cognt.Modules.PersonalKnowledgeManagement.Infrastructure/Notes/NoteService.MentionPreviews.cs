@@ -12,36 +12,41 @@ internal sealed partial class NoteService
         string relativePath,
         int maxCharacters)
     {
+        string normalizedRelativePath = NormalizeRelativePath(relativePath);
+
         string root = GetExistingCollectionRoot(collectionId);
-        string path = ResolveMentionPathInCollectionRoot(root, relativePath);
-        string normalizedRelativePath = NormalizeRelativePath(Path.GetRelativePath(root, path));
+        string path = ResolveMentionPathInCollectionRoot(root, normalizedRelativePath);
+        string resolvedRelativePath = NormalizeRelativePath(Path.GetRelativePath(root, path));
         if (IsPdfPath(path))
         {
             string title = Path.GetFileNameWithoutExtension(path);
-            return BlockSuiteDocumentContent.FromPlainText(
+            string pdfPreview = BlockSuiteDocumentContent.FromPlainText(
                 $"PDF document: {Path.GetFileName(path)}",
                 title);
+            return pdfPreview;
         }
 
         string content = File.ReadAllText(path, Encoding.UTF8);
         bool isBlockSuiteNote = IsBlockSuiteNotePath(path);
-        string previewTitle = OpenTreeRepositoryForCollectionPath(root).FindNoteByFileRelPath(normalizedRelativePath)?.Title
+        string previewTitle = OpenTreeRepositoryForCollectionPath(root).FindNoteByFileRelPath(resolvedRelativePath)?.Title
             ?? (isBlockSuiteNote
                 ? Path.GetFileNameWithoutExtension(path)
                 : ExtractTitle(content, Path.GetFileName(path)));
 
-        return isBlockSuiteNote
+        string preview = isBlockSuiteNote
             ? content
             : BlockSuiteDocumentContent.FromPlainText(
                 CreateExcerpt(content, Math.Max(0, maxCharacters)),
                 previewTitle);
+        return preview;
     }
 
     string INoteService.ResolveMentionPath(
         string collectionId,
         string relativePath)
     {
+        string normalizedRelativePath = NormalizeRelativePath(relativePath);
         string root = GetExistingCollectionRoot(collectionId);
-        return ResolveMentionPathInCollectionRoot(root, relativePath);
+        return ResolveMentionPathInCollectionRoot(root, normalizedRelativePath);
     }
 }

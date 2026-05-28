@@ -30,7 +30,8 @@ internal sealed partial class NoteService
             DocumentMentionContext context = CreateMentionContext(
                 fullText,
                 occurrence.StartOffset,
-                occurrence.EndOffset);
+                occurrence.EndOffset,
+                logger);
             string normalizedMentionText = NormalizeMentionText(occurrence.MentionText);
             string id = CreateDocumentMentionId(
                 source.DocumentId,

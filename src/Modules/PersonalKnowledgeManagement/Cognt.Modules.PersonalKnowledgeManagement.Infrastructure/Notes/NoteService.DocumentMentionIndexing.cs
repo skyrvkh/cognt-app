@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -23,12 +24,14 @@ internal sealed partial class NoteService
 
         string relativePath = NormalizeRelativePath(Path.GetRelativePath(normalizedRoot, fullPath));
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(normalizedRoot);
-        Dictionary<string, DocumentLinkNote> notesByPath = LoadDocumentLinkNotesByRelativePath(normalizedRoot, repository);
+        Dictionary<string, DocumentLinkNote> notesByPath = LoadDocumentLinkNotesByRelativePath(normalizedRoot, repository, logger);
 
         if (notesByPath.TryGetValue(relativePath, out DocumentLinkNote? sourceNote))
         {
-            ReplaceSourceDocumentMentions(normalizedRoot, repository, sourceNote, content, notesByPath);
+            ReplaceSourceDocumentMentions(normalizedRoot, repository, sourceNote, content, notesByPath, logger);
+            return;
         }
+
     }
 
     private static void EnsureDocumentMentionIndexCurrent(
@@ -36,13 +39,14 @@ internal sealed partial class NoteService
         ITreeRepository repository,
         DocumentLinkNote currentNote,
         string currentContent,
-        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath)
+        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
+        Microsoft.Extensions.Logging.ILogger<NoteService>? logger = null)
     {
         if (!repository.HasDocumentMentions())
         {
-            RebuildDocumentMentionIndex(root, repository, notesByPath);
+            RebuildDocumentMentionIndex(root, repository, notesByPath, logger);
         }
 
-        ReplaceSourceDocumentMentions(root, repository, currentNote, currentContent, notesByPath);
+        ReplaceSourceDocumentMentions(root, repository, currentNote, currentContent, notesByPath, logger);
     }
 }

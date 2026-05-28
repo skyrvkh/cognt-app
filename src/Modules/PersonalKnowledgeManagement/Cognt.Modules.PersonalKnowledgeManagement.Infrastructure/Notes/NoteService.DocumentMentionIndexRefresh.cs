@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -9,7 +10,8 @@ internal sealed partial class NoteService
     private static void RebuildDocumentMentionIndex(
         string root,
         ITreeRepository repository,
-        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath)
+        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
+        ILogger<NoteService>? logger = null)
     {
         foreach (DocumentLinkNote note in notesByPath.Values)
         {
@@ -24,7 +26,8 @@ internal sealed partial class NoteService
                 repository,
                 note,
                 File.ReadAllText(notePath, Encoding.UTF8),
-                notesByPath);
+                notesByPath,
+                logger);
         }
     }
 
@@ -33,13 +36,15 @@ internal sealed partial class NoteService
         ITreeRepository repository,
         DocumentLinkNote sourceNote,
         string content,
-        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath)
+        IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
+        ILogger<NoteService>? logger = null)
     {
         IReadOnlyList<DocumentMentionRow> mentions = ExtractDocumentMentions(
             root,
             sourceNote,
             content,
-            notesByPath);
+            notesByPath,
+            logger);
         repository.ReplaceDocumentMentions(sourceNote.DocumentId, mentions);
     }
 }

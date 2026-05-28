@@ -83,6 +83,7 @@ internal sealed partial class NoteService
         }
         catch (UriFormatException)
         {
+            // Keep the trimmed target when URI decoding fails.
         }
 
         return string.IsNullOrWhiteSpace(target) ? null : target;

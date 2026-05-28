@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -25,7 +26,11 @@ internal sealed partial class NoteService
         internal string? ContextAfter { get; }
     }
 
-    private static DocumentMentionContext CreateMentionContext(string text, int start, int end)
+    private static DocumentMentionContext CreateMentionContext(
+        string text,
+        int start,
+        int end,
+        ILogger<NoteService>? logger = null)
     {
         const int previewRadius = 150;
         const int contextRadius = 80;

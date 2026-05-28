@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -12,6 +13,7 @@ internal sealed partial class NoteService
         private readonly DocumentLinkNote source;
         private readonly string sourceBlockId;
         private readonly IReadOnlyDictionary<string, DocumentLinkNote> notesByPath;
+        private readonly ILogger<NoteService>? logger;
         private readonly StringBuilder text = new();
         private readonly List<DocumentMentionOccurrence> occurrences = [];
 
@@ -19,7 +21,8 @@ internal sealed partial class NoteService
             string root,
             DocumentLinkNote source,
             string sourceBlockId,
-            IReadOnlyDictionary<string, DocumentLinkNote> notesByPath)
+            IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
+            ILogger<NoteService>? logger = null)
         {
             this.root = root;
             this.source = source;
@@ -27,6 +30,7 @@ internal sealed partial class NoteService
                 ? DocumentMentionBlockId
                 : sourceBlockId.Trim();
             this.notesByPath = notesByPath;
+            this.logger = logger;
         }
 
         internal string Text => text.ToString();

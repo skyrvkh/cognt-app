@@ -1,4 +1,5 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -8,16 +9,18 @@ internal sealed partial class NoteService
         DocumentMentionBuilder builder,
         DocumentLinkNote source,
         DocumentLinkTitleIndex titleIndex,
-        long now)
+        long now,
+        ILogger<NoteService>? logger = null)
     {
-        ApplyTitleMentions(builder, source, titleIndex);
+        ApplyTitleMentions(builder, source, titleIndex, logger);
         return builder.MaterializeRows(now);
     }
 
     private static void ApplyTitleMentions(
         DocumentMentionBuilder builder,
         DocumentLinkNote source,
-        DocumentLinkTitleIndex titleIndex)
+        DocumentLinkTitleIndex titleIndex,
+        ILogger<NoteService>? logger = null)
     {
         string plainText = builder.Text;
         foreach (DocumentLinkNote note in titleIndex.UnambiguousTitles.Values)
@@ -27,7 +30,7 @@ internal sealed partial class NoteService
                 continue;
             }
 
-            foreach (DocumentLinkTitleMatch occurrence in EnumerateTitleMentionMatches(plainText, note))
+            foreach (DocumentLinkTitleMatch occurrence in EnumerateTitleMentionMatches(plainText, note, logger))
             {
                 builder.AddTitleMention(
                     note,
@@ -45,7 +48,7 @@ internal sealed partial class NoteService
             }
 
             DocumentLinkNote representative = candidates[0];
-            foreach (DocumentLinkTitleMatch occurrence in EnumerateTitleMentionMatches(plainText, representative))
+            foreach (DocumentLinkTitleMatch occurrence in EnumerateTitleMentionMatches(plainText, representative, logger))
             {
                 builder.AddAmbiguousTitleMention(
                     occurrence.MatchStart,

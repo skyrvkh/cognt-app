@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -6,7 +7,8 @@ internal sealed partial class NoteService
 {
     private static IEnumerable<DocumentLinkTitleMatch> EnumerateTitleMentionMatches(
         string plainText,
-        DocumentLinkNote note)
+        DocumentLinkNote note,
+        ILogger<NoteService>? logger = null)
     {
         if (string.IsNullOrWhiteSpace(plainText))
         {

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
@@ -12,12 +13,13 @@ internal sealed partial class NoteService
         IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
         DocumentLinkTitleIndex titleIndex,
         List<DocumentMentionRow> rows,
-        long now)
+        long now,
+        ILogger<NoteService>? logger = null)
     {
         string sourceBlockId = GetStableBlockSuiteBlockId(block);
-        DocumentMentionBuilder builder = new(root, source, sourceBlockId, notesByPath);
+        DocumentMentionBuilder builder = new(root, source, sourceBlockId, notesByPath, logger);
         JsonObject? props = block["props"] as JsonObject;
-        string? blockTarget = GetLinkedNoteRelativePathFromReference(block) ?? GetLinkedNoteRelativePathFromReference(props);
+        string? blockTarget = GetLinkedNoteRelativePathFromReference(block, logger) ?? GetLinkedNoteRelativePathFromReference(props, logger);
         string? blockTitle = props is null ? null : GetTrimmedJsonStringProperty(props, "title");
         if (!string.IsNullOrWhiteSpace(blockTarget))
         {
@@ -26,11 +28,11 @@ internal sealed partial class NoteService
 
         if (props is not null)
         {
-            AppendBlockSuiteRichTextMentions(props["title"], builder);
-            AppendBlockSuiteRichTextMentions(props["text"], builder);
+            AppendBlockSuiteRichTextMentions(props["title"], builder, logger);
+            AppendBlockSuiteRichTextMentions(props["text"], builder, logger);
         }
 
-        rows.AddRange(MaterializeDocumentMentionRows(builder, source, titleIndex, now));
+        rows.AddRange(MaterializeDocumentMentionRows(builder, source, titleIndex, now, logger));
 
         if (block["children"] is not JsonArray children)
         {
@@ -48,7 +50,8 @@ internal sealed partial class NoteService
                     notesByPath,
                     titleIndex,
                     rows,
-                    now);
+                    now,
+                    logger);
             }
         }
     }
@@ -61,10 +64,11 @@ internal sealed partial class NoteService
         IReadOnlyDictionary<string, DocumentLinkNote> notesByPath,
         DocumentLinkTitleIndex titleIndex,
         List<DocumentMentionRow> rows,
-        long now)
+        long now,
+        ILogger<NoteService>? logger = null)
     {
-        DocumentMentionBuilder builder = new(root, source, sourceBlockId, notesByPath);
+        DocumentMentionBuilder builder = new(root, source, sourceBlockId, notesByPath, logger);
         builder.AppendText(text);
-        rows.AddRange(MaterializeDocumentMentionRows(builder, source, titleIndex, now));
+        rows.AddRange(MaterializeDocumentMentionRows(builder, source, titleIndex, now, logger));
     }
 }

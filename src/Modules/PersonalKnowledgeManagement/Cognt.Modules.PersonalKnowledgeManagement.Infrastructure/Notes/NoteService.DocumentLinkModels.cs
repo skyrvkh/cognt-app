@@ -2,6 +2,22 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
+    private static DocumentLinkNote CreateDocumentLinkNoteModel(
+        string documentId,
+        string relativePath,
+        string title,
+        long updatedAt)
+    {
+        return new DocumentLinkNote(documentId, relativePath, title, updatedAt);
+    }
+
+    private static DocumentLinkTitleIndex CreateDocumentLinkTitleIndexModel(
+        IReadOnlyDictionary<string, DocumentLinkNote> unambiguousTitles,
+        IReadOnlyDictionary<string, IReadOnlyList<DocumentLinkNote>> ambiguousTitles)
+    {
+        return new DocumentLinkTitleIndex(unambiguousTitles, ambiguousTitles);
+    }
+
     private sealed class DocumentLinkNote
     {
         internal DocumentLinkNote(

@@ -1,10 +1,14 @@
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 
 internal sealed partial class NoteService
 {
-    private static void AppendBlockSuiteRichTextMentions(JsonNode? textValue, DocumentMentionBuilder builder)
+    private static void AppendBlockSuiteRichTextMentions(
+        JsonNode? textValue,
+        DocumentMentionBuilder builder,
+        ILogger<NoteService>? logger = null)
     {
         if (textValue is not JsonObject textObject || textObject["delta"] is not JsonArray delta)
         {
@@ -23,7 +27,7 @@ internal sealed partial class NoteService
             if (entry["attributes"] is JsonObject attributes
                 && attributes["reference"] is JsonObject reference)
             {
-                referenceTarget = GetLinkedNoteRelativePathFromReference(reference);
+                referenceTarget = GetLinkedNoteRelativePathFromReference(reference, logger);
                 referenceTitle = GetTrimmedJsonStringProperty(reference, "title");
             }
 
@@ -36,18 +40,25 @@ internal sealed partial class NoteService
         }
     }
 
-    private static string? GetLinkedNoteRelativePathFromReference(JsonObject? value)
+    private static string? GetLinkedNoteRelativePathFromReference(
+        JsonObject? value,
+        ILogger<NoteService>? logger = null)
     {
         if (value is null)
         {
             return null;
         }
 
-        return GetTrimmedJsonStringProperty(value, "cogntLinkedNotePath")
+        string? resolved = GetTrimmedJsonStringProperty(value, "cogntLinkedNotePath")
             ?? GetTrimmedJsonStringProperty(value["params"] as JsonObject, "cogntLinkedNotePath")
             ?? GetTrimmedJsonStringProperty(value["params"] as JsonObject, "relativePath")
             ?? GetLegacyLinkedNoteRelativePath(GetTrimmedJsonStringProperty(value, "relativePath"))
             ?? GetLegacyLinkedNoteRelativePath(GetTrimmedJsonStringProperty(value, "description"));
+        if (resolved is not null)
+        {
+        }
+
+        return resolved;
     }
 
     private static string? GetTrimmedJsonStringProperty(JsonObject? value, string propertyName)

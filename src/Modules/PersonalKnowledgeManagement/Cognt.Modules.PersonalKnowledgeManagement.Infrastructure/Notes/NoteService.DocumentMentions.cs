@@ -27,9 +27,10 @@ internal sealed partial class NoteService
     {
         string root = GetExistingCollectionRoot(collectionId);
         string normalizedCurrentRelativePath = NormalizeRelativePath(currentRelativePath);
+
         string currentFullPath = ResolveExistingRelativeNotePathInRoot(root, normalizedCurrentRelativePath);
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        Dictionary<string, DocumentLinkNote> notesByPath = LoadDocumentLinkNotesByRelativePath(root, repository);
+        Dictionary<string, DocumentLinkNote> notesByPath = LoadDocumentLinkNotesByRelativePath(root, repository, logger);
 
         if (!notesByPath.TryGetValue(normalizedCurrentRelativePath, out DocumentLinkNote? currentNote))
         {
@@ -41,7 +42,8 @@ internal sealed partial class NoteService
             repository,
             currentNote,
             string.IsNullOrWhiteSpace(currentContent) ? File.ReadAllText(currentFullPath, Encoding.UTF8) : currentContent,
-            notesByPath);
+            notesByPath,
+            logger);
 
         Dictionary<string, DocumentLinkNote> notesByDocumentId = CreateNotesByDocumentId(notesByPath);
 
@@ -52,87 +54,15 @@ internal sealed partial class NoteService
 
         List<KnowledgeDocumentLinkReadModel> outgoing = MaterializeDocumentLinkReadModels(
             "outgoing",
-            FilterSelfDocumentMentions(repository.LoadDocumentMentionsBySource(currentNote.DocumentId), currentNote.DocumentId),
+            DocumentLinkOrdering.ExcludeSelfTargets(
+                repository.LoadDocumentMentionsBySource(currentNote.DocumentId),
+                currentNote.DocumentId),
             notesByDocumentId);
 
-        return new KnowledgeDocumentLinksReadModel(
-            OrderDocumentLinks(incoming, DocumentLinkSortDirection.Incoming),
-            OrderDocumentLinks(outgoing, DocumentLinkSortDirection.Outgoing));
-    }
+        KnowledgeDocumentLinksReadModel links = new(
+            DocumentLinkOrdering.Order(incoming, DocumentLinkSortDirection.Incoming),
+            DocumentLinkOrdering.Order(outgoing, DocumentLinkSortDirection.Outgoing));
 
-    private static IReadOnlyList<DocumentMentionRow> FilterSelfDocumentMentions(
-        IReadOnlyList<DocumentMentionRow> mentions,
-        string currentDocumentId)
-    {
-        List<DocumentMentionRow> filteredMentions = new(mentions.Count);
-        foreach (DocumentMentionRow mention in mentions)
-        {
-            if (!string.Equals(mention.TargetDocumentId, currentDocumentId, StringComparison.OrdinalIgnoreCase))
-            {
-                filteredMentions.Add(mention);
-            }
-        }
-
-        return filteredMentions;
-    }
-
-    private static KnowledgeDocumentLinkReadModel[] OrderDocumentLinks(
-        IReadOnlyList<KnowledgeDocumentLinkReadModel> links,
-        DocumentLinkSortDirection direction)
-    {
-        if (links.Count == 0)
-        {
-            return [];
-        }
-
-        DocumentLinkSortRow[] rows = new DocumentLinkSortRow[links.Count];
-        for (int index = 0; index < rows.Length; index++)
-        {
-            rows[index] = new DocumentLinkSortRow(links[index], index);
-        }
-
-        Array.Sort(rows, (left, right) => CompareDocumentLinks(left, right, direction));
-
-        KnowledgeDocumentLinkReadModel[] orderedLinks = new KnowledgeDocumentLinkReadModel[rows.Length];
-        for (int index = 0; index < orderedLinks.Length; index++)
-        {
-            orderedLinks[index] = rows[index].Link;
-        }
-
-        return orderedLinks;
-    }
-
-    private static int CompareDocumentLinks(
-        DocumentLinkSortRow left,
-        DocumentLinkSortRow right,
-        DocumentLinkSortDirection direction)
-    {
-        int comparison = direction == DocumentLinkSortDirection.Incoming
-            ? (right.Link.UpdatedAt ?? 0).CompareTo(left.Link.UpdatedAt ?? 0)
-            : string.Compare(left.Link.DisplayTitle, right.Link.DisplayTitle, StringComparison.OrdinalIgnoreCase);
-        if (comparison != 0)
-        {
-            return comparison;
-        }
-
-        comparison = direction == DocumentLinkSortDirection.Incoming
-            ? string.Compare(left.Link.DisplayTitle, right.Link.DisplayTitle, StringComparison.OrdinalIgnoreCase)
-            : string.Compare(left.Link.OpenRelativePath, right.Link.OpenRelativePath, StringComparison.OrdinalIgnoreCase);
-        return comparison != 0
-            ? comparison
-            : left.SequenceIndex.CompareTo(right.SequenceIndex);
-    }
-
-    private readonly struct DocumentLinkSortRow(KnowledgeDocumentLinkReadModel link, int sequenceIndex)
-    {
-        internal KnowledgeDocumentLinkReadModel Link { get; } = link;
-
-        internal int SequenceIndex { get; } = sequenceIndex;
-    }
-
-    private enum DocumentLinkSortDirection
-    {
-        Incoming,
-        Outgoing
+        return links;
     }
 }

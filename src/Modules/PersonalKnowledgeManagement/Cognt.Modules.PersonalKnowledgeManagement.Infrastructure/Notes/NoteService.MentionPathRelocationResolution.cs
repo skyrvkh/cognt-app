@@ -23,7 +23,7 @@ internal sealed partial class NoteService
         }
 
         ITreeRepository repository = OpenTreeRepositoryForCollectionPath(root);
-        return LoadRelocatedMentionPathCandidates(
+        string[] candidates = LoadRelocatedMentionPathCandidates(
                 root,
                 repository,
                 targetRelativePath,
@@ -31,9 +31,8 @@ internal sealed partial class NoteService
                 targetStemKey)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(2)
-            .ToArray() is [string single]
-                ? single
-                : null;
+            .ToArray();
+        return candidates is [string single] ? single : null;
     }
 
     private static IEnumerable<string> LoadRelocatedMentionPathCandidates(
