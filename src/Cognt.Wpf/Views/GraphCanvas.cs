@@ -43,6 +43,12 @@ public sealed class GraphCanvas : FrameworkElement
 
     private readonly Dictionary<string, Point> positions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Vector> velocities = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Vector> simulationForces = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, KnowledgeGraphNodeReadModel> nodesByDocumentId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> reciprocalEdgeKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> staleVelocityKeys = [];
+    private readonly List<GraphNodeOrderEntry> drawOrderedNodes = [];
+    private readonly List<GraphNodeOrderEntry> hitTestOrderedNodes = [];
     private KnowledgeGraphReadModel? layoutGraph;
     private Vector pan;
     private double zoom = 1.0d;
@@ -291,6 +297,12 @@ public sealed class GraphCanvas : FrameworkElement
         canvas.layoutGraph = null;
         canvas.positions.Clear();
         canvas.velocities.Clear();
+        canvas.simulationForces.Clear();
+        canvas.nodesByDocumentId.Clear();
+        canvas.reciprocalEdgeKeys.Clear();
+        canvas.staleVelocityKeys.Clear();
+        canvas.drawOrderedNodes.Clear();
+        canvas.hitTestOrderedNodes.Clear();
         canvas.hoveredDocumentId = null;
         canvas.selectedDocumentId = (e.NewValue as KnowledgeGraphReadModel)?.CurrentDocumentId;
         canvas.draggedDocumentId = null;
@@ -323,6 +335,7 @@ public sealed class GraphCanvas : FrameworkElement
 
         positions.Clear();
         velocities.Clear();
+        RefreshNodeLookup(currentGraph);
         BuildInitialLayout(currentGraph);
         RefineLayout(currentGraph);
         layoutGraph = currentGraph;
@@ -332,31 +345,71 @@ public sealed class GraphCanvas : FrameworkElement
 
     private void BuildInitialLayout(KnowledgeGraphReadModel currentGraph)
     {
-        foreach (KnowledgeGraphNodeReadModel currentNode in currentGraph.Nodes.Where(node => node.IsCurrent))
+        Dictionary<int, List<KnowledgeGraphNodeReadModel>> nodesByDepth = [];
+        List<int> depths = [];
+
+        foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
         {
-            positions[currentNode.DocumentId] = new Point(0, 0);
+            if (node.IsCurrent)
+            {
+                positions[node.DocumentId] = new Point(0, 0);
+                continue;
+            }
+
+            if (!nodesByDepth.TryGetValue(node.Depth, out List<KnowledgeGraphNodeReadModel>? depthNodes))
+            {
+                depthNodes = [];
+                nodesByDepth[node.Depth] = depthNodes;
+                depths.Add(node.Depth);
+            }
+
+            depthNodes.Add(node);
         }
 
-        foreach (IGrouping<int, KnowledgeGraphNodeReadModel> depthGroup in currentGraph.Nodes
-            .Where(node => !node.IsCurrent)
-            .GroupBy(node => node.Depth)
-            .OrderBy(group => group.Key))
+        depths.Sort();
+        foreach (int depth in depths)
         {
-            KnowledgeGraphNodeReadModel[] nodes = depthGroup
-                .OrderBy(node => node.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            double radius = GetInitialRingRadius(currentGraph, depthGroup.Key);
-            double offset = depthGroup.Key % 2 == 0 ? Math.PI / Math.Max(1, nodes.Length) : 0;
+            List<KnowledgeGraphNodeReadModel> nodes = nodesByDepth[depth];
+            nodes.Sort(CompareNodesByTitleThenPath);
+            double radius = GetInitialRingRadius(currentGraph, depth);
+            double offset = depth % 2 == 0 ? Math.PI / Math.Max(1, nodes.Count) : 0;
 
-            for (int i = 0; i < nodes.Length; i++)
+            for (int i = 0; i < nodes.Count; i++)
             {
-                double angle = offset + (Math.PI * 2.0d * i / nodes.Length);
+                double angle = offset + (Math.PI * 2.0d * i / nodes.Count);
                 positions[nodes[i].DocumentId] = new Point(
                     Math.Cos(angle) * radius,
                     Math.Sin(angle) * radius);
             }
         }
+    }
+
+    private static int CompareNodesByTitleThenPath(
+        KnowledgeGraphNodeReadModel left,
+        KnowledgeGraphNodeReadModel right)
+    {
+        int titleComparison = StringComparer.OrdinalIgnoreCase.Compare(left.Title, right.Title);
+        return titleComparison != 0
+            ? titleComparison
+            : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    }
+
+    private void RefreshNodeLookup(KnowledgeGraphReadModel currentGraph)
+    {
+        nodesByDocumentId.Clear();
+        drawOrderedNodes.Clear();
+        hitTestOrderedNodes.Clear();
+        for (int index = 0; index < currentGraph.Nodes.Count; index++)
+        {
+            KnowledgeGraphNodeReadModel node = currentGraph.Nodes[index];
+            nodesByDocumentId[node.DocumentId] = node;
+            GraphNodeOrderEntry entry = new(node, index);
+            drawOrderedNodes.Add(entry);
+            hitTestOrderedNodes.Add(entry);
+        }
+
+        drawOrderedNodes.Sort(CompareDrawOrder);
+        hitTestOrderedNodes.Sort(CompareHitTestOrder);
     }
 
     private void RefineLayout(KnowledgeGraphReadModel currentGraph)
@@ -429,10 +482,11 @@ public sealed class GraphCanvas : FrameworkElement
     {
         EnsureVelocityEntries(currentGraph);
         double idealDistance = GetIdealDistance(currentGraph);
-        Dictionary<string, Vector> forces = currentGraph.Nodes.ToDictionary(
-            node => node.DocumentId,
-            _ => new Vector(),
-            StringComparer.OrdinalIgnoreCase);
+        simulationForces.Clear();
+        foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
+        {
+            simulationForces[node.DocumentId] = new Vector();
+        }
 
         for (int i = 0; i < currentGraph.Nodes.Count; i++)
         {
@@ -460,8 +514,8 @@ public sealed class GraphCanvas : FrameworkElement
 
                 double effectiveDistance = Math.Max(26.0d, distance);
                 double strength = idealDistance * idealDistance / effectiveDistance;
-                forces[a.DocumentId] += direction * strength;
-                forces[b.DocumentId] -= direction * strength;
+                simulationForces[a.DocumentId] += direction * strength;
+                simulationForces[b.DocumentId] -= direction * strength;
             }
         }
 
@@ -469,8 +523,8 @@ public sealed class GraphCanvas : FrameworkElement
         {
             if (!positions.TryGetValue(edge.SourceDocumentId, out Point source)
                 || !positions.TryGetValue(edge.TargetDocumentId, out Point target)
-                || !forces.ContainsKey(edge.SourceDocumentId)
-                || !forces.ContainsKey(edge.TargetDocumentId))
+                || !simulationForces.ContainsKey(edge.SourceDocumentId)
+                || !simulationForces.ContainsKey(edge.TargetDocumentId))
             {
                 continue;
             }
@@ -490,8 +544,8 @@ public sealed class GraphCanvas : FrameworkElement
             double mentionWeight = Math.Min(3.0d, Math.Max(1.0d, edge.MentionCount));
             double targetDistance = idealDistance + 6.0d;
             double strength = (distance - targetDistance) * 0.090d * mentionWeight;
-            forces[edge.SourceDocumentId] += direction * strength;
-            forces[edge.TargetDocumentId] -= direction * strength;
+            simulationForces[edge.SourceDocumentId] += direction * strength;
+            simulationForces[edge.TargetDocumentId] -= direction * strength;
         }
 
         foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
@@ -503,7 +557,7 @@ public sealed class GraphCanvas : FrameworkElement
 
             Vector toCenter = new(-position.X, -position.Y);
             double centerStrength = node.IsCurrent ? 0.030d : 0.0035d;
-            forces[node.DocumentId] += toCenter * centerStrength;
+            simulationForces[node.DocumentId] += toCenter * centerStrength;
 
             if (!node.IsCurrent && toCenter.Length > 0.001d)
             {
@@ -511,7 +565,7 @@ public sealed class GraphCanvas : FrameworkElement
                 double radius = radial.Length;
                 radial /= radius;
                 double targetRadius = GetTargetRadius(currentGraph, node.Depth);
-                forces[node.DocumentId] += radial * ((targetRadius - radius) * 0.006d);
+                simulationForces[node.DocumentId] += radial * ((targetRadius - radius) * 0.006d);
             }
         }
 
@@ -531,7 +585,7 @@ public sealed class GraphCanvas : FrameworkElement
                 continue;
             }
 
-            Vector velocity = (velocities[node.DocumentId] + forces[node.DocumentId] * 0.014d) * 0.78d;
+            Vector velocity = (velocities[node.DocumentId] + simulationForces[node.DocumentId] * 0.014d) * 0.78d;
             velocity = ClampVector(velocity, 22.0d);
             velocities[node.DocumentId] = velocity;
             positions[node.DocumentId] += velocity;
@@ -543,16 +597,21 @@ public sealed class GraphCanvas : FrameworkElement
 
     private void EnsureVelocityEntries(KnowledgeGraphReadModel currentGraph)
     {
-        HashSet<string> documentIds = currentGraph.Nodes
-            .Select(node => node.DocumentId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
         {
             velocities.TryAdd(node.DocumentId, new Vector());
         }
 
-        foreach (string staleDocumentId in velocities.Keys.Where(documentId => !documentIds.Contains(documentId)).ToArray())
+        staleVelocityKeys.Clear();
+        foreach (string documentId in velocities.Keys)
+        {
+            if (!nodesByDocumentId.ContainsKey(documentId))
+            {
+                staleVelocityKeys.Add(documentId);
+            }
+        }
+
+        foreach (string staleDocumentId in staleVelocityKeys)
         {
             velocities.Remove(staleDocumentId);
         }
@@ -571,10 +630,11 @@ public sealed class GraphCanvas : FrameworkElement
             return;
         }
 
-        double minX = positions.Values.Min(point => point.X) - 80;
-        double maxX = positions.Values.Max(point => point.X) + 80;
-        double minY = positions.Values.Min(point => point.Y) - 80;
-        double maxY = positions.Values.Max(point => point.Y) + 80;
+        GetPositionBounds(out double minX, out double maxX, out double minY, out double maxY);
+        minX -= 80;
+        maxX += 80;
+        minY -= 80;
+        maxY += 80;
         double width = Math.Max(1, maxX - minX);
         double height = Math.Max(1, maxY - minY);
         double maxZoom = GetMaxAutoFitZoom(Graph?.Nodes.Count ?? positions.Count);
@@ -594,13 +654,17 @@ public sealed class GraphCanvas : FrameworkElement
     private void FocusNode(string documentId)
     {
         KnowledgeGraphReadModel? currentGraph = Graph;
-        if (currentGraph is null
-            || !currentGraph.Nodes.Any(node => string.Equals(node.DocumentId, documentId, StringComparison.OrdinalIgnoreCase)))
+        if (currentGraph is null)
         {
             return;
         }
 
         EnsureLayout();
+        if (!nodesByDocumentId.ContainsKey(documentId))
+        {
+            return;
+        }
+
         if (!positions.TryGetValue(documentId, out Point position))
         {
             return;
@@ -613,11 +677,36 @@ public sealed class GraphCanvas : FrameworkElement
         InvalidateVisual();
     }
 
+    private void GetPositionBounds(out double minX, out double maxX, out double minY, out double maxY)
+    {
+        using Dictionary<string, Point>.ValueCollection.Enumerator enumerator = positions.Values.GetEnumerator();
+        if (!enumerator.MoveNext())
+        {
+            minX = maxX = minY = maxY = 0;
+            return;
+        }
+
+        Point first = enumerator.Current;
+        minX = maxX = first.X;
+        minY = maxY = first.Y;
+
+        while (enumerator.MoveNext())
+        {
+            Point point = enumerator.Current;
+            minX = Math.Min(minX, point.X);
+            maxX = Math.Max(maxX, point.X);
+            minY = Math.Min(minY, point.Y);
+            maxY = Math.Max(maxY, point.Y);
+        }
+    }
+
     private void DrawEdges(DrawingContext drawingContext, KnowledgeGraphReadModel currentGraph)
     {
-        HashSet<string> reciprocalKeys = currentGraph.Edges
-            .Select(edge => CreateEdgeKey(edge.TargetDocumentId, edge.SourceDocumentId))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        reciprocalEdgeKeys.Clear();
+        foreach (KnowledgeGraphEdgeReadModel edge in currentGraph.Edges)
+        {
+            reciprocalEdgeKeys.Add(CreateEdgeKey(edge.TargetDocumentId, edge.SourceDocumentId));
+        }
 
         foreach (KnowledgeGraphEdgeReadModel edge in currentGraph.Edges)
         {
@@ -627,9 +716,8 @@ public sealed class GraphCanvas : FrameworkElement
                 continue;
             }
 
-            KnowledgeGraphNodeReadModel? sourceNode = currentGraph.Nodes.FirstOrDefault(node => string.Equals(node.DocumentId, edge.SourceDocumentId, StringComparison.OrdinalIgnoreCase));
-            KnowledgeGraphNodeReadModel? targetNode = currentGraph.Nodes.FirstOrDefault(node => string.Equals(node.DocumentId, edge.TargetDocumentId, StringComparison.OrdinalIgnoreCase));
-            if (sourceNode is null || targetNode is null)
+            if (!nodesByDocumentId.TryGetValue(edge.SourceDocumentId, out KnowledgeGraphNodeReadModel? sourceNode)
+                || !nodesByDocumentId.TryGetValue(edge.TargetDocumentId, out KnowledgeGraphNodeReadModel? targetNode))
             {
                 continue;
             }
@@ -644,7 +732,7 @@ public sealed class GraphCanvas : FrameworkElement
 
             direction.Normalize();
             Vector normal = new(-direction.Y, direction.X);
-            bool hasReciprocal = reciprocalKeys.Contains(CreateEdgeKey(edge.SourceDocumentId, edge.TargetDocumentId));
+            bool hasReciprocal = reciprocalEdgeKeys.Contains(CreateEdgeKey(edge.SourceDocumentId, edge.TargetDocumentId));
             double offset = hasReciprocal
                 ? string.Compare(edge.SourceDocumentId, edge.TargetDocumentId, StringComparison.OrdinalIgnoreCase) < 0 ? 7.0d : -7.0d
                 : 0.0d;
@@ -676,10 +764,9 @@ public sealed class GraphCanvas : FrameworkElement
 
     private void DrawNodes(DrawingContext drawingContext, KnowledgeGraphReadModel currentGraph)
     {
-        foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes
-            .OrderByDescending(node => node.Depth)
-            .ThenBy(node => node.Title, StringComparer.OrdinalIgnoreCase))
+        foreach (GraphNodeOrderEntry entry in drawOrderedNodes)
         {
+            KnowledgeGraphNodeReadModel node = entry.Node;
             if (!positions.TryGetValue(node.DocumentId, out Point world))
             {
                 continue;
@@ -789,14 +876,14 @@ public sealed class GraphCanvas : FrameworkElement
 
     private KnowledgeGraphNodeReadModel? HitTestNode(Point screenPoint)
     {
-        KnowledgeGraphReadModel? currentGraph = Graph;
-        if (currentGraph is null)
+        if (Graph is null)
         {
             return null;
         }
 
-        foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes.OrderBy(node => node.Depth))
+        foreach (GraphNodeOrderEntry entry in hitTestOrderedNodes)
         {
+            KnowledgeGraphNodeReadModel node = entry.Node;
             if (!positions.TryGetValue(node.DocumentId, out Point world))
             {
                 continue;
@@ -812,6 +899,32 @@ public sealed class GraphCanvas : FrameworkElement
 
         return null;
     }
+
+    private static int CompareDrawOrder(GraphNodeOrderEntry left, GraphNodeOrderEntry right)
+    {
+        int depthComparison = right.Node.Depth.CompareTo(left.Node.Depth);
+        if (depthComparison != 0)
+        {
+            return depthComparison;
+        }
+
+        int titleComparison = StringComparer.OrdinalIgnoreCase.Compare(left.Node.Title, right.Node.Title);
+        return titleComparison != 0
+            ? titleComparison
+            : left.OriginalIndex.CompareTo(right.OriginalIndex);
+    }
+
+    private static int CompareHitTestOrder(GraphNodeOrderEntry left, GraphNodeOrderEntry right)
+    {
+        int depthComparison = left.Node.Depth.CompareTo(right.Node.Depth);
+        return depthComparison != 0
+            ? depthComparison
+            : left.OriginalIndex.CompareTo(right.OriginalIndex);
+    }
+
+    private readonly record struct GraphNodeOrderEntry(
+        KnowledgeGraphNodeReadModel Node,
+        int OriginalIndex);
 
     private void ExecuteOpenNode(KnowledgeGraphNodeReadModel node)
     {

@@ -14,6 +14,7 @@ public sealed class GraphViewModel : ObservableObject
     private readonly PkmNoteService noteService;
     private readonly MainViewModel mainViewModel;
     private KnowledgeGraphReadModel graph = KnowledgeGraphReadModel.Empty(KnowledgeGraphSettingsReadModel.Default);
+    private IReadOnlyList<KnowledgeGraphNodeReadModel> orderedGraphSearchNodes = Array.Empty<KnowledgeGraphNodeReadModel>();
     private bool isLoading;
     private string errorMessage = string.Empty;
     private string statusMessage = string.Empty;
@@ -22,6 +23,7 @@ public sealed class GraphViewModel : ObservableObject
     private string maxNodesText = KnowledgeGraphSettingsReadModel.DefaultMaxNodes.ToString(CultureInfo.InvariantCulture);
     private string searchText = string.Empty;
     private KnowledgeGraphNodeReadModel? selectedSearchResult;
+    private string currentNodeTitle = "Graph";
     private string focusedDocumentId = string.Empty;
     private string lastGraphCollectionPath = string.Empty;
     private string lastGraphRelativePath = string.Empty;
@@ -62,10 +64,11 @@ public sealed class GraphViewModel : ObservableObject
         {
             if (SetProperty(ref graph, value))
             {
+                orderedGraphSearchNodes = CreateOrderedGraphSearchNodes(value);
+                CurrentNodeTitle = ResolveCurrentNodeTitle(value);
                 OnPropertyChanged(nameof(HasGraph));
                 OnPropertyChanged(nameof(ShouldShowState));
                 OnPropertyChanged(nameof(GraphSummary));
-                OnPropertyChanged(nameof(CurrentNodeTitle));
                 FocusedDocumentId = value.CurrentDocumentId ?? string.Empty;
                 RebuildSearchResults();
             }
@@ -202,6 +205,12 @@ public sealed class GraphViewModel : ObservableObject
         private set => SetProperty(ref focusedDocumentId, value);
     }
 
+    public string CurrentNodeTitle
+    {
+        get => currentNodeTitle;
+        private set => SetProperty(ref currentNodeTitle, value);
+    }
+
     public bool HasSearchResults => SearchResults.Count > 0;
 
     public bool ShouldShowSearchResults =>
@@ -274,9 +283,6 @@ public sealed class GraphViewModel : ObservableObject
                 : "This note has no resolved links within the selected range.";
         }
     }
-
-    public string CurrentNodeTitle =>
-        Graph.Nodes.FirstOrDefault(node => node.IsCurrent)?.Title ?? "Graph";
 
     public string GraphSummary
     {
@@ -532,7 +538,8 @@ public sealed class GraphViewModel : ObservableObject
 
     private void FocusSearchResult()
     {
-        KnowledgeGraphNodeReadModel? node = SelectedSearchResult ?? SearchResults.FirstOrDefault();
+        KnowledgeGraphNodeReadModel? node = SelectedSearchResult
+            ?? (SearchResults.Count > 0 ? SearchResults[0] : null);
         if (node is null)
         {
             StatusMessage = string.IsNullOrWhiteSpace(SearchText)
@@ -550,30 +557,27 @@ public sealed class GraphViewModel : ObservableObject
         StatusMessage = $"Focused {node.Title}.";
     }
 
-    private void RebuildSearchResults()
+    private static string ResolveCurrentNodeTitle(KnowledgeGraphReadModel graph)
     {
-        SearchResults.Clear();
-
-        string query = SearchText.Trim();
-        if (!string.IsNullOrWhiteSpace(query))
+        foreach (KnowledgeGraphNodeReadModel node in graph.Nodes)
         {
-            foreach (KnowledgeGraphNodeReadModel node in Graph.Nodes
-                .Where(node => node.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || node.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(node => node.Depth)
-                .ThenBy(node => node.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase)
-                .Take(12))
+            if (node.IsCurrent)
             {
-                SearchResults.Add(node);
+                return node.Title;
             }
         }
 
-        if (selectedSearchResult is not null
-            && !SearchResults.Any(node => string.Equals(
-                node.DocumentId,
-                selectedSearchResult.DocumentId,
-                StringComparison.OrdinalIgnoreCase)))
+        return "Graph";
+    }
+
+    private void RebuildSearchResults()
+    {
+        string query = SearchText.Trim();
+        (KnowledgeGraphNodeReadModel[] results, bool containsSelectedResult) = CreateSearchResults(query);
+
+        ApplySearchResults(results);
+
+        if (selectedSearchResult is not null && !containsSelectedResult)
         {
             selectedSearchResult = null;
             OnPropertyChanged(nameof(SelectedSearchResult));
@@ -582,6 +586,92 @@ public sealed class GraphViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSearchResults));
         OnPropertyChanged(nameof(ShouldShowSearchResults));
         OnPropertyChanged(nameof(SearchStatus));
+    }
+
+    private (KnowledgeGraphNodeReadModel[] Results, bool ContainsSelectedResult) CreateSearchResults(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return (Array.Empty<KnowledgeGraphNodeReadModel>(), false);
+        }
+
+        string? selectedDocumentId = selectedSearchResult?.DocumentId;
+        bool containsSelectedResult = false;
+        List<KnowledgeGraphNodeReadModel> matches = [];
+
+        foreach (KnowledgeGraphNodeReadModel node in orderedGraphSearchNodes)
+        {
+            if (!node.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+                && !node.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            matches.Add(node);
+            if (!containsSelectedResult
+                && selectedDocumentId is not null
+                && string.Equals(node.DocumentId, selectedDocumentId, StringComparison.OrdinalIgnoreCase))
+            {
+                containsSelectedResult = true;
+            }
+
+            if (matches.Count >= 12)
+            {
+                break;
+            }
+        }
+
+        return (matches.Count == 0 ? Array.Empty<KnowledgeGraphNodeReadModel>() : [.. matches], containsSelectedResult);
+    }
+
+    private void ApplySearchResults(IReadOnlyList<KnowledgeGraphNodeReadModel> nextResults)
+    {
+        int sharedCount = Math.Min(SearchResults.Count, nextResults.Count);
+        for (int index = 0; index < sharedCount; index++)
+        {
+            if (!ReferenceEquals(SearchResults[index], nextResults[index]))
+            {
+                SearchResults[index] = nextResults[index];
+            }
+        }
+
+        for (int index = SearchResults.Count - 1; index >= nextResults.Count; index--)
+        {
+            SearchResults.RemoveAt(index);
+        }
+
+        for (int index = sharedCount; index < nextResults.Count; index++)
+        {
+            SearchResults.Add(nextResults[index]);
+        }
+    }
+
+    private static IReadOnlyList<KnowledgeGraphNodeReadModel> CreateOrderedGraphSearchNodes(KnowledgeGraphReadModel graph)
+    {
+        if (graph.Nodes.Count == 0)
+        {
+            return Array.Empty<KnowledgeGraphNodeReadModel>();
+        }
+
+        List<KnowledgeGraphNodeReadModel> orderedNodes = [.. graph.Nodes];
+        orderedNodes.Sort(CompareGraphSearchNodes);
+        return orderedNodes;
+    }
+
+    private static int CompareGraphSearchNodes(
+        KnowledgeGraphNodeReadModel left,
+        KnowledgeGraphNodeReadModel right)
+    {
+        int depthComparison = left.Depth.CompareTo(right.Depth);
+        if (depthComparison != 0)
+        {
+            return depthComparison;
+        }
+
+        int titleComparison = StringComparer.OrdinalIgnoreCase.Compare(left.Title, right.Title);
+        return titleComparison != 0
+            ? titleComparison
+            : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
     }
 
     private void MainViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
