@@ -1,6 +1,7 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
@@ -19,12 +20,16 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
     private const double RecencyBonusDecayDays = 7;
 
     private readonly INoteService noteService;
+    private readonly ILogger<GlobalSearchService>? logger;
 
-    internal GlobalSearchService(INoteService noteService)
+    internal GlobalSearchService(
+        INoteService noteService,
+        ILogger<GlobalSearchService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(noteService);
 
         this.noteService = noteService;
+        this.logger = logger;
     }
 
     IReadOnlyList<GlobalSearchResultReadModel> IGlobalSearchService.Search(
@@ -95,42 +100,4 @@ internal sealed partial class GlobalSearchService : IGlobalSearchService
         return OrderSearchResults(rankedMatches, limit);
     }
 
-    private static string[] CreateQueryTerms(string query)
-    {
-        HashSet<string> seenTerms = new(StringComparer.OrdinalIgnoreCase);
-        List<string> terms = [];
-        int termStart = 0;
-
-        for (int index = 0; index <= query.Length; index++)
-        {
-            if (index < query.Length && query[index] != ' ')
-            {
-                continue;
-            }
-
-            AddQueryTerm(query, termStart, index - termStart, seenTerms, terms);
-            termStart = index + 1;
-        }
-
-        return terms.ToArray();
-    }
-
-    private static void AddQueryTerm(
-        string query,
-        int startIndex,
-        int length,
-        HashSet<string> seenTerms,
-        List<string> terms)
-    {
-        if (length <= 0)
-        {
-            return;
-        }
-
-        string term = query.Substring(startIndex, length);
-        if (seenTerms.Add(term))
-        {
-            terms.Add(term);
-        }
-    }
 }

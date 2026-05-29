@@ -1,6 +1,7 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
@@ -32,6 +33,12 @@ internal sealed partial class GlobalSearchService
         }
         catch (Exception ex) when (IsRecoverableSearchException(ex))
         {
+            logger?.LogWarning(
+                ex,
+                "Global search candidate loading failed; collection skipped. CollectionId={CollectionId} CollectionName={CollectionName} QueryLength={QueryLength}",
+                collection.CollectionId,
+                collection.CollectionName,
+                query.Length);
             return [];
         }
     }
@@ -44,6 +51,11 @@ internal sealed partial class GlobalSearchService
         }
         catch (Exception ex) when (IsRecoverableSearchException(ex))
         {
+            logger?.LogWarning(
+                ex,
+                "Global search note content read failed; candidate skipped. CollectionId={CollectionId} RelativePath={RelativePath}",
+                collectionId,
+                relativePath);
             return null;
         }
     }

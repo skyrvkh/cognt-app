@@ -5,7 +5,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
 internal sealed partial class GlobalSearchService
 {
-    private static ScoredSearchResult CreateRankedMatch(
+    private ScoredSearchResult CreateRankedMatch(
         GlobalSearchCollectionScope collection,
         KnowledgeNoteListItemReadModel candidate,
         string bodyText,

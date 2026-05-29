@@ -5,6 +5,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Documents;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Notes;
 using Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure;
 
@@ -23,24 +24,26 @@ public static class PersonalKnowledgeManagementModule
 
     private static IServiceCollection AddDocumentServices(this IServiceCollection services)
     {
-        services.AddSingleton<IKnowledgeDocumentContentFactory>(_ => new KnowledgeDocumentContentFactory());
+        services.AddSingleton<IKnowledgeDocumentContentFactory>(provider =>
+            new KnowledgeDocumentContentFactory(provider.GetService<ILogger<KnowledgeDocumentContentFactory>>()));
 
         return services;
     }
 
     private static IServiceCollection AddNoteServices(this IServiceCollection services)
     {
-        services.AddSingleton<INoteService>(_ => new NoteService());
+        services.AddSingleton<INoteService>(provider =>
+            new NoteService(provider.GetService<ILogger<NoteService>>()));
 
         return services;
     }
 
     private static IServiceCollection AddSearchServices(this IServiceCollection services)
     {
-        services.AddSingleton(provider =>
-            new GlobalSearchService(provider.GetRequiredService<INoteService>()));
         services.AddSingleton<IGlobalSearchService>(provider =>
-            provider.GetRequiredService<GlobalSearchService>());
+            new GlobalSearchService(
+                provider.GetRequiredService<INoteService>(),
+                provider.GetService<ILogger<GlobalSearchService>>()));
 
         return services;
     }

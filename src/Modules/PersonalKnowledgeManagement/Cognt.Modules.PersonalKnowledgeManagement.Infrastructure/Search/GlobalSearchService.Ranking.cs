@@ -4,7 +4,7 @@ namespace Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.Search;
 
 internal sealed partial class GlobalSearchService
 {
-    private static MatchScore ScoreMatch(
+    private MatchScore ScoreMatch(
         string title,
         string bodyText,
         string query,
@@ -45,11 +45,10 @@ internal sealed partial class GlobalSearchService
         score += Math.Max(
             0,
             MaximumRecencyBonusScore - Math.Min(MaximumRecencyBonusScore, daysOld / RecencyBonusDecayDays));
-
         return new MatchScore(isMatch, score);
     }
 
-    private static string CreateSnippet(
+    private string CreateSnippet(
         string bodyText,
         string title,
         string query,
@@ -63,6 +62,7 @@ internal sealed partial class GlobalSearchService
         }
 
         int matchIndex = IndexOf(source, query);
+        bool usedQueryMatch = matchIndex >= 0;
         if (matchIndex < 0)
         {
             matchIndex = FindEarliestTermMatchIndex(source, terms);

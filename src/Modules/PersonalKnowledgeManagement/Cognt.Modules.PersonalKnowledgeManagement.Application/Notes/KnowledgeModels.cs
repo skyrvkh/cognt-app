@@ -61,6 +61,18 @@ public sealed record KnowledgeCreatedNoteReadModel(
     string RelativePath,
     string Title);
 
+public sealed record KnowledgeCollectionImportReadModel(
+    string SourceCollectionPath,
+    string ImportFolderTitle,
+    int ImportedFolders,
+    int ImportedNotes,
+    int ImportedPdfDocuments,
+    int ImportedAttachments,
+    int ImportedAttachmentLinks,
+    int ImportedTaggedItems,
+    int SkippedMissingFiles,
+    IReadOnlyDictionary<string, string> ImportedDocumentPathMap);
+
 public sealed record KnowledgeMentionTargetReadModel(
     string RelativePath,
     string Title);

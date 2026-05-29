@@ -45,6 +45,10 @@ public interface INoteService : IDisposable
         long? previousSiblingId = null,
         long? nextSiblingId = null);
 
+    KnowledgeCollectionImportReadModel ImportExistingCollection(
+        string collectionId,
+        string sourceCollectionId);
+
     void MoveItem(
         string collectionId,
         long itemId,
