@@ -2,11 +2,13 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 
-internal sealed class CreateFlashcards(IFlashcardAuthoringWriter flashcardWriter) : ICreateFlashcardsCommand
+internal sealed class CreateFlashcards(
+    IFlashcardAuthoringWriter flashcardWriter)
+    : ICreateFlashcardsCommand
 {
     private readonly IFlashcardAuthoringWriter writer = flashcardWriter ?? throw new ArgumentNullException(nameof(flashcardWriter));
 
-    public Task<int> ExecuteAsync(
+    public async Task<int> ExecuteAsync(
         CreateFlashcardsRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -14,13 +16,13 @@ internal sealed class CreateFlashcards(IFlashcardAuthoringWriter flashcardWriter
         cancellationToken.ThrowIfCancellationRequested();
 
         string[] tags = request.Tags.ToArray();
-
-        return writer.CreateCardsFromContentAsync(
+        int createdCount = await writer.CreateCardsFromContentAsync(
             request.CollectionId,
             request.DeckName,
             request.Content,
             tags,
             request.SourceRelPath,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+        return createdCount;
     }
 }

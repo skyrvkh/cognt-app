@@ -4,27 +4,33 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 
-internal sealed class UpdateFlashcardReviewSettings(IFlashcardReviewWriter flashcardReviews) : IUpdateFlashcardReviewSettingsCommand
+internal sealed class UpdateFlashcardReviewSettings(
+    IFlashcardReviewWriter flashcardReviews)
+    : IUpdateFlashcardReviewSettingsCommand
 {
     private readonly IFlashcardReviewWriter reviews = flashcardReviews ?? throw new ArgumentNullException(nameof(flashcardReviews));
 
-    public Task ExecuteAsync(
+    public async Task ExecuteAsync(
         UpdateFlashcardReviewSettingsRequest request,
         CancellationToken cancellationToken = default)
     {
         request = FlashcardRequestGuards.EnsureUpdateReviewSettingsRequest(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return reviews.UpdateReviewSettingsAsync(
+        FlashcardReviewSettingsReadModel settings = new(
+            request.MaximumReviewCardsPerDay,
+            request.MaximumNewCardsPerDay,
+            request.DesiredRetention,
+            request.LearningSteps,
+            request.RelearningSteps,
+            request.IsOptimizationEnabled,
+            request.FsrsParameters,
+            request.IsCramEnabled,
+            request.ShowFlashcardsInNavigationTree);
+        FlashcardReviewSettingsReadModel normalizedSettings = settings.Normalize();
+        await reviews.UpdateReviewSettingsAsync(
             request.CollectionId,
-            new FlashcardReviewSettingsReadModel(
-                request.MaximumReviewCardsPerDay,
-                request.MaximumNewCardsPerDay,
-                request.DesiredRetention,
-                request.LearningSteps,
-                request.RelearningSteps,
-                request.IsOptimizationEnabled,
-                request.FsrsParameters).Normalize(),
-            cancellationToken);
+            normalizedSettings,
+            cancellationToken).ConfigureAwait(false);
     }
 }

@@ -23,7 +23,7 @@ internal sealed partial class SqliteFlashcardStore
         return Task.CompletedTask;
     }
 
-    public async Task RecordReviewAsync(
+    public async Task<AppReadModels.RecordedFlashcardReviewReadModel> RecordReviewAsync(
         string collectionId,
         long cardId,
         AppReadModels.FlashcardReviewRatingReadModel rating,
@@ -47,6 +47,11 @@ internal sealed partial class SqliteFlashcardStore
             cancellationToken);
 
         repository.ApplyReview(cardId, ToPersistenceRating(rating), schedule);
+        return new AppReadModels.RecordedFlashcardReviewReadModel(
+            cardId,
+            schedule.DueUtc,
+            ToCardStateReadModel(schedule.State),
+            schedule.Step);
     }
 
     public Task SetCardSuspensionAsync(
@@ -135,5 +140,18 @@ internal sealed partial class SqliteFlashcardStore
         AppReadModels.FlashcardReviewRatingReadModel rating)
     {
         return (PersistenceRating)(int)rating;
+    }
+
+    private static AppReadModels.FlashcardCardStateReadModel ToCardStateReadModel(
+        FlashcardLearningState state)
+    {
+        return state switch
+        {
+            FlashcardLearningState.New => AppReadModels.FlashcardCardStateReadModel.New,
+            FlashcardLearningState.Learning => AppReadModels.FlashcardCardStateReadModel.Learning,
+            FlashcardLearningState.Review => AppReadModels.FlashcardCardStateReadModel.Review,
+            FlashcardLearningState.Relearning => AppReadModels.FlashcardCardStateReadModel.Relearning,
+            _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unsupported flashcard state."),
+        };
     }
 }

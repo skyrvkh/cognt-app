@@ -95,13 +95,19 @@ internal static partial class FlashcardRequestGuards
     {
         request = EnsureRequest(request);
         EnsureCollectionId(request.CollectionId);
-        long[] cardIds = NormalizeCardIds(request.CardIds);
-        if (cardIds.Length == 0)
-        {
-            throw new ArgumentException("At least one card must be selected.", nameof(request));
-        }
+        long[] cardIds = EnsureSelectedCardIds(request.CardIds, nameof(request));
 
         return request with { CardIds = cardIds };
+    }
+
+    internal static DeleteFlashcardDeckRequest EnsureDeleteFlashcardDeckRequest(
+        DeleteFlashcardDeckRequest? request)
+    {
+        request = EnsureRequest(request);
+        EnsureCollectionId(request.CollectionId);
+        long[] deckIds = EnsureSelectedDeckIds(request.DeckIds, nameof(request));
+
+        return request with { DeckIds = deckIds };
     }
 
     internal static AddFlashcardTagsRequest EnsureAddFlashcardTagsRequest(
@@ -109,22 +115,15 @@ internal static partial class FlashcardRequestGuards
     {
         request = EnsureRequest(request);
         EnsureCollectionId(request.CollectionId);
-        long[] cardIds = NormalizeCardIds(request.CardIds);
-        IReadOnlyList<string> tags = NormalizeStrings(request.Tags);
-        if (cardIds.Length == 0)
-        {
-            throw new ArgumentException("At least one card must be selected.", nameof(request));
-        }
-
-        if (tags.Count == 0)
-        {
-            throw new ArgumentException("At least one tag must be supplied.", nameof(request));
-        }
+        FlashcardCardTagSelection selection = EnsureCardTagSelection(
+            request.CardIds,
+            request.Tags,
+            nameof(request));
 
         return request with
         {
-            CardIds = cardIds,
-            Tags = tags,
+            CardIds = selection.CardIds,
+            Tags = selection.Tags,
         };
     }
 
@@ -133,22 +132,15 @@ internal static partial class FlashcardRequestGuards
     {
         request = EnsureRequest(request);
         EnsureCollectionId(request.CollectionId);
-        long[] cardIds = NormalizeCardIds(request.CardIds);
-        IReadOnlyList<string> tags = NormalizeStrings(request.Tags);
-        if (cardIds.Length == 0)
-        {
-            throw new ArgumentException("At least one card must be selected.", nameof(request));
-        }
-
-        if (tags.Count == 0)
-        {
-            throw new ArgumentException("At least one tag must be supplied.", nameof(request));
-        }
+        FlashcardCardTagSelection selection = EnsureCardTagSelection(
+            request.CardIds,
+            request.Tags,
+            nameof(request));
 
         return request with
         {
-            CardIds = cardIds,
-            Tags = tags,
+            CardIds = selection.CardIds,
+            Tags = selection.Tags,
         };
     }
 
@@ -182,12 +174,4 @@ internal static partial class FlashcardRequestGuards
         return request;
     }
 
-    private static long[] NormalizeCardIds(IEnumerable<long>? cardIds)
-    {
-        return cardIds?
-            .Where(cardId => cardId > 0)
-            .Distinct()
-            .ToArray()
-            ?? [];
-    }
 }

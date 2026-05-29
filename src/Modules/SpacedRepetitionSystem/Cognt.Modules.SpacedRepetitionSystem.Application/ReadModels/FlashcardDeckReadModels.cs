@@ -43,4 +43,5 @@ public sealed record FlashcardCardSummaryReadModel(
     string BackContent = "",
     string CardType = "",
     FlashcardContentKind FrontContentKind = FlashcardContentKind.LegacyText,
-    FlashcardContentKind BackContentKind = FlashcardContentKind.LegacyText);
+    FlashcardContentKind BackContentKind = FlashcardContentKind.LegacyText,
+    bool HasImageOcclusion = false);

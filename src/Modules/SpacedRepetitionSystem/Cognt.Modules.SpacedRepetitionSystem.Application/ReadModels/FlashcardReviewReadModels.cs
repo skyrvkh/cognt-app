@@ -1,4 +1,5 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
@@ -15,6 +16,10 @@ public sealed record FlashcardReviewCardReadModel(
     MultimodalClozeReadModel? BackMultimodalContent = null)
 {
     public bool WasDueAtQueueStart { get; init; }
+
+    public FlashcardReviewQueueCategory? QueueCategory { get; init; }
+
+    public DateTimeOffset? QueueDueUtc { get; init; }
 }
 
 public enum FlashcardReviewQueueMode
@@ -23,6 +28,10 @@ public enum FlashcardReviewQueueMode
     Cram = 1,
 }
 
+public sealed record FlashcardReviewCardQueuePlacement(
+    FlashcardReviewQueueCategory Category,
+    DateTimeOffset DueUtc);
+
 public sealed record FlashcardReviewSettingsReadModel(
     int MaximumReviewCardsPerDay,
     int MaximumNewCardsPerDay,
@@ -30,7 +39,9 @@ public sealed record FlashcardReviewSettingsReadModel(
     IReadOnlyList<TimeSpan>? LearningSteps = null,
     IReadOnlyList<TimeSpan>? RelearningSteps = null,
     bool IsOptimizationEnabled = false,
-    IReadOnlyList<double>? FsrsParameters = null)
+    IReadOnlyList<double>? FsrsParameters = null,
+    bool IsCramEnabled = false,
+    bool ShowFlashcardsInNavigationTree = false)
 {
     public const int DefaultMaximumReviewCardsPerDay = 100;
     public const int DefaultMaximumNewCardsPerDay = 20;
@@ -38,6 +49,8 @@ public sealed record FlashcardReviewSettingsReadModel(
     public const double MinimumDesiredRetention = 0.7d;
     public const double MaximumDesiredRetention = 0.99d;
     public const bool DefaultIsOptimizationEnabled = false;
+    public const bool DefaultIsCramEnabled = false;
+    public const bool DefaultShowFlashcardsInNavigationTree = false;
     public const int FsrsParameterCount = 21;
 
     public static IReadOnlyList<TimeSpan> DefaultLearningSteps { get; } =
@@ -108,7 +121,9 @@ public sealed record FlashcardReviewSettingsReadModel(
         DefaultLearningSteps,
         DefaultRelearningSteps,
         DefaultIsOptimizationEnabled,
-        FsrsParameters: null);
+        FsrsParameters: null,
+        IsCramEnabled: DefaultIsCramEnabled,
+        ShowFlashcardsInNavigationTree: DefaultShowFlashcardsInNavigationTree);
 
     public FlashcardReviewSettingsReadModel Normalize()
     {

@@ -15,4 +15,6 @@ public sealed record UpdateFlashcardReviewSettingsRequest(
     IReadOnlyList<TimeSpan>? LearningSteps = null,
     IReadOnlyList<TimeSpan>? RelearningSteps = null,
     bool IsOptimizationEnabled = false,
-    IReadOnlyList<double>? FsrsParameters = null);
+    IReadOnlyList<double>? FsrsParameters = null,
+    bool IsCramEnabled = false,
+    bool ShowFlashcardsInNavigationTree = false);

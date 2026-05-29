@@ -3,7 +3,9 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
-internal sealed class GetNoteToCardQueue(IFlashcardNoteGenerationReader flashcardReader) : INoteToCardQueueQuery
+internal sealed class GetNoteToCardQueue(
+    IFlashcardNoteGenerationReader flashcardReader)
+    : INoteToCardQueueQuery
 {
     private readonly IFlashcardNoteGenerationReader reader = flashcardReader ?? throw new ArgumentNullException(nameof(flashcardReader));
 

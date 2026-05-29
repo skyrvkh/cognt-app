@@ -4,7 +4,9 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
-internal sealed class GetFlashcardDashboardSummary(IFlashcardDashboardReader flashcardReader) : IFlashcardDashboardSummaryQuery
+internal sealed class GetFlashcardDashboardSummary(
+    IFlashcardDashboardReader flashcardReader)
+    : IFlashcardDashboardSummaryQuery
 {
     private readonly IFlashcardDashboardReader reader = flashcardReader ?? throw new ArgumentNullException(nameof(flashcardReader));
 
@@ -13,8 +15,9 @@ internal sealed class GetFlashcardDashboardSummary(IFlashcardDashboardReader fla
         IReadOnlyList<string>? deckNames = null)
     {
         request = FlashcardRequestGuards.EnsureCollectionQueryRequest(request);
+        IReadOnlyList<string> normalizedDeckNames = NormalizeDeckNames(deckNames);
 
-        return reader.LoadDashboardSummary(request.CollectionId, NormalizeDeckNames(deckNames));
+        return reader.LoadDashboardSummary(request.CollectionId, normalizedDeckNames);
     }
 
     private static IReadOnlyList<string> NormalizeDeckNames(IReadOnlyList<string>? deckNames)

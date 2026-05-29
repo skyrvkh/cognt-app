@@ -9,7 +9,7 @@ public interface IFlashcardReviewWriter
         FlashcardReviewSettingsReadModel settings,
         CancellationToken cancellationToken = default);
 
-    Task RecordReviewAsync(
+    Task<RecordedFlashcardReviewReadModel> RecordReviewAsync(
         string collectionId,
         long cardId,
         FlashcardReviewRatingReadModel rating,

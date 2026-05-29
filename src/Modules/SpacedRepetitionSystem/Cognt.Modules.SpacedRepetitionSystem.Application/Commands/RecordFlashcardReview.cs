@@ -1,23 +1,27 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Abstractions;
+using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 
-internal sealed class RecordFlashcardReview(IFlashcardReviewWriter flashcardReviews) : IRecordFlashcardReviewCommand
+internal sealed class RecordFlashcardReview(
+    IFlashcardReviewWriter flashcardReviews)
+    : IRecordFlashcardReviewCommand
 {
     private readonly IFlashcardReviewWriter reviews = flashcardReviews ?? throw new ArgumentNullException(nameof(flashcardReviews));
 
-    public Task ExecuteAsync(
+    public async Task<RecordedFlashcardReviewReadModel> ExecuteAsync(
         RecordFlashcardReviewRequest request,
         CancellationToken cancellationToken = default)
     {
         request = FlashcardRequestGuards.EnsureRecordReviewRequest(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return reviews.RecordReviewAsync(
+        RecordedFlashcardReviewReadModel result = await reviews.RecordReviewAsync(
             request.CollectionId,
             request.CardId,
             request.Rating,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+        return result;
     }
 }

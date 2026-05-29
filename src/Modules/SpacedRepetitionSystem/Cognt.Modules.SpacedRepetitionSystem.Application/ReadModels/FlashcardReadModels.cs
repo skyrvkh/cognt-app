@@ -15,3 +15,9 @@ public enum FlashcardReviewRatingReadModel
     Good = 3,
     Easy = 4,
 }
+
+public sealed record RecordedFlashcardReviewReadModel(
+    long CardId,
+    DateTimeOffset DueUtc,
+    FlashcardCardStateReadModel State,
+    int? Step);

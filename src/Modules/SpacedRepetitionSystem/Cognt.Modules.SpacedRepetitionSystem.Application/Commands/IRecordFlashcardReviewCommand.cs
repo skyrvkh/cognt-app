@@ -4,7 +4,7 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 
 public interface IRecordFlashcardReviewCommand
 {
-    Task ExecuteAsync(
+    Task<RecordedFlashcardReviewReadModel> ExecuteAsync(
         RecordFlashcardReviewRequest request,
         CancellationToken cancellationToken = default);
 }

@@ -4,7 +4,9 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
-internal sealed class GetFlashcardCards(IFlashcardDeckReader flashcardReader) : IFlashcardCardsQuery
+internal sealed class GetFlashcardCards(
+    IFlashcardDeckReader flashcardReader)
+    : IFlashcardCardsQuery
 {
     private readonly IFlashcardDeckReader reader = flashcardReader ?? throw new ArgumentNullException(nameof(flashcardReader));
 

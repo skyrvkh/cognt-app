@@ -3,7 +3,9 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 
-internal sealed class GetFlashcardProgressAnalytics(IFlashcardDashboardReader flashcardReader) : IFlashcardProgressAnalyticsQuery
+internal sealed class GetFlashcardProgressAnalytics(
+    IFlashcardDashboardReader flashcardReader)
+    : IFlashcardProgressAnalyticsQuery
 {
     private readonly IFlashcardDashboardReader reader = flashcardReader ?? throw new ArgumentNullException(nameof(flashcardReader));
 
