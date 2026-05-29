@@ -28,7 +28,7 @@ public static partial class CardContextQueueBuilder
 
         if (duplicateDisplayIndexes.Contains(slot.DisplayClozeIndex))
         {
-            return CandidateValidation.Invalid("Display cloze indexes must be unique within a card context.");
+            return CandidateValidation.Invalid("Display cloze indexes must be unique within a card candidate group.");
         }
 
         if (targets.Count == 0)

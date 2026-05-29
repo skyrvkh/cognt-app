@@ -2,41 +2,6 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 
 public static partial class CardContextQueueBuilder
 {
-    private static IReadOnlyList<CardTarget> ResolveEnabledTargets(
-        CardSlot slot,
-        IReadOnlyDictionary<string, CardTarget> targetsById,
-        IReadOnlyDictionary<string, List<CardTarget>> targetsBySlotId)
-    {
-        var targets = new List<CardTarget>();
-
-        if (slot.TargetIds.Count == 0)
-        {
-            if (targetsBySlotId.TryGetValue(slot.Id, out List<CardTarget>? slotTargets))
-            {
-                foreach (CardTarget target in slotTargets)
-                {
-                    if (!target.IsDisabled)
-                    {
-                        targets.Add(target);
-                    }
-                }
-            }
-
-            return targets;
-        }
-
-        foreach (string targetId in slot.TargetIds)
-        {
-            if (targetsById.TryGetValue(targetId, out CardTarget? target)
-                && !target.IsDisabled)
-            {
-                targets.Add(target);
-            }
-        }
-
-        return targets;
-    }
-
     private static IReadOnlyList<TextAnchorPreviewReadModel> BuildTextAnchorPreviews(IReadOnlyList<CardTarget> targets)
     {
         var previews = new List<TextAnchorPreviewReadModel>();

@@ -22,27 +22,22 @@ public static partial class CardContextQueueBuilder
         List<CardCandidateReadModel> items = new(CountCandidateSlots(document.Contexts));
         foreach (CardContext context in document.Contexts)
         {
-            IReadOnlySet<int> duplicateDisplayIndexes = FindDuplicateDisplayIndexes(context.Slots);
-            Dictionary<string, CardTarget> targetsById = BuildTargetLookup(context.Targets);
-            Dictionary<string, List<CardTarget>> targetsBySlotId = BuildTargetsBySlotLookup(context.Targets);
-            Dictionary<string, CardContextImageSurface> imagesByBlockId = BuildImageSurfaceLookup(context.Images);
-            Dictionary<(string ImageBlockId, string MaskId), ImageOcclusionMask> masksByImageAndId =
-                BuildImageMaskLookup(context.Images);
+            CardContextQueueLookups lookups = CardContextQueueLookups.Create(context);
             CardContextSnapshot snapshot = CardContextSnapshotFactory.CreateSnapshot(normalizedSourceRelPath, noteContent, context);
             foreach (CardSlot slot in context.Slots
                          .OrderBy(candidate => candidate.DisplayClozeIndex)
                          .ThenBy(candidate => candidate.Id, StringComparer.Ordinal))
             {
-                IReadOnlyList<CardTarget> targets = ResolveEnabledTargets(slot, targetsById, targetsBySlotId);
+                IReadOnlyList<CardTarget> targets = lookups.ResolveEnabledTargets(slot);
                 string snapshotHash = CardContextSnapshotFactory.CreateSlotSnapshotHash(snapshot, slot.Id);
                 CandidateValidation validation = ValidateCandidate(
                     context,
                     slot,
                     targets,
                     availableBlockIds,
-                    duplicateDisplayIndexes,
-                    imagesByBlockId,
-                    masksByImageAndId);
+                    lookups.DuplicateDisplayIndexes,
+                    lookups.ImagesByBlockId,
+                    lookups.MasksByImageAndId);
                 generatedByKey.TryGetValue((context.Id, slot.Id), out GeneratedCardContextCardReadModel? generated);
 
                 items.Add(new CardCandidateReadModel(
@@ -52,7 +47,7 @@ public static partial class CardContextQueueBuilder
                     CreateTargetIdArray(targets),
                     BuildAnswerPreview(targets),
                     BuildTextAnchorPreviews(targets),
-                    BuildImageAnchorPreviews(imagesByBlockId, masksByImageAndId, targets),
+                    BuildImageAnchorPreviews(lookups.ImagesByBlockId, lookups.MasksByImageAndId, targets),
                     DetermineStatus(context, slot, validation, generated, snapshotHash),
                     validation.Message,
                     snapshotHash));
@@ -109,77 +104,4 @@ public static partial class CardContextQueueBuilder
         return generatedByKey;
     }
 
-    private static Dictionary<string, CardTarget> BuildTargetLookup(IReadOnlyList<CardTarget> targets)
-    {
-        var targetsById = new Dictionary<string, CardTarget>(targets.Count, StringComparer.Ordinal);
-
-        foreach (CardTarget target in targets)
-        {
-            targetsById.TryAdd(target.Id, target);
-        }
-
-        return targetsById;
-    }
-
-    private static Dictionary<string, List<CardTarget>> BuildTargetsBySlotLookup(IReadOnlyList<CardTarget> targets)
-    {
-        var targetsBySlotId = new Dictionary<string, List<CardTarget>>(StringComparer.Ordinal);
-
-        foreach (CardTarget target in targets)
-        {
-            if (!targetsBySlotId.TryGetValue(target.SlotId, out List<CardTarget>? slotTargets))
-            {
-                slotTargets = [];
-                targetsBySlotId.Add(target.SlotId, slotTargets);
-            }
-
-            slotTargets.Add(target);
-        }
-
-        return targetsBySlotId;
-    }
-
-    private static Dictionary<string, CardContextImageSurface> BuildImageSurfaceLookup(IReadOnlyList<CardContextImageSurface> images)
-    {
-        var imagesByBlockId = new Dictionary<string, CardContextImageSurface>(images.Count, StringComparer.Ordinal);
-
-        foreach (CardContextImageSurface image in images)
-        {
-            imagesByBlockId.TryAdd(image.ImageBlockId, image);
-        }
-
-        return imagesByBlockId;
-    }
-
-    private static Dictionary<(string ImageBlockId, string MaskId), ImageOcclusionMask> BuildImageMaskLookup(
-        IReadOnlyList<CardContextImageSurface> images)
-    {
-        var masksByImageAndId = new Dictionary<(string ImageBlockId, string MaskId), ImageOcclusionMask>();
-
-        foreach (CardContextImageSurface image in images)
-        {
-            foreach (ImageOcclusionMask mask in image.Masks)
-            {
-                masksByImageAndId.TryAdd((image.ImageBlockId, mask.Id), mask);
-            }
-        }
-
-        return masksByImageAndId;
-    }
-
-    private static IReadOnlySet<int> FindDuplicateDisplayIndexes(IReadOnlyList<CardSlot> slots)
-    {
-        var seen = new HashSet<int>();
-        var duplicates = new HashSet<int>();
-
-        foreach (CardSlot slot in slots)
-        {
-            if (!seen.Add(slot.DisplayClozeIndex))
-            {
-                duplicates.Add(slot.DisplayClozeIndex);
-            }
-        }
-
-        return duplicates;
-    }
 }
