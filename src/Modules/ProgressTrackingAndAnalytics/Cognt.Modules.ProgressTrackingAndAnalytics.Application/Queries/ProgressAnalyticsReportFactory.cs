@@ -3,7 +3,7 @@ using Cognt.Modules.ProgressTrackingAndAnalytics.Application.ReadModels;
 
 namespace Cognt.Modules.ProgressTrackingAndAnalytics.Application.Queries;
 
-internal static class ProgressAnalyticsReportFactory
+internal static partial class ProgressAnalyticsReportFactory
 {
     private const int ActivityWindowDays = 14;
 
@@ -11,31 +11,21 @@ internal static class ProgressAnalyticsReportFactory
         CollectionProgressAnalyticsSnapshot collectionSnapshot,
         DateOnly today)
     {
-        IReadOnlyDictionary<DateOnly, int> reviewedByDate = ProgressAnalyticsActivityFactory.CreateReviewedByDate(collectionSnapshot.Dashboard.ReviewActivity);
-        (int currentStreak, int bestStreak) = ProgressAnalyticsStreakCalculator.Calculate(today, reviewedByDate);
+        ProgressAnalyticsReviewedActivityShape reviewedActivity =
+            ProgressAnalyticsReviewedActivityShape.Create(today, collectionSnapshot.Dashboard.ReviewActivity);
 
         return new ProgressAnalyticsReport(
-            CreateSummary(collectionSnapshot, currentStreak, bestStreak),
+            CreateSummary(collectionSnapshot, reviewedActivity.CurrentStreak, reviewedActivity.BestStreak),
             ProgressAnalyticsDeckPerformanceFactory.CreateRows(
                 collectionSnapshot.Decks,
                 collectionSnapshot.Details.DeckReviewHistory),
-            ProgressAnalyticsActivityFactory.CreateDailyStudyActivity(today, reviewedByDate, ActivityWindowDays),
+            ProgressAnalyticsActivityFactory.CreateDailyStudyActivity(
+                today,
+                reviewedActivity.ReviewedByDate,
+                ActivityWindowDays),
             ProgressAnalyticsRecallDistributionFactory.CreateRows(collectionSnapshot.Details.RecallDistribution),
             ProgressAnalyticsWeeklyReviewOutcomeFactory.CreateRows(collectionSnapshot.Details.WeeklyReviewOutcomes),
-            ProgressAnalyticsActivityFactory.CreateStudyStreak(today, reviewedByDate));
+            ProgressAnalyticsActivityFactory.CreateStudyStreak(today, reviewedActivity.ReviewedByDate));
     }
 
-    private static ProgressAnalyticsSummaryReadModel CreateSummary(
-        CollectionProgressAnalyticsSnapshot collectionSnapshot,
-        int currentStreak,
-        int bestStreak)
-    {
-        return new ProgressAnalyticsSummaryReadModel(
-            collectionSnapshot.Dashboard.ReviewHistoryCount,
-            currentStreak,
-            bestStreak,
-            ProgressAnalyticsMetrics.CalculateAverageRecall(collectionSnapshot.Details.RecallDistribution),
-            collectionSnapshot.Details.DueTomorrowCards,
-            collectionSnapshot.Details.DueTomorrowDecks);
-    }
 }

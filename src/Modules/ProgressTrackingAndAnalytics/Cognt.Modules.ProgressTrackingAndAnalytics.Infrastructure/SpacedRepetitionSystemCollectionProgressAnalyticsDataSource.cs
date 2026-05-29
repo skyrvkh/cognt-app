@@ -9,19 +9,23 @@ internal sealed class SpacedRepetitionSystemCollectionProgressAnalyticsDataSourc
     private readonly IFlashcardDeckSummariesQuery deckSummariesQuery;
     private readonly IFlashcardDashboardSummaryQuery dashboardSummaryQuery;
     private readonly IFlashcardProgressAnalyticsQuery progressAnalyticsQuery;
+    private readonly ISpacedRepetitionSystemProgressAnalyticsSnapshotMapper snapshotMapper;
 
     public SpacedRepetitionSystemCollectionProgressAnalyticsDataSource(
         IFlashcardDeckSummariesQuery deckSummariesQuery,
         IFlashcardDashboardSummaryQuery dashboardSummaryQuery,
-        IFlashcardProgressAnalyticsQuery progressAnalyticsQuery)
+        IFlashcardProgressAnalyticsQuery progressAnalyticsQuery,
+        ISpacedRepetitionSystemProgressAnalyticsSnapshotMapper snapshotMapper)
     {
         ArgumentNullException.ThrowIfNull(deckSummariesQuery);
         ArgumentNullException.ThrowIfNull(dashboardSummaryQuery);
         ArgumentNullException.ThrowIfNull(progressAnalyticsQuery);
+        ArgumentNullException.ThrowIfNull(snapshotMapper);
 
         this.deckSummariesQuery = deckSummariesQuery;
         this.dashboardSummaryQuery = dashboardSummaryQuery;
         this.progressAnalyticsQuery = progressAnalyticsQuery;
+        this.snapshotMapper = snapshotMapper;
     }
 
     public CollectionProgressAnalyticsSnapshot LoadCollectionSnapshot(
@@ -30,35 +34,15 @@ internal sealed class SpacedRepetitionSystemCollectionProgressAnalyticsDataSourc
         IReadOnlyList<string> selectedDeckNames)
     {
         FlashcardCollectionQueryRequest collectionQueryRequest = new(collectionId);
-        HashSet<string> selectedDeckNameSet = selectedDeckNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        IReadOnlyList<FlashcardDeckSummaryReadModel> decks = FilterDeckSummaries(
-            deckSummariesQuery.Execute(collectionQueryRequest),
-            selectedDeckNameSet);
+        IReadOnlyList<FlashcardDeckSummaryReadModel> allDecks = deckSummariesQuery.Execute(collectionQueryRequest);
+        IReadOnlyList<FlashcardDeckSummaryReadModel> decks = SelectedFlashcardDeckFilter.Apply(allDecks, selectedDeckNames);
+
         FlashcardDashboardSummaryReadModel dashboard = dashboardSummaryQuery.Execute(collectionQueryRequest, selectedDeckNames);
+
         FlashcardProgressAnalyticsReadModel analytics = progressAnalyticsQuery.Execute(
             new FlashcardProgressAnalyticsQueryRequest(collectionId, today, selectedDeckNames));
 
-        return SpacedRepetitionSystemCollectionProgressAnalyticsSnapshotFactory.CreateCollectionSnapshot(decks, dashboard, analytics);
-    }
-
-    private static IReadOnlyList<FlashcardDeckSummaryReadModel> FilterDeckSummaries(
-        IReadOnlyList<FlashcardDeckSummaryReadModel> decks,
-        HashSet<string> selectedDeckNameSet)
-    {
-        if (selectedDeckNameSet.Count == 0)
-        {
-            return decks;
-        }
-
-        List<FlashcardDeckSummaryReadModel> filteredDecks = [];
-        foreach (FlashcardDeckSummaryReadModel deck in decks)
-        {
-            if (selectedDeckNameSet.Contains(deck.Name))
-            {
-                filteredDecks.Add(deck);
-            }
-        }
-
-        return filteredDecks;
+        return snapshotMapper.CreateCollectionSnapshot(
+            new SpacedRepetitionSystemProgressAnalyticsReadData(decks, dashboard, analytics));
     }
 }

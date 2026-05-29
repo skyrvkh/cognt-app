@@ -9,8 +9,8 @@ internal static class ProgressAnalyticsDashboardFactory
         ProgressAnalyticsDashboardSnapshot dashboard,
         DateOnly today)
     {
-        IReadOnlyDictionary<DateOnly, int> reviewedByDate = ProgressAnalyticsActivityFactory.CreateReviewedByDate(dashboard.ReviewActivity);
-        (int currentStreak, int bestStreak) = ProgressAnalyticsStreakCalculator.Calculate(today, reviewedByDate);
+        ProgressAnalyticsReviewedActivityShape reviewedActivity =
+            ProgressAnalyticsReviewedActivityShape.Create(today, dashboard.ReviewActivity);
 
         return new ProgressAnalyticsDashboardReadModel(
             dashboard.TotalCards,
@@ -19,8 +19,8 @@ internal static class ProgressAnalyticsDashboardFactory
             dashboard.ReviewedTodayCards,
             dashboard.DifficultCards,
             dashboard.ReviewHistoryCount,
-            currentStreak,
-            bestStreak,
+            reviewedActivity.CurrentStreak,
+            reviewedActivity.BestStreak,
             [.. dashboard.ReviewActivity]);
     }
 }
