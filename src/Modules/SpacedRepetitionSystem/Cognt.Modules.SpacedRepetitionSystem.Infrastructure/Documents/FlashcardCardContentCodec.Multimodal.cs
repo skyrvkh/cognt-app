@@ -56,6 +56,7 @@ internal static partial class FlashcardCardContentCodec
             FlashcardContentKind.MultimodalCloze,
             status,
             MultimodalClozeCardType,
+            frontReadModel.ImageOcclusion is not null || backReadModel.ImageOcclusion is not null,
             frontReadModel,
             backReadModel);
     }
@@ -77,6 +78,7 @@ internal static partial class FlashcardCardContentCodec
         IReadOnlyList<MultimodalTextSegmentReadModel> textSegments = BuildClozeAwareTextSegments(
             contextText,
             slotsByDisplayIndex,
+            targets,
             currentSlotId,
             presentation,
             isAnswerVisible);

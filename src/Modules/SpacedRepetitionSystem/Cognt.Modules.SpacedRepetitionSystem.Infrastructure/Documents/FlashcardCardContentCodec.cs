@@ -35,9 +35,34 @@ internal static partial class FlashcardCardContentCodec
             return updatedContent;
         }
 
-        return string.Equals(document.CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase)
-            ? SerializeDocument(document with { ContextContent = updatedContent })
-            : SerializeDocument(document with { FrontContent = updatedContent });
+        if (string.Equals(document.CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase))
+        {
+            return SerializeDocument((document with { ContextContent = updatedContent })
+                .WithSynchronizedTextClozeSlots(updatedContent));
+        }
+
+        if (string.Equals(document.CardType, BasicCardType, StringComparison.OrdinalIgnoreCase)
+            && ResolveEditedClozeIndex(updatedContent, null) is int newClozeIndex)
+        {
+            return SerializeDocument(document with
+            {
+                CardType = ClozeCardType,
+                FrontContent = updatedContent,
+                BackContent = null,
+                ClozeIndex = newClozeIndex,
+            });
+        }
+
+        if (string.Equals(document.CardType, ClozeCardType, StringComparison.OrdinalIgnoreCase))
+        {
+            return SerializeDocument(document with
+            {
+                FrontContent = updatedContent,
+                ClozeIndex = ResolveEditedClozeIndex(updatedContent, document.ClozeIndex),
+            });
+        }
+
+        return SerializeDocument(document with { FrontContent = updatedContent });
     }
 
     internal static bool TryUpdateEditableContent(
@@ -63,6 +88,19 @@ internal static partial class FlashcardCardContentCodec
         string[] normalizedTags = NormalizeTags(tags);
         if (string.Equals(document.CardType, BasicCardType, StringComparison.OrdinalIgnoreCase))
         {
+            if (ResolveEditedClozeIndex(frontContent, null) is int newClozeIndex)
+            {
+                updatedContent = SerializeDocument(document with
+                {
+                    CardType = ClozeCardType,
+                    FrontContent = frontContent,
+                    BackContent = null,
+                    ClozeIndex = newClozeIndex,
+                    Tags = normalizedTags,
+                });
+                return true;
+            }
+
             updatedContent = SerializeDocument(document with
             {
                 FrontContent = frontContent,
@@ -74,9 +112,11 @@ internal static partial class FlashcardCardContentCodec
 
         if (string.Equals(document.CardType, ClozeCardType, StringComparison.OrdinalIgnoreCase))
         {
+            int? clozeIndex = ResolveEditedClozeIndex(frontContent, document.ClozeIndex);
             updatedContent = SerializeDocument(document with
             {
                 FrontContent = frontContent,
+                ClozeIndex = clozeIndex,
                 Tags = normalizedTags,
             });
             return true;
@@ -84,11 +124,39 @@ internal static partial class FlashcardCardContentCodec
 
         if (string.Equals(document.CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase))
         {
-            error = "Multimodal/image occlusion cards must be edited from the note-to-card queue.";
-            return false;
+            if (HasImageOcclusion(document))
+            {
+                error = "Image occlusion cards are not editable in this text editor yet.";
+                return false;
+            }
+
+            updatedContent = SerializeDocument((document with
+            {
+                ContextContent = frontContent,
+                Tags = normalizedTags,
+            }).WithSynchronizedTextClozeSlots(frontContent));
+            return true;
         }
 
         error = $"Card type '{document.CardType}' is not editable in this dialog.";
+        return false;
+    }
+
+    private static bool HasImageOcclusion(FlashcardCardDocument document)
+    {
+        if (document.Images is null)
+        {
+            return false;
+        }
+
+        foreach (CardContextImageSurface image in document.Images)
+        {
+            if (image.Masks.Count > 0)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 }
