@@ -16,7 +16,9 @@ internal sealed partial class SqliteFlashcardRepository
                        learning_steps,
                        relearning_steps,
                        fsrs_optimization_enabled,
-                       fsrs_parameters
+                       fsrs_parameters,
+                       is_cram_enabled,
+                       show_flashcards_in_navigation_tree
                 FROM flashcard_review_settings
                 WHERE id = 1;
                 """;
@@ -34,16 +36,17 @@ internal sealed partial class SqliteFlashcardRepository
     internal void SaveReviewSettings(FlashcardReviewSettingsReadModel settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        FlashcardReviewSettingsReadModel normalized = settings.Normalize();
 
         UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO flashcard_review_settings (
-                    id, max_due_review_cards_per_day, max_new_cards_per_day, desired_retention, learning_steps, relearning_steps, fsrs_optimization_enabled, fsrs_parameters, updated_at
+                    id, max_due_review_cards_per_day, max_new_cards_per_day, desired_retention, learning_steps, relearning_steps, fsrs_optimization_enabled, fsrs_parameters, is_cram_enabled, show_flashcards_in_navigation_tree, updated_at
                 )
                 VALUES (
-                    1, $reviewLimit, $newLimit, $desiredRetention, $learningSteps, $relearningSteps, $optimizationEnabled, $fsrsParameters, $updatedAt
+                    1, $reviewLimit, $newLimit, $desiredRetention, $learningSteps, $relearningSteps, $optimizationEnabled, $fsrsParameters, $cramEnabled, $showFlashcardsInNavigationTree, $updatedAt
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     max_due_review_cards_per_day = excluded.max_due_review_cards_per_day,
@@ -53,9 +56,12 @@ internal sealed partial class SqliteFlashcardRepository
                     relearning_steps = excluded.relearning_steps,
                     fsrs_optimization_enabled = excluded.fsrs_optimization_enabled,
                     fsrs_parameters = excluded.fsrs_parameters,
+                    is_cram_enabled = excluded.is_cram_enabled,
+                    show_flashcards_in_navigation_tree = excluded.show_flashcards_in_navigation_tree,
                     updated_at = excluded.updated_at;
                 """;
-            AddReviewSettingsParameters(command, settings, NowUnixTime());
+            long updatedAt = NowUnixTime();
+            AddReviewSettingsParameters(command, normalized, updatedAt);
             command.ExecuteNonQuery();
         });
     }
@@ -74,7 +80,9 @@ internal sealed partial class SqliteFlashcardRepository
                 FlashcardReviewSettingsReadModel.DefaultRelearningSteps),
             reader.GetInt32(5) != 0,
             FlashcardReviewParameterStorage.Deserialize(
-                reader.IsDBNull(6) ? null : reader.GetString(6))).Normalize();
+                reader.IsDBNull(6) ? null : reader.GetString(6)),
+            reader.GetInt32(7) != 0,
+            reader.GetInt32(8) != 0).Normalize();
     }
 
     private static void AddReviewSettingsParameters(
@@ -96,6 +104,8 @@ internal sealed partial class SqliteFlashcardRepository
         command.Parameters.AddWithValue(
             "$fsrsParameters",
             DbValue(FlashcardReviewParameterStorage.Serialize(normalized.FsrsParameters)));
+        command.Parameters.AddWithValue("$cramEnabled", normalized.IsCramEnabled ? 1 : 0);
+        command.Parameters.AddWithValue("$showFlashcardsInNavigationTree", normalized.ShowFlashcardsInNavigationTree ? 1 : 0);
         command.Parameters.AddWithValue("$updatedAt", updatedAt);
     }
 }

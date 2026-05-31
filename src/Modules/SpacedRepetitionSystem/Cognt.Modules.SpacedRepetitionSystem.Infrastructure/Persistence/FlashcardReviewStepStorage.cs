@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
-internal static class FlashcardReviewStepStorage
+internal static partial class FlashcardReviewStepStorage
 {
     internal static string Serialize(
         IReadOnlyList<TimeSpan>? steps,
@@ -37,19 +37,6 @@ internal static class FlashcardReviewStepStorage
 
         return steps.Count > 0
             ? steps.ToArray()
-            : fallback.ToArray();
-    }
-
-    private static TimeSpan[] Normalize(
-        IReadOnlyList<TimeSpan>? steps,
-        IReadOnlyList<TimeSpan> fallback)
-    {
-        TimeSpan[] normalized = (steps ?? [])
-            .Where(step => step > TimeSpan.Zero)
-            .ToArray();
-
-        return normalized.Length > 0
-            ? normalized
             : fallback.ToArray();
     }
 }

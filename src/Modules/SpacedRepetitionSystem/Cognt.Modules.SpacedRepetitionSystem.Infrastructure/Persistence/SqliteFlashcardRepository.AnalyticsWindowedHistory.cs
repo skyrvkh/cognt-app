@@ -10,9 +10,6 @@ internal sealed partial class SqliteFlashcardRepository
         DateTimeOffset endUtc,
         IReadOnlyList<string> deckNames)
     {
-        long start = startUtc.ToUnixTimeSeconds();
-        long end = endUtc.ToUnixTimeSeconds();
-
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -31,16 +28,11 @@ internal sealed partial class SqliteFlashcardRepository
                   AND h.reviewed_at < $end
                   {deckNameFilter};
                 """;
-            command.Parameters.AddWithValue("$start", start);
-            command.Parameters.AddWithValue("$end", end);
+            AddUnixRangeParameters(command, startUtc, endUtc);
 
             using SqliteDataReader reader = command.ExecuteReader();
             reader.Read();
-            return new FlashcardWeeklyReviewOutcomeSummaryRecord(
-                reader.GetInt32(0),
-                reader.GetInt32(1),
-                reader.GetInt32(2),
-                reader.GetInt32(3));
+            return ReadWeeklyReviewOutcomeSummary(reader);
         });
     }
 
@@ -49,9 +41,6 @@ internal sealed partial class SqliteFlashcardRepository
         DateTimeOffset endUtc,
         IReadOnlyList<string> deckNames)
     {
-        long start = startUtc.ToUnixTimeSeconds();
-        long end = endUtc.ToUnixTimeSeconds();
-
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -67,8 +56,7 @@ internal sealed partial class SqliteFlashcardRepository
                   {deckNameFilter}
                 ORDER BY h.reviewed_at;
                 """;
-            command.Parameters.AddWithValue("$start", start);
-            command.Parameters.AddWithValue("$end", end);
+            AddUnixRangeParameters(command, startUtc, endUtc);
 
             List<DateTimeOffset> activity = [];
             using SqliteDataReader reader = command.ExecuteReader();

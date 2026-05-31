@@ -44,7 +44,9 @@ internal sealed record FlashcardReviewSettingsReadModel(
     IReadOnlyList<TimeSpan>? LearningSteps = null,
     IReadOnlyList<TimeSpan>? RelearningSteps = null,
     bool IsOptimizationEnabled = false,
-    IReadOnlyList<double>? FsrsParameters = null)
+    IReadOnlyList<double>? FsrsParameters = null,
+    bool IsCramEnabled = false,
+    bool ShowFlashcardsInNavigationTree = false)
 {
     private const int DefaultMaximumReviewCardsPerDay = 100;
     private const int DefaultMaximumNewCardsPerDay = 20;
@@ -52,6 +54,8 @@ internal sealed record FlashcardReviewSettingsReadModel(
     private const double MinimumDesiredRetention = 0.7d;
     private const double MaximumDesiredRetention = 0.99d;
     private const bool DefaultIsOptimizationEnabled = false;
+    private const bool DefaultIsCramEnabled = false;
+    private const bool DefaultShowFlashcardsInNavigationTree = false;
 
     internal static IReadOnlyList<TimeSpan> DefaultLearningSteps { get; } =
     [
@@ -71,7 +75,9 @@ internal sealed record FlashcardReviewSettingsReadModel(
         DefaultLearningSteps,
         DefaultRelearningSteps,
         DefaultIsOptimizationEnabled,
-        FsrsParameters: null);
+        FsrsParameters: null,
+        IsCramEnabled: DefaultIsCramEnabled,
+        ShowFlashcardsInNavigationTree: DefaultShowFlashcardsInNavigationTree);
 
     internal FlashcardReviewSettingsReadModel Normalize()
     {

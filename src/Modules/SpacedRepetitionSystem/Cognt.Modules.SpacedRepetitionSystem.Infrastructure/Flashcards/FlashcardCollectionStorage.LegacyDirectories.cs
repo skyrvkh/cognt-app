@@ -1,8 +1,12 @@
+using Microsoft.Extensions.Logging;
+
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
 internal static partial class FlashcardCollectionStorage
 {
-    private static void MigrateLegacyFlashcardsDirectory(string root)
+    private static void MigrateLegacyFlashcardsDirectory(
+        string root,
+        Microsoft.Extensions.Logging.ILogger? logger)
     {
         if (!IsExactChildDirectory(root, LegacyFlashcardsDirectoryName)
             || IsExactChildDirectory(root, FlashcardsDirectoryName))
@@ -20,8 +24,16 @@ internal static partial class FlashcardCollectionStorage
             movedToTemporaryDirectory = true;
             Directory.Move(temporaryDirectory, currentDirectory);
         }
-        catch
+        catch (Exception ex)
         {
+            logger?.LogWarning(
+                ex,
+                "Legacy flashcards directory migration failed. Root={Root} LegacyDirectory={LegacyDirectory} CurrentDirectory={CurrentDirectory} TemporaryDirectory={TemporaryDirectory}",
+                root,
+                legacyDirectory,
+                currentDirectory,
+                temporaryDirectory);
+
             if (movedToTemporaryDirectory
                 && Directory.Exists(temporaryDirectory)
                 && !Directory.Exists(legacyDirectory))
@@ -30,8 +42,14 @@ internal static partial class FlashcardCollectionStorage
                 {
                     Directory.Move(temporaryDirectory, legacyDirectory);
                 }
-                catch
+                catch (Exception rollbackException)
                 {
+                    logger?.LogWarning(
+                        rollbackException,
+                        "Failed to roll back flashcards directory migration. Root={Root} TemporaryDirectory={TemporaryDirectory} LegacyDirectory={LegacyDirectory}",
+                        root,
+                        temporaryDirectory,
+                        legacyDirectory);
                 }
             }
 

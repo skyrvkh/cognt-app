@@ -23,6 +23,8 @@ internal sealed partial class SqliteFlashcardRepository
         new("flashcard_review_settings", "relearning_steps", "TEXT NOT NULL DEFAULT '600'"),
         new("flashcard_review_settings", "fsrs_optimization_enabled", "INTEGER NOT NULL DEFAULT 0"),
         new("flashcard_review_settings", "fsrs_parameters", "TEXT"),
+        new("flashcard_review_settings", "is_cram_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        new("flashcard_review_settings", "show_flashcards_in_navigation_tree", "INTEGER NOT NULL DEFAULT 0"),
     ];
 
     private static void EnsureCompatibilityColumns(SqliteConnection connection)

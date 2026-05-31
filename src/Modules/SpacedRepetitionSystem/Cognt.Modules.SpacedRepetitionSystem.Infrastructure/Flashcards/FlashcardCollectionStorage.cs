@@ -1,5 +1,6 @@
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
@@ -22,17 +23,21 @@ internal static partial class FlashcardCollectionStorage
         return collectionPath;
     }
 
-    internal static SqliteFlashcardRepository OpenRepositoryForCollectionId(string collectionId)
+    internal static SqliteFlashcardRepository OpenRepositoryForCollectionId(
+        string collectionId,
+        ILogger? logger = null)
     {
-        return OpenRepositoryForCollectionPath(GetExistingCollectionPath(collectionId));
+        return OpenRepositoryForCollectionPath(GetExistingCollectionPath(collectionId), logger);
     }
 
-    internal static SqliteFlashcardRepository OpenRepositoryForCollectionPath(string collectionPath)
+    internal static SqliteFlashcardRepository OpenRepositoryForCollectionPath(
+        string collectionPath,
+        ILogger? logger = null)
     {
         string normalizedCollectionPath = Path.GetFullPath(collectionPath);
-        MigrateLegacyFlashcardsDirectory(normalizedCollectionPath);
+        MigrateLegacyFlashcardsDirectory(normalizedCollectionPath, logger);
 
-        SqliteFlashcardRepository repository = new(GetDatabasePath(normalizedCollectionPath));
+        SqliteFlashcardRepository repository = new(GetDatabasePath(normalizedCollectionPath), logger);
         if (IsExactChildDirectory(normalizedCollectionPath, FlashcardsDirectoryName)
             && !IsExactChildDirectory(normalizedCollectionPath, LegacyFlashcardsDirectoryName))
         {
@@ -52,15 +57,19 @@ internal static partial class FlashcardCollectionStorage
         return repository;
     }
 
-    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionId(string collectionId)
+    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionId(
+        string collectionId,
+        ILogger? logger = null)
     {
-        return OpenPrunedRepositoryForCollectionPath(GetExistingCollectionPath(collectionId));
+        return OpenPrunedRepositoryForCollectionPath(GetExistingCollectionPath(collectionId), logger);
     }
 
-    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionPath(string collectionPath)
+    internal static SqliteFlashcardRepository OpenPrunedRepositoryForCollectionPath(
+        string collectionPath,
+        ILogger? logger = null)
     {
-        SqliteFlashcardRepository repository = OpenRepositoryForCollectionPath(collectionPath);
-        PruneMissingActiveCardFiles(collectionPath, repository);
+        SqliteFlashcardRepository repository = OpenRepositoryForCollectionPath(collectionPath, logger);
+        PruneMissingActiveCardFiles(collectionPath, repository, logger);
         return repository;
     }
 
@@ -70,11 +79,27 @@ internal static partial class FlashcardCollectionStorage
         return $"{FlashcardsDirectoryName}/{cardUid}.json";
     }
 
-    internal static void WriteFlashcardFile(string root, string relPath, string content)
+    internal static void WriteFlashcardFile(
+        string root,
+        string relPath,
+        string content)
     {
         string fullPath = GetFlashcardFullPath(root, relPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         File.WriteAllText(fullPath, content);
+    }
+
+    internal static string CopyFlashcardFile(
+        string sourceRoot,
+        string sourceRelPath,
+        string destinationRoot)
+    {
+        string sourceFullPath = GetExistingFlashcardFullPath(sourceRoot, sourceRelPath);
+        string destinationRelPath = CreateFlashcardRelPath();
+        string destinationFullPath = GetFlashcardFullPath(destinationRoot, destinationRelPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationFullPath)!);
+        File.Copy(sourceFullPath, destinationFullPath, overwrite: false);
+        return destinationRelPath;
     }
 
     internal static string ReadFlashcardFile(string root, string relPath)

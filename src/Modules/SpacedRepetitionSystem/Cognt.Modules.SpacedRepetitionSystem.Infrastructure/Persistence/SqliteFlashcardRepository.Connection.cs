@@ -1,22 +1,59 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 internal sealed partial class SqliteFlashcardRepository
 {
-    private T UseConnection<T>(Func<SqliteConnection, T> action)
+    private T UseConnection<T>(
+        Func<SqliteConnection, T> action,
+        [CallerMemberName] string? operation = null)
     {
         lock (connectionLock)
         {
-            return action(GetConnection());
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return action(GetConnection());
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                logger?.LogError(
+                    ex,
+                    "SQLite flashcard repository operation failed. Operation={Operation} DatabasePath={DatabasePath} ElapsedMs={ElapsedMs}",
+                    operation,
+                    databasePath,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
         }
     }
 
-    private void UseConnection(Action<SqliteConnection> action)
+    private void UseConnection(
+        Action<SqliteConnection> action,
+        [CallerMemberName] string? operation = null)
     {
         lock (connectionLock)
         {
-            action(GetConnection());
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            try
+            {
+                action(GetConnection());
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                logger?.LogError(
+                    ex,
+                    "SQLite flashcard repository operation failed. Operation={Operation} DatabasePath={DatabasePath} ElapsedMs={ElapsedMs}",
+                    operation,
+                    databasePath,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
         }
     }
 
@@ -27,7 +64,11 @@ internal sealed partial class SqliteFlashcardRepository
             throw new ObjectDisposedException(nameof(SqliteFlashcardRepository));
         }
 
-        connection ??= OpenConnection();
+        if (connection is null)
+        {
+            connection = OpenConnection();
+        }
+
         return connection;
     }
 

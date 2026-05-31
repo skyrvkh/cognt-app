@@ -10,9 +10,6 @@ internal sealed partial class SqliteFlashcardRepository
         DateTimeOffset endUtc,
         IReadOnlyList<string> deckNames)
     {
-        long start = startUtc.ToUnixTimeSeconds();
-        long end = endUtc.ToUnixTimeSeconds();
-
         return UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
@@ -28,14 +25,11 @@ internal sealed partial class SqliteFlashcardRepository
                   AND c.due_at < $end
                   {deckNameFilter};
                 """;
-            command.Parameters.AddWithValue("$start", start);
-            command.Parameters.AddWithValue("$end", end);
+            AddUnixRangeParameters(command, startUtc, endUtc);
 
             using SqliteDataReader reader = command.ExecuteReader();
             reader.Read();
-            return new FlashcardDueCardSummaryRecord(
-                reader.GetInt32(0),
-                reader.GetInt32(1));
+            return ReadDueCardSummary(reader);
         });
     }
 }

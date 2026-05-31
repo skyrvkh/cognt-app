@@ -11,6 +11,7 @@ internal sealed partial class SqliteFlashcardRepository
         {
             using SqliteTransaction transaction = connection.BeginTransaction();
             FlashcardRecord previous = GetCard(cardId, connection, transaction);
+
             long now = NowUnixTime();
 
             UpdateReviewedCardSchedule(connection, transaction, cardId, schedule, now);

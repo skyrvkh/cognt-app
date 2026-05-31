@@ -24,7 +24,8 @@ internal sealed partial class SqliteFlashcardRepository
             command.Parameters.AddWithValue("$suspendedAt", isSuspended ? now : DBNull.Value);
             command.Parameters.AddWithValue("$updatedAt", now);
 
-            EnsureCardUpdated(cardId, command.ExecuteNonQuery());
+            int affectedRows = command.ExecuteNonQuery();
+            EnsureCardUpdated(cardId, affectedRows);
         });
     }
 
@@ -37,6 +38,7 @@ internal sealed partial class SqliteFlashcardRepository
         UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
+            long updatedAt = NowUnixTime();
             command.CommandText = """
                 UPDATE flashcard_card
                 SET fsrs_card_state_json = $fsrsCardStateJson,
@@ -50,10 +52,12 @@ internal sealed partial class SqliteFlashcardRepository
             command.Parameters.AddWithValue("$id", cardId);
             command.Parameters.AddWithValue("$fsrsCardStateJson", serializedState);
             command.Parameters.AddWithValue("$dueAt", dueUtc.ToUnixTimeSeconds());
-            command.Parameters.AddWithValue("$scheduledDays", Math.Max(0, scheduledDays));
-            command.Parameters.AddWithValue("$updatedAt", NowUnixTime());
+            int normalizedScheduledDays = Math.Max(0, scheduledDays);
+            command.Parameters.AddWithValue("$scheduledDays", normalizedScheduledDays);
+            command.Parameters.AddWithValue("$updatedAt", updatedAt);
 
-            EnsureCardUpdated(cardId, command.ExecuteNonQuery());
+            int affectedRows = command.ExecuteNonQuery();
+            EnsureCardUpdated(cardId, affectedRows);
         });
     }
 

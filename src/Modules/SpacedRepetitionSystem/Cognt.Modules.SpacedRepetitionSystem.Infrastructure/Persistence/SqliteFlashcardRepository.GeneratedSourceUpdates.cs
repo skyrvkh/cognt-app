@@ -17,6 +17,7 @@ internal sealed partial class SqliteFlashcardRepository
         UseConnection(connection =>
         {
             using SqliteCommand command = connection.CreateCommand();
+            long updatedAt = NowUnixTime();
             command.CommandText = """
                 UPDATE flashcard_card
                 SET deck_id = $deckId,
@@ -37,7 +38,7 @@ internal sealed partial class SqliteFlashcardRepository
             command.Parameters.AddWithValue("$sourceSlotId", DbValue(sourceSlotId));
             command.Parameters.AddWithValue("$sourceTargetId", DbValue(sourceTargetId));
             command.Parameters.AddWithValue("$sourceSnapshotHash", DbValue(sourceSnapshotHash));
-            command.Parameters.AddWithValue("$updatedAt", NowUnixTime());
+            command.Parameters.AddWithValue("$updatedAt", updatedAt);
             command.ExecuteNonQuery();
         });
     }

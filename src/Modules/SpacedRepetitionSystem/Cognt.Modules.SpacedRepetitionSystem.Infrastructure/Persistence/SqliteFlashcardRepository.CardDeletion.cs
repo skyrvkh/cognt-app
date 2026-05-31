@@ -11,17 +11,27 @@ internal sealed partial class SqliteFlashcardRepository
             return;
         }
 
+        long[] normalizedCardIds = cardIds
+            .Where(id => id > 0)
+            .Distinct()
+            .OrderBy(static id => id)
+            .ToArray();
+        if (normalizedCardIds.Length == 0)
+        {
+            return;
+        }
+
         UseConnection(connection =>
         {
             long now = NowUnixTime();
-            foreach (long cardId in cardIds.Where(id => id > 0).Distinct())
+            foreach (long cardId in normalizedCardIds)
             {
                 MarkCardDeleted(connection, cardId, now);
             }
         });
     }
 
-    private static void MarkCardDeleted(
+    private static int MarkCardDeleted(
         SqliteConnection connection,
         long cardId,
         long updatedAt)
@@ -34,6 +44,6 @@ internal sealed partial class SqliteFlashcardRepository
             """;
         command.Parameters.AddWithValue("$id", cardId);
         command.Parameters.AddWithValue("$updatedAt", updatedAt);
-        command.ExecuteNonQuery();
+        return command.ExecuteNonQuery();
     }
 }

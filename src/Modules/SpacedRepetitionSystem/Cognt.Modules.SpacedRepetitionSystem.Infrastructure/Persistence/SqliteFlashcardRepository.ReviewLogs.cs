@@ -1,5 +1,6 @@
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
@@ -19,6 +20,7 @@ internal sealed partial class SqliteFlashcardRepository
                 """;
 
             List<FsrsReviewLog> reviewLogs = [];
+            int skippedReviewLogCount = 0;
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -26,6 +28,18 @@ internal sealed partial class SqliteFlashcardRepository
                 {
                     reviewLogs.Add(reviewLog);
                 }
+                else
+                {
+                    skippedReviewLogCount++;
+                }
+            }
+
+            if (skippedReviewLogCount > 0)
+            {
+                logger?.LogWarning(
+                    "Skipped malformed FSRS review logs while loading scheduler history. DatabasePath={DatabasePath} SkippedReviewLogCount={SkippedReviewLogCount}",
+                    databasePath,
+                    skippedReviewLogCount);
             }
 
             return reviewLogs;

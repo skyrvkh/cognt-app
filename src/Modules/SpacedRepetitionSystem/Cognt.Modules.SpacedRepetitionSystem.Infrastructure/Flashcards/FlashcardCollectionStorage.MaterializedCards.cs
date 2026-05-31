@@ -1,5 +1,6 @@
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
@@ -7,7 +8,8 @@ internal static partial class FlashcardCollectionStorage
 {
     private static void PruneMissingActiveCardFiles(
         string root,
-        SqliteFlashcardRepository repository)
+        SqliteFlashcardRepository repository,
+        Microsoft.Extensions.Logging.ILogger? logger)
     {
         long[] missingCardIds = repository
             .LoadActiveCardFileReferences()
@@ -15,7 +17,16 @@ internal static partial class FlashcardCollectionStorage
             .Select(card => card.Id)
             .ToArray();
 
+        if (missingCardIds.Length == 0)
+        {
+            return;
+        }
+
         repository.MarkCardsDeleted(missingCardIds);
+        logger?.LogWarning(
+            "Pruned active flashcards with missing content files. Root={Root} MissingCardCount={MissingCardCount}",
+            root,
+            missingCardIds.Length);
     }
 
     private static MaterializedFlashcardContent LoadMaterializedContent(

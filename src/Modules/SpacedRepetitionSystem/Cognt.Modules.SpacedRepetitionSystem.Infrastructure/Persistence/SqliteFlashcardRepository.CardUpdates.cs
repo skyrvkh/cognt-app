@@ -19,7 +19,8 @@ internal sealed partial class SqliteFlashcardRepository
                 """;
             command.Parameters.AddWithValue("$id", cardId);
             command.Parameters.AddWithValue("$deckId", deckId);
-            command.Parameters.AddWithValue("$updatedAt", NowUnixTime());
+            long updatedAt = NowUnixTime();
+            command.Parameters.AddWithValue("$updatedAt", updatedAt);
             command.ExecuteNonQuery();
         });
     }

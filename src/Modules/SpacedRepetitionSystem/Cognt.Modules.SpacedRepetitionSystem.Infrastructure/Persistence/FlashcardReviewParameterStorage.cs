@@ -3,7 +3,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
-internal static class FlashcardReviewParameterStorage
+internal static partial class FlashcardReviewParameterStorage
 {
     internal static string? Serialize(IReadOnlyList<double>? parameters)
     {
@@ -42,27 +42,5 @@ internal static class FlashcardReviewParameterStorage
         }
 
         return parameters;
-    }
-
-    private static double[] Normalize(IReadOnlyList<double>? parameters)
-    {
-        double[] normalized = (parameters ?? [])
-            .Where(double.IsFinite)
-            .ToArray();
-        if (normalized.Length != FsrsScheduler.DefaultParameters.Length)
-        {
-            return [];
-        }
-
-        for (int i = 0; i < normalized.Length; i++)
-        {
-            if (normalized[i] < FsrsScheduler.LowerBoundsParameters[i]
-                || normalized[i] > FsrsScheduler.UpperBoundsParameters[i])
-            {
-                return [];
-            }
-        }
-
-        return normalized;
     }
 }

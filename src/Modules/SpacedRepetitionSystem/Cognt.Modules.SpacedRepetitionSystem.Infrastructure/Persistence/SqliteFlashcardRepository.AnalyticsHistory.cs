@@ -1,4 +1,3 @@
-using Cognt.Modules.SpacedRepetitionSystem.Domain;
 using Microsoft.Data.Sqlite;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
@@ -31,10 +30,7 @@ internal sealed partial class SqliteFlashcardRepository
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
-                summaries.Add(new FlashcardDeckReviewHistorySummaryRecord(
-                    reader.GetString(0),
-                    reader.GetInt32(1),
-                    reader.GetInt32(2)));
+                summaries.Add(ReadDeckReviewHistorySummary(reader));
             }
 
             return summaries;
@@ -64,9 +60,7 @@ internal sealed partial class SqliteFlashcardRepository
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
-                counts.Add(new FlashcardReviewRatingCountRecord(
-                    (FlashcardReviewRating)reader.GetInt32(0),
-                    reader.GetInt32(1)));
+                counts.Add(ReadReviewRatingCount(reader));
             }
 
             return counts;

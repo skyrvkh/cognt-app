@@ -86,15 +86,4 @@ internal sealed partial class SqliteFlashcardRepository
                 : new FlashcardDashboardSummaryRecord(0, 0, 0, 0, 0, 0);
         });
     }
-
-    private static FlashcardDashboardSummaryRecord ReadDashboardSummary(SqliteDataReader reader)
-    {
-        return new FlashcardDashboardSummaryRecord(
-            reader.GetInt32(0),
-            reader.GetInt32(1),
-            reader.GetInt32(2),
-            reader.GetInt32(3),
-            reader.GetInt32(4),
-            reader.GetInt32(5));
-    }
 }

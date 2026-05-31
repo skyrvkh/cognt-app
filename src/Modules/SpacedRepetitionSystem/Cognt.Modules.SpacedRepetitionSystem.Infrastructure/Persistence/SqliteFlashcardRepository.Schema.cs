@@ -4,7 +4,7 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 
 internal sealed partial class SqliteFlashcardRepository
 {
-    private static void EnsureSchema(SqliteConnection connection)
+    private void EnsureSchema(SqliteConnection connection)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -81,6 +81,8 @@ internal sealed partial class SqliteFlashcardRepository
               relearning_steps TEXT NOT NULL DEFAULT '600',
               fsrs_optimization_enabled INTEGER NOT NULL DEFAULT 0,
               fsrs_parameters TEXT,
+              is_cram_enabled INTEGER NOT NULL DEFAULT 0,
+              show_flashcards_in_navigation_tree INTEGER NOT NULL DEFAULT 0,
               updated_at INTEGER NOT NULL
             );
             """;
@@ -112,7 +114,7 @@ internal sealed partial class SqliteFlashcardRepository
             """);
     }
 
-    private static void ExecutePragma(SqliteConnection connection, string sql)
+    private void ExecutePragma(SqliteConnection connection, string sql)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = sql;
