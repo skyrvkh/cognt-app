@@ -7,6 +7,8 @@ namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
 internal sealed partial class SqliteFlashcardStore
 {
+    private const string DefaultDeckName = "Default";
+
     public async Task<int> CreateCardsFromContentAsync(
         string collectionId,
         string deckName,
@@ -33,7 +35,7 @@ internal sealed partial class SqliteFlashcardStore
             return 1;
         }
 
-        return await CreateClozeCardsAsync(
+        int createdCards = await CreateClozeCardsAsync(
             collectionId,
             deckName,
             content,
@@ -41,6 +43,7 @@ internal sealed partial class SqliteFlashcardStore
             sourceRelPath,
             clozeIndexes,
             cancellationToken);
+        return createdCards;
     }
 
     public Task UpdateCardFrontContentAsync(
@@ -50,9 +53,10 @@ internal sealed partial class SqliteFlashcardStore
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
 
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         FlashcardRecord card = repository.GetCard(cardId);
         string existingContent = FlashcardCollectionStorage.ReadFlashcardFile(collectionPath, card.FrontRelPath);
         FlashcardCollectionStorage.WriteFlashcardFile(
@@ -77,7 +81,7 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         FlashcardRecord card = repository.GetCard(cardId);
         string existingContent = FlashcardCollectionStorage.ReadFlashcardFile(collectionPath, card.FrontRelPath);
         if (!FlashcardCardContentCodec.TryUpdateEditableContent(
@@ -106,10 +110,24 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         IReadOnlyList<FlashcardRecord> activeCards = repository.LoadCardsByIds(cardIds);
         repository.MarkCardsDeleted(CreateCardIds(activeCards));
         return Task.FromResult(activeCards.Count);
+    }
+
+    public Task<int> DeleteDecksAsync(
+        string collectionId,
+        IReadOnlyList<long> deckIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(deckIds);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
+        int deletedDecks = repository.DeleteDecksReassignCards(deckIds, DefaultDeckName);
+        return Task.FromResult(deletedDecks);
     }
 
     public Task<int> AddTagsToCardsAsync(
@@ -123,7 +141,7 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         int updatedCards = 0;
         foreach (FlashcardRecord card in repository.LoadCardsByIds(cardIds))
         {
@@ -137,7 +155,6 @@ internal sealed partial class SqliteFlashcardStore
             FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, card.FrontRelPath, updatedContent);
             updatedCards++;
         }
-
         return Task.FromResult(updatedCards);
     }
 
@@ -152,7 +169,7 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         int updatedCards = 0;
         foreach (FlashcardRecord card in repository.LoadCardsByIds(cardIds))
         {
@@ -166,7 +183,6 @@ internal sealed partial class SqliteFlashcardStore
             FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, card.FrontRelPath, updatedContent);
             updatedCards++;
         }
-
         return Task.FromResult(updatedCards);
     }
 }

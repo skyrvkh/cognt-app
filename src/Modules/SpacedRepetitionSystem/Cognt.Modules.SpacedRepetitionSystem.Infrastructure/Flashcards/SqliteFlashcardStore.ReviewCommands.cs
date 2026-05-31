@@ -18,7 +18,8 @@ internal sealed partial class SqliteFlashcardStore
         ArgumentNullException.ThrowIfNull(settings);
 
         cancellationToken.ThrowIfCancellationRequested();
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId);
+
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId, logger);
         repository.SaveReviewSettings(ToPersistenceSettings(settings));
         return Task.CompletedTask;
     }
@@ -33,7 +34,7 @@ internal sealed partial class SqliteFlashcardStore
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
 
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         FlashcardRecord card = repository.GetCard(cardId);
         PersistenceSettings settings = repository.LoadReviewSettings();
         (double desiredRetention, IReadOnlyList<double>? parameters) = CreateSchedulerOptimization(repository, settings);
@@ -47,11 +48,12 @@ internal sealed partial class SqliteFlashcardStore
             cancellationToken);
 
         repository.ApplyReview(cardId, ToPersistenceRating(rating), schedule);
-        return new AppReadModels.RecordedFlashcardReviewReadModel(
+        AppReadModels.RecordedFlashcardReviewReadModel recordedReview = new(
             cardId,
             schedule.DueUtc,
             ToCardStateReadModel(schedule.State),
             schedule.Step);
+        return recordedReview;
     }
 
     public Task SetCardSuspensionAsync(
@@ -62,7 +64,7 @@ internal sealed partial class SqliteFlashcardStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId, logger);
         repository.SetCardSuspension(cardId, isSuspended);
         return Task.CompletedTask;
     }
@@ -76,7 +78,7 @@ internal sealed partial class SqliteFlashcardStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         FlashcardRecord card = repository.GetCard(cardId);
         StoredFsrsCard stored = FsrsStoredStateCodec.Read(card.SerializedState);
         FsrsCard postponedCard = stored.Card.Copy();
@@ -98,7 +100,7 @@ internal sealed partial class SqliteFlashcardStore
         return Task.CompletedTask;
     }
 
-    private static (double DesiredRetention, IReadOnlyList<double>? Parameters) CreateSchedulerOptimization(
+    private (double DesiredRetention, IReadOnlyList<double>? Parameters) CreateSchedulerOptimization(
         SqliteFlashcardRepository repository,
         PersistenceSettings settings)
     {
@@ -133,7 +135,9 @@ internal sealed partial class SqliteFlashcardStore
             settings.LearningSteps,
             settings.RelearningSteps,
             settings.IsOptimizationEnabled,
-            settings.FsrsParameters).Normalize();
+            settings.FsrsParameters,
+            settings.IsCramEnabled,
+            settings.ShowFlashcardsInNavigationTree).Normalize();
     }
 
     private static PersistenceRating ToPersistenceRating(

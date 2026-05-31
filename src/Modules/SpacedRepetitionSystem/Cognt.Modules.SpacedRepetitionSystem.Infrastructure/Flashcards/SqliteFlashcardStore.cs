@@ -15,7 +15,8 @@ internal sealed partial class SqliteFlashcardStore :
     IFlashcardReviewReader,
     IFlashcardNoteGenerationReader,
     IFlashcardAuthoringWriter,
-    IFlashcardReviewWriter
+    IFlashcardReviewWriter,
+    IFlashcardCollectionImportWriter
 {
     private readonly IFlashcardScheduler scheduler;
     private readonly ILogger<SqliteFlashcardStore>? logger;
@@ -46,7 +47,7 @@ internal sealed partial class SqliteFlashcardStore :
         int limit)
     {
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath, logger);
 
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
         var (todayStartUtc, tomorrowStartUtc) = GetLocalTodayUtcBounds(nowUtc);
@@ -61,6 +62,14 @@ internal sealed partial class SqliteFlashcardStore :
         CardSummaries loadedSummaries = CardSummaryMaterializer.Load(collectionPath, cards, tag, tags, searchText);
 
         repository.MarkCardsDeleted(loadedSummaries.StaleCardIds);
+        if (loadedSummaries.StaleCardIds.Count > 0)
+        {
+            logger?.LogWarning(
+                "Marked stale flashcards deleted while loading card summaries because content files are missing. CollectionPath={CollectionPath} StaleCardCount={StaleCardCount}",
+                collectionPath,
+                loadedSummaries.StaleCardIds.Count);
+        }
+
         return loadedSummaries.Summaries;
     }
 
@@ -95,12 +104,13 @@ internal sealed partial class SqliteFlashcardStore :
 
     internal IReadOnlyList<FlashcardDeckSummaryReadModel> LoadDeckSummaries(string collectionId)
     {
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId, logger);
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
-        return repository
+        IReadOnlyList<FlashcardDeckSummaryReadModel> summaries = repository
             .LoadDeckSummaries(nowUtc)
             .Select(ToDeckSummaryReadModel)
             .ToArray();
+        return summaries;
     }
 
     private static FlashcardDeckSummaryReadModel ToDeckSummaryReadModel(
