@@ -9,7 +9,7 @@ internal sealed partial class SqliteFlashcardStore
         string collectionId,
         IReadOnlyList<string>? deckNames)
     {
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId, logger);
 
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
         var (todayStartUtc, tomorrowStartUtc) = GetLocalTodayUtcBounds(nowUtc);
@@ -23,7 +23,8 @@ internal sealed partial class SqliteFlashcardStore
             nowUtc,
             deckNames ?? []);
 
-        return ToDashboardSummaryReadModel(summary, reviewActivity);
+        FlashcardDashboardSummaryReadModel readModel = ToDashboardSummaryReadModel(summary, reviewActivity);
+        return readModel;
     }
 
     internal FlashcardProgressAnalyticsReadModel LoadProgressAnalytics(
@@ -31,7 +32,7 @@ internal sealed partial class SqliteFlashcardStore
         DateOnly today,
         IReadOnlyList<string>? deckNames)
     {
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId, logger);
         IReadOnlyList<string> selectedDeckNames = deckNames ?? [];
 
         DateTimeOffset dueTomorrowStartUtc = ToReviewTimeZoneOffset(today.AddDays(1).ToDateTime(TimeOnly.MinValue)).ToUniversalTime();
@@ -44,7 +45,7 @@ internal sealed partial class SqliteFlashcardStore
         IReadOnlyList<FlashcardDeckReviewHistorySummaryRecord> deckReviewHistory = repository.LoadDeckReviewHistorySummaries(selectedDeckNames);
         IReadOnlyList<FlashcardReviewRatingCountRecord> recallDistribution = repository.LoadReviewRatingCounts(selectedDeckNames);
 
-        return new FlashcardProgressAnalyticsReadModel(
+        FlashcardProgressAnalyticsReadModel analytics = new(
             dueTomorrow.DueCards,
             dueTomorrow.DueDecks,
             deckReviewHistory
@@ -59,5 +60,6 @@ internal sealed partial class SqliteFlashcardStore
                     count.Count))
                 .ToArray(),
             LoadWeeklyReviewOutcomes(repository, today, selectedDeckNames));
+        return analytics;
     }
 }

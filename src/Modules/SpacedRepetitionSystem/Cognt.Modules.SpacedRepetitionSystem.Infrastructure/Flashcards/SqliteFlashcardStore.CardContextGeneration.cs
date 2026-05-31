@@ -20,11 +20,12 @@ internal sealed partial class SqliteFlashcardStore
         ArgumentNullException.ThrowIfNull(context);
 
         cancellationToken.ThrowIfCancellationRequested();
+
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
         IReadOnlyList<ExpandedCardContextCard> expandedCards = CardContextCardExpansion.Expand(context);
         string[] cardTags = CreateDistinctCardTags(tags);
 
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         long deckId = repository.EnsureDeck(deckName);
         Dictionary<string, GeneratedFlashcardSourceRecord> existingBySlotId = LoadFirstGeneratedCardsBySlotId(
             repository,
@@ -79,13 +80,12 @@ internal sealed partial class SqliteFlashcardStore
             createdCards++;
         }
 
-        string[] orphanedSlotIds = CreateOrphanedSlotIds(existingBySlotId, currentSlotIds);
-
-        return new CreateCardsFromCardContextResult(
+        CreateCardsFromCardContextResult result = new(
             createdCards,
             updatedCards,
             affectedCardIds,
-            orphanedSlotIds);
+            CreateOrphanedSlotIds(existingBySlotId, currentSlotIds));
+        return result;
     }
 
     private static string[] CreateDistinctCardTags(IReadOnlyList<string> tags)

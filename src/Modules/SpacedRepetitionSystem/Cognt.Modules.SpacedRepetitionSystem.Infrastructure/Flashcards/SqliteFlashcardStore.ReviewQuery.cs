@@ -4,14 +4,11 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 using AppQueueCandidate = Cognt.Modules.SpacedRepetitionSystem.Application.Review.FlashcardReviewQueueCandidate;
-using AppQueueCategory = Cognt.Modules.SpacedRepetitionSystem.Application.Review.FlashcardReviewQueueCategory;
-using AppQueueCounts = Cognt.Modules.SpacedRepetitionSystem.Application.Review.FlashcardReviewQueueCounts;
-using AppReviewLimitUsage = Cognt.Modules.SpacedRepetitionSystem.Application.Review.FlashcardReviewLimitUsage;
 using PersistenceQueueCandidate = Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence.FlashcardReviewQueueCandidate;
 using PersistenceQueueCategory = Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence.FlashcardReviewQueueCategory;
 using PersistenceQueueCounts = Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence.FlashcardReviewQueueCounts;
 using PersistenceReviewLimitUsage = Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence.FlashcardReviewLimitUsage;
-using PersistenceSettings = Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence.FlashcardReviewSettingsReadModel;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
@@ -19,7 +16,7 @@ internal sealed partial class SqliteFlashcardStore
 {
     internal AppReadModels.FlashcardReviewSettingsReadModel LoadReviewSettings(string collectionId)
     {
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionId(collectionId, logger);
         return ToReadModel(repository.LoadReviewSettings());
     }
 
@@ -36,7 +33,7 @@ internal sealed partial class SqliteFlashcardStore
     private AppReadModels.FlashcardReviewQueueReadModel LoadScheduledReviewQueue(string collectionId)
     {
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath, logger);
 
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
         AppReadModels.FlashcardReviewSettingsReadModel settings = ToReadModel(repository.LoadReviewSettings());
@@ -55,8 +52,9 @@ internal sealed partial class SqliteFlashcardStore
             counts.RelearningDueCards,
             counts.OverdueCards + counts.DueCards,
             counts.NewCards);
+        AppQueueCandidate[] queueCandidates = CreateReviewQueueCandidates(candidates);
         FlashcardReviewQueuePlan plan = FlashcardReviewQueuePlanner.CreatePlan(
-            CreateReviewQueueCandidates(candidates),
+            queueCandidates,
             ToReadModel(counts),
             settings,
             ToReadModel(usage));
@@ -64,13 +62,20 @@ internal sealed partial class SqliteFlashcardStore
         DateTimeOffset? nextIntradayDueUtc = repository.LoadNextFutureIntradayDueUtc(nowUtc);
         Dictionary<long, FlashcardRecord> cardsById = CreateCardsById(repository.LoadCardsByIds(plan.CardIds));
 
-        ReviewQueueCards loadedCards = LoadReviewCardsForPlan(collectionPath, plan.CardIds, cardsById);
+        ReviewQueueCards loadedCards = ReviewQueueCardLoader.LoadForPlan(
+            collectionPath,
+            plan.CardIds,
+            cardsById,
+            CreateQueuePlacements(queueCandidates),
+            logger);
         repository.MarkCardsDeleted(loadedCards.StaleCardIds);
-        return new AppReadModels.FlashcardReviewQueueReadModel(
+        LogStaleReviewCardsDeleted(collectionPath, loadedCards.StaleCardIds, "Scheduled");
+        AppReadModels.FlashcardReviewQueueReadModel queue = new(
             loadedCards.ReviewCards,
             plan.Summary with { TotalCards = loadedCards.ReviewCards.Count },
             nextDueUtc,
             nextIntradayDueUtc);
+        return queue;
     }
 
     private AppReadModels.FlashcardReviewQueueReadModel LoadCramReviewQueue(
@@ -78,7 +83,7 @@ internal sealed partial class SqliteFlashcardStore
         CramScope? cramScope)
     {
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath, logger);
 
         DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
         var (todayStartUtc, tomorrowStartUtc) = GetLocalTodayUtcBounds(nowUtc);
@@ -97,12 +102,13 @@ internal sealed partial class SqliteFlashcardStore
         long[] cardIds = CreateCardIds(candidates);
         Dictionary<long, FlashcardRecord> cardsById = CreateCardsById(repository.LoadCardsByIds(cardIds));
 
-        ReviewQueueCards loadedCards = LoadReviewCardsForPlan(collectionPath, cardIds, cardsById);
+        ReviewQueueCards loadedCards = ReviewQueueCardLoader.LoadForPlan(collectionPath, cardIds, cardsById, logger: logger);
         repository.MarkCardsDeleted(loadedCards.StaleCardIds);
+        LogStaleReviewCardsDeleted(collectionPath, loadedCards.StaleCardIds, "Cram");
         AppReadModels.FlashcardReviewCardReadModel[] reviewCards =
             ApplyQueueStartDueFlags(loadedCards.ReviewCards, schedulerEligibleCardIds);
 
-        return new AppReadModels.FlashcardReviewQueueReadModel(
+        AppReadModels.FlashcardReviewQueueReadModel queue = new(
             reviewCards,
             CreateCramSummary(
                 ToReadModel(counts),
@@ -112,17 +118,39 @@ internal sealed partial class SqliteFlashcardStore
         {
             Mode = AppReadModels.FlashcardReviewQueueMode.Cram,
         };
+        return queue;
     }
 
-    private static AppQueueCandidate[] CreateReviewQueueCandidates(IReadOnlyList<PersistenceQueueCandidate> candidates)
+    private void LogStaleReviewCardsDeleted(
+        string collectionPath,
+        IReadOnlyCollection<long> staleCardIds,
+        string queueMode)
     {
-        AppQueueCandidate[] queueCandidates = new AppQueueCandidate[candidates.Count];
-        for (int index = 0; index < candidates.Count; index++)
+        if (staleCardIds.Count == 0)
         {
-            queueCandidates[index] = ToReadModel(candidates[index]);
+            return;
         }
 
-        return queueCandidates;
+        logger?.LogWarning(
+            "Marked stale flashcards deleted while loading review queue because content files are missing. CollectionPath={CollectionPath} QueueMode={QueueMode} StaleCardCount={StaleCardCount}",
+            collectionPath,
+            queueMode,
+            staleCardIds.Count);
+    }
+
+    private static Dictionary<long, AppReadModels.FlashcardReviewCardQueuePlacement> CreateQueuePlacements(
+        IReadOnlyList<AppQueueCandidate> candidates)
+    {
+        Dictionary<long, AppReadModels.FlashcardReviewCardQueuePlacement> placements = new(candidates.Count);
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            AppQueueCandidate candidate = candidates[index];
+            placements[candidate.CardId] = new AppReadModels.FlashcardReviewCardQueuePlacement(
+                candidate.Category,
+                candidate.DueUtc);
+        }
+
+        return placements;
     }
 
     private static HashSet<long> CreateSchedulerEligibleCardIds(
@@ -194,76 +222,4 @@ internal sealed partial class SqliteFlashcardStore
         return reviewCards;
     }
 
-    private static AppReadModels.FlashcardReviewSettingsReadModel ToReadModel(
-        PersistenceSettings settings)
-    {
-        return new AppReadModels.FlashcardReviewSettingsReadModel(
-            settings.MaximumReviewCardsPerDay,
-            settings.MaximumNewCardsPerDay,
-            settings.DesiredRetention,
-            settings.LearningSteps,
-            settings.RelearningSteps,
-            settings.IsOptimizationEnabled,
-            settings.FsrsParameters).Normalize();
-    }
-
-    private static AppQueueCounts ToReadModel(PersistenceQueueCounts counts)
-    {
-        return new AppQueueCounts(
-            counts.LearningDueCards,
-            counts.RelearningDueCards,
-            counts.OverdueCards,
-            counts.DueCards,
-            counts.NewCards,
-            counts.SuspendedCardsExcluded)
-        {
-            FutureReviewCards = counts.FutureReviewCards,
-        };
-    }
-
-    private static AppReadModels.FlashcardReviewQueueSummaryReadModel CreateCramSummary(
-        AppQueueCounts counts,
-        int queuedCards,
-        int selectedCards,
-        int skippedInvalidCards)
-    {
-        return new AppReadModels.FlashcardReviewQueueSummaryReadModel(
-            counts.LearningDueCards,
-            counts.RelearningDueCards,
-            counts.OverdueCards,
-            counts.DueCards,
-            counts.NewCards,
-            counts.SuspendedCardsExcluded,
-            0,
-            0,
-            queuedCards)
-        {
-            FutureReviewCards = counts.FutureReviewCards,
-            SelectedCards = selectedCards,
-            SkippedInvalidCards = skippedInvalidCards,
-        };
-    }
-
-    private static AppReviewLimitUsage ToReadModel(PersistenceReviewLimitUsage usage)
-    {
-        return new AppReviewLimitUsage(
-            usage.ReviewCards,
-            usage.NewCards);
-    }
-
-    private static AppQueueCandidate ToReadModel(PersistenceQueueCandidate candidate)
-    {
-        return new AppQueueCandidate(
-            candidate.CardId,
-            candidate.Category switch
-            {
-                PersistenceQueueCategory.Learning => AppQueueCategory.Learning,
-                PersistenceQueueCategory.Relearning => AppQueueCategory.Relearning,
-                PersistenceQueueCategory.Overdue => AppQueueCategory.Overdue,
-                PersistenceQueueCategory.Due => AppQueueCategory.Due,
-                PersistenceQueueCategory.New => AppQueueCategory.New,
-                _ => AppQueueCategory.New,
-            },
-            candidate.DueUtc);
-    }
 }

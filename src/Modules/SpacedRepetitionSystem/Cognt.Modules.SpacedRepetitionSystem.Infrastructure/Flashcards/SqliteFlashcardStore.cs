@@ -5,6 +5,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Documents;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Persistence;
 using Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Scheduling;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Modules.SpacedRepetitionSystem.Infrastructure.Flashcards;
 
@@ -17,12 +18,16 @@ internal sealed partial class SqliteFlashcardStore :
     IFlashcardReviewWriter
 {
     private readonly IFlashcardScheduler scheduler;
+    private readonly ILogger<SqliteFlashcardStore>? logger;
 
-    internal SqliteFlashcardStore(IFlashcardScheduler scheduler)
+    internal SqliteFlashcardStore(
+        IFlashcardScheduler scheduler,
+        ILogger<SqliteFlashcardStore>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(scheduler);
 
         this.scheduler = scheduler;
+        this.logger = logger;
     }
 
     IReadOnlyList<FlashcardDeckSummaryReadModel> IFlashcardDeckReader.LoadDeckSummaries(string collectionId)

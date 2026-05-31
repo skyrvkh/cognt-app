@@ -69,9 +69,9 @@ internal sealed partial class SqliteFlashcardStore
 
         FlashcardCollectionStorage.WriteFlashcardFile(collectionPath, relPath, content);
 
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenRepositoryForCollectionPath(collectionPath, logger);
         long deckId = repository.EnsureDeck(deckName);
-        return repository.CreateCard(
+        long cardId = repository.CreateCard(
             deckId,
             cardType,
             relPath,
@@ -82,6 +82,7 @@ internal sealed partial class SqliteFlashcardStore
             sourceSnapshotHash: null,
             clozeIndex,
             initialSchedule);
-    }
 
+        return cardId;
+    }
 }

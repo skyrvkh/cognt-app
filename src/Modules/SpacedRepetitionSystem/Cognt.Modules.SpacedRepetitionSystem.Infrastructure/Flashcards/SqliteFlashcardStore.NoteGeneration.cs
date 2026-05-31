@@ -13,7 +13,7 @@ internal sealed partial class SqliteFlashcardStore
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceRelPath);
 
         string collectionPath = FlashcardCollectionStorage.GetExistingCollectionPath(collectionId);
-        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath);
+        using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionPath(collectionPath, logger);
         return repository.LoadActiveGeneratedCardsForSourceNote(sourceRelPath)
             .Where(record =>
                 !string.IsNullOrWhiteSpace(record.SourceContextId)
