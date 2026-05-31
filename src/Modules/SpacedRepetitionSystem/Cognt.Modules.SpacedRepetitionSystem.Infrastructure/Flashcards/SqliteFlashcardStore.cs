@@ -53,7 +53,7 @@ internal sealed partial class SqliteFlashcardStore :
             filter,
             sourceRelPath,
             limit);
-        CardSummaries loadedSummaries = LoadMaterializedCardSummaries(collectionPath, cards, tag, tags, searchText);
+        CardSummaries loadedSummaries = CardSummaryMaterializer.Load(collectionPath, cards, tag, tags, searchText);
 
         repository.MarkCardsDeleted(loadedSummaries.StaleCardIds);
         return loadedSummaries.Summaries;
