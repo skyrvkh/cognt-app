@@ -54,6 +54,9 @@
     <ApplicationDefinition Include="App.xaml" />
     <Resource Include="Assets\icon.ico" />
     <Resource Include="Assets\icon.png" />
+    <Resource Include="EditorHost\EditorWeb\src\fonts\*.ttf">
+      <Link>Assets\Fonts\%(Filename)%(Extension)</Link>
+    </Resource>
   </ItemGroup>
 
   <ItemGroup>
@@ -63,6 +66,25 @@
     <ProjectReference Include="..\Modules\ProgressTrackingAndAnalytics\Cognt.Modules.ProgressTrackingAndAnalytics.Application\Cognt.Modules.ProgressTrackingAndAnalytics.Application.csproj" />
     <ProjectReference Include="..\Modules\SpacedRepetitionSystem\Cognt.Modules.SpacedRepetitionSystem.Application\Cognt.Modules.SpacedRepetitionSystem.Application.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\Cognt.Wpf.EditorHost.csproj" />
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\EditorWeb\package.json" />
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\EditorWeb\tsconfig.json" />
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\EditorWeb\vite.config.js" />
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\EditorWeb\build.mjs" />
+    <EditorHostWebBuildInput Include="$(MSBuildProjectDirectory)\EditorHost\EditorWeb\src\**\*" />
+  </ItemGroup>
+
+  <Target Name="EnsureEditorHostWebDist"
+          BeforeTargets="CopyEditorHostWebOutput;CopyEditorHostWebOutputToPublish"
+          Inputs="@(EditorHostWebBuildInput)"
+          Outputs="$(MSBuildProjectDirectory)\EditorHost\obj\EditorWebBuild\dist\assets\blazor-blocksuite.js">
+    <MSBuild Projects="$(MSBuildProjectDirectory)\EditorHost\Cognt.Wpf.EditorHost.csproj"
+             Targets="BuildEditorWeb"
+             BuildInParallel="false"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=net10.0-windows10.0.17763.0" />
+  </Target>
 
   <Target Name="CopyEditorHostWebOutput"
           AfterTargets="Build"
