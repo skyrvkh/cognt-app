@@ -1,13 +1,15 @@
 :root {
   color-scheme: light dark;
-  --cognt-font-sans: "Inter", "Roboto", "Noto Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --cognt-font-display: "Inter", "Roboto", "Noto Sans", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --cognt-font-reading: "Source Sans Pro", "Inter", "Roboto", "Noto Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --cognt-font-mono: "Roboto Mono", "Cascadia Mono", "Cascadia Code", "Consolas", monospace;
+  --cognt-font-sans: "Inter";
+  --cognt-font-display: "Source Serif 4";
+  --cognt-font-reading: "Source Serif 4";
+  --cognt-font-mono: "Recursive";
   --affine-font-family: var(--cognt-font-sans);
   --affine-font-code-family: var(--cognt-font-mono);
+  --cognt-editor-code-font-size: 13px;
+  --cognt-editor-zoom: 1;
   font-family: var(--cognt-font-sans);
-  font-size: 15px;
+  font-size: var(--affine-font-base, 15px);
   line-height: 1.55;
   background: var(--cognt-editor-page, var(--affine-background-primary-color));
   color: var(--cognt-editor-ink, var(--affine-text-primary-color));
@@ -66,8 +68,9 @@ page-editor {
   background: var(--cognt-editor-page, var(--affine-background-primary-color));
   color: var(--cognt-editor-ink, var(--affine-text-primary-color));
   font-family: var(--cognt-font-reading);
-  font-size: 15px;
+  font-size: var(--affine-font-base, 15px);
   line-height: 1.62;
+  zoom: var(--cognt-editor-zoom, 1);
 }
 
 #editor-host {
@@ -122,11 +125,36 @@ rich-text,
   letter-spacing: 0;
 }
 
+.cognt-blocksuite-host h1,
+.cognt-blocksuite-host [data-block-id] h1 {
+  font-family: var(--cognt-font-display);
+  font-size: var(--affine-font-h1, 40px);
+}
+
+.cognt-blocksuite-host h2,
+.cognt-blocksuite-host [data-block-id] h2 {
+  font-family: var(--cognt-font-display);
+  font-size: var(--affine-font-h2, 32px);
+}
+
+.cognt-blocksuite-host h3,
+.cognt-blocksuite-host [data-block-id] h3 {
+  font-family: var(--cognt-font-display);
+  font-size: var(--affine-font-h3, 26px);
+}
+
+.cognt-blocksuite-host h4,
+.cognt-blocksuite-host [data-block-id] h4 {
+  font-family: var(--cognt-font-display);
+  font-size: var(--affine-font-h4, 21px);
+}
+
 .cognt-blocksuite-host code,
 .cognt-blocksuite-host pre,
 .cognt-blocksuite-host .affine-code-block-container,
 .cognt-blocksuite-host .affine-code-block-container * {
   font-family: var(--cognt-font-mono);
+  font-size: var(--cognt-editor-code-font-size, 13px);
 }
 
 .cognt-blocksuite-host [contenteditable='true'],
@@ -145,4 +173,27 @@ rich-text,
   background: var(--cognt-editor-cloze, #dbe4ee);
   text-shadow: none;
   text-decoration: none;
+}
+
+affine-reference[data-cognt-link-display='icon'] {
+  display: inline-flex !important;
+  width: 1.1em !important;
+  min-width: 1.1em !important;
+  height: 1.1em !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: -0.12em !important;
+  border-radius: 999px !important;
+  color: var(--cognt-editor-accent-strong, var(--affine-primary-color)) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  font-size: 0 !important;
+}
+
+affine-reference[data-cognt-link-display='icon']::after {
+  content: "↗";
+  display: inline-block;
+  font-size: 0.82rem;
+  line-height: 1;
+  font-weight: 700;
 }

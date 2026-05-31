@@ -1,3 +1,5 @@
+import { reportDiagnostic } from './host';
+
 export type CogntEditorTheme = {
   name?: string;
   Name?: string;
@@ -27,6 +29,22 @@ export type CogntEditorTheme = {
   Selection?: string;
   cloze?: string;
   Cloze?: string;
+  interfaceFontFamily?: string;
+  InterfaceFontFamily?: string;
+  displayFontFamily?: string;
+  DisplayFontFamily?: string;
+  readingFontFamily?: string;
+  ReadingFontFamily?: string;
+  codeFontFamily?: string;
+  CodeFontFamily?: string;
+  editorTextFontSize?: number;
+  EditorTextFontSize?: number;
+  editorHeadingFontSize?: number;
+  EditorHeadingFontSize?: number;
+  editorCodeFontSize?: number;
+  EditorCodeFontSize?: number;
+  editorZoomPercent?: number;
+  EditorZoomPercent?: number;
 };
 
 type NormalizedEditorTheme = Required<{
@@ -44,6 +62,14 @@ type NormalizedEditorTheme = Required<{
   accentSoft: string;
   selection: string;
   cloze: string;
+  interfaceFontFamily: string;
+  displayFontFamily: string;
+  readingFontFamily: string;
+  codeFontFamily: string;
+  editorTextFontSize: number;
+  editorHeadingFontSize: number;
+  editorCodeFontSize: number;
+  editorZoomPercent: number;
 }>;
 
 const fallbackTheme: NormalizedEditorTheme = {
@@ -61,6 +87,14 @@ const fallbackTheme: NormalizedEditorTheme = {
   accentSoft: '#EEF2FF',
   selection: '#DDE7FF',
   cloze: '#DBE4EE',
+  interfaceFontFamily: 'Inter',
+  displayFontFamily: 'Source Serif 4',
+  readingFontFamily: 'Source Serif 4',
+  codeFontFamily: 'Recursive',
+  editorTextFontSize: 15,
+  editorHeadingFontSize: 40,
+  editorCodeFontSize: 13,
+  editorZoomPercent: 100,
 };
 
 export function applyCogntEditorTheme(hostElement: HTMLElement, theme: CogntEditorTheme) {
@@ -70,7 +104,7 @@ export function applyCogntEditorTheme(hostElement: HTMLElement, theme: CogntEdit
   const shell = hostElement.closest<HTMLElement>('.cognt-blocksuite-host') ?? hostElement;
 
   for (const target of [documentElement, body, shell, hostElement]) {
-    applyVariables(target, normalized);
+    applyThemeVariables(target, normalized);
   }
 
   documentElement.dataset.theme = normalized.mode;
@@ -81,12 +115,63 @@ export function applyCogntEditorTheme(hostElement: HTMLElement, theme: CogntEdit
   shell.dataset.cogntThemeMode = normalized.mode;
 }
 
-function applyVariables(element: HTMLElement, theme: NormalizedEditorTheme) {
-  const variables: Record<string, string> = {
-    '--cognt-font-sans': '"Inter", "Roboto", "Noto Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-    '--cognt-font-display': '"Inter", "Roboto", "Noto Sans", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-    '--cognt-font-reading': '"Source Sans Pro", "Inter", "Roboto", "Noto Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-    '--cognt-font-mono': '"Roboto Mono", "Cascadia Mono", "Cascadia Code", "Consolas", monospace',
+function normalizeTheme(theme: CogntEditorTheme): NormalizedEditorTheme {
+  const mode = getValue(theme, 'mode').toLowerCase() === 'dark' ? 'dark' : 'light';
+
+  return {
+    name: getValue(theme, 'name') || fallbackTheme.name,
+    mode,
+    page: getValue(theme, 'page') || fallbackTheme.page,
+    surface: getValue(theme, 'surface') || fallbackTheme.surface,
+    panel: getValue(theme, 'panel') || fallbackTheme.panel,
+    panelAlt: getValue(theme, 'panelAlt') || fallbackTheme.panelAlt,
+    line: getValue(theme, 'line') || fallbackTheme.line,
+    ink: getValue(theme, 'ink') || fallbackTheme.ink,
+    muted: getValue(theme, 'muted') || fallbackTheme.muted,
+    accent: getValue(theme, 'accent') || fallbackTheme.accent,
+    accentStrong: getValue(theme, 'accentStrong') || fallbackTheme.accentStrong,
+    accentSoft: getValue(theme, 'accentSoft') || fallbackTheme.accentSoft,
+    selection: getValue(theme, 'selection') || fallbackTheme.selection,
+    cloze: getValue(theme, 'cloze') || fallbackTheme.cloze,
+    interfaceFontFamily: cssFontStack(
+      getValue(theme, 'interfaceFontFamily') || fallbackTheme.interfaceFontFamily,
+      fallbackTheme.interfaceFontFamily),
+    displayFontFamily: cssFontStack(
+      getValue(theme, 'displayFontFamily') || fallbackTheme.displayFontFamily,
+      fallbackTheme.displayFontFamily),
+    readingFontFamily: cssFontStack(
+      getValue(theme, 'readingFontFamily') || fallbackTheme.readingFontFamily,
+      fallbackTheme.readingFontFamily),
+    codeFontFamily: cssFontStack(
+      getValue(theme, 'codeFontFamily') || fallbackTheme.codeFontFamily,
+      fallbackTheme.codeFontFamily),
+    editorTextFontSize: getNumberValue(theme, 'editorTextFontSize', fallbackTheme.editorTextFontSize, 10, 28),
+    editorHeadingFontSize: getNumberValue(theme, 'editorHeadingFontSize', fallbackTheme.editorHeadingFontSize, 18, 72),
+    editorCodeFontSize: getNumberValue(theme, 'editorCodeFontSize', fallbackTheme.editorCodeFontSize, 9, 24),
+    editorZoomPercent: getNumberValue(theme, 'editorZoomPercent', fallbackTheme.editorZoomPercent, 50, 200),
+  };
+}
+
+function applyThemeVariables(element: HTMLElement, theme: NormalizedEditorTheme) {
+  const variables = buildThemeVariables(theme);
+  for (const [name, value] of Object.entries(variables)) {
+    element.style.setProperty(name, value);
+  }
+}
+
+function buildThemeVariables(theme: NormalizedEditorTheme): Record<string, string> {
+  const editorTextSize = Math.round(theme.editorTextFontSize);
+  const headingSize = Math.round(theme.editorHeadingFontSize);
+  const codeSize = Math.round(theme.editorCodeFontSize);
+  const heading2Size = Math.max(editorTextSize + 8, Math.round(headingSize * 0.8));
+  const heading3Size = Math.max(editorTextSize + 5, Math.round(headingSize * 0.65));
+  const heading4Size = Math.max(editorTextSize + 2, Math.round(headingSize * 0.52));
+
+  return {
+    '--cognt-font-sans': theme.interfaceFontFamily,
+    '--cognt-font-display': theme.displayFontFamily,
+    '--cognt-font-reading': theme.readingFontFamily,
+    '--cognt-font-mono': theme.codeFontFamily,
     '--cognt-editor-page': theme.page,
     '--cognt-editor-surface': theme.surface,
     '--cognt-editor-panel': theme.panel,
@@ -102,13 +187,15 @@ function applyVariables(element: HTMLElement, theme: NormalizedEditorTheme) {
     '--affine-theme-mode': theme.mode,
     '--affine-font-family': 'var(--cognt-font-reading)',
     '--affine-font-code-family': 'var(--cognt-font-mono)',
-    '--affine-font-h1': '40px',
-    '--affine-font-h2': '32px',
-    '--affine-font-h3': '26px',
-    '--affine-font-h4': '21px',
-    '--affine-font-base': '15px',
-    '--affine-font-sm': '13px',
-    '--affine-font-xs': '12px',
+    '--affine-font-h1': `${headingSize}px`,
+    '--affine-font-h2': `${heading2Size}px`,
+    '--affine-font-h3': `${heading3Size}px`,
+    '--affine-font-h4': `${heading4Size}px`,
+    '--affine-font-base': `${editorTextSize}px`,
+    '--affine-font-sm': `${Math.max(10, editorTextSize - 2)}px`,
+    '--affine-font-xs': `${Math.max(9, editorTextSize - 3)}px`,
+    '--cognt-editor-code-font-size': `${codeSize}px`,
+    '--cognt-editor-zoom': `${theme.editorZoomPercent / 100}`,
     '--affine-background-primary-color': theme.page,
     '--affine-background-secondary-color': theme.panel,
     '--affine-background-tertiary-color': theme.panelAlt,
@@ -165,31 +252,6 @@ function applyVariables(element: HTMLElement, theme: NormalizedEditorTheme) {
     '--affine-v2-icon-tertiary': theme.muted,
     '--affine-v2-icon-monotone': theme.muted,
   };
-
-  for (const [name, value] of Object.entries(variables)) {
-    element.style.setProperty(name, value);
-  }
-}
-
-function normalizeTheme(theme: CogntEditorTheme): NormalizedEditorTheme {
-  const mode = getValue(theme, 'mode').toLowerCase() === 'dark' ? 'dark' : 'light';
-
-  return {
-    name: getValue(theme, 'name') || fallbackTheme.name,
-    mode,
-    page: getValue(theme, 'page') || fallbackTheme.page,
-    surface: getValue(theme, 'surface') || fallbackTheme.surface,
-    panel: getValue(theme, 'panel') || fallbackTheme.panel,
-    panelAlt: getValue(theme, 'panelAlt') || fallbackTheme.panelAlt,
-    line: getValue(theme, 'line') || fallbackTheme.line,
-    ink: getValue(theme, 'ink') || fallbackTheme.ink,
-    muted: getValue(theme, 'muted') || fallbackTheme.muted,
-    accent: getValue(theme, 'accent') || fallbackTheme.accent,
-    accentStrong: getValue(theme, 'accentStrong') || fallbackTheme.accentStrong,
-    accentSoft: getValue(theme, 'accentSoft') || fallbackTheme.accentSoft,
-    selection: getValue(theme, 'selection') || fallbackTheme.selection,
-    cloze: getValue(theme, 'cloze') || fallbackTheme.cloze,
-  };
 }
 
 function getValue(theme: CogntEditorTheme, key: keyof CogntEditorTheme) {
@@ -197,13 +259,57 @@ function getValue(theme: CogntEditorTheme, key: keyof CogntEditorTheme) {
   return typeof value === 'string' ? value : '';
 }
 
-function capitalize(value: string) {
-  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
+function getNumberValue(
+  theme: CogntEditorTheme,
+  key: keyof CogntEditorTheme,
+  fallback: number,
+  minimum: number,
+  maximum: number
+) {
+  const raw = theme[key] ?? theme[capitalize(key) as keyof CogntEditorTheme];
+  const value = typeof raw === 'number' ? raw : Number.parseFloat(String(raw ?? ''));
+  if (!Number.isFinite(value)) {
+    reportDiagnostic('warn', 'Using fallback Cognt editor theme number value.', {
+      key,
+      fallback,
+      minimum,
+      maximum,
+    });
+    return fallback;
+  }
+
+  return Math.min(maximum, Math.max(minimum, Math.round(value)));
+}
+
+function cssFontStack(value: string, fallback: string) {
+  const stack = value
+    .split(',')
+    .map(font => normalizeCssFontName(font.trim()))
+    .filter(Boolean)
+    .join(', ');
+
+  return stack.length > 0 ? stack : fallback;
+}
+
+function normalizeCssFontName(font: string) {
+  if (font.length === 0 || font.startsWith('"') || font.startsWith("'")) {
+    return font;
+  }
+
+  if (/[^a-zA-Z-]/.test(font)) {
+    return `"${font.replaceAll('"', '\\"')}"`;
+  }
+
+  return font;
 }
 
 function alpha(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
   if (normalized.length !== 6) {
+    reportDiagnostic('warn', 'Skipped alpha conversion for non-hex color.', {
+      hex,
+      opacity,
+    });
     return hex;
   }
 
@@ -211,4 +317,8 @@ function alpha(hex: string, opacity: number) {
   const green = Number.parseInt(normalized.slice(2, 4), 16);
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+function capitalize(value: string) {
+  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
 }

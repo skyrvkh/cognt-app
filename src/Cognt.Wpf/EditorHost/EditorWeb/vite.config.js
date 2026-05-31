@@ -18,6 +18,7 @@ export default defineConfig({
         blazorBlocksuite: fileURLToPath(new URL('./src/blazor-blocksuite.ts', import.meta.url)),
       },
       output: {
+        inlineDynamicImports: true,
         entryFileNames: 'assets/blazor-blocksuite.js',
         assetFileNames: assetInfo =>
           assetInfo.name === 'style.css'

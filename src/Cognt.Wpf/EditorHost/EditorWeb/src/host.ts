@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     __cogntPostHost?: (message: unknown) => void;
+    __cogntEnableInfoDiagnostics?: boolean;
   }
 }
 
@@ -8,8 +9,20 @@ export function postHost(message: unknown) {
   window.__cogntPostHost?.(message);
 }
 
-export function reportDiagnostic(level: 'info' | 'warn' | 'error', message: string) {
-  postHost({ type: 'diagnostic', level, message });
+export function reportDiagnostic(
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  details?: Record<string, unknown>
+) {
+  if (level === 'info' && window.__cogntEnableInfoDiagnostics !== true) {
+    return;
+  }
+
+  postHost({
+    type: 'diagnostic',
+    level,
+    message: details ? `${message} ${formatDiagnosticDetails(details)}` : message,
+  });
 }
 
 export function installHostDiagnostics() {
@@ -36,4 +49,12 @@ function errorDetail(error: unknown, fallback: string) {
   }
 
   return error ? String(error) : fallback;
+}
+
+function formatDiagnosticDetails(details: Record<string, unknown>) {
+  try {
+    return JSON.stringify(details);
+  } catch (error) {
+    return `[details unavailable: ${errorDetail(error, 'serialization failed')}]`;
+  }
 }
