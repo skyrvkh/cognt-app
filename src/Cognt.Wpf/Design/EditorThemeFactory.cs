@@ -6,6 +6,14 @@ internal static class EditorThemeFactory
 {
     internal static EditorTheme Create(ApplicationTheme theme)
     {
+        return Create(EditorSettings.Default with { Theme = theme });
+    }
+
+    internal static EditorTheme Create(EditorSettings settings)
+    {
+        EditorSettings normalized = settings.Normalize();
+        ApplicationTheme theme = normalized.Theme;
+
         return new EditorTheme(
             Name: theme.ToString(),
             Mode: theme == ApplicationTheme.Graphite ? "dark" : "light",
@@ -20,6 +28,14 @@ internal static class EditorThemeFactory
             AccentStrong: ThemeResourceLookup.ColorHex("AccentStrongBrush", "#4254E8"),
             AccentSoft: ThemeResourceLookup.ColorHex("AccentSoftBrush", "#EEF2FF"),
             Selection: ThemeResourceLookup.ColorHex("EditorSelectionBrush", "#DDE7FF"),
-            Cloze: ThemeResourceLookup.ColorHex("EditorClozeBrush", "#DBE4EE"));
+            Cloze: ThemeResourceLookup.ColorHex("EditorClozeBrush", "#DBE4EE"),
+            InterfaceFontFamily: normalized.InterfaceFontFamily,
+            DisplayFontFamily: normalized.DisplayFontFamily,
+            ReadingFontFamily: normalized.ReadingFontFamily,
+            CodeFontFamily: normalized.CodeFontFamily,
+            EditorTextFontSize: normalized.EditorTextFontSize,
+            EditorHeadingFontSize: normalized.EditorHeadingFontSize,
+            EditorCodeFontSize: normalized.EditorCodeFontSize,
+            EditorZoomPercent: normalized.EditorZoomPercent);
     }
 }

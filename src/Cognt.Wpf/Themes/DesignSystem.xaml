@@ -10,7 +10,7 @@
     </Style>
 
     <Style x:Key="MetricTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AppDisplayTextStyle}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeTitle}" />
         <Setter Property="LineHeight" Value="{StaticResource LineHeightTitle}" />
     </Style>
 
@@ -159,7 +159,7 @@
         <Setter Property="Foreground" Value="{DynamicResource ContextMenuForegroundBrush}" />
         <Setter Property="Padding" Value="10,7" />
         <Setter Property="MinHeight" Value="30" />
-        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
         <Style.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
                 <Setter Property="Background" Value="{DynamicResource ContextMenuHoverBackgroundBrush}" />
@@ -189,7 +189,7 @@
     </Style>
 
     <Style x:Key="MetaTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
         <Setter Property="LineHeight" Value="{StaticResource LineHeightBody}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
@@ -198,8 +198,8 @@
         <Setter Property="Height" Value="38" />
         <Setter Property="Padding" Value="12,8" />
         <Setter Property="Margin" Value="0,8,0,0" />
-        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBodyLarge}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeBodyLarge}" />
     </Style>
 
     <Style x:Key="ThemeModeToggleStyle" TargetType="{x:Type ToggleButton}">

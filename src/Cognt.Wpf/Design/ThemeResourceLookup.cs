@@ -15,7 +15,7 @@ internal static class ThemeResourceLookup
     internal static FontFamily FontFamily(string key, string fallback)
     {
         object? resource = Application.Current?.TryFindResource(key);
-        return resource as FontFamily ?? new FontFamily(fallback);
+        return resource as FontFamily ?? BundledFontFamilyCatalog.CreateFontFamily(fallback);
     }
 
     internal static Style? Style(string key)

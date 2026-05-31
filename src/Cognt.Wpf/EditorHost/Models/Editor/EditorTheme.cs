@@ -14,4 +14,12 @@ public sealed record EditorTheme(
     string AccentStrong,
     string AccentSoft,
     string Selection,
-    string Cloze);
+    string Cloze,
+    string InterfaceFontFamily,
+    string DisplayFontFamily,
+    string ReadingFontFamily,
+    string CodeFontFamily,
+    double EditorTextFontSize,
+    double EditorHeadingFontSize,
+    double EditorCodeFontSize,
+    double EditorZoomPercent);
