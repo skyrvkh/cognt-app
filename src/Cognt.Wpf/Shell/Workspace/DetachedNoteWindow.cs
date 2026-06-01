@@ -2,17 +2,20 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Workspace;
 
 internal sealed class DetachedNoteWindow : Window
 {
     private readonly TextBlock titleText = new();
+    private readonly ILogger? logger;
     private Point dragStart;
     private bool isDragging;
 
-    internal DetachedNoteWindow(string title)
+    internal DetachedNoteWindow(string title, ILogger? logger = null)
     {
+        this.logger = logger;
         Title = title;
         Width = 920;
         Height = 680;
@@ -94,10 +97,12 @@ internal sealed class DetachedNoteWindow : Window
         {
             DragMove();
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            logger?.LogWarning(ex, "Detached note window DragMove failed. Title={Title}", Title);
             return;
         }
+
 
         HeaderDragCompleted?.Invoke(
             this,
