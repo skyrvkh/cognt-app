@@ -1,7 +1,9 @@
 import type { Doc } from '@blocksuite/store';
+import { reportDiagnostic } from '../host';
 
 export function findEditableElement(root: ParentNode | ShadowRoot | null): HTMLElement | null {
   if (!root) {
+    reportDiagnostic('info', 'Editable element lookup skipped: root is null.');
     return null;
   }
 
@@ -10,7 +12,12 @@ export function findEditableElement(root: ParentNode | ShadowRoot | null): HTMLE
     return editable;
   }
 
-  return findElementDeep(root, '.inline-editor, rich-text');
+  const fallback = findElementDeep(root, '.inline-editor, rich-text');
+  if (!fallback) {
+    reportDiagnostic('info', 'Editable element lookup did not find an editable target.');
+  }
+
+  return fallback;
 }
 
 export function getInteractivityDiagnostic(doc: Doc | null, root: ParentNode | ShadowRoot) {
@@ -19,7 +26,7 @@ export function getInteractivityDiagnostic(doc: Doc | null, root: ParentNode | S
     .filter(element => (element as HTMLElement & { readonly?: boolean }).readonly);
   const falseContentEditableCount = findElementsDeep(root, '[contenteditable="false"]').length;
 
-  return [
+  const diagnostic = [
     `docReadonly=${String(doc?.readonly ?? false)}`,
     `editable=${String(!!editable)}`,
     `editableTag=${editable?.tagName.toLowerCase() ?? 'none'}`,
@@ -27,6 +34,7 @@ export function getInteractivityDiagnostic(doc: Doc | null, root: ParentNode | S
     `readOnlyRichTexts=${readOnlyRichTexts.length}`,
     `falseContentEditable=${falseContentEditableCount}`,
   ].join(', ');
+  return diagnostic;
 }
 
 export function findElementDeep(root: ParentNode | ShadowRoot, selector: string): HTMLElement | null {
@@ -64,6 +72,8 @@ export function findElementsDeep(root: ParentNode | ShadowRoot, selector: string
 
 export function waitForNextAnimationFrame() {
   return new Promise<void>(resolve => {
-    window.requestAnimationFrame(() => resolve());
+    window.requestAnimationFrame(() => {
+      resolve();
+    });
   });
 }
