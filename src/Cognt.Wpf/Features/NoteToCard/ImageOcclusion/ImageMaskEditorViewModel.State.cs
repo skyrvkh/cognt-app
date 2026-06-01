@@ -22,9 +22,9 @@ public sealed partial class ImageMaskEditorViewModel
         UpdateCommandStates();
     }
 
-    private EditorSnapshot CreateSnapshot()
+    private ImageMaskEditorSnapshot CreateSnapshot()
     {
-        return new EditorSnapshot(
+        return new ImageMaskEditorSnapshot(
             currentContext,
             selectedMaskId,
             selectedMaskLabelText,
@@ -33,7 +33,7 @@ public sealed partial class ImageMaskEditorViewModel
             selectedTargetOption?.TargetId);
     }
 
-    private void RestoreSnapshot(EditorSnapshot snapshot)
+    private void RestoreSnapshot(ImageMaskEditorSnapshot snapshot)
     {
         currentContext = snapshot.Context;
         ReloadEditorStateFromContext(snapshot.SelectedMaskId, preserveFields: false, markDirty: true);
@@ -151,8 +151,11 @@ public sealed partial class ImageMaskEditorViewModel
                 item.Update(mask);
             }
 
-            item.IsInvalid = !IsMaskValid(mask);
-            item.VisualRole = ResolveVisualRole(mask, item.IsInvalid, string.Equals(mask.Id, SelectedMaskId, StringComparison.Ordinal));
+            item.IsInvalid = !ImageMaskEditorMaskState.IsValid(mask);
+            item.VisualRole = ImageMaskEditorMaskState.ResolveVisualRole(
+                mask,
+                item.IsInvalid,
+                string.Equals(mask.Id, SelectedMaskId, StringComparison.Ordinal));
             item.IsSelected = string.Equals(mask.Id, SelectedMaskId, StringComparison.Ordinal);
         }
 
@@ -171,7 +174,7 @@ public sealed partial class ImageMaskEditorViewModel
         {
             bool isSelected = string.Equals(mask.Id, SelectedMaskId, StringComparison.Ordinal);
             mask.IsSelected = isSelected;
-            mask.VisualRole = ResolveVisualRole(mask.Mask, mask.IsInvalid, isSelected);
+            mask.VisualRole = ImageMaskEditorMaskState.ResolveVisualRole(mask.Mask, mask.IsInvalid, isSelected);
         }
 
         ImageOcclusionMask? selectedMask = FindSelectedMask();
@@ -260,28 +263,6 @@ public sealed partial class ImageMaskEditorViewModel
         return CurrentImageSurface?.Masks.FirstOrDefault()?.Id;
     }
 
-    private static ImageMaskVisualRole ResolveVisualRole(ImageOcclusionMask mask, bool isInvalid, bool isSelected)
-    {
-        if (mask.IsDisabled)
-        {
-            return ImageMaskVisualRole.Disabled;
-        }
-
-        if (isSelected)
-        {
-            return ImageMaskVisualRole.Selected;
-        }
-
-        if (isInvalid)
-        {
-            return ImageMaskVisualRole.Invalid;
-        }
-
-        return string.IsNullOrWhiteSpace(mask.TargetId)
-            ? ImageMaskVisualRole.Draft
-            : ImageMaskVisualRole.ResolvedTarget;
-    }
-
     private void UpdateCommandStates()
     {
         OnPropertyChanged(nameof(CanUndo));
@@ -328,11 +309,4 @@ public sealed partial class ImageMaskEditorViewModel
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private readonly record struct EditorSnapshot(
-        CardContext Context,
-        string? SelectedMaskId,
-        string SelectedMaskLabelText,
-        string SelectedMaskAnswerText,
-        string SelectedMaskHintText,
-        string? SelectedTargetId);
 }

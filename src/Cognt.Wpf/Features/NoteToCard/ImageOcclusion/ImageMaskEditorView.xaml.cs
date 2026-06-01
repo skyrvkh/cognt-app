@@ -1,19 +1,23 @@
 using System.ComponentModel;
 using System.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Features.NoteToCard.ImageOcclusion;
 
 public partial class ImageMaskEditorView : Window
 {
     private readonly Func<ImageMaskEditorResult, Task>? applyAsync;
+    private readonly ILogger<ImageMaskEditorView>? logger;
 
     public ImageMaskEditorView(
         ImageMaskEditorViewModel viewModel,
-        Func<ImageMaskEditorResult, Task>? applyAsync = null)
+        Func<ImageMaskEditorResult, Task>? applyAsync = null,
+        ILogger<ImageMaskEditorView>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
 
         this.applyAsync = applyAsync;
+        this.logger = logger;
         InitializeComponent();
         DataContext = viewModel;
     }
@@ -66,11 +70,17 @@ public partial class ImageMaskEditorView : Window
 
         try
         {
-            await applyAsync(ViewModel.BuildResult(saved: true));
+            ImageMaskEditorResult result = ViewModel.BuildResult(saved: true);
+            await applyAsync(result);
             ViewModel.MarkSaved();
         }
         catch (Exception ex)
         {
+            logger?.LogError(
+                ex,
+                "Image occlusion apply failed. SourceRelPath={SourceRelPath} ImageBlockId={ImageBlockId}",
+                ViewModel.SourceRelPath,
+                ViewModel.ImageBlockId);
             MessageBox.Show(
                 this,
                 ex.Message,

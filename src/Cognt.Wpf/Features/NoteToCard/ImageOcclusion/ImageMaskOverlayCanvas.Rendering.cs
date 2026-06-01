@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
+using CogntApp.Design;
 
 namespace CogntApp.Features.NoteToCard.ImageOcclusion;
 
@@ -91,7 +92,7 @@ public sealed partial class ImageMaskOverlayCanvas
         }
 
         FontFamily fontFamily = TryFindResource("AppSansFontFamily") as FontFamily
-            ?? new FontFamily("Inter, Roboto, Noto Sans, Segoe UI");
+            ?? BundledFontFamilyCatalog.CreateFontFamily(EditorSettings.DefaultInterfaceFontFamily);
 
         FormattedText text = new(
             item.Label,

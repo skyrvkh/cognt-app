@@ -11,8 +11,8 @@ public sealed partial class ImageMaskEditorViewModel : ObservableObject
 {
     private const double MinimumNormalizedSize = 0.01d;
 
-    private readonly Stack<EditorSnapshot> undoSnapshots = [];
-    private readonly Stack<EditorSnapshot> redoSnapshots = [];
+    private readonly Stack<ImageMaskEditorSnapshot> undoSnapshots = [];
+    private readonly Stack<ImageMaskEditorSnapshot> redoSnapshots = [];
     private readonly ImageMaskCoordinateMapper coordinateMapper = new();
     private CardContext currentContext;
     private string? selectedMaskId;
@@ -46,7 +46,9 @@ public sealed partial class ImageMaskEditorViewModel : ObservableObject
             if (parameter is string text && Enum.TryParse<ImageMaskEditorTool>(text, ignoreCase: true, out ImageMaskEditorTool parsed))
             {
                 CurrentTool = parsed;
+                return;
             }
+
         });
         DeleteSelectedMaskCommand = new RelayCommand(_ => DeleteSelectedMask(), _ => HasSelection);
         LinkSelectedMaskCommand = new RelayCommand(

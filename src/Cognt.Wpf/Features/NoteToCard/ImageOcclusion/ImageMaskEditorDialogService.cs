@@ -1,9 +1,17 @@
 using System.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Features.NoteToCard.ImageOcclusion;
 
 public sealed class ImageMaskEditorDialogService : IImageMaskEditorDialogService
 {
+    private readonly ILoggerFactory loggerFactory;
+
+    public ImageMaskEditorDialogService(ILoggerFactory loggerFactory)
+    {
+        this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+    }
+
     public Task<ImageMaskEditorResult> ShowAsync(
         OpenImageMaskEditorRequest request,
         Func<ImageMaskEditorResult, Task>? applyAsync = null,
@@ -12,8 +20,12 @@ public sealed class ImageMaskEditorDialogService : IImageMaskEditorDialogService
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
+
         ImageMaskEditorViewModel viewModel = new(request);
-        ImageMaskEditorView view = new(viewModel, applyAsync)
+        ImageMaskEditorView view = new(
+            viewModel,
+            applyAsync,
+            loggerFactory.CreateLogger<ImageMaskEditorView>())
         {
             Owner = Application.Current?.MainWindow,
         };
@@ -28,6 +40,7 @@ public sealed class ImageMaskEditorDialogService : IImageMaskEditorDialogService
                 request.Context,
                 request.Context.Images.FirstOrDefault(image =>
                     string.Equals(image.ImageBlockId, request.ImageBlockId, StringComparison.Ordinal))?.Masks ?? []);
+
 
         return Task.FromResult(result);
     }

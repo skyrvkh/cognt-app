@@ -56,7 +56,7 @@ internal static class CardCandidateTextPreview
         if (matches.Count == 0)
         {
             return string.IsNullOrWhiteSpace(text)
-                ? "No previewable text was found in this card context."
+                ? "No previewable text was found in this card candidate."
                 : text;
         }
 
