@@ -1,5 +1,6 @@
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -7,16 +8,19 @@ internal sealed class StartupWorkflowController
 {
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<StartupWorkflowController>? logger;
 
     internal StartupWorkflowController(
         MainViewModel viewModel,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<StartupWorkflowController>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
 
         this.viewModel = viewModel;
         this.dialogs = dialogs;
+        this.logger = logger;
     }
 
     internal async Task InitializeAsync()
@@ -29,6 +33,7 @@ internal sealed class StartupWorkflowController
             },
             dialogs,
             "Startup Failed",
-            "The collection could not be initialized");
+            "The collection could not be initialized",
+            logger);
     }
 }

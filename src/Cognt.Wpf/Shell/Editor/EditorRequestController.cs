@@ -1,6 +1,7 @@
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -8,16 +9,19 @@ internal sealed class EditorRequestController
 {
     private readonly EditorWorkflowCoordinator editorWorkflow;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<EditorRequestController>? logger;
 
     internal EditorRequestController(
         EditorWorkflowCoordinator editorWorkflow,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<EditorRequestController>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(editorWorkflow);
         ArgumentNullException.ThrowIfNull(dialogs);
 
         this.editorWorkflow = editorWorkflow;
         this.dialogs = dialogs;
+        this.logger = logger;
     }
 
     internal async Task HandleClearEditorRequestedAsync()
@@ -26,7 +30,8 @@ internal sealed class EditorRequestController
             editorWorkflow.ShowEmptyEditorViewAsync,
             dialogs,
             "Editor Not Ready",
-            "The editor could not be cleared");
+            "The editor could not be cleared",
+            logger);
     }
 
     internal async Task HandleOpenNoteRequestedAsync(OpenNoteRequestedEventArgs e)
@@ -37,7 +42,8 @@ internal sealed class EditorRequestController
             () => editorWorkflow.OpenNoteAsync(e.NotePath, e.SelectInTree),
             dialogs,
             "Open Note Failed",
-            "The note could not be opened");
+            "The note could not be opened",
+            logger);
     }
 
     internal void HandleMentionTargetsChanged()
@@ -49,6 +55,7 @@ internal sealed class EditorRequestController
     internal void HandleUserMessageRequested(UserMessageRequestedEventArgs e)
     {
         ArgumentNullException.ThrowIfNull(e);
+
         dialogs.ShowWarning(e.Title, e.Message);
     }
 
@@ -63,6 +70,7 @@ internal sealed class EditorRequestController
             () => editorWorkflow.SetReadOnlyAsync(isReadOnly),
             dialogs,
             "Editor Mode",
-            "The editor mode could not be changed");
+            "The editor mode could not be changed",
+            logger);
     }
 }

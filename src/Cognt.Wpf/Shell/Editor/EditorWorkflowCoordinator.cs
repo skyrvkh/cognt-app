@@ -6,6 +6,7 @@ using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -18,8 +19,10 @@ internal sealed partial class EditorWorkflowCoordinator
     private readonly Func<Task> closeReviewIfActiveAsync;
     private readonly Action hideOverlay;
     private readonly Action<string> selectNote;
+    private readonly EditorDerivedDataRefreshController refreshes;
+    private readonly EditorHostRequestController hostRequests;
+    private readonly ILogger<EditorWorkflowCoordinator>? logger;
     private int editorOpenRequestId;
-    private int mentionTargetsRefreshRequestId;
     private string? retryNotePath;
     private bool retrySelectInTree;
 
@@ -30,7 +33,8 @@ internal sealed partial class EditorWorkflowCoordinator
         IImageMaskEditorDialogService imageMaskEditorDialogs,
         Func<Task> closeReviewIfActiveAsync,
         Action hideOverlay,
-        Action<string> selectNote)
+        Action<string> selectNote,
+        ILogger<EditorWorkflowCoordinator>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(editorView);
@@ -47,18 +51,21 @@ internal sealed partial class EditorWorkflowCoordinator
         this.closeReviewIfActiveAsync = closeReviewIfActiveAsync;
         this.hideOverlay = hideOverlay;
         this.selectNote = selectNote;
+        this.logger = logger;
+        refreshes = new EditorDerivedDataRefreshController(
+            viewModel,
+            editorView,
+            dialogs,
+            logger);
+        hostRequests = new EditorHostRequestController(
+            viewModel,
+            editorView,
+            refreshes,
+            OpenNoteAsync,
+            OpenImageOcclusionForImageAsync,
+            logger);
 
         this.viewModel.GetCurrentEditorContent = editorView.GetContent;
-        editorView.ContentChanged += EditorView_ContentChanged;
-        editorView.CreateExtractRequested += EditorView_CreateExtractRequested;
-        editorView.SaveClozeRequested += EditorView_SaveClozeRequested;
-        editorView.OpenImageOcclusionRequested += EditorView_OpenImageOcclusionRequested;
-        editorView.MentionSearchRequested += EditorView_MentionSearchRequested;
-        editorView.MentionPreviewRequested += EditorView_MentionPreviewRequested;
-        editorView.OpenMentionRequested += EditorView_OpenMentionRequested;
-        editorView.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
-        editorView.AttachFileRequested += EditorView_AttachFileRequested;
-        editorView.ReadAttachmentRequested += EditorView_ReadAttachmentRequested;
         editorView.RetryRequested += EditorView_RetryRequested;
     }
 
@@ -81,6 +88,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Editor workflow note preparation failed. NotePath={NotePath}", notePath);
             editorView.ShowFailedState($"The note could not be opened: {ex.Message}", canRetry: true);
             return false;
         }
@@ -107,7 +115,11 @@ internal sealed partial class EditorWorkflowCoordinator
         {
             if (requestId == editorOpenRequestId)
             {
+                logger?.LogError(ex, "Editor workflow note load failed. RequestId={RequestId} NotePath={NotePath}", requestId, note.NotePath);
                 editorView.ShowFailedState($"The editor could not open this note: {ex.Message}", canRetry: true);
+            }
+            else
+            {
             }
 
             return false;
@@ -121,8 +133,8 @@ internal sealed partial class EditorWorkflowCoordinator
         viewModel.CompleteOpenNote(note);
         retryNotePath = null;
         hideOverlay();
-        RefreshDocumentLinks(note.Content);
-        QueueMentionTargetsRefresh();
+        refreshes.RefreshDocumentLinks(note.Content);
+        refreshes.QueueMentionTargetsRefresh();
 
         if (selectInTree)
         {
@@ -149,9 +161,13 @@ internal sealed partial class EditorWorkflowCoordinator
         {
             if (requestId == editorOpenRequestId)
             {
+                logger?.LogError(ex, "Editor workflow clear editor failed. RequestId={RequestId}", requestId);
                 dialogs.ShowWarning(
                     "Editor Not Ready",
                     $"The editor could not be cleared: {ex.Message}");
+            }
+            else
+            {
             }
         }
     }

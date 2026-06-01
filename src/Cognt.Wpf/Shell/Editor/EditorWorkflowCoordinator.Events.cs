@@ -4,6 +4,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Attachments;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Models.Editor;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -25,6 +26,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Editor extract note failed. SourcePath={SourcePath}", sourcePath);
             editorView.PostExtractResult(ok: false, error: ex.Message);
         }
     }
@@ -46,8 +48,15 @@ internal sealed partial class EditorWorkflowCoordinator
                 RefreshDocumentLinks(e.Content);
                 return true;
             },
-            _ => editorView.PostSaveResult(ok: true),
-            ex => editorView.PostSaveResult(ok: false, error: ex.Message));
+            _ =>
+            {
+                editorView.PostSaveResult(ok: true);
+            },
+            ex =>
+            {
+                logger?.LogError(ex, "Editor cloze save failed. SourcePath={SourcePath} BlockId={BlockId}", e.SourcePath, e.BlockId);
+                editorView.PostSaveResult(ok: false, error: ex.Message);
+            });
     }
 
     private async void EditorView_OpenImageOcclusionRequested(object? sender, OpenImageOcclusionRequestedEventArgs e)
@@ -60,25 +69,33 @@ internal sealed partial class EditorWorkflowCoordinator
 
     private void EditorView_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
     {
-        e.Complete(viewModel.SearchMentionTargets(e.Query, e.Limit));
+        IReadOnlyList<KnowledgeMentionTargetReadModel> targets = viewModel.SearchMentionTargets(e.Query, e.Limit);
+        e.Complete(targets);
     }
 
     private void EditorView_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
     {
         PostEditorActionResult(
             () => viewModel.ReadMentionPreview(e.RelativePath, e.MaxCharacters),
-            preview => editorView.PostMentionPreviewResult(
-                e.RequestId,
-                e.RelativePath,
-                e.Mode,
-                ok: true,
-                documentContent: preview),
-            ex => editorView.PostMentionPreviewResult(
-                e.RequestId,
-                e.RelativePath,
-                e.Mode,
-                ok: false,
-                error: ex.Message));
+            preview =>
+            {
+                editorView.PostMentionPreviewResult(
+                    e.RequestId,
+                    e.RelativePath,
+                    e.Mode,
+                    ok: true,
+                    documentContent: preview);
+            },
+            ex =>
+            {
+                logger?.LogError(ex, "Editor mention preview failed. RequestId={RequestId} RelativePath={RelativePath}", e.RequestId, e.RelativePath);
+                editorView.PostMentionPreviewResult(
+                    e.RequestId,
+                    e.RelativePath,
+                    e.Mode,
+                    ok: false,
+                    error: ex.Message);
+            });
     }
 
     private async void EditorView_OpenMentionRequested(object? sender, OpenMentionRequestedEventArgs e)
@@ -100,6 +117,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Editor mention open failed. RelativePath={RelativePath}", e.RelativePath);
             editorView.PostMentionOpenResult(ok: false, error: ex.Message);
         }
     }
@@ -108,8 +126,15 @@ internal sealed partial class EditorWorkflowCoordinator
     {
         PostEditorActionResult(
             () => viewModel.CreateLinkedNote(e.SourcePath),
-            e.Complete,
-            ex => e.Complete(CreateLinkedNoteResult.Fail(ex.Message)));
+            result =>
+            {
+                e.Complete(result);
+            },
+            ex =>
+            {
+                logger?.LogError(ex, "Editor create linked note failed. SourcePath={SourcePath}", e.SourcePath);
+                e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
+            });
     }
 
     private async Task EditorView_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
@@ -129,6 +154,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Editor attach file failed. FileName={FileName}", e.FileName);
             e.Complete(AttachFileResult.Fail(ex.Message));
         }
     }
@@ -144,6 +170,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Editor read attachment failed. SourcePath={SourcePath} ImageSource={ImageSource}", e.SourcePath, e.ImageSource);
             e.Complete(ReadAttachmentResult.Fail(ex.Message));
         }
     }
@@ -158,7 +185,11 @@ internal sealed partial class EditorWorkflowCoordinator
                 return true;
             },
             _ => { },
-            ex => editorView.PostSaveResult(ok: false, error: ex.Message));
+            ex =>
+            {
+                logger?.LogError(ex, "Editor content save failed. ContentLength={ContentLength}", content.Length);
+                editorView.PostSaveResult(ok: false, error: ex.Message);
+            });
     }
 
     private void RefreshDocumentLinks(string currentContent)
@@ -194,7 +225,7 @@ internal sealed partial class EditorWorkflowCoordinator
 
             if (task.Exception is not null)
             {
-                System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {task.Exception}");
+                logger?.LogError(task.Exception.GetBaseException(), "Document links refresh failed. Version={Version}", refreshVersion);
             }
 
             editorView.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
@@ -210,7 +241,7 @@ internal sealed partial class EditorWorkflowCoordinator
         PostIfCurrent();
     }
 
-    private static void PostEditorActionResult<TResult>(
+    private void PostEditorActionResult<TResult>(
         Func<TResult> action,
         Action<TResult> onSuccess,
         Action<Exception> onFailure)

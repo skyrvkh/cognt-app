@@ -1,4 +1,5 @@
 using CogntApp.Shell.Dialogs;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -8,7 +9,8 @@ internal static class EditorShellOperationGuard
         Func<Task> action,
         IShellDialogService dialogs,
         string title,
-        string failurePrefix)
+        string failurePrefix,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dialogs);
@@ -21,6 +23,7 @@ internal static class EditorShellOperationGuard
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Guarded editor shell operation failed. Title={Title} FailurePrefix={FailurePrefix}", title, failurePrefix);
             dialogs.ShowWarning(title, $"{failurePrefix}: {ex.Message}");
         }
     }

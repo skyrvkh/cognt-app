@@ -1,7 +1,7 @@
-using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Wpf.EditorHost.Models.Editor;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Editor;
 
@@ -37,37 +37,14 @@ internal sealed partial class EditorWorkflowCoordinator
         await OpenNoteAsync(retryNotePath, retrySelectInTree);
     }
 
-    internal async void QueueMentionTargetsRefresh()
+    internal void QueueMentionTargetsRefresh()
     {
-        int requestId = ++mentionTargetsRefreshRequestId;
-
-        try
-        {
-            IReadOnlyList<KnowledgeMentionTargetReadModel> targets = await Task.Run(viewModel.ListMentionTargets);
-
-            if (requestId != mentionTargetsRefreshRequestId)
-            {
-                return;
-            }
-
-            editorView.PostMentionTargets(targets);
-        }
-        catch (Exception ex)
-        {
-            if (requestId != mentionTargetsRefreshRequestId)
-            {
-                return;
-            }
-
-            dialogs.ShowWarning(
-                "Mentions",
-                $"Mention targets could not be refreshed: {ex.Message}");
-        }
+        refreshes.QueueMentionTargetsRefresh();
     }
 
     internal void RefreshDocumentLinksFromCurrentContent()
     {
-        RefreshDocumentLinks(editorView.GetContent());
+        refreshes.RefreshDocumentLinksFromCurrentContent();
     }
 
     internal async Task OpenImageOcclusionForSelectedImageAsync()
@@ -93,6 +70,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Open image occlusion for selected image failed.");
             dialogs.ShowWarning("Image Occlusion", ex.Message);
         }
     }
@@ -126,6 +104,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Open image occlusion failed. ImageBlockId={ImageBlockId} ImageRelPath={ImageRelPath}", imageBlockId, imageRelPath);
             dialogs.ShowWarning("Image Occlusion", ex.Message);
         }
     }
@@ -138,30 +117,8 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Create cloze from selection failed.");
             dialogs.ShowWarning("Create Cloze", ex.Message);
-        }
-    }
-
-    internal async Task CreateCardContextFromSelectionAsync()
-    {
-        try
-        {
-            SelectedCardContextBlocksReadModel? selection = await editorView.GetSelectedCardContextBlocksAsync();
-            if (selection is null || selection.BlockIds.Count == 0)
-            {
-                dialogs.ShowWarning(
-                    "Card Context",
-                    "Select one or more note blocks before creating a card context.");
-                return;
-            }
-
-            string content = editorView.GetContent();
-            viewModel.CreateCardContextFromSelection(selection.BlockIds, selection.Title, content);
-            editorView.PostSaveResult(ok: true);
-        }
-        catch (Exception ex)
-        {
-            dialogs.ShowWarning("Create Card Context", ex.Message);
         }
     }
 
@@ -183,6 +140,7 @@ internal sealed partial class EditorWorkflowCoordinator
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Add selected text to selected card slot failed.");
             dialogs.ShowWarning("Add To Card Slot", ex.Message);
         }
     }
