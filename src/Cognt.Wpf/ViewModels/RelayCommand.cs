@@ -8,11 +8,13 @@ public sealed class RelayCommand : ICommand
     private readonly Predicate<object?>? canExecute;
 
     public RelayCommand(Action execute)
-        : this(ToParameterizedExecute(execute))
+        : this(ToParameterizedExecute(execute), canExecute: null)
     {
     }
 
-    public RelayCommand(Action<object?> execute, Predicate<object?>? canExecute = null)
+    public RelayCommand(
+        Action<object?> execute,
+        Predicate<object?>? canExecute = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
 

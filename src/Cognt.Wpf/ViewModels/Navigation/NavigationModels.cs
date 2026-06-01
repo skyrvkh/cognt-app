@@ -106,6 +106,27 @@ internal sealed class OpenNoteCardsRequestedEventArgs
     internal string Title { get; }
 }
 
+internal sealed class OpenFlashcardRequestedEventArgs
+{
+    internal OpenFlashcardRequestedEventArgs(long cardId, string? sourceRelPath, string title)
+    {
+        if (cardId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cardId));
+        }
+
+        CardId = cardId;
+        SourceRelPath = sourceRelPath;
+        Title = string.IsNullOrWhiteSpace(title) ? $"Card {cardId}" : title.Trim();
+    }
+
+    internal long CardId { get; }
+
+    internal string? SourceRelPath { get; }
+
+    internal string Title { get; }
+}
+
 internal sealed class CollectionRemovalPlan
 {
     private CollectionRemovalPlan(bool canRemove, string message)

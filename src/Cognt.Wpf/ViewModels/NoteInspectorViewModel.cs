@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -10,16 +11,21 @@ public sealed class NoteInspectorViewModel : ObservableObject
     private const int AsyncOutlineParseThreshold = 200_000;
     private const int OutlineParseDebounceMilliseconds = 200;
     private readonly MainViewModel mainViewModel;
+    private readonly ILogger<NoteInspectorViewModel>? logger;
     private CancellationTokenSource? outlineParseCancellation;
     private ObservableCollection<NoteOutlineItemViewModel> outlineItems = [];
     private bool isActive;
 
-    public NoteInspectorViewModel(MainViewModel mainViewModel, GraphViewModel graphViewModel)
+    public NoteInspectorViewModel(
+        MainViewModel mainViewModel,
+        GraphViewModel graphViewModel,
+        ILogger<NoteInspectorViewModel>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(mainViewModel);
         ArgumentNullException.ThrowIfNull(graphViewModel);
 
         this.mainViewModel = mainViewModel;
+        this.logger = logger;
         GraphViewModel = graphViewModel;
 
         RefreshCommand = new RelayCommand(Refresh);
@@ -133,6 +139,7 @@ public sealed class NoteInspectorViewModel : ObservableObject
             return;
         }
 
+
         OutlineNavigationRequested?.Invoke(this, new NoteOutlineNavigationRequestedEventArgs(item));
     }
 
@@ -160,6 +167,14 @@ public sealed class NoteInspectorViewModel : ObservableObject
                         || cancellationToken.IsCancellationRequested
                         || !ReferenceEquals(outlineParseCancellation, cancellation))
                     {
+                        if (task.IsFaulted)
+                        {
+                            logger?.LogError(
+                                task.Exception,
+                                "Note outline parse failed. ContentLength={ContentLength}",
+                                content.Length);
+                        }
+
                         return;
                     }
 
