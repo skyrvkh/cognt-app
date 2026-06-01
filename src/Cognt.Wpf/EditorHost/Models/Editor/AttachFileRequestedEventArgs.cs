@@ -35,6 +35,41 @@ public sealed class AttachFileRequestedEventArgs : EventArgs
     }
 }
 
+public sealed class AttachImageSourceRequestedEventArgs : EventArgs
+{
+    public AttachImageSourceRequestedEventArgs(
+        string sourcePath,
+        string imageSource,
+        string fallbackFileName)
+    {
+        SourcePath = string.IsNullOrWhiteSpace(sourcePath)
+            ? throw new ArgumentException("Source path is required.", nameof(sourcePath))
+            : sourcePath;
+        ImageSource = string.IsNullOrWhiteSpace(imageSource)
+            ? throw new ArgumentException("Image source is required.", nameof(imageSource))
+            : imageSource;
+        FallbackFileName = string.IsNullOrWhiteSpace(fallbackFileName)
+            ? "pasted-image.png"
+            : fallbackFileName;
+    }
+
+    public string SourcePath { get; }
+
+    public string ImageSource { get; }
+
+    public string FallbackFileName { get; }
+
+    public AttachFileResult Result { get; private set; } =
+        AttachFileResult.Fail("No image source attachment handler is registered.");
+
+    public void Complete(AttachFileResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        Result = result;
+    }
+}
+
 public sealed record AttachFileResult(
     bool Ok,
     string? DisplayName = null,
