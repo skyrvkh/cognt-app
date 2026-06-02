@@ -6,6 +6,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -15,6 +16,7 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private const string AllTypesValue = "__all_types";
     private readonly INoteService noteService;
     private readonly IFlashcardCardsQuery flashcardCardsQuery;
+    private readonly ILogger<AllNotesViewModel> logger;
     private readonly RelayCommand openNoteCommand;
     private readonly RelayCommand showCardsCommand;
     private readonly RelayCommand addTagsCommand;
@@ -49,13 +51,18 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
     private bool isTreeViewMode;
     private bool isUpdatingFilterOptions;
 
-    public AllNotesViewModel(INoteService noteService, IFlashcardCardsQuery flashcardCardsQuery)
+    public AllNotesViewModel(
+        INoteService noteService,
+        IFlashcardCardsQuery flashcardCardsQuery,
+        ILogger<AllNotesViewModel> logger)
     {
         ArgumentNullException.ThrowIfNull(noteService);
         ArgumentNullException.ThrowIfNull(flashcardCardsQuery);
+        ArgumentNullException.ThrowIfNull(logger);
 
         this.noteService = noteService;
         this.flashcardCardsQuery = flashcardCardsQuery;
+        this.logger = logger;
         openNoteCommand = new RelayCommand(OpenNoteFromCommand, CanOpenNoteFromCommand);
         showCardsCommand = new RelayCommand(ShowCardsFromCommand, CanShowCardsFromCommand);
         addTagsCommand = new RelayCommand(parameter => RequestTagEdit(parameter, KnowledgeTagOperationKind.Add), CanRequestTagEdit);
@@ -304,119 +311,6 @@ public sealed partial class AllNotesViewModel : ObservableObject, IDisposable
                 QueueApplyFilters();
             }
         }
-    }
-
-    private void ClearFilters()
-    {
-        SearchQuery = string.Empty;
-        SelectOnlyAllFilterOption(TagOptions, AllTagsValue);
-        SelectOnlyAllFilterOption(TypeOptions, AllTypesValue);
-        SelectedSortOption = SortOptions.FirstOrDefault();
-    }
-
-    private void ClearSearch()
-    {
-        SearchQuery = string.Empty;
-    }
-
-    private bool CanOpenNoteFromCommand(object? parameter)
-    {
-        if (string.IsNullOrWhiteSpace(currentCollectionId))
-        {
-            return false;
-        }
-
-        return parameter switch
-        {
-            AllNotesListItemViewModel note => !string.IsNullOrWhiteSpace(note.RelativePath),
-            AllNotesTreeItemViewModel treeItem => treeItem.CanOpen,
-            _ => false
-        };
-    }
-
-    private void OpenNoteFromCommand(object? parameter)
-    {
-        string? relativePath = parameter switch
-        {
-            AllNotesListItemViewModel note => note.RelativePath,
-            AllNotesTreeItemViewModel treeItem when treeItem.CanOpen => treeItem.RelativePath,
-            _ => null
-        };
-
-        if (!string.IsNullOrWhiteSpace(relativePath))
-        {
-            OpenNoteRequested?.Invoke(this, new OpenAllNotesRequestedEventArgs(relativePath));
-        }
-    }
-
-    private bool CanShowCardsFromCommand(object? parameter)
-    {
-        return parameter switch
-        {
-            AllNotesListItemViewModel note => note.HasCards,
-            AllNotesTreeItemViewModel treeItem => treeItem.HasCards,
-            _ => false
-        };
-    }
-
-    private void ShowCardsFromCommand(object? parameter)
-    {
-        (string? relativePath, string? title) = parameter switch
-        {
-            AllNotesListItemViewModel note when note.HasCards => (note.RelativePath, note.Title),
-            AllNotesTreeItemViewModel treeItem when treeItem.HasCards => (treeItem.RelativePath, treeItem.Title),
-            _ => (null, null)
-        };
-
-        if (!string.IsNullOrWhiteSpace(relativePath) && !string.IsNullOrWhiteSpace(title))
-        {
-            ShowCardsRequested?.Invoke(this, new OpenNoteCardsRequestedEventArgs(relativePath, title));
-        }
-    }
-
-    internal void RequestBulkTagEdit(
-        IReadOnlyList<long> itemIds,
-        KnowledgeTagOperationKind operation)
-    {
-        if (itemIds.Count == 0)
-        {
-            return;
-        }
-
-        TagEditRequested?.Invoke(
-            this,
-            new TagEditRequestedEventArgs(
-                itemIds,
-                operation,
-                itemIds.Count == 1 ? "1 item" : $"{itemIds.Count} selected items"));
-    }
-
-    private bool CanRequestTagEdit(object? parameter)
-    {
-        return GetTagTarget(parameter) is { Id: > 0 };
-    }
-
-    private void RequestTagEdit(object? parameter, KnowledgeTagOperationKind operation)
-    {
-        (long id, string title) = GetTagTarget(parameter) ?? default;
-        if (id <= 0)
-        {
-            return;
-        }
-
-        TagEditRequested?.Invoke(
-            this,
-            new TagEditRequestedEventArgs([id], operation, title));
-    }
-
-    private static (long Id, string Title)? GetTagTarget(object? parameter)
-    {
-        return parameter switch
-        {
-            AllNotesListItemViewModel note => (note.ItemId, note.Title),
-            AllNotesTreeItemViewModel treeItem => (treeItem.Id, treeItem.Title),
-            _ => null
-        };
     }
 
     private void AddFilterOption(

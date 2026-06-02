@@ -118,18 +118,20 @@ public sealed partial class AllNotesViewModel
 
     private TreeItemPresentation CreateTreeItemPresentation(KnowledgeTreeItemReadModel item)
     {
-        string? relativePath = NormalizeTreeItemRelativePath(item.FileRelPath);
+        string? relativePath = AllNotesPresentationFormatter.NormalizeOptionalRelativePath(item.FileRelPath);
         KnowledgeNoteListItemReadModel? note = TryGetTreeNote(relativePath);
         int cardCount = GetCardCount(relativePath);
 
         return new TreeItemPresentation(
             relativePath,
-            note is null ? GetTreeFallbackTypeLabel(item.Kind) : GetTypeLabel(note.Type),
-            CreateTreeTagsLabel(note),
+            note is null
+                ? AllNotesPresentationFormatter.GetTreeFallbackTypeLabel(item.Kind)
+                : AllNotesPresentationFormatter.GetTypeLabel(note.Type),
+            note is null ? string.Empty : AllNotesPresentationFormatter.CreateTagsLabel(note.Tags),
             cardCount,
-            FormatCardCount(cardCount),
-            note is null ? string.Empty : FormatTimestamp(note.CreatedAt),
-            note is null ? string.Empty : FormatTimestamp(note.UpdatedAt));
+            AllNotesPresentationFormatter.FormatCardCount(cardCount),
+            note is null ? string.Empty : AllNotesPresentationFormatter.FormatTimestamp(note.CreatedAt),
+            note is null ? string.Empty : AllNotesPresentationFormatter.FormatTimestamp(note.UpdatedAt));
     }
 
     private KnowledgeNoteListItemReadModel? TryGetTreeNote(string? relativePath)
@@ -144,38 +146,12 @@ public sealed partial class AllNotesViewModel
             : null;
     }
 
-    private static string CreateTreeTagsLabel(KnowledgeNoteListItemReadModel? note)
-    {
-        return note is null || note.Tags.Count == 0
-            ? string.Empty
-            : string.Join(", ", note.Tags);
-    }
-
-    private static string GetTreeFallbackTypeLabel(KnowledgeItemKind kind)
-    {
-        return kind switch
-        {
-            KnowledgeItemKind.Folder => "Folder",
-            KnowledgeItemKind.PdfDocument => "PDF",
-            KnowledgeItemKind.Trash => "Trash",
-            KnowledgeItemKind.Root => "Workspace",
-            _ => "Note"
-        };
-    }
-
     private static bool CanTreeItemContainChildren(KnowledgeItemKind kind)
     {
         return kind is KnowledgeItemKind.Folder
             or KnowledgeItemKind.Note
             or KnowledgeItemKind.Root
             or KnowledgeItemKind.Trash;
-    }
-
-    private static string? NormalizeTreeItemRelativePath(string? relativePath)
-    {
-        return string.IsNullOrWhiteSpace(relativePath)
-            ? null
-            : relativePath.Replace('\\', '/').Trim('/');
     }
 
     private readonly record struct TreeItemPresentation(

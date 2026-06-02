@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -77,6 +78,7 @@ public sealed partial class AllNotesViewModel
             OnPropertyChanged(nameof(NoteCountLabel));
             OnPropertyChanged(nameof(PageSubtitle));
             OnPropertyChanged(nameof(ResultsSummary));
+            logger.LogError(ex, "All notes catalog load failed. CollectionId={CollectionId}", currentCollectionId);
         }
         finally
         {
@@ -117,47 +119,18 @@ public sealed partial class AllNotesViewModel
                 cancellationToken);
         }
 
-        FilterApplyResult filtered = await Task.Run(() =>
+        AllNotesFilterApplyResult filtered = await Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            List<int> matchingNoteIndexes = new(allNotes.Count);
-            for (int allNotesIndex = 0; allNotesIndex < allNotes.Count; allNotesIndex++)
-            {
-                KnowledgeNoteListItemReadModel note = allNotes[allNotesIndex];
-                if (matchingRelativePaths is not null && !matchingRelativePaths.Contains(note.RelativePath))
-                {
-                    continue;
-                }
-
-                if (selectedTagSet.Count > 0 && !HasSelectedTag(note, selectedTagSet))
-                {
-                    continue;
-                }
-
-                if (selectedTypeSet.Count > 0 && !selectedTypeSet.Contains(note.Type))
-                {
-                    continue;
-                }
-
-                matchingNoteIndexes.Add(allNotesIndex);
-            }
-
-            SortMatchingNotes(matchingNoteIndexes, allNotes, sortKey);
-
-            HashSet<string>? visibleRelativePaths = hasActiveFilters
-                ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                : null;
-            AllNotesListItemViewModel[] filteredNotes = new AllNotesListItemViewModel[matchingNoteIndexes.Count];
-            for (int index = 0; index < matchingNoteIndexes.Count; index++)
-            {
-                int allNotesIndex = matchingNoteIndexes[index];
-                AllNotesListItemViewModel filteredNote = allNoteListItems[allNotesIndex];
-                filteredNotes[index] = filteredNote;
-                visibleRelativePaths?.Add(filteredNote.RelativePath);
-            }
-
-            return new FilterApplyResult(filteredNotes, visibleRelativePaths);
+            return AllNotesFilterEngine.Apply(
+                allNotes,
+                allNoteListItems,
+                matchingRelativePaths,
+                selectedTagSet,
+                selectedTypeSet,
+                sortKey,
+                hasActiveFilters);
         }, cancellationToken);
 
         if (cancellationToken.IsCancellationRequested)
@@ -175,45 +148,6 @@ public sealed partial class AllNotesViewModel
         showCardsCommand.RaiseCanExecuteChanged();
     }
 
-    private static void SortMatchingNotes(
-        List<int> matchingNoteIndexes,
-        IReadOnlyList<KnowledgeNoteListItemReadModel> notes,
-        AllNotesSortKey sortKey)
-    {
-        matchingNoteIndexes.Sort((leftIndex, rightIndex) => CompareNotes(
-            notes[leftIndex],
-            leftIndex,
-            notes[rightIndex],
-            rightIndex,
-            sortKey));
-    }
-
-    private static int CompareNotes(
-        KnowledgeNoteListItemReadModel leftNote,
-        int leftOriginalIndex,
-        KnowledgeNoteListItemReadModel rightNote,
-        int rightOriginalIndex,
-        AllNotesSortKey sortKey)
-    {
-        int comparison = sortKey switch
-        {
-            AllNotesSortKey.CreatedOldest => leftNote.CreatedAt.CompareTo(rightNote.CreatedAt),
-            AllNotesSortKey.CreatedNewest => rightNote.CreatedAt.CompareTo(leftNote.CreatedAt),
-            AllNotesSortKey.ModifiedOldest => leftNote.UpdatedAt.CompareTo(rightNote.UpdatedAt),
-            _ => rightNote.UpdatedAt.CompareTo(leftNote.UpdatedAt)
-        };
-
-        if (comparison != 0)
-        {
-            return comparison;
-        }
-
-        comparison = StringComparer.OrdinalIgnoreCase.Compare(leftNote.Title, rightNote.Title);
-        return comparison != 0
-            ? comparison
-            : leftOriginalIndex.CompareTo(rightOriginalIndex);
-    }
-
     private static Dictionary<string, KnowledgeNoteListItemReadModel> CreateNoteLookupByRelativePath(
         IReadOnlyList<KnowledgeNoteListItemReadModel> notes)
     {
@@ -224,21 +158,6 @@ public sealed partial class AllNotesViewModel
         }
 
         return lookup;
-    }
-
-    private static bool HasSelectedTag(
-        KnowledgeNoteListItemReadModel note,
-        HashSet<string> selectedTagSet)
-    {
-        foreach (string tag in note.Tags)
-        {
-            if (selectedTagSet.Contains(tag))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private AllNotesListItemViewModel[] CreateListItemViewModels(
@@ -265,7 +184,7 @@ public sealed partial class AllNotesViewModel
                     continue;
                 }
 
-                string sourceRelativePath = NormalizeSourceRelativePath(card.SourceRelPath!);
+                string sourceRelativePath = AllNotesPresentationFormatter.NormalizeSourceRelativePath(card.SourceRelPath!);
                 countsBySourceRelativePath[sourceRelativePath] = countsBySourceRelativePath.TryGetValue(sourceRelativePath, out int count)
                     ? count + 1
                     : 1;
@@ -275,6 +194,7 @@ public sealed partial class AllNotesViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
         {
+            logger.LogWarning(ex, "All notes card count load failed; continuing without card counts. CollectionId={CollectionId}", collectionId);
             return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         }
     }
@@ -334,7 +254,4 @@ public sealed partial class AllNotesViewModel
         return -1;
     }
 
-    private readonly record struct FilterApplyResult(
-        IReadOnlyList<AllNotesListItemViewModel> Notes,
-        IReadOnlySet<string>? VisibleRelativePaths);
 }

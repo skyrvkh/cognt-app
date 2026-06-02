@@ -32,7 +32,7 @@ public sealed partial class AllNotesViewModel
         }
 
         availableTags.Sort(StringComparer.OrdinalIgnoreCase);
-        availableTypes.Sort(CompareNoteTypes);
+        availableTypes.Sort(AllNotesPresentationFormatter.CompareNoteTypes);
 
         List<(string Label, string Value, bool IsSelected)> nextTagOptions =
         [
@@ -49,7 +49,7 @@ public sealed partial class AllNotesViewModel
         ];
         foreach (KnowledgeNoteListItemType type in availableTypes)
         {
-            string typeLabel = GetTypeLabel(type);
+            string typeLabel = AllNotesPresentationFormatter.GetTypeLabel(type);
             string typeValue = type.ToString();
             nextTypeOptions.Add((typeLabel, typeValue, previousTypeSet.Contains(type)));
         }
@@ -140,37 +140,12 @@ public sealed partial class AllNotesViewModel
             note.ItemId,
             note.RelativePath,
             note.Title,
-            GetTypeLabel(note.Type),
-            note.Tags.Count == 0 ? string.Empty : string.Join(", ", note.Tags),
+            AllNotesPresentationFormatter.GetTypeLabel(note.Type),
+            AllNotesPresentationFormatter.CreateTagsLabel(note.Tags),
             cardCount,
-            FormatCardCount(cardCount),
-            FormatTimestamp(note.CreatedAt),
-            FormatTimestamp(note.UpdatedAt));
-    }
-
-    private static string FormatTimestamp(DateTimeOffset value)
-    {
-        return value
-            .ToLocalTime()
-            .ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture);
-    }
-
-    private static string GetTypeLabel(KnowledgeNoteListItemType type)
-    {
-        return type switch
-        {
-            KnowledgeNoteListItemType.Markdown => "Markdown",
-            KnowledgeNoteListItemType.PdfLinkedNote => "PDF-linked note",
-            KnowledgeNoteListItemType.AttachmentBackedNote => "Attachment-backed note",
-            _ => "Note"
-        };
-    }
-
-    private static int CompareNoteTypes(
-        KnowledgeNoteListItemType left,
-        KnowledgeNoteListItemType right)
-    {
-        return StringComparer.OrdinalIgnoreCase.Compare(GetTypeLabel(left), GetTypeLabel(right));
+            AllNotesPresentationFormatter.FormatCardCount(cardCount),
+            AllNotesPresentationFormatter.FormatTimestamp(note.CreatedAt),
+            AllNotesPresentationFormatter.FormatTimestamp(note.UpdatedAt));
     }
 
     private static AllNotesFilterOptionViewModel? FindFirstSelectedOption(
@@ -191,21 +166,9 @@ public sealed partial class AllNotesViewModel
     {
         return string.IsNullOrWhiteSpace(relativePath)
             ? 0
-            : cardCountsBySourceRelativePath.TryGetValue(NormalizeSourceRelativePath(relativePath), out int count)
+            : cardCountsBySourceRelativePath.TryGetValue(AllNotesPresentationFormatter.NormalizeSourceRelativePath(relativePath), out int count)
                 ? count
                 : 0;
-    }
-
-    private static string FormatCardCount(int cardCount)
-    {
-        return cardCount == 0
-            ? string.Empty
-            : cardCount.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private static string NormalizeSourceRelativePath(string relativePath)
-    {
-        return relativePath.Replace('\\', '/').Trim('/');
     }
 
     private static IReadOnlyList<AllNotesSortOptionViewModel> CreateSortOptions()
