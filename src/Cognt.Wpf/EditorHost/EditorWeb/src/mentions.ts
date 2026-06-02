@@ -1,4 +1,5 @@
 import { getNotePathFileName } from './links/note-path-utils';
+import { reportDiagnostic } from './host';
 
 export type MentionTarget = {
   relativePath: string;
@@ -44,6 +45,9 @@ export function parseNoteMentionTarget(value: string) {
   const normalizedPath = relativePath.trim();
 
   if (!normalizedPath) {
+    reportDiagnostic('warn', 'Failed to parse note mention target because path was empty.', {
+      valueLength: value.length,
+    });
     return null;
   }
 

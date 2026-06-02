@@ -79,8 +79,7 @@ export class NativeMentionMenuController {
         index: range.index + REFERENCE_NODE.length,
         length: 0,
       });
-    } catch (error) {
-      console.warn('Native mention insertion failed.', error);
+    } catch {
       this.options.showStatus('Could not insert the note link at the current caret.');
       return;
     }
@@ -147,12 +146,11 @@ export class NativeMentionMenuController {
 
       this.mergeTargets(targets);
       return targets;
-    } catch (error) {
+    } catch {
       if (signal.aborted) {
         return [];
       }
 
-      console.warn('Mention search failed.', error);
       return filterMentionTargets(
         this.options.getTargets(),
         query,
