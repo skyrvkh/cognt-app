@@ -7,6 +7,7 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
 {
     private bool isExpanded;
     private bool isSelected;
+    private bool isMultiSelected;
     private bool areChildrenLoaded;
     private bool isRenaming;
     private string? notePath;
@@ -21,7 +22,8 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         string? fileRelPath,
         string? notePath,
         int childCount,
-        bool isPlaceholder = false)
+        bool isPlaceholder = false,
+        long? flashcardCardId = null)
     {
         ArgumentNullException.ThrowIfNull(title);
 
@@ -33,6 +35,7 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
         FileRelPath = fileRelPath;
         ChildCount = Math.Max(0, childCount);
         IsPlaceholder = isPlaceholder;
+        FlashcardCardId = flashcardCardId;
         this.notePath = notePath;
         areChildrenLoaded = isPlaceholder || ChildCount == 0;
     }
@@ -51,6 +54,8 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
 
     public string Prefix => IsPlaceholder
         ? string.Empty
+        : IsFlashcardNode
+            ? "[Card]"
         : Kind switch
         {
             KnowledgeItemKind.Note => "[N]",
@@ -66,11 +71,16 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
 
     public string? FileRelPath { get; }
 
+    public long? FlashcardCardId { get; }
+
+    public bool IsFlashcardNode => FlashcardCardId.HasValue;
+
     public int ChildCount { get; private set; }
 
     public bool IsPlaceholder { get; }
 
     public bool CanContainChildren => !IsPlaceholder
+        && !IsFlashcardNode
         && Kind is KnowledgeItemKind.Folder
             or KnowledgeItemKind.Note
             or KnowledgeItemKind.Root
@@ -88,6 +98,12 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
     {
         get => isSelected;
         set => SetProperty(ref isSelected, value);
+    }
+
+    public bool IsMultiSelected
+    {
+        get => isMultiSelected;
+        set => SetProperty(ref isMultiSelected, value);
     }
 
     public string? NotePath
@@ -170,4 +186,21 @@ public sealed class NoteTreeNodeViewModel : ObservableObject
             isPlaceholder: true);
     }
 
+    public static NoteTreeNodeViewModel CreateFlashcardNode(
+        long cardId,
+        long parentId,
+        string title,
+        string? sourceRelPath)
+    {
+        return new NoteTreeNodeViewModel(
+            id: -Math.Abs(cardId),
+            parentId,
+            KnowledgeItemKind.Note,
+            title,
+            fileRelPath: sourceRelPath,
+            notePath: null,
+            childCount: 0,
+            isPlaceholder: false,
+            flashcardCardId: cardId);
+    }
 }
