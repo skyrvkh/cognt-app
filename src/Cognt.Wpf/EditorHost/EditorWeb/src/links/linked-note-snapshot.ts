@@ -14,9 +14,12 @@ import {
   getLinkedNoteTitle,
 } from './linked-note-paths';
 import { createLinkedPageReference } from './linked-note-reference';
+import { reportDiagnostic } from '../host';
 
 export function upgradeSerializedRawCogntInlineMentionSnapshots(snapshot: DocSnapshot) {
+  reportDiagnostic('info', 'Upgrading serialized raw Cognt inline mention snapshots.');
   upgradeBlockSnapshotRawCogntInlineMentions(snapshot.blocks);
+  reportDiagnostic('info', 'Serialized raw Cognt inline mention snapshot upgrade completed.');
 }
 
 function upgradeBlockSnapshotRawCogntInlineMentions(snapshot: BlockSnapshot) {
@@ -32,6 +35,10 @@ function upgradeBlockSnapshotRawCogntInlineMentions(snapshot: BlockSnapshot) {
         delta: upgradedDelta,
       },
     };
+    reportDiagnostic(
+      'info',
+      `Serialized raw Cognt inline mentions upgraded in snapshot block (block=${snapshot.id}, oldDelta=${delta.length}, newDelta=${upgradedDelta.length}).`
+    );
   }
 
   snapshot.children.forEach(upgradeBlockSnapshotRawCogntInlineMentions);
@@ -49,11 +56,13 @@ function upgradeRawCogntInlineMentionDelta(delta: unknown[]) {
 
     const segments = splitRawCogntInlineMentionEntry(entry as Record<string, unknown>);
     if (segments === null) {
+      reportDiagnostic('warn', 'Raw Cognt inline mention entry contained markers but produced no segments.');
       upgraded.push(entry);
       continue;
     }
 
     changed = true;
+    reportDiagnostic('info', `Raw Cognt inline mention delta upgraded (segments=${segments.length}).`);
     upgraded.push(...segments);
   }
 
@@ -68,9 +77,11 @@ function splitRawCogntInlineMentionEntry(entry: Record<string, unknown>) {
 
   const matches = findRawCogntInlineMentionMatches(insert);
   if (matches.length === 0) {
+    reportDiagnostic('warn', 'Raw Cognt inline mention split skipped: no matches.');
     return null;
   }
 
+  reportDiagnostic('info', `Splitting raw Cognt inline mention entry (matches=${matches.length}).`);
   const segments: unknown[] = [];
   let lastIndex = 0;
 

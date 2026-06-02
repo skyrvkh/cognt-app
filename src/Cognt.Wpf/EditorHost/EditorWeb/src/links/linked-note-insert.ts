@@ -18,6 +18,7 @@ import {
 } from './linked-note-paths';
 import {
   createLinkedPageReference,
+  createIconOnlyLinkedPageReference,
   updateLinkedPageReference,
 } from './linked-note-reference';
 import {
@@ -25,6 +26,7 @@ import {
   getDeltaReference,
   walkBlockModels,
 } from './linked-note-block-text';
+import { reportDiagnostic } from '../host';
 
 export type ExtractTextReplacementRange = {
   kind?: 'text';
@@ -55,11 +57,16 @@ export function insertCogntLinkedNoteEmbed(
   relativePath: string,
   requestedTitle?: string | null
 ): Doc {
+  reportDiagnostic(
+    'info',
+    `Inserting Cognt linked note embed (relativePath=${relativePath}, requestedTitle=${requestedTitle ?? ''}).`
+  );
   const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
   const { model } = context;
   const parent = rootComponent.doc.getParent(model);
 
   if (!parent) {
+    reportDiagnostic('error', 'Linked note embed insert failed: insertion parent was not found.');
     throw new Error('Could not find the insertion block.');
   }
 
@@ -83,12 +90,17 @@ export function insertCogntLinkedNoteEmbed(
 
   if (model.text?.length === 0 && model.children.length === 0) {
     rootComponent.doc.deleteBlock(model);
+    reportDiagnostic('info', 'Linked note embed insert removed empty source slash-menu block.');
   }
 
   rootComponent.host.selection.setGroup('note', [
     rootComponent.host.selection.create('block', { blockId }),
   ]);
 
+  reportDiagnostic(
+    'info',
+    `Linked note embed inserted (relativePath=${relativePath}, title=${title}, blockId=${blockId}, pageId=${linkedDoc.id}).`
+  );
   return linkedDoc;
 }
 
@@ -97,16 +109,22 @@ export function insertCogntLinkedNoteInline(
   relativePath: string,
   requestedTitle?: string | null
 ): Doc {
+  reportDiagnostic(
+    'info',
+    `Inserting Cognt linked note inline reference (relativePath=${relativePath}, requestedTitle=${requestedTitle ?? ''}).`
+  );
   const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
   const { model } = context;
   const inlineEditor = getInlineEditorByModel(rootComponent.host, model);
 
   if (!inlineEditor) {
+    reportDiagnostic('error', 'Linked note inline insert failed: inline editor was not found.');
     throw new Error('Could not find the inline editor for the insertion block.');
   }
 
   const inlineRange = inlineEditor.getInlineRange();
   if (!inlineRange) {
+    reportDiagnostic('error', 'Linked note inline insert failed: inline insertion point was not found.');
     throw new Error('Could not find the inline insertion point.');
   }
 
@@ -121,6 +139,10 @@ export function insertCogntLinkedNoteInline(
     length: 0,
   });
 
+  reportDiagnostic(
+    'info',
+    `Linked note inline reference inserted (relativePath=${relativePath}, title=${title}, pageId=${linkedDoc.id}, index=${inlineRange.index}).`
+  );
   return linkedDoc;
 }
 
@@ -130,6 +152,10 @@ export function attachCogntPathToInlineReference(
   relativePath: string,
   title?: string | null
 ) {
+  reportDiagnostic(
+    'info',
+    `Attaching Cognt path to inline reference (pageId=${pageId}, relativePath=${relativePath}).`
+  );
   for (const model of walkBlockModels(doc.root)) {
     const text = getBlockText(model);
     if (!text) {
@@ -151,6 +177,10 @@ export function attachCogntPathToInlineReference(
             title ?? reference.title ?? relativePath
           ),
         });
+        reportDiagnostic(
+          'info',
+          `Attached Cognt path to inline reference (pageId=${pageId}, relativePath=${relativePath}, index=${index}).`
+        );
         return true;
       }
 
@@ -158,6 +188,7 @@ export function attachCogntPathToInlineReference(
     }
   }
 
+  reportDiagnostic('warn', `Inline reference path attach skipped: page id not found (pageId=${pageId}).`);
   return false;
 }
 
@@ -167,6 +198,10 @@ export function replaceExtractTextRangeWithLinkedPage(
   relativePath: string,
   title: string
 ): Doc {
+  reportDiagnostic(
+    'info',
+    `Replacing extract text range with linked page (kind=${range.kind ?? 'text'}, relativePath=${relativePath}, titleLength=${title.length}).`
+  );
   if (range.kind === 'text-range') {
     return replaceExtractTextSpanWithLinkedPage(doc, range, relativePath, title);
   }
@@ -184,6 +219,7 @@ export function replaceExtractTextRangeWithLinkedPage(
       }
     | null;
   if (!model?.text) {
+    reportDiagnostic('error', `Extract text replacement failed: editable text block missing (block=${range.blockId}).`);
     throw new Error('selected block no longer has editable text');
   }
 
@@ -196,6 +232,49 @@ export function replaceExtractTextRangeWithLinkedPage(
     });
   });
 
+  reportDiagnostic(
+    'info',
+    `Extract text range replaced with linked page (block=${range.blockId}, index=${range.index}, length=${range.length}, pageId=${linkedDoc.id}).`
+  );
+  return linkedDoc;
+}
+
+export function insertExtractTextRangeLinkedPageIcon(
+  doc: Doc,
+  range: ExtractTextReplacement,
+  relativePath: string,
+  title: string
+): Doc {
+  reportDiagnostic(
+    'info',
+    `Inserting extract text range linked-page icon (kind=${range.kind ?? 'text'}, relativePath=${relativePath}, titleLength=${title.length}).`
+  );
+  if (range.kind === 'text-range') {
+    return insertExtractTextSpanLinkedPageIcon(doc, range, relativePath, title);
+  }
+
+  const model = getEditableTextBlock(doc, range.blockId);
+  if (!model?.text) {
+    reportDiagnostic('error', `Extract text icon insertion failed: editable text block missing (block=${range.blockId}).`);
+    throw new Error('selected block no longer has editable text');
+  }
+
+  const titleText = getLinkedNoteTitle(relativePath, title);
+  const linkedDoc = createDefaultDoc(doc.collection, { title: titleText });
+  const reference = createIconOnlyLinkedPageReference(linkedDoc.id, relativePath, titleText);
+  const insertIndex = clampTextIndex(
+    range.index + Math.max(0, range.length),
+    getEditableTextLength(model)
+  );
+
+  doc.transact(() => {
+    model.text!.replace(insertIndex, 0, REFERENCE_NODE, { reference });
+  });
+
+  reportDiagnostic(
+    'info',
+    `Extract text range linked-page icon inserted (block=${range.blockId}, insertIndex=${insertIndex}, pageId=${linkedDoc.id}).`
+  );
   return linkedDoc;
 }
 
@@ -205,9 +284,14 @@ function replaceExtractTextSpanWithLinkedPage(
   relativePath: string,
   title: string
 ): Doc {
+  reportDiagnostic(
+    'info',
+    `Replacing extract text span with linked page (blocks=${range.blockIds.length}, relativePath=${relativePath}).`
+  );
   const startModel = getEditableTextBlock(doc, range.start.blockId);
   const endModel = getEditableTextBlock(doc, range.end.blockId);
   if (!startModel || !endModel) {
+    reportDiagnostic('error', 'Extract text-span replacement failed: range blocks no longer have editable text.');
     throw new Error('selected range blocks no longer have editable text');
   }
 
@@ -236,6 +320,7 @@ function replaceExtractTextSpanWithLinkedPage(
   const startIndex = siblings.indexOf(startModel);
   const endIndex = siblings.indexOf(endModel);
   if (!parent || parent !== endParent || startIndex < 0 || endIndex < 0) {
+    reportDiagnostic('error', 'Extract text-span replacement failed: selected blocks are not siblings.');
     throw new Error('range replacement supports selected text across sibling blocks only');
   }
 
@@ -284,6 +369,10 @@ function replaceExtractTextSpanWithLinkedPage(
     }
   });
 
+  reportDiagnostic(
+    'info',
+    `Extract text span replaced with linked page (relativePath=${relativePath}, pageId=${linkedDoc.id}, deletedMiddleBlocks=${selectedMiddleModels.length}).`
+  );
   return linkedDoc;
 }
 
@@ -293,10 +382,15 @@ export function replaceExtractBlocksWithLinkedPage(
   relativePath: string,
   title: string
 ) {
+  reportDiagnostic(
+    'info',
+    `Replacing extract blocks with linked page (requestedBlocks=${blockIds.length}, relativePath=${relativePath}).`
+  );
   const models = getUniqueBlockIds(blockIds)
     .map(blockId => doc.getBlockById(blockId))
     .filter((model: unknown): model is NonNullable<unknown> => Boolean(model));
   if (models.length === 0) {
+    reportDiagnostic('error', 'Extract block replacement failed: selected blocks no longer exist.');
     throw new Error('selected blocks no longer exist');
   }
 
@@ -305,11 +399,13 @@ export function replaceExtractBlocksWithLinkedPage(
     parent: doc.getParent(model as never) as { id?: string; children?: unknown[] } | null,
   }));
   if (entries.some(entry => !entry.parent)) {
+    reportDiagnostic('error', 'Extract block replacement failed: selected block parent not found.');
     throw new Error('could not find the selected block parent');
   }
 
   const parent = entries[0].parent;
   if (!parent || entries.some(entry => entry.parent !== parent)) {
+    reportDiagnostic('error', 'Extract block replacement failed: selected blocks do not share one parent.');
     throw new Error('selected blocks must share one parent');
   }
 
@@ -344,6 +440,138 @@ export function replaceExtractBlocksWithLinkedPage(
     }
   });
 
+  reportDiagnostic(
+    'info',
+    `Extract blocks replaced with linked page (selectedBlocks=${sortedEntries.length}, firstIndex=${firstIndex ?? -1}, pageId=${linkedDoc.id}).`
+  );
+  return linkedDoc;
+}
+
+export function insertExtractBlocksLinkedPageIcon(
+  doc: Doc,
+  blockIds: string[],
+  relativePath: string,
+  title: string
+) {
+  reportDiagnostic(
+    'info',
+    `Inserting extract blocks linked-page icon (requestedBlocks=${blockIds.length}, relativePath=${relativePath}).`
+  );
+  const sortedEntries = getSortedBlockEntries(doc, blockIds);
+  if (sortedEntries.length === 0) {
+    reportDiagnostic('error', 'Extract block icon insertion failed: selected blocks no longer exist.');
+    throw new Error('selected blocks no longer exist');
+  }
+
+  const titleText = getLinkedNoteTitle(relativePath, title);
+  const linkedDoc = createDefaultDoc(doc.collection, { title: titleText });
+  const reference = createIconOnlyLinkedPageReference(linkedDoc.id, relativePath, titleText);
+  const editableEntry = [...sortedEntries]
+    .reverse()
+    .find(entry => hasEditableText(entry.model));
+
+  doc.transact(() => {
+    if (editableEntry && hasEditableText(editableEntry.model)) {
+      const model = editableEntry.model;
+      model.text!.replace(getEditableTextLength(model), 0, REFERENCE_NODE, { reference });
+      reportDiagnostic('info', `Extract block linked-page icon inserted into existing editable block (pageId=${linkedDoc.id}).`);
+      return;
+    }
+
+    const lastEntry = sortedEntries.at(-1);
+    const parent = lastEntry?.parent;
+    if (!parent) {
+      reportDiagnostic('error', 'Extract block icon insertion failed: selected block parent was not found.');
+      throw new Error('could not find the selected block parent');
+    }
+
+    const blockId = doc.addBlock(
+      'affine:paragraph' as never,
+      { type: 'text' } as never,
+      parent as never,
+      Math.max(0, lastEntry.index + 1)
+    );
+    const model = getEditableTextBlock(doc, blockId);
+    if (!model?.text) {
+      reportDiagnostic('error', 'Extract block icon insertion failed: compact paragraph could not be created.');
+      throw new Error('could not create a compact link paragraph');
+    }
+
+    model.text.replace(0, 0, REFERENCE_NODE, { reference });
+    reportDiagnostic('info', `Extract block linked-page icon inserted into new compact paragraph (blockId=${blockId}, pageId=${linkedDoc.id}).`);
+  });
+
+  reportDiagnostic(
+    'info',
+    `Extract blocks linked-page icon insertion completed (selectedBlocks=${sortedEntries.length}, pageId=${linkedDoc.id}).`
+  );
+  return linkedDoc;
+}
+
+function insertExtractTextSpanLinkedPageIcon(
+  doc: Doc,
+  range: ExtractTextRangeReplacement,
+  relativePath: string,
+  title: string
+): Doc {
+  reportDiagnostic(
+    'info',
+    `Inserting extract text span linked-page icon (blocks=${range.blockIds.length}, relativePath=${relativePath}).`
+  );
+  const startModel = getEditableTextBlock(doc, range.start.blockId);
+  const endModel = getEditableTextBlock(doc, range.end.blockId);
+  if (!startModel || !endModel) {
+    reportDiagnostic('error', 'Extract text-span icon insertion failed: range blocks no longer have editable text.');
+    throw new Error('selected range blocks no longer have editable text');
+  }
+
+  if (startModel === endModel) {
+    const index = Math.min(range.start.index, range.end.index);
+    const selectionEnd = Math.max(
+      getSelectionPointEndOffset(range.start),
+      getSelectionPointEndOffset(range.end)
+    );
+    return insertExtractTextRangeLinkedPageIcon(
+      doc,
+      {
+        kind: 'text',
+        blockId: range.start.blockId,
+        index,
+        length: Math.max(0, selectionEnd - index),
+      },
+      relativePath,
+      title
+    );
+  }
+
+  const parent = doc.getParent(startModel as never) as { children?: unknown[] } | null;
+  const endParent = doc.getParent(endModel as never);
+  const siblings = Array.isArray(parent?.children) ? parent.children : [];
+  const startIndex = siblings.indexOf(startModel);
+  const endIndex = siblings.indexOf(endModel);
+  if (!parent || parent !== endParent || startIndex < 0 || endIndex < 0) {
+    reportDiagnostic('error', 'Extract text-span icon insertion failed: selected blocks are not siblings.');
+    throw new Error('range icon insertion supports selected text across sibling blocks only');
+  }
+
+  const lastPoint = startIndex <= endIndex ? range.end : range.start;
+  const lastModel = startIndex <= endIndex ? endModel : startModel;
+  const titleText = getLinkedNoteTitle(relativePath, title);
+  const linkedDoc = createDefaultDoc(doc.collection, { title: titleText });
+  const reference = createIconOnlyLinkedPageReference(linkedDoc.id, relativePath, titleText);
+  const insertIndex = clampTextIndex(
+    getSelectionPointEndOffset(lastPoint),
+    getEditableTextLength(lastModel)
+  );
+
+  doc.transact(() => {
+    lastModel.text!.replace(insertIndex, 0, REFERENCE_NODE, { reference });
+  });
+
+  reportDiagnostic(
+    'info',
+    `Extract text span linked-page icon inserted (relativePath=${relativePath}, pageId=${linkedDoc.id}, insertIndex=${insertIndex}).`
+  );
   return linkedDoc;
 }
 
@@ -361,6 +589,38 @@ function getUniqueBlockIds(values: string[]) {
   }
 
   return ids;
+}
+
+function getSortedBlockEntries(doc: Doc, blockIds: string[]) {
+  const models = getUniqueBlockIds(blockIds)
+    .map(blockId => doc.getBlockById(blockId))
+    .filter((model: unknown): model is NonNullable<unknown> => Boolean(model));
+  if (models.length === 0) {
+    return [];
+  }
+
+  const entries = models.map(model => ({
+    model: model as EditableTextBlock,
+    parent: doc.getParent(model as never) as { id?: string; children?: unknown[] } | null,
+  }));
+  if (entries.some(entry => !entry.parent)) {
+    reportDiagnostic('error', 'Extract block replacement failed: selected block parent not found.');
+    throw new Error('could not find the selected block parent');
+  }
+
+  const parent = entries[0].parent;
+  if (!parent || entries.some(entry => entry.parent !== parent)) {
+    reportDiagnostic('error', 'Extract block replacement failed: selected blocks do not share one parent.');
+    throw new Error('selected blocks must share one parent');
+  }
+
+  const children = Array.isArray(parent.children) ? parent.children : [];
+  return entries
+    .map(entry => ({
+      ...entry,
+      index: children.indexOf(entry.model),
+    }))
+    .sort((left, right) => left.index - right.index);
 }
 
 type EditableTextBlock = {
@@ -398,6 +658,12 @@ function getEditableTextLength(model: EditableTextBlock) {
     ? model.text.toString()
     : '';
   return text === '[object Object]' ? 0 : text.length;
+}
+
+function hasEditableText(model: EditableTextBlock): model is EditableTextBlock & {
+  text: NonNullable<EditableTextBlock['text']>;
+} {
+  return Boolean(model.text);
 }
 
 function clampTextIndex(index: number, textLength: number) {

@@ -25,7 +25,7 @@ import {
   getCogntLinkedNotePathFromModel,
   getLinkedNoteTitleFromModel,
   isCogntLinkedDocModel,
-} from './linked-note-dom';
+} from './linked-note-dom-models';
 import {
   ensureLinkedDocReferenceDoc,
   ensureLinkedPageReferenceDoc,
@@ -37,18 +37,22 @@ import {
   createLinkedPageReference,
   updateLinkedPageReference,
 } from './linked-note-reference';
+import { reportDiagnostic } from '../host';
 
 export function hydrateCogntEmbedLinkedNotes(
   doc: Doc,
   onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
   resolveTitle?: LinkedNoteTitleResolver
 ) {
+  reportDiagnostic('info', 'Hydrating Cognt embed linked notes from paragraphs.');
   const note = doc.root?.children.find(child => child.flavour === 'affine:note') ?? null;
 
   if (!note) {
+    reportDiagnostic('warn', 'Embed linked note hydration skipped: note block not found.');
     return;
   }
 
+  let hydratedCount = 0;
   for (const child of [...note.children]) {
     if (child.flavour !== 'affine:paragraph') {
       continue;
@@ -87,7 +91,10 @@ export function hydrateCogntEmbedLinkedNotes(
       index
     );
     doc.deleteBlock(child, { deleteChildren: true });
+    hydratedCount++;
   }
+
+  reportDiagnostic('info', `Embed linked note hydration completed (hydrated=${hydratedCount}).`);
 }
 
 export function registerSerializedCogntEmbedLinkedNotes(
@@ -95,9 +102,13 @@ export function registerSerializedCogntEmbedLinkedNotes(
   onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
   resolveTitle?: LinkedNoteTitleResolver
 ) {
+  reportDiagnostic('info', 'Registering serialized embed linked notes.');
   let changed = false;
+  let visited = 0;
+  let registered = 0;
 
   for (const model of doc.getBlocks()) {
+    visited++;
     if (!isCogntLinkedDocModel(model)) {
       continue;
     }
@@ -135,10 +146,19 @@ export function registerSerializedCogntEmbedLinkedNotes(
         cogntLinkedNotePath: relativePath,
       });
       changed = true;
+      reportDiagnostic(
+        'info',
+        `Serialized embed linked note model updated (relativePath=${relativePath}, pageId=${linkedDoc.id}).`
+      );
     }
     onLinkedDoc?.({ doc: linkedDoc, relativePath });
+    registered++;
   }
 
+  reportDiagnostic(
+    'info',
+    `Serialized embed linked note registration completed (visited=${visited}, registered=${registered}, changed=${changed}).`
+  );
   return changed;
 }
 
@@ -146,9 +166,14 @@ export function registerSerializedCogntInlineLinkedNotes(
   doc: Doc,
   resolveTitle?: LinkedNoteTitleResolver
 ) {
+  reportDiagnostic('info', 'Registering serialized inline linked notes.');
   let changed = false;
+  let visitedBlocks = 0;
+  let visitedReferences = 0;
+  let updatedReferences = 0;
 
   for (const model of walkBlockModels(doc.root)) {
+    visitedBlocks++;
     const text = getBlockText(model);
     if (!text) {
       continue;
@@ -162,6 +187,7 @@ export function registerSerializedCogntInlineLinkedNotes(
       const relativePath = reference ? getLinkedPageReferencePath(reference) : null;
 
       if (reference?.type === 'LinkedPage' && reference.pageId && relativePath) {
+        visitedReferences++;
         const linkedPage = ensureLinkedPageReferenceDoc(doc, reference, relativePath, resolveTitle);
         const needsUpdate =
           reference.pageId !== linkedPage.pageId
@@ -180,6 +206,11 @@ export function registerSerializedCogntInlineLinkedNotes(
             ),
           });
           changed = true;
+          updatedReferences++;
+          reportDiagnostic(
+            'info',
+            `Serialized inline linked note reference updated (relativePath=${relativePath}, pageId=${linkedPage.pageId}).`
+          );
         }
       }
 
@@ -187,6 +218,10 @@ export function registerSerializedCogntInlineLinkedNotes(
     }
   }
 
+  reportDiagnostic(
+    'info',
+    `Serialized inline linked note registration completed (blocks=${visitedBlocks}, references=${visitedReferences}, updated=${updatedReferences}, changed=${changed}).`
+  );
   return changed;
 }
 
@@ -194,7 +229,11 @@ export function upgradeRuntimeRawCogntInlineMentions(
   doc: Doc,
   resolveTitle?: LinkedNoteTitleResolver
 ) {
+  reportDiagnostic('info', 'Upgrading runtime raw Cognt inline mentions.');
+  let visitedBlocks = 0;
+  let replacementCount = 0;
   for (const model of walkBlockModels(doc.root)) {
+    visitedBlocks++;
     const text = getBlockText(model);
     if (!text) {
       continue;
@@ -237,6 +276,12 @@ export function upgradeRuntimeRawCogntInlineMentions(
           ),
         }
       );
+      replacementCount++;
     }
   }
+
+  reportDiagnostic(
+    'info',
+    `Runtime raw Cognt inline mention upgrade completed (blocks=${visitedBlocks}, replacements=${replacementCount}).`
+  );
 }

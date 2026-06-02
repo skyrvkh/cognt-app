@@ -45,18 +45,22 @@ export async function runCreateLinkedNoteCommand(
   viewMode: LinkedNoteViewMode,
   context: AffineSlashMenuContext
 ) {
+  reportDiagnostic('info', `Create linked note command requested (viewMode=${viewMode}).`);
   if (host.isInputLocked()) {
     host.showStatus('Wait for the full note to finish loading before creating linked notes.');
+    reportDiagnostic('info', 'Create linked note command skipped: editor input is locked.');
     return;
   }
 
   const currentPath = host.getCurrentPath();
   if (!host.getCurrentDoc() || !currentPath) {
     host.showStatus('Open a note before creating a linked note.');
+    reportDiagnostic('info', 'Create linked note command skipped: no current document or source path.');
     return;
   }
 
   try {
+    reportDiagnostic('info', `Create linked note host request started (source=${currentPath}, viewMode=${viewMode}).`);
     const result = await host.createLinkedNote({
       type: 'createLinkedNote',
       sourcePath: currentPath,
@@ -64,16 +68,22 @@ export async function runCreateLinkedNoteCommand(
     });
 
     if (!result.ok) {
+      reportDiagnostic('warn', `Create linked note host request failed (source=${currentPath}, error=${result.error ?? ''}).`);
       throw new Error(result.error ?? 'The linked note could not be created.');
     }
 
     const linkedNotePath = getLinkedNotePathFromResult(result);
     if (!linkedNotePath) {
+      reportDiagnostic('warn', `Create linked note host response missing path (source=${currentPath}).`);
       throw new Error('The linked note path was not returned.');
     }
 
     const generation = host.getLoadGeneration();
     if (viewMode === 'embed') {
+      reportDiagnostic(
+        'info',
+        `Inserting linked note embed (source=${currentPath}, linked=${linkedNotePath}, hasContent=${typeof result.documentContent === 'string'}, generation=${generation}).`
+      );
       const linkedDoc = insertCogntLinkedNoteEmbed(
         context,
         linkedNotePath,
@@ -88,10 +98,13 @@ export async function runCreateLinkedNoteCommand(
           nestedLinkedDoc => host.registerNestedLinkedDoc(nestedLinkedDoc, generation)
         );
         host.markLinkedDocPreviewed(linkedDoc);
+        reportDiagnostic('info', `Linked note embedded content imported (linked=${linkedNotePath}).`);
       } else {
         host.requestLinkedDocPreview(linkedDoc, linkedNotePath, generation);
+        reportDiagnostic('info', `Linked note embed queued preview request (linked=${linkedNotePath}).`);
       }
     } else {
+      reportDiagnostic('info', `Inserting linked note inline reference (source=${currentPath}, linked=${linkedNotePath}).`);
       const linkedDoc = insertCogntLinkedNoteInline(
         context,
         linkedNotePath,
@@ -102,6 +115,7 @@ export async function runCreateLinkedNoteCommand(
 
     await persistMutation(host);
     host.refreshMentionHighlights();
+    reportDiagnostic('info', `Create linked note command completed (source=${currentPath}, linked=${linkedNotePath}, viewMode=${viewMode}).`);
     host.showStatus(`Created ${result.relativePath ?? 'linked note'}.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
