@@ -1,6 +1,7 @@
 import { createDefaultDoc } from '@blocksuite/blocks';
 import type { Doc } from '@blocksuite/store';
 import { createBlockId } from '../documents/block-suite-document';
+import { reportDiagnostic } from '../host';
 import type { LinkedNoteTitleResolver } from './linked-note-types';
 import {
   getLinkedNoteTitle,
@@ -9,6 +10,7 @@ import {
 
 export function* walkBlockModels(model: unknown): Generator<unknown> {
   if (!model) {
+    reportDiagnostic('warn', 'Skipped block model walk because model was empty.');
     return;
   }
 
@@ -47,6 +49,10 @@ export function getBlockText(model: unknown) {
     };
   }
 
+  reportDiagnostic('warn', 'Block model did not expose an editable text adapter.', {
+    modelType: typeof model,
+    hasText: text !== undefined && text !== null,
+  });
   return null;
 }
 

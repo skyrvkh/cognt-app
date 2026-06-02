@@ -1,8 +1,11 @@
 import type { Doc } from '@blocksuite/store';
 
 export const cogntLinkedNotePathProp = 'cogntLinkedNotePath';
+export const cogntLinkedNoteDisplayProp = 'cogntLinkedNoteDisplay';
+export const iconOnlyCogntLinkedNoteDisplay = 'icon';
 export const embedLinkedDocTagName = 'affine-embed-linked-doc-block';
 export const cogntLinkedDocWrapStyleId = 'cognt-linked-doc-wrap-style';
+export const cogntInlineReferenceStyleId = 'cognt-inline-reference-style';
 export const defaultCogntEmbedStyle = 'horizontal';
 
 export const cogntEmbedStyleAliases = new Map([
@@ -28,6 +31,7 @@ export type LinkedPageReference = {
   params?: Record<string, unknown>;
   title?: string;
   type?: string;
+  cogntLinkedNoteDisplay?: string;
 };
 
 export type LinkedNoteResult = {

@@ -1,17 +1,30 @@
 import { findElementsDeep } from '../editor/dom';
 import {
+  cogntInlineReferenceStyleId,
   cogntLinkedDocWrapStyleId,
   embedLinkedDocTagName,
   type LinkedPageReference,
 } from './linked-note-types';
+import { reportDiagnostic } from '../host';
 import {
   getCogntLinkedNotePath,
   getCogntLinkedNoteTitle,
+  getLinkedPageReferencePath,
+  getLinkedPageReferenceTitle,
+  isIconOnlyLinkedPageReference,
 } from './linked-note-paths';
 
 export function getInlineLinkedPageReferenceFromEvent(event: MouseEvent): LinkedPageReference | null {
   const element = getInlineLinkedPageReferenceElementFromEvent(event);
-  return element ? getInlineLinkedPageReference(element) : null;
+  const reference = element ? getInlineLinkedPageReference(element) : null;
+  if (!reference) {
+    reportDiagnostic('warn', 'Inline linked page reference was not found for event.', {
+      eventType: event.type,
+      hasElement: element !== null,
+    });
+  }
+
+  return reference;
 }
 
 export function getInlineLinkedPageReferenceElementFromEvent(
@@ -20,7 +33,16 @@ export function getInlineLinkedPageReferenceElementFromEvent(
   referenceInfo?: unknown;
   delta?: { attributes?: { reference?: unknown } };
 }) | null {
-  return event.composedPath().find(isInlineLinkedPageReferenceElement) ?? null;
+  const path = event.composedPath();
+  const element = path.find(isInlineLinkedPageReferenceElement) ?? null;
+  if (!element) {
+    reportDiagnostic('warn', 'Inline linked page reference element was not found for event.', {
+      eventType: event.type,
+      pathLength: path.length,
+    });
+  }
+
+  return element;
 }
 
 export function getInlineLinkedPageReference(
@@ -31,7 +53,15 @@ export function getInlineLinkedPageReference(
 ): LinkedPageReference | null {
   const reference = element?.referenceInfo ?? element?.delta?.attributes?.reference;
 
-  return isLinkedPageReference(reference) ? reference : null;
+  const linkedReference = isLinkedPageReference(reference) ? reference : null;
+  if (!linkedReference) {
+    reportDiagnostic('warn', 'Inline linked page reference element did not contain reference metadata.', {
+      hasReferenceInfo: element.referenceInfo !== undefined,
+      hasDeltaReference: element.delta?.attributes?.reference !== undefined,
+    });
+  }
+
+  return linkedReference;
 }
 
 export function getCogntLinkedDocOpenIntent(event: MouseEvent) {
@@ -44,10 +74,17 @@ export function getCogntLinkedDocOpenIntent(event: MouseEvent) {
     return null;
   }
 
-  return isCogntLinkedDocModel(block.model)
+  const model = isCogntLinkedDocModel(block.model)
     && getCogntLinkedNotePathFromModel(block.model)
     ? block.model
     : null;
+  if (!model) {
+    reportDiagnostic('warn', 'Cognt linked doc open intent did not include a usable model.', {
+      eventType: event.type,
+    });
+  }
+
+  return model;
 }
 
 export function isOpenThisDocToolbarIntent(event: MouseEvent) {
@@ -55,6 +92,7 @@ export function isOpenThisDocToolbarIntent(event: MouseEvent) {
 }
 
 export function getCogntLinkedDocToolbarModel(event: MouseEvent) {
+  const path = event.composedPath();
   for (const target of event.composedPath()) {
     if (typeof target !== 'object' || target === null) {
       continue;
@@ -67,19 +105,27 @@ export function getCogntLinkedDocToolbarModel(event: MouseEvent) {
     }
   }
 
+  reportDiagnostic('warn', 'Cognt linked doc toolbar model was not found.', {
+    eventType: event.type,
+    pathLength: path.length,
+  });
   return null;
 }
 
 export function getLinkedDocReferenceFromModel(model: unknown) {
   if (!isCogntLinkedDocModel(model)) {
+    reportDiagnostic('warn', 'Cannot create linked doc reference from non-linked-doc model.', {
+      modelType: typeof model,
+    });
     return null;
   }
 
   const linkedDocModel = model as Record<string, unknown> & { pageId: string };
+  const relativePath = getCogntLinkedNotePathFromModel(linkedDocModel) ?? undefined;
 
   return {
     pageId: linkedDocModel.pageId,
-    relativePath: getCogntLinkedNotePathFromModel(linkedDocModel) ?? undefined,
+    relativePath,
   };
 }
 
@@ -92,6 +138,9 @@ export function isCogntLinkedDocModel(model: unknown) {
 
 export function getCogntLinkedNotePathFromModel(model: unknown) {
   if (typeof model !== 'object' || model === null) {
+    reportDiagnostic('warn', 'Cannot resolve Cognt linked note path from non-object model.', {
+      modelType: typeof model,
+    });
     return null;
   }
 
@@ -100,11 +149,21 @@ export function getCogntLinkedNotePathFromModel(model: unknown) {
     ? record.props as Record<string, unknown>
     : {};
 
-  return getCogntLinkedNotePath(record) ?? getCogntLinkedNotePath(props);
+  const relativePath = getCogntLinkedNotePath(record) ?? getCogntLinkedNotePath(props);
+  if (!relativePath) {
+    reportDiagnostic('warn', 'Could not resolve Cognt linked note path from model.', {
+      hasProps: Object.keys(props).length > 0,
+    });
+  }
+
+  return relativePath;
 }
 
 export function getLinkedNoteTitleFromModel(model: unknown) {
   if (typeof model !== 'object' || model === null) {
+    reportDiagnostic('warn', 'Cannot resolve linked note title from non-object model.', {
+      modelType: typeof model,
+    });
     return null;
   }
 
@@ -125,6 +184,27 @@ export function patchRenderedEmbedLinkedDocBlocks(root: ParentNode | ShadowRoot)
       'affine-paragraph, affine-list, rich-text, .inline-editor'
     )) {
       injectShadowStyle(child, linkedDocNestedWrapCss());
+    }
+  }
+}
+
+export function patchRenderedInlineLinkedNoteReferences(root: ParentNode | ShadowRoot) {
+  for (const element of findElementsDeep(root, 'affine-reference')) {
+    const reference = getInlineLinkedPageReference(element as HTMLElement & {
+      referenceInfo?: unknown;
+      delta?: { attributes?: { reference?: unknown } };
+    });
+    if (reference && isIconOnlyLinkedPageReference(reference)) {
+      element.setAttribute('data-cognt-link-display', 'icon');
+      element.setAttribute(
+        'title',
+        getLinkedPageReferenceTitle(reference)
+          ?? getLinkedPageReferencePath(reference)
+          ?? 'Linked note'
+      );
+      injectShadowStyle(element, iconOnlyInlineReferenceCss(), cogntInlineReferenceStyleId);
+    } else {
+      element.removeAttribute('data-cognt-link-display');
     }
   }
 }
@@ -168,16 +248,50 @@ function isOpenThisDocActionElement(value: EventTarget) {
     || actionType === 'open';
 }
 
-function injectShadowStyle(element: HTMLElement, cssText: string) {
+function injectShadowStyle(
+  element: HTMLElement,
+  cssText: string,
+  styleId = cogntLinkedDocWrapStyleId
+) {
   const root = element.shadowRoot;
-  if (!root || root.getElementById(cogntLinkedDocWrapStyleId)) {
+  if (!root || root.getElementById(styleId)) {
     return;
   }
 
   const style = document.createElement('style');
-  style.id = cogntLinkedDocWrapStyleId;
+  style.id = styleId;
   style.textContent = cssText;
   root.prepend(style);
+}
+
+function iconOnlyInlineReferenceCss() {
+  return `
+    :host([data-cognt-link-display="icon"]) {
+      display: inline-flex !important;
+      width: 1.1em !important;
+      min-width: 1.1em !important;
+      height: 1.1em !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: -0.12em !important;
+      border-radius: 999px !important;
+      color: var(--cognt-editor-accent-strong, var(--affine-primary-color)) !important;
+      text-decoration: none !important;
+      cursor: pointer !important;
+    }
+
+    :host([data-cognt-link-display="icon"]) * {
+      display: none !important;
+    }
+
+    :host([data-cognt-link-display="icon"])::after {
+      content: "↗";
+      display: inline-block;
+      font-size: 0.82em;
+      line-height: 1;
+      font-weight: 700;
+    }
+  `;
 }
 
 function linkedDocCardWrapCss() {

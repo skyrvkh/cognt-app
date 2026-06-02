@@ -1,9 +1,12 @@
 import {
   cogntEmbedStyleAliases,
+  cogntLinkedNoteDisplayProp,
   cogntLinkedNotePathProp,
+  iconOnlyCogntLinkedNoteDisplay,
   type LinkedNoteResult,
   type LinkedPageReference,
 } from './linked-note-types';
+import { reportDiagnostic } from '../host';
 import { parseNoteMentionTarget } from '../mentions';
 import { isPlainRecord } from '../documents/block-suite-document';
 import {
@@ -22,6 +25,9 @@ export function getLinkedNotePathFromResult(result: LinkedNoteResult) {
     return result.relativePath.trim();
   }
 
+  reportDiagnostic('warn', 'Linked note result did not include a relative path.', {
+    hasTitle: Boolean(result.title?.trim()),
+  });
   return null;
 }
 
@@ -32,6 +38,9 @@ export function getLinkedNoteTitleFromResult(result: LinkedNoteResult) {
 export function normalizeCreatedExtractPath(path: string | null | undefined) {
   const value = path?.trim().replace(/\\/g, '/');
   if (!value) {
+    reportDiagnostic('warn', 'Created extract path was empty after normalization.', {
+      hadInput: path !== null && path !== undefined,
+    });
     return null;
   }
 
@@ -48,9 +57,10 @@ export function getExtractTitleFromRelPath(relativePath: string) {
   const stem = fileName.replace(/\.(json|md|markdown)$/i, '').trim();
   const separatorIndex = stem.lastIndexOf('.');
 
-  return separatorIndex >= 0 && separatorIndex < stem.length - 1
+  const title = separatorIndex >= 0 && separatorIndex < stem.length - 1
     ? stem.slice(separatorIndex + 1)
     : stem;
+  return title;
 }
 
 export function getLinkedNoteTitle(relativePath: string, title?: string | null) {
@@ -72,28 +82,57 @@ export function normalizeLinkedNotePathKey(relativePath: string) {
 
 export function getLinkedPageReferencePath(reference: LinkedPageReference | Record<string, unknown>) {
   const record = reference as Record<string, unknown>;
-  return getCogntLinkedNotePath(record)
+  const relativePath = getCogntLinkedNotePath(record)
     ?? getTrimmedString(record.relativePath)
     ?? getTrimmedString(record.description);
+  if (!relativePath) {
+    reportDiagnostic('warn', 'Linked page reference did not include a note path.', {
+      hasReferencePageId: typeof record.pageId === 'string',
+    });
+  }
+
+  return relativePath;
 }
 
 export function getLinkedPageReferenceTitle(reference: LinkedPageReference | Record<string, unknown>) {
   return getTrimmedString((reference as Record<string, unknown>).title);
 }
 
+export function isIconOnlyLinkedPageReference(reference: LinkedPageReference | Record<string, unknown>) {
+  const record = reference as Record<string, unknown>;
+  const params = getRecordProperty(record, 'params');
+  const display = getTrimmedString(record[cogntLinkedNoteDisplayProp])
+    ?? (params ? getTrimmedString(params[cogntLinkedNoteDisplayProp]) : null);
+
+  const iconOnly = display === iconOnlyCogntLinkedNoteDisplay;
+  return iconOnly;
+}
+
 export function extractCogntEmbedTarget(markdown: string | undefined) {
   const match = markdown?.trim().match(/^!\[\[([^\]\n]+)\]\]$/);
-  return parseCogntLinkTarget(match?.[1]);
+  const target = parseCogntLinkTarget(match?.[1]);
+  if (!target) {
+    reportDiagnostic('warn', 'Could not extract Cognt embed target from markdown.', {
+      markdownLength: markdown?.length ?? 0,
+      matched: Boolean(match),
+    });
+  }
+
+  return target;
 }
 
 export function parseCogntLinkTarget(value: string | undefined) {
   if (!value) {
+    reportDiagnostic('warn', 'Skipped Cognt link target parsing because value was empty.');
     return null;
   }
 
   const [relativePath, ...parts] = value.split('|');
   const normalizedPath = relativePath.trim();
   if (!normalizedPath) {
+    reportDiagnostic('warn', 'Skipped Cognt link target parsing because path was empty.', {
+      partCount: parts.length,
+    });
     return null;
   }
 
@@ -110,11 +149,12 @@ export function parseCogntLinkTarget(value: string | undefined) {
     titleParts.push(part);
   }
 
-  return {
+  const target = {
     relativePath: normalizedPath,
     title: normalizeLinkedNoteTitle(titleParts.join('|')),
     style,
   };
+  return target;
 }
 
 export function findRawCogntInlineMentionMatches(text: string): RawCogntInlineMentionMatch[] {
@@ -144,10 +184,18 @@ export function normalizeLinkedNoteTitle(title: string | null | undefined) {
 
 export function normalizeCogntEmbedStyle(style: unknown) {
   if (typeof style !== 'string') {
+    reportDiagnostic('warn', 'Embed style normalization received a non-string value.', {
+      valueType: typeof style,
+    });
     return null;
   }
 
-  return cogntEmbedStyleAliases.get(style.trim().toLowerCase()) ?? null;
+  const normalized = cogntEmbedStyleAliases.get(style.trim().toLowerCase()) ?? null;
+  if (!normalized) {
+    reportDiagnostic('warn', 'Embed style normalization rejected an unknown style.', { style });
+  }
+
+  return normalized;
 }
 
 export function isCogntNoteRelativePath(relativePath: string) {
@@ -172,8 +220,9 @@ export function getCogntLinkedNotePath(props: Record<string, unknown>) {
     return paramPath;
   }
 
-  return getCogntLinkedNoteLegacyPath(props.relativePath)
+  const legacyPath = getCogntLinkedNoteLegacyPath(props.relativePath)
     ?? getCogntLinkedNoteLegacyPath(props.description);
+  return legacyPath;
 }
 
 export function getTrimmedString(value: unknown) {
@@ -188,6 +237,13 @@ export function getCogntLinkedNoteLegacyPath(value: unknown) {
 export function createCogntLinkedNoteParams(relativePath: string) {
   return {
     [cogntLinkedNotePathProp]: relativePath,
+  };
+}
+
+export function createIconOnlyCogntLinkedNoteParams(relativePath: string) {
+  return {
+    [cogntLinkedNotePathProp]: relativePath,
+    [cogntLinkedNoteDisplayProp]: iconOnlyCogntLinkedNoteDisplay,
   };
 }
 
