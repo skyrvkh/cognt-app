@@ -1,18 +1,20 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Text.RegularExpressions;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 using PkmNoteService = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.INoteService;
 
 namespace CogntApp.ViewModels;
 
-public sealed class GraphViewModel : ObservableObject
+public sealed partial class GraphViewModel : ObservableObject
 {
     private readonly PkmNoteService noteService;
     private readonly MainViewModel mainViewModel;
+    private readonly ILogger<GraphViewModel> logger;
     private KnowledgeGraphReadModel graph = KnowledgeGraphReadModel.Empty(KnowledgeGraphSettingsReadModel.Default);
     private IReadOnlyList<KnowledgeGraphNodeReadModel> orderedGraphSearchNodes = Array.Empty<KnowledgeGraphNodeReadModel>();
     private bool isLoading;
@@ -29,15 +31,16 @@ public sealed class GraphViewModel : ObservableObject
     private string lastGraphRelativePath = string.Empty;
     private bool isRefreshingForCurrentNote;
     private int graphRefreshVersion;
-    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
-    public GraphViewModel(PkmNoteService noteService, MainViewModel mainViewModel)
+    public GraphViewModel(PkmNoteService noteService, MainViewModel mainViewModel, ILogger<GraphViewModel> logger)
     {
         ArgumentNullException.ThrowIfNull(noteService);
         ArgumentNullException.ThrowIfNull(mainViewModel);
+        ArgumentNullException.ThrowIfNull(logger);
 
         this.noteService = noteService;
         this.mainViewModel = mainViewModel;
+        this.logger = logger;
 
         RefreshCommand = new RelayCommand(RefreshGraph);
         SaveSettingsCommand = new RelayCommand(SaveSettingsAndRefresh);
@@ -64,7 +67,7 @@ public sealed class GraphViewModel : ObservableObject
         {
             if (SetProperty(ref graph, value))
             {
-                orderedGraphSearchNodes = CreateOrderedGraphSearchNodes(value);
+                orderedGraphSearchNodes = GraphSearchResultBuilder.CreateOrderedNodes(value);
                 CurrentNodeTitle = ResolveCurrentNodeTitle(value);
                 OnPropertyChanged(nameof(HasGraph));
                 OnPropertyChanged(nameof(ShouldShowState));
@@ -309,17 +312,6 @@ public sealed class GraphViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
-    private void LoadSettings()
-    {
-        if (!mainViewModel.HasOpenCollection)
-        {
-            ApplySettings(KnowledgeGraphSettingsReadModel.Default);
-            return;
-        }
-
-        ApplySettings(noteService.LoadGraphViewSettings(mainViewModel.OpenCollectionPath));
-    }
-
     private void RefreshGraph()
     {
         int refreshVersion = ++graphRefreshVersion;
@@ -384,6 +376,11 @@ public sealed class GraphViewModel : ObservableObject
             IsLoading = false;
             OnPropertyChanged(nameof(StateTitle));
             OnPropertyChanged(nameof(StateMessage));
+            logger.LogError(
+                ex,
+                "Graph refresh failed before background read. RefreshVersion={RefreshVersion} RelativePath={RelativePath}",
+                refreshVersion,
+                currentRelativePath);
         }
     }
 
@@ -394,6 +391,10 @@ public sealed class GraphViewModel : ObservableObject
         KnowledgeGraphSettingsReadModel settings,
         Task<KnowledgeGraphReadModel> task)
     {
+        Exception? failure = task.IsFaulted
+            ? task.Exception?.GetBaseException()
+            : null;
+
         void ApplyIfCurrent()
         {
             if (refreshVersion != graphRefreshVersion)
@@ -412,7 +413,13 @@ public sealed class GraphViewModel : ObservableObject
                 else
                 {
                     Graph = KnowledgeGraphReadModel.Empty(settings);
-                    ErrorMessage = task.Exception?.GetBaseException().Message ?? "The graph could not be loaded.";
+                    ErrorMessage = CreateGraphRefreshErrorMessage(failure);
+                    logger.LogError(
+                        failure,
+                        "Graph refresh background read failed. RefreshVersion={RefreshVersion} RelativePath={RelativePath} ErrorMessage={ErrorMessage}",
+                        refreshVersion,
+                        relativePath,
+                        ErrorMessage);
                 }
             }
             finally
@@ -431,6 +438,16 @@ public sealed class GraphViewModel : ObservableObject
         }
 
         ApplyIfCurrent();
+    }
+
+    private static string CreateGraphRefreshErrorMessage(Exception? exception)
+    {
+        return exception switch
+        {
+            FileNotFoundException => "The selected note was deleted before the graph finished loading.",
+            null => "The graph could not be loaded.",
+            _ => exception.Message
+        };
     }
 
     private void SaveSettingsAndRefresh()
@@ -455,60 +472,12 @@ public sealed class GraphViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-        }
-    }
-
-    private bool TryCreateSettings(out KnowledgeGraphSettingsReadModel settings)
-    {
-        if (!int.TryParse(NeighborDepthText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int neighborDepthValue))
-        {
-            settings = KnowledgeGraphSettingsReadModel.Default;
-            ErrorMessage = "Depth must be a whole number from 1 to 4.";
-            return false;
-        }
-
-        if (!int.TryParse(MaxNodesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int maxNodes))
-        {
-            settings = KnowledgeGraphSettingsReadModel.Default;
-            ErrorMessage = "Max nodes must be a whole number.";
-            return false;
-        }
-
-        settings = new KnowledgeGraphSettingsReadModel(neighborDepthValue, maxNodes).Normalize();
-        NeighborDepth = settings.NeighborDepth;
-        MaxNodesText = settings.MaxNodes.ToString(CultureInfo.InvariantCulture);
-        return true;
-    }
-
-    private void ApplySettings(KnowledgeGraphSettingsReadModel settings)
-    {
-        KnowledgeGraphSettingsReadModel normalized = settings.Normalize();
-        NeighborDepth = normalized.NeighborDepth;
-        MaxNodesText = normalized.MaxNodes.ToString(CultureInfo.InvariantCulture);
-    }
-
-    internal string CreatePreviewText(KnowledgeGraphNodeReadModel node)
-    {
-        ArgumentNullException.ThrowIfNull(node);
-
-        try
-        {
-            string preview = mainViewModel.ReadMentionPreview(node.RelativePath, 260);
-            preview = WhitespaceRegex.Replace(preview ?? string.Empty, " ").Trim();
-            if (preview.Length > 260)
-            {
-                preview = $"{preview[..257]}...";
-            }
-
-            return string.IsNullOrWhiteSpace(preview)
-                ? node.Title
-                : $"{node.Title}{Environment.NewLine}{preview}";
-        }
-        catch
-        {
-            return string.IsNullOrWhiteSpace(node.Title)
-                ? node.RelativePath
-                : node.Title;
+            logger.LogError(
+                ex,
+                "Graph settings save failed. CollectionPath={CollectionPath} NeighborDepth={NeighborDepth} MaxNodes={MaxNodes}",
+                mainViewModel.OpenCollectionPath,
+                settings.NeighborDepth,
+                settings.MaxNodes);
         }
     }
 
@@ -533,6 +502,7 @@ public sealed class GraphViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            logger.LogError(ex, "Graph node open failed. ParameterType={ParameterType}", parameter?.GetType().Name ?? "<null>");
         }
     }
 
@@ -573,11 +543,14 @@ public sealed class GraphViewModel : ObservableObject
     private void RebuildSearchResults()
     {
         string query = SearchText.Trim();
-        (KnowledgeGraphNodeReadModel[] results, bool containsSelectedResult) = CreateSearchResults(query);
+        GraphSearchResult result = GraphSearchResultBuilder.Build(
+            orderedGraphSearchNodes,
+            query,
+            selectedSearchResult?.DocumentId);
 
-        ApplySearchResults(results);
+        ApplySearchResults(result.Nodes);
 
-        if (selectedSearchResult is not null && !containsSelectedResult)
+        if (selectedSearchResult is not null && !result.ContainsSelectedResult)
         {
             selectedSearchResult = null;
             OnPropertyChanged(nameof(SelectedSearchResult));
@@ -586,42 +559,6 @@ public sealed class GraphViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSearchResults));
         OnPropertyChanged(nameof(ShouldShowSearchResults));
         OnPropertyChanged(nameof(SearchStatus));
-    }
-
-    private (KnowledgeGraphNodeReadModel[] Results, bool ContainsSelectedResult) CreateSearchResults(string query)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return (Array.Empty<KnowledgeGraphNodeReadModel>(), false);
-        }
-
-        string? selectedDocumentId = selectedSearchResult?.DocumentId;
-        bool containsSelectedResult = false;
-        List<KnowledgeGraphNodeReadModel> matches = [];
-
-        foreach (KnowledgeGraphNodeReadModel node in orderedGraphSearchNodes)
-        {
-            if (!node.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
-                && !node.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            matches.Add(node);
-            if (!containsSelectedResult
-                && selectedDocumentId is not null
-                && string.Equals(node.DocumentId, selectedDocumentId, StringComparison.OrdinalIgnoreCase))
-            {
-                containsSelectedResult = true;
-            }
-
-            if (matches.Count >= 12)
-            {
-                break;
-            }
-        }
-
-        return (matches.Count == 0 ? Array.Empty<KnowledgeGraphNodeReadModel>() : [.. matches], containsSelectedResult);
     }
 
     private void ApplySearchResults(IReadOnlyList<KnowledgeGraphNodeReadModel> nextResults)
@@ -644,34 +581,6 @@ public sealed class GraphViewModel : ObservableObject
         {
             SearchResults.Add(nextResults[index]);
         }
-    }
-
-    private static IReadOnlyList<KnowledgeGraphNodeReadModel> CreateOrderedGraphSearchNodes(KnowledgeGraphReadModel graph)
-    {
-        if (graph.Nodes.Count == 0)
-        {
-            return Array.Empty<KnowledgeGraphNodeReadModel>();
-        }
-
-        List<KnowledgeGraphNodeReadModel> orderedNodes = [.. graph.Nodes];
-        orderedNodes.Sort(CompareGraphSearchNodes);
-        return orderedNodes;
-    }
-
-    private static int CompareGraphSearchNodes(
-        KnowledgeGraphNodeReadModel left,
-        KnowledgeGraphNodeReadModel right)
-    {
-        int depthComparison = left.Depth.CompareTo(right.Depth);
-        if (depthComparison != 0)
-        {
-            return depthComparison;
-        }
-
-        int titleComparison = StringComparer.OrdinalIgnoreCase.Compare(left.Title, right.Title);
-        return titleComparison != 0
-            ? titleComparison
-            : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
     }
 
     private void MainViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
