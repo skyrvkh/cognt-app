@@ -20,8 +20,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -93,8 +93,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
@@ -104,8 +104,8 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 

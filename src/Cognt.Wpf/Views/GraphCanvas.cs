@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using CogntApp.Design;
 
 namespace CogntApp.Views;
 
@@ -40,6 +41,8 @@ public sealed class GraphCanvas : FrameworkElement
 
     private const int InitialSimulationFrames = 90;
     private const int InteractionSimulationFrames = 240;
+    private const double EdgeNodeClearance = 18.0d;
+    private const double EdgeNodeForce = 0.16d;
 
     private readonly Dictionary<string, Point> positions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Vector> velocities = new(StringComparer.OrdinalIgnoreCase);
@@ -294,6 +297,7 @@ public sealed class GraphCanvas : FrameworkElement
     private static void OnGraphChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
     {
         GraphCanvas canvas = (GraphCanvas)dependencyObject;
+        KnowledgeGraphReadModel? newGraph = e.NewValue as KnowledgeGraphReadModel;
         canvas.layoutGraph = null;
         canvas.positions.Clear();
         canvas.velocities.Clear();
@@ -304,7 +308,7 @@ public sealed class GraphCanvas : FrameworkElement
         canvas.drawOrderedNodes.Clear();
         canvas.hitTestOrderedNodes.Clear();
         canvas.hoveredDocumentId = null;
-        canvas.selectedDocumentId = (e.NewValue as KnowledgeGraphReadModel)?.CurrentDocumentId;
+        canvas.selectedDocumentId = newGraph?.CurrentDocumentId;
         canvas.draggedDocumentId = null;
         canvas.isDraggingNode = false;
         canvas.isPanning = false;
@@ -371,7 +375,7 @@ public sealed class GraphCanvas : FrameworkElement
         {
             List<KnowledgeGraphNodeReadModel> nodes = nodesByDepth[depth];
             nodes.Sort(CompareNodesByTitleThenPath);
-            double radius = GetInitialRingRadius(currentGraph, depth);
+            double radius = GraphCanvasGeometry.GetInitialRingRadius(currentGraph, depth);
             double offset = depth % 2 == 0 ? Math.PI / Math.Max(1, nodes.Count) : 0;
 
             for (int i = 0; i < nodes.Count; i++)
@@ -481,7 +485,7 @@ public sealed class GraphCanvas : FrameworkElement
     private bool StepSimulation(KnowledgeGraphReadModel currentGraph)
     {
         EnsureVelocityEntries(currentGraph);
-        double idealDistance = GetIdealDistance(currentGraph);
+        double idealDistance = GraphCanvasGeometry.GetIdealDistance(currentGraph);
         simulationForces.Clear();
         foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
         {
@@ -504,7 +508,7 @@ public sealed class GraphCanvas : FrameworkElement
                 double distance = direction.Length;
                 if (distance < 0.001d)
                 {
-                    direction = CreateStableDirection(a.DocumentId, b.DocumentId);
+                    direction = GraphCanvasGeometry.CreateStableDirection(a.DocumentId, b.DocumentId);
                     distance = 1.0d;
                 }
                 else
@@ -533,7 +537,7 @@ public sealed class GraphCanvas : FrameworkElement
             double distance = direction.Length;
             if (distance < 0.001d)
             {
-                direction = CreateStableDirection(edge.SourceDocumentId, edge.TargetDocumentId);
+                direction = GraphCanvasGeometry.CreateStableDirection(edge.SourceDocumentId, edge.TargetDocumentId);
                 distance = 1.0d;
             }
             else
@@ -547,6 +551,8 @@ public sealed class GraphCanvas : FrameworkElement
             simulationForces[edge.SourceDocumentId] += direction * strength;
             simulationForces[edge.TargetDocumentId] -= direction * strength;
         }
+
+        ApplyEdgeNodeSeparationForces(currentGraph);
 
         foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
         {
@@ -564,7 +570,7 @@ public sealed class GraphCanvas : FrameworkElement
                 Vector radial = new(position.X, position.Y);
                 double radius = radial.Length;
                 radial /= radius;
-                double targetRadius = GetTargetRadius(currentGraph, node.Depth);
+                double targetRadius = GraphCanvasGeometry.GetTargetRadius(currentGraph, node.Depth);
                 simulationForces[node.DocumentId] += radial * ((targetRadius - radius) * 0.006d);
             }
         }
@@ -586,13 +592,69 @@ public sealed class GraphCanvas : FrameworkElement
             }
 
             Vector velocity = (velocities[node.DocumentId] + simulationForces[node.DocumentId] * 0.014d) * 0.78d;
-            velocity = ClampVector(velocity, 22.0d);
+            velocity = GraphCanvasGeometry.ClampVector(velocity, 22.0d);
             velocities[node.DocumentId] = velocity;
             positions[node.DocumentId] += velocity;
             moved |= velocity.Length > 0.02d;
         }
 
         return moved;
+    }
+
+    private void ApplyEdgeNodeSeparationForces(KnowledgeGraphReadModel currentGraph)
+    {
+        foreach (KnowledgeGraphEdgeReadModel edge in currentGraph.Edges)
+        {
+            if (!positions.TryGetValue(edge.SourceDocumentId, out Point source)
+                || !positions.TryGetValue(edge.TargetDocumentId, out Point target)
+                || !simulationForces.ContainsKey(edge.SourceDocumentId)
+                || !simulationForces.ContainsKey(edge.TargetDocumentId))
+            {
+                continue;
+            }
+
+            Vector edgeVector = target - source;
+            double edgeLengthSquared = GraphCanvasGeometry.Dot(edgeVector, edgeVector);
+            if (edgeLengthSquared < 1.0d)
+            {
+                continue;
+            }
+
+            foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
+            {
+                if (string.Equals(node.DocumentId, edge.SourceDocumentId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(node.DocumentId, edge.TargetDocumentId, StringComparison.OrdinalIgnoreCase)
+                    || !positions.TryGetValue(node.DocumentId, out Point nodePosition))
+                {
+                    continue;
+                }
+
+                double progress = Math.Clamp(GraphCanvasGeometry.Dot(nodePosition - source, edgeVector) / edgeLengthSquared, 0.08d, 0.92d);
+                Point closestPoint = source + edgeVector * progress;
+                Vector away = nodePosition - closestPoint;
+                double distance = away.Length;
+                if (distance < 0.001d)
+                {
+                    away = GraphCanvasGeometry.CreateStableDirection(edge.SourceDocumentId, node.DocumentId);
+                    distance = 1.0d;
+                }
+                else
+                {
+                    away /= distance;
+                }
+
+                double clearance = GetNodeRadius(node) + EdgeNodeClearance;
+                if (distance >= clearance)
+                {
+                    continue;
+                }
+
+                double strength = (clearance - distance) * EdgeNodeForce;
+                simulationForces[node.DocumentId] += away * strength;
+                simulationForces[edge.SourceDocumentId] -= away * strength * 0.035d;
+                simulationForces[edge.TargetDocumentId] -= away * strength * 0.035d;
+            }
+        }
     }
 
     private void EnsureVelocityEntries(KnowledgeGraphReadModel currentGraph)
@@ -637,7 +699,7 @@ public sealed class GraphCanvas : FrameworkElement
         maxY += 80;
         double width = Math.Max(1, maxX - minX);
         double height = Math.Max(1, maxY - minY);
-        double maxZoom = GetMaxAutoFitZoom(Graph?.Nodes.Count ?? positions.Count);
+        double maxZoom = GraphCanvasGeometry.GetMaxAutoFitZoom(IsMiniView, Graph?.Nodes.Count ?? positions.Count);
         zoom = Math.Clamp(Math.Min(ActualWidth / width, ActualHeight / height), 0.35d, maxZoom);
         Point center = new((minX + maxX) / 2.0d, (minY + maxY) / 2.0d);
         if (centerOnCurrentNode
@@ -705,7 +767,7 @@ public sealed class GraphCanvas : FrameworkElement
         reciprocalEdgeKeys.Clear();
         foreach (KnowledgeGraphEdgeReadModel edge in currentGraph.Edges)
         {
-            reciprocalEdgeKeys.Add(CreateEdgeKey(edge.TargetDocumentId, edge.SourceDocumentId));
+            reciprocalEdgeKeys.Add(GraphCanvasGeometry.CreateEdgeKey(edge.TargetDocumentId, edge.SourceDocumentId));
         }
 
         foreach (KnowledgeGraphEdgeReadModel edge in currentGraph.Edges)
@@ -732,7 +794,7 @@ public sealed class GraphCanvas : FrameworkElement
 
             direction.Normalize();
             Vector normal = new(-direction.Y, direction.X);
-            bool hasReciprocal = reciprocalEdgeKeys.Contains(CreateEdgeKey(edge.SourceDocumentId, edge.TargetDocumentId));
+            bool hasReciprocal = reciprocalEdgeKeys.Contains(GraphCanvasGeometry.CreateEdgeKey(edge.SourceDocumentId, edge.TargetDocumentId));
             double offset = hasReciprocal
                 ? string.Compare(edge.SourceDocumentId, edge.TargetDocumentId, StringComparison.OrdinalIgnoreCase) < 0 ? 7.0d : -7.0d
                 : 0.0d;
@@ -751,15 +813,88 @@ public sealed class GraphCanvas : FrameworkElement
                 StartLineCap = PenLineCap.Round,
                 EndLineCap = PenLineCap.Round,
             };
-            drawingContext.DrawLine(pen, start, end);
-            DrawArrowHead(drawingContext, end, direction, edgeBrush, highlighted);
+            double avoidanceOffset = GetScreenEdgeAvoidanceOffset(currentGraph, edge, start, end, normal);
+            Point labelPoint;
+            if (Math.Abs(avoidanceOffset) > 0.1d)
+            {
+                Point control = new Point((start.X + end.X) / 2.0d, (start.Y + end.Y) / 2.0d)
+                    + normal * avoidanceOffset;
+                DrawQuadraticEdge(drawingContext, pen, start, control, end);
+
+                Vector arrowDirection = end - control;
+                if (arrowDirection.Length < 1.0d)
+                {
+                    arrowDirection = direction;
+                }
+                else
+                {
+                    arrowDirection.Normalize();
+                }
+
+                DrawArrowHead(drawingContext, end, arrowDirection, edgeBrush, highlighted);
+                labelPoint = GraphCanvasGeometry.GetQuadraticPoint(start, control, end, 0.5d);
+            }
+            else
+            {
+                drawingContext.DrawLine(pen, start, end);
+                DrawArrowHead(drawingContext, end, direction, edgeBrush, highlighted);
+                labelPoint = new Point((start.X + end.X) / 2.0d, (start.Y + end.Y) / 2.0d);
+            }
 
             if (edge.MentionCount > 1 && zoom > 0.55d)
             {
-                Point labelPoint = new((start.X + end.X) / 2.0d, (start.Y + end.Y) / 2.0d);
                 DrawBadge(drawingContext, labelPoint, edge.MentionCount.ToString(CultureInfo.InvariantCulture));
             }
         }
+    }
+
+    private double GetScreenEdgeAvoidanceOffset(
+        KnowledgeGraphReadModel currentGraph,
+        KnowledgeGraphEdgeReadModel edge,
+        Point start,
+        Point end,
+        Vector normal)
+    {
+        double largestOffset = 0.0d;
+        foreach (KnowledgeGraphNodeReadModel node in currentGraph.Nodes)
+        {
+            if (string.Equals(node.DocumentId, edge.SourceDocumentId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(node.DocumentId, edge.TargetDocumentId, StringComparison.OrdinalIgnoreCase)
+                || !positions.TryGetValue(node.DocumentId, out Point nodeWorld))
+            {
+                continue;
+            }
+
+            Point nodeCenter = ToScreen(nodeWorld);
+            double protectedRadius = GetNodeRadius(node) * zoom + 10.0d;
+            double distance = GraphCanvasGeometry.GetDistanceToSegment(nodeCenter, start, end);
+            if (distance >= protectedRadius)
+            {
+                continue;
+            }
+
+            double side = GraphCanvasGeometry.Dot(nodeCenter - start, normal) >= 0.0d ? -1.0d : 1.0d;
+            double neededOffset = Math.Min(96.0d, protectedRadius - distance + 26.0d);
+            if (Math.Abs(neededOffset) > Math.Abs(largestOffset))
+            {
+                largestOffset = neededOffset * side;
+            }
+        }
+
+        return largestOffset;
+    }
+
+    private static void DrawQuadraticEdge(DrawingContext drawingContext, Pen pen, Point start, Point control, Point end)
+    {
+        StreamGeometry geometry = new();
+        using (StreamGeometryContext context = geometry.Open())
+        {
+            context.BeginFigure(start, isFilled: false, isClosed: false);
+            context.QuadraticBezierTo(control, end, isStroked: true, isSmoothJoin: false);
+        }
+
+        geometry.Freeze();
+        drawingContext.DrawGeometry(null, pen, geometry);
     }
 
     private void DrawNodes(DrawingContext drawingContext, KnowledgeGraphReadModel currentGraph)
@@ -803,7 +938,7 @@ public sealed class GraphCanvas : FrameworkElement
         double radius,
         double opacity)
     {
-        string text = TrimLabel(node.Title);
+        string text = GraphCanvasGeometry.TrimLabel(node.Title);
         double fontSize = node.IsCurrent ? 13.0d : 12.0d;
         FormattedText formatted = CreateFormattedText(
             text,
@@ -1076,132 +1211,10 @@ public sealed class GraphCanvas : FrameworkElement
             ?? new SolidColorBrush(fallback);
     }
 
-    private static double GetInitialRingRadius(KnowledgeGraphReadModel graph, int depth)
-    {
-        return Math.Max(
-            34.0d,
-            (52.0d * Math.Max(1, depth) + 6.0d * Math.Max(0, depth - 1)) * GetLayoutScale(graph.Nodes.Count));
-    }
-
-    private static double GetTargetRadius(KnowledgeGraphReadModel graph, int depth)
-    {
-        return Math.Max(34.0d, depth * 48.0d * GetLayoutScale(graph.Nodes.Count));
-    }
-
-    private static double GetIdealDistance(KnowledgeGraphReadModel graph)
-    {
-        return 44.0d * GetLayoutScale(graph.Nodes.Count);
-    }
-
-    private double GetMaxAutoFitZoom(int nodeCount)
-    {
-        if (IsMiniView)
-        {
-            if (nodeCount <= 4)
-            {
-                return 1.05d;
-            }
-
-            if (nodeCount <= 8)
-            {
-                return 1.18d;
-            }
-
-            if (nodeCount <= 16)
-            {
-                return 1.36d;
-            }
-
-            return 1.65d;
-        }
-
-        if (nodeCount <= 4)
-        {
-            return 1.35d;
-        }
-
-        if (nodeCount <= 8)
-        {
-            return 1.55d;
-        }
-
-        if (nodeCount <= 16)
-        {
-            return 1.85d;
-        }
-
-        return 2.2d;
-    }
-
-    private static double GetLayoutScale(int nodeCount)
-    {
-        if (nodeCount <= 4)
-        {
-            return 0.68d;
-        }
-
-        if (nodeCount <= 8)
-        {
-            return 0.78d;
-        }
-
-        if (nodeCount <= 16)
-        {
-            return 0.90d;
-        }
-
-        return 1.05d;
-    }
-
-    private static Vector ClampVector(Vector vector, double maxLength)
-    {
-        if (vector.Length <= maxLength)
-        {
-            return vector;
-        }
-
-        vector.Normalize();
-        return vector * maxLength;
-    }
-
-    private static Vector CreateStableDirection(string firstDocumentId, string secondDocumentId)
-    {
-        int hash = StableHash($"{firstDocumentId}|{secondDocumentId}");
-        double angle = (hash % 360) * Math.PI / 180.0d;
-        return new Vector(Math.Cos(angle), Math.Sin(angle));
-    }
-
-    private static int StableHash(string text)
-    {
-        unchecked
-        {
-            int hash = 17;
-            foreach (char character in text)
-            {
-                hash = hash * 31 + char.ToUpperInvariant(character);
-            }
-
-            return hash & int.MaxValue;
-        }
-    }
-
-    private static string TrimLabel(string label)
-    {
-        string trimmed = label.Trim();
-        return trimmed.Length <= 28
-            ? trimmed
-            : $"{trimmed[..25]}...";
-    }
-
-    private static string CreateEdgeKey(string sourceDocumentId, string targetDocumentId)
-    {
-        return string.Join('|', sourceDocumentId.ToUpperInvariant(), targetDocumentId.ToUpperInvariant());
-    }
-
     private FormattedText CreateFormattedText(string text, double fontSize, Brush brush)
     {
         FontFamily fontFamily = TryFindResource("AppSansFontFamily") as FontFamily
-            ?? new FontFamily("Inter, Roboto, Noto Sans, Segoe UI");
+            ?? BundledFontFamilyCatalog.CreateFontFamily(EditorSettings.DefaultInterfaceFontFamily);
 
         return new FormattedText(
             text,

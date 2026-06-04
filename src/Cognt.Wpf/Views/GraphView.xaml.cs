@@ -75,7 +75,9 @@ public partial class GraphView : UserControl
         if (DataContext is GraphViewModel viewModel)
         {
             e.PreviewText = viewModel.CreatePreviewText(e.Node);
+            return;
         }
+
     }
 
     private void SaveGraphSettings()
