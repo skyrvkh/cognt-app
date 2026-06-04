@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Collections;
 
@@ -6,6 +7,12 @@ internal sealed class FileSystemKnowledgeCollectionPathResolver : IKnowledgeColl
 {
     private const string CognCollectionDirectoryExtension = ".cognt";
     private const string DefaultCollectionName = "Default";
+    private readonly ILogger<FileSystemKnowledgeCollectionPathResolver> logger;
+
+    public FileSystemKnowledgeCollectionPathResolver(ILogger<FileSystemKnowledgeCollectionPathResolver> logger)
+    {
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     public string CollectionDirectoryExtension => CognCollectionDirectoryExtension;
 
@@ -36,7 +43,8 @@ internal sealed class FileSystemKnowledgeCollectionPathResolver : IKnowledgeColl
             }
         }
 
-        return Path.Combine(Environment.CurrentDirectory, $"{DefaultCollectionName}{CognCollectionDirectoryExtension}");
+        string fallbackPath = Path.Combine(Environment.CurrentDirectory, $"{DefaultCollectionName}{CognCollectionDirectoryExtension}");
+        return fallbackPath;
     }
 
     public bool IsCollectionPath(string path)
@@ -46,7 +54,7 @@ internal sealed class FileSystemKnowledgeCollectionPathResolver : IKnowledgeColl
         return directoryName.EndsWith(CognCollectionDirectoryExtension, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? FindFirstCollectionPath(string directoryPath)
+    private string? FindFirstCollectionPath(string directoryPath)
     {
         try
         {
@@ -67,6 +75,7 @@ internal sealed class FileSystemKnowledgeCollectionPathResolver : IKnowledgeColl
         }
         catch (Exception ex) when (IsRecoverableDirectoryDiscoveryException(ex))
         {
+            logger.LogWarning(ex, "First collection path discovery recovered from directory read failure. DirectoryPath={DirectoryPath}", directoryPath);
             return null;
         }
     }

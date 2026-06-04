@@ -11,6 +11,7 @@ public sealed class DecksSubviewViewModel : ObservableObject
 {
     private readonly Dictionary<long, string> selectedDeckNamesById = [];
     private readonly ObservableCollection<DeckRow> deckRows = [];
+    private readonly Func<IReadOnlyList<DeckRow>, Task> deleteDecksAsync;
     private HashSet<long> selectedDeckIds = [];
     private string deckCountSummary = "0";
     private string decksShowingSummary = "Showing 0 decks";
@@ -19,13 +20,16 @@ public sealed class DecksSubviewViewModel : ObservableObject
 
     public DecksSubviewViewModel(
         Action showStatistics,
+        Func<IReadOnlyList<DeckRow>, Task> deleteDecksAsync,
         CardsSubviewViewModel cards,
         StatisticsSubviewViewModel statistics)
     {
         ArgumentNullException.ThrowIfNull(showStatistics);
+        ArgumentNullException.ThrowIfNull(deleteDecksAsync);
         ArgumentNullException.ThrowIfNull(cards);
         ArgumentNullException.ThrowIfNull(statistics);
 
+        this.deleteDecksAsync = deleteDecksAsync;
         Cards = cards;
         Statistics = statistics;
         ShowStatisticsCommand = new RelayCommand(showStatistics);
@@ -97,6 +101,21 @@ public sealed class DecksSubviewViewModel : ObservableObject
         NotifyDeckStateChanged();
     }
 
+
+    internal IReadOnlyList<DeckRow> SelectedDeckRows => deckRows
+        .Where(static deck => deck.IsSelected)
+        .ToArray();
+
+    internal async Task DeleteSelectedDecksAsync()
+    {
+        IReadOnlyList<DeckRow> selectedDecks = SelectedDeckRows;
+        if (selectedDecks.Count == 0)
+        {
+            return;
+        }
+
+        await deleteDecksAsync(selectedDecks);
+    }
     private void SetAllDeckSelections(bool isSelected)
     {
         if (DeckRows.Count == 0)

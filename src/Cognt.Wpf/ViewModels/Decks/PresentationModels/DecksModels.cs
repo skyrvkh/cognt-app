@@ -136,8 +136,7 @@ public sealed record CardLibraryRow(
     string Status,
     string Due,
     string LastReviewed,
-    string Recall,
-    bool IsSelected)
+    string Recall)
 {
     private const string BasicCardType = "basic";
     private const string ClozeCardType = "cloze";
@@ -157,6 +156,8 @@ public sealed record CardLibraryRow(
 
     public FlashcardContentKind BackContentKind { get; init; } = FlashcardContentKind.LegacyText;
 
+    public bool HasImageOcclusion { get; init; }
+
     public string? SourceRelPath { get; init; }
 
     public DateTimeOffset DueUtc { get; init; }
@@ -173,7 +174,7 @@ public sealed record CardLibraryRow(
 
     public bool IsMultimodalCard => string.Equals(CardType, MultimodalClozeCardType, StringComparison.OrdinalIgnoreCase);
 
-    public bool IsEditableCardType => IsBasicCard || IsClozeCard;
+    public bool IsEditableCardType => IsBasicCard || IsClozeCard || (IsMultimodalCard && !HasImageOcclusion);
 
     public bool CanEdit => Id > 0 && !string.IsNullOrWhiteSpace(FrontContent);
 
@@ -186,7 +187,7 @@ public sealed record CardLibraryRow(
         : IsClozeCard
             ? "Cloze"
             : IsMultimodalCard
-                ? "Image/multimodal cloze"
+                ? HasImageOcclusion ? "Image/multimodal cloze" : "Text/code cloze"
                 : string.IsNullOrWhiteSpace(CardType)
                     ? "Legacy"
                     : CardType;
@@ -204,23 +205,22 @@ public sealed record CardLibraryRow(
         Recall,
         IsSuspended ? " | Suspended" : string.Empty);
 
-    internal static CardLibraryRow Learning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    internal static CardLibraryRow Learning(string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Learning", due, lastReviewed, recall);
+        return Create(question, deck, "Learning", due, lastReviewed, recall);
     }
 
-    internal static CardLibraryRow Relearning(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    internal static CardLibraryRow Relearning(string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Relearning", due, lastReviewed, recall);
+        return Create(question, deck, "Relearning", due, lastReviewed, recall);
     }
 
-    internal static CardLibraryRow Review(bool isSelected, string question, string deck, string due, string lastReviewed, string recall)
+    internal static CardLibraryRow Review(string question, string deck, string due, string lastReviewed, string recall)
     {
-        return Create(isSelected, question, deck, "Review", due, lastReviewed, recall);
+        return Create(question, deck, "Review", due, lastReviewed, recall);
     }
 
     private static CardLibraryRow Create(
-        bool isSelected,
         string question,
         string deck,
         string status,
@@ -234,8 +234,7 @@ public sealed record CardLibraryRow(
             status,
             due,
             lastReviewed,
-            recall,
-            isSelected);
+            recall);
     }
 }
 

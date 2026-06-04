@@ -1,6 +1,7 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels.Decks;
 
@@ -9,11 +10,13 @@ internal sealed class DecksWorkspaceDataProvider : IDecksWorkspaceDataProvider
     private readonly IFlashcardDeckSummariesQuery flashcardDeckSummariesQuery;
     private readonly IFlashcardCardsQuery flashcardCardsQuery;
     private readonly INoteService noteService;
+    private readonly ILogger<DecksWorkspaceDataProvider>? logger;
 
     internal DecksWorkspaceDataProvider(
         IFlashcardDeckSummariesQuery flashcardDeckSummariesQuery,
         IFlashcardCardsQuery flashcardCardsQuery,
-        INoteService noteService)
+        INoteService noteService,
+        ILogger<DecksWorkspaceDataProvider>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(flashcardDeckSummariesQuery);
         ArgumentNullException.ThrowIfNull(flashcardCardsQuery);
@@ -22,6 +25,7 @@ internal sealed class DecksWorkspaceDataProvider : IDecksWorkspaceDataProvider
         this.flashcardDeckSummariesQuery = flashcardDeckSummariesQuery;
         this.flashcardCardsQuery = flashcardCardsQuery;
         this.noteService = noteService;
+        this.logger = logger;
     }
 
     DecksWorkspaceData IDecksWorkspaceDataProvider.Load(
@@ -88,6 +92,10 @@ internal sealed class DecksWorkspaceDataProvider : IDecksWorkspaceDataProvider
             or PathTooLongException
             or NotSupportedException)
         {
+            logger?.LogWarning(
+                ex,
+                "Deck source title load failed; continuing without note titles. CollectionId={CollectionId}",
+                collectionId);
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
     }

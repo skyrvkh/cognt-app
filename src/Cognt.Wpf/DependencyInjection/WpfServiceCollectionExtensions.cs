@@ -5,6 +5,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using CogntApp.Design;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Shell.Collections;
+using CogntApp.Shell.Workspace;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Decks;
 using CogntApp.Views;
@@ -22,13 +23,25 @@ internal static class WpfServiceCollectionExtensions
 
         services.AddSingleton<IThemeService, WpfThemeService>();
         services.AddSingleton<IEditorSettingsService, WpfEditorSettingsService>();
-        services.AddSingleton<IKnowledgeCollectionPathResolver>(_ => new FileSystemKnowledgeCollectionPathResolver());
+        services.AddSingleton<IKnowledgeCollectionPathResolver>(provider =>
+            new FileSystemKnowledgeCollectionPathResolver(
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileSystemKnowledgeCollectionPathResolver>>()));
+        services.AddSingleton<IKnownCollectionStore, FileSystemKnownCollectionStore>();
+        services.AddSingleton<IWorkspaceSessionStore, FileSystemWorkspaceSessionStore>();
         services.AddSingleton<IImageMaskEditorDialogService, ImageMaskEditorDialogService>();
         services.AddSingleton<IDecksWorkspaceDataProvider>(provider =>
             new DecksWorkspaceDataProvider(
                 provider.GetRequiredService<IFlashcardDeckSummariesQuery>(),
                 provider.GetRequiredService<IFlashcardCardsQuery>(),
-                provider.GetRequiredService<INoteService>()));
+                provider.GetRequiredService<INoteService>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DecksWorkspaceDataProvider>>()));
+        services.AddSingleton<IDecksCardActionService>(provider =>
+            new DecksCardActionService(
+                provider.GetRequiredService<IUpdateFlashcardSchedulingCommand>(),
+                provider.GetRequiredService<IUpdateFlashcardContentCommand>(),
+                provider.GetRequiredService<IDeleteFlashcardsCommand>(),
+                provider.GetRequiredService<IUpdateFlashcardTagsCommand>(),
+                provider.GetRequiredService<IDeleteFlashcardDeckCommand>()));
         services.AddSingleton<AllNotesViewModel>();
         services.AddSingleton<AllNotesView>();
         services.AddSingleton<MainViewModel>();
@@ -41,13 +54,11 @@ internal static class WpfServiceCollectionExtensions
         services.AddSingleton(provider =>
             new DecksViewModel(
                 provider.GetRequiredService<IDecksWorkspaceDataProvider>(),
-                provider.GetRequiredService<IUpdateFlashcardSchedulingCommand>(),
-                provider.GetRequiredService<IUpdateFlashcardContentCommand>(),
-                provider.GetRequiredService<IDeleteFlashcardsCommand>(),
-                provider.GetRequiredService<IUpdateFlashcardTagsCommand>(),
+                provider.GetRequiredService<IDecksCardActionService>(),
                 provider.GetRequiredService<INoteService>(),
                 provider.GetRequiredService<IEditorViewFactory>(),
-                provider.GetRequiredService<StatisticsSubviewViewModel>()));
+                provider.GetRequiredService<StatisticsSubviewViewModel>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()));
         services.AddSingleton<DecksView>();
         services.AddSingleton<MainWindow>();
 

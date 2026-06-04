@@ -23,13 +23,14 @@ public sealed partial class CardsSubviewViewModel
         string collectionId,
         bool includeDeckFilter = true)
     {
-        return new FlashcardCardsQueryRequest(
+        FlashcardCardsQueryRequest request = new(
             collectionId,
             includeDeckFilter ? SelectedDeckFilter?.Id : null,
             GetSelectedFilterKind(),
             GetSelectedSourceRelPath(),
             Tags: GetSelectedTags(),
             SearchText: SearchText);
+        return request;
     }
 
     private void ConfigureFilterOptions(CardsFilterOptionsState options)
@@ -42,7 +43,6 @@ public sealed partial class CardsSubviewViewModel
         string[] previousTags = resetFiltersForRequestedSource
             ? []
             : GetSelectedTags();
-
         isUpdatingFilterConfiguration = true;
         try
         {

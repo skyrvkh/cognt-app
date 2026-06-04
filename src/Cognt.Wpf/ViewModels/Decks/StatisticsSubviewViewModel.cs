@@ -8,12 +8,14 @@ using CogntApp.ViewModels.Decks.PresentationModels;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 
+
 namespace CogntApp.ViewModels.Decks;
 
 public sealed partial class StatisticsSubviewViewModel : ObservableObject
 {
     private readonly ICollectionProgressAnalyticsReportQuery collectionProgressAnalyticsReportQuery;
     private readonly IThemeService themeService;
+
 
     private ProgressAnalyticsReport? currentReport;
     private IReadOnlyList<DeckPerformanceRow> deckPerformanceRows = [];
@@ -184,6 +186,7 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
         string[] selectedDeckNames = NormalizeDeckNames(deckNames);
         ScopeLabel = FormatScopeLabel(selectedDeckNames);
 
+
         if (string.IsNullOrWhiteSpace(collectionId) || !Directory.Exists(collectionId))
         {
             LoadEmptyState();
@@ -191,6 +194,7 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
         }
 
         string existingCollectionId = collectionId;
+
         ProgressAnalyticsReport report = collectionProgressAnalyticsReportQuery.Execute(
             new CollectionProgressAnalyticsReportQueryRequest(
                 existingCollectionId,
@@ -198,6 +202,7 @@ public sealed partial class StatisticsSubviewViewModel : ObservableObject
                 selectedDeckNames));
 
         LoadReport(report);
+
     }
 
     internal void SetBackToDecksAction(Action backToDecks)

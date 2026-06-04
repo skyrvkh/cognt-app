@@ -15,18 +15,15 @@ internal static partial class CardsPresentationFactory
         CardLibraryRow[] rows = new CardLibraryRow[visibleCards.Count];
         for (int index = 0; index < visibleCards.Count; index++)
         {
-            rows[index] = ToCardLibraryRow(visibleCards[index], index == 0);
+            rows[index] = ToCardLibraryRow(visibleCards[index]);
         }
 
         return rows;
     }
 
-    private static CardLibraryRow ToCardLibraryRow(
-        FlashcardCardSummaryReadModel card,
-        bool isSelected)
+    private static CardLibraryRow ToCardLibraryRow(FlashcardCardSummaryReadModel card)
     {
         return CreateCardLibraryRow(
-            isSelected,
             card.Id,
             card.FrontText,
             card.BackText,
@@ -40,13 +37,13 @@ internal static partial class CardsPresentationFactory
             card.CardType,
             card.FrontContentKind,
             card.BackContentKind,
+            card.HasImageOcclusion,
             card.SourceRelPath,
             card.Tags,
             card.IsSuspended);
     }
 
     private static CardLibraryRow CreateCardLibraryRow(
-        bool isSelected,
         long id,
         string frontText,
         string backText,
@@ -60,6 +57,7 @@ internal static partial class CardsPresentationFactory
         string cardType,
         Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts.FlashcardContentKind frontContentKind,
         Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts.FlashcardContentKind backContentKind,
+        bool hasImageOcclusion,
         string? sourceRelPath,
         IReadOnlyList<string> tags,
         bool isSuspended)
@@ -69,13 +67,13 @@ internal static partial class CardsPresentationFactory
         string recall = FormatRecall(lastRating);
 
         CardLibraryRow row = isSuspended
-            ? new CardLibraryRow(frontText, deckName, "Suspended", due, lastReviewed, recall, isSelected)
+            ? new CardLibraryRow(frontText, deckName, "Suspended", due, lastReviewed, recall)
             : state switch
         {
-            FlashcardCardStateReadModel.Relearning => CardLibraryRow.Relearning(isSelected, frontText, deckName, due, lastReviewed, recall),
-            FlashcardCardStateReadModel.Review => CardLibraryRow.Review(isSelected, frontText, deckName, due, lastReviewed, recall),
-            FlashcardCardStateReadModel.Learning => CardLibraryRow.Learning(isSelected, frontText, deckName, due, lastReviewed, recall),
-            _ => CardLibraryRow.Learning(isSelected, frontText, deckName, due, lastReviewed, recall)
+            FlashcardCardStateReadModel.Relearning => CardLibraryRow.Relearning(frontText, deckName, due, lastReviewed, recall),
+            FlashcardCardStateReadModel.Review => CardLibraryRow.Review(frontText, deckName, due, lastReviewed, recall),
+            FlashcardCardStateReadModel.Learning => CardLibraryRow.Learning(frontText, deckName, due, lastReviewed, recall),
+            _ => CardLibraryRow.Learning(frontText, deckName, due, lastReviewed, recall)
         };
 
         return row with
@@ -87,6 +85,7 @@ internal static partial class CardsPresentationFactory
             CardType = cardType,
             FrontContentKind = frontContentKind,
             BackContentKind = backContentKind,
+            HasImageOcclusion = hasImageOcclusion,
             SourceRelPath = sourceRelPath,
             DueUtc = dueUtc,
             Tags = NormalizeVisibleCardTags(tags),

@@ -6,6 +6,7 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed class CramSettingsDialogViewModel : ObservableObject
 {
+
     private string requiredPassCountText = CrammingSettings.Default.RequiredPassCount.ToString(CultureInfo.InvariantCulture);
     private bool countHardAsPass = CrammingSettings.Default.CountHardAsPass;
     private bool countGoodAsPass = CrammingSettings.Default.CountGoodAsPass;
@@ -20,7 +21,10 @@ public sealed class CramSettingsDialogViewModel : ObservableObject
     public CramSettingsDialogViewModel()
     {
         StartCommand = new RelayCommand(Start);
-        CancelCommand = new RelayCommand(() => CancelRequested?.Invoke(this, EventArgs.Empty));
+        CancelCommand = new RelayCommand(() =>
+        {
+            CancelRequested?.Invoke(this, EventArgs.Empty);
+        });
     }
 
     public event EventHandler<CramSettingsAcceptedEventArgs>? StartRequested;
@@ -132,13 +136,23 @@ public sealed class CramSettingsDialogViewModel : ObservableObject
     public bool ShuffleRemainingCards
     {
         get => shuffleRemainingCards;
-        set => SetProperty(ref shuffleRemainingCards, value);
+        set
+        {
+            if (SetProperty(ref shuffleRemainingCards, value))
+            {
+            }
+        }
     }
 
     public bool AffectNormalSchedule
     {
         get => affectNormalSchedule;
-        set => SetProperty(ref affectNormalSchedule, value);
+        set
+        {
+            if (SetProperty(ref affectNormalSchedule, value))
+            {
+            }
+        }
     }
 
     public string ValidationMessage

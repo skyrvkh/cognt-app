@@ -8,6 +8,7 @@ namespace CogntApp.ViewModels.Decks;
 
 public sealed partial class CardsSubviewViewModel : ObservableObject
 {
+    private readonly Func<IReadOnlyList<CardLibraryRow>, bool, Task> setCardsSuspension;
     private readonly Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards;
     private readonly Func<CardLibraryRow, CardEditResult, Task> updateCardContent;
     private readonly Func<IReadOnlyList<CardLibraryRow>, Task> deleteCards;
@@ -25,7 +26,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
     private string dueCards = "0";
 
     public CardsSubviewViewModel(
-        Func<CardLibraryRow, bool, Task> setCardSuspension,
+        Func<IReadOnlyList<CardLibraryRow>, bool, Task> setCardsSuspension,
         Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards,
         Func<CardLibraryRow, CardEditResult, Task> updateCardContent,
         Func<IReadOnlyList<CardLibraryRow>, Task> deleteCards,
@@ -34,7 +35,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         Func<IReadOnlyList<string>> loadAvailableTagNames,
         Func<EditorView> createEditorView)
     {
-        ArgumentNullException.ThrowIfNull(setCardSuspension);
+        ArgumentNullException.ThrowIfNull(setCardsSuspension);
         ArgumentNullException.ThrowIfNull(postponeCards);
         ArgumentNullException.ThrowIfNull(updateCardContent);
         ArgumentNullException.ThrowIfNull(deleteCards);
@@ -43,6 +44,7 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(loadAvailableTagNames);
         ArgumentNullException.ThrowIfNull(createEditorView);
 
+        this.setCardsSuspension = setCardsSuspension;
         this.postponeCards = postponeCards;
         this.updateCardContent = updateCardContent;
         this.deleteCards = deleteCards;
@@ -55,8 +57,10 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         {
             if (parameter is CardLibraryRow card && card.CanSchedule)
             {
-                await setCardSuspension(card, !card.IsSuspended);
+                await setCardsSuspension([card], !card.IsSuspended);
+                return;
             }
+
         });
         PostponeOneDayCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 1, postponeCards));
         PostponeThreeDaysCommand = new RelayCommand(async parameter => await PostponeAsync(parameter, 3, postponeCards));
@@ -178,9 +182,27 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(cards);
 
         CardLibraryRow[] schedulableCards = CardLibraryRowSelection.DistinctSchedulable(cards);
-        return schedulableCards.Length == 0
-            ? Task.CompletedTask
-            : postponeCards(schedulableCards, days);
+        if (schedulableCards.Length == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return postponeCards(schedulableCards, days);
+    }
+
+    internal Task SetCardsSuspensionAsync(
+        IReadOnlyList<CardLibraryRow> cards,
+        bool isSuspended)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+
+        CardLibraryRow[] schedulableCards = CardLibraryRowSelection.DistinctSchedulable(cards);
+        if (schedulableCards.Length == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return setCardsSuspension(schedulableCards, isSuspended);
     }
 
     internal Task DeleteCardsAsync(IReadOnlyList<CardLibraryRow> cards)
@@ -188,9 +210,12 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(cards);
 
         CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
-        return distinctCards.Length == 0
-            ? Task.CompletedTask
-            : deleteCards(distinctCards);
+        if (distinctCards.Length == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return deleteCards(distinctCards);
     }
 
     internal Task UpdateCardContentAsync(CardLibraryRow card, CardEditResult edit)
@@ -198,9 +223,12 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(card);
         ArgumentNullException.ThrowIfNull(edit);
 
-        return card.CanEdit
-            ? updateCardContent(card, edit)
-            : Task.CompletedTask;
+        if (!card.CanEdit)
+        {
+            return Task.CompletedTask;
+        }
+
+        return updateCardContent(card, edit);
     }
 
     internal EditorView CreateEditorView()
@@ -221,9 +249,12 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(tags);
 
         CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
-        return distinctCards.Length == 0 || tags.Count == 0
-            ? Task.CompletedTask
-            : addTagsToCards(distinctCards, tags);
+        if (distinctCards.Length == 0 || tags.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return addTagsToCards(distinctCards, tags);
     }
 
     internal Task RemoveTagsFromCardsAsync(
@@ -234,25 +265,18 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(tags);
 
         CardLibraryRow[] distinctCards = CardLibraryRowSelection.DistinctPersisted(cards);
-        return distinctCards.Length == 0 || tags.Count == 0
-            ? Task.CompletedTask
-            : removeTagsFromCards(distinctCards, tags);
+        if (distinctCards.Length == 0 || tags.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return removeTagsFromCards(distinctCards, tags);
     }
 
     internal IReadOnlyList<string> GetAvailableTagNames()
     {
-        IReadOnlyList<string> storedTags = loadAvailableTagNames();
         HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
-        List<string> tags = new(storedTags.Count + CardFilterTagRows.Count);
-
-        foreach (string tag in storedTags)
-        {
-            if (seenTags.Add(tag))
-            {
-                tags.Add(tag);
-            }
-        }
-
+        List<string> tags = [];
         foreach (CardFilterOptionRow row in CardFilterTagRows)
         {
             string? value = row.Value;
@@ -265,17 +289,21 @@ public sealed partial class CardsSubviewViewModel : ObservableObject
         }
 
         tags.Sort(StringComparer.OrdinalIgnoreCase);
-        return tags.ToArray();
+        string[] result = tags.ToArray();
+        return result;
     }
 
-    private static Task PostponeAsync(
+    private Task PostponeAsync(
         object? parameter,
         int days,
         Func<IReadOnlyList<CardLibraryRow>, int, Task> postponeCards)
     {
-        return parameter is CardLibraryRow card && card.CanSchedule
-            ? postponeCards([card], days)
-            : Task.CompletedTask;
+        if (parameter is CardLibraryRow card && card.CanSchedule)
+        {
+            return postponeCards([card], days);
+        }
+
+        return Task.CompletedTask;
     }
 }
 
