@@ -8,11 +8,9 @@
              d:DesignHeight="860"
              d:DesignWidth="1292"
              HorizontalAlignment="Stretch"
-             MaxWidth="1292"
              Loaded="DecksSubview_Loaded"
              SizeChanged="DecksSubview_SizeChanged">
     <Grid x:Name="LayoutRoot"
-          MaxWidth="1292"
           HorizontalAlignment="Stretch"
           Margin="0">
         <Grid.RowDefinitions>
@@ -77,6 +75,12 @@
                                 Width="72"
                                 Margin="10,0,0,0"
                                 Command="{Binding ClearDeckSelectionCommand}"
+                                Style="{StaticResource OutlineButtonStyle}" />
+                        <Button Content="Delete"
+                                Width="78"
+                                Margin="10,0,0,0"
+                                Click="DeleteSelectedDecksButton_Click"
+                                IsEnabled="{Binding HasSelectedDecks}"
                                 Style="{StaticResource OutlineButtonStyle}" />
                         <Button Content="Statistics"
                                 Width="102"
@@ -145,7 +149,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Learning" Width="76" IsReadOnly="True">
+                        <DataGridTemplateColumn Header="Learning" Width="104" MinWidth="104" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding LearningQueueCards}"
@@ -154,7 +158,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Due" Width="56" IsReadOnly="True">
+                        <DataGridTemplateColumn Header="Due" Width="72" MinWidth="72" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DueCards}"
@@ -165,10 +169,11 @@
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Binding="{Binding TotalCards}"
                                             Header="Total Cards"
-                                            Width="86"
+                                            Width="112"
+                                            MinWidth="112"
                                             IsReadOnly="True"
                                             ElementStyle="{StaticResource GridCenterTextBlockStyle}" />
-                        <DataGridTemplateColumn Header="Progress" Width="150" IsReadOnly="True">
+                        <DataGridTemplateColumn Header="Progress" Width="178" MinWidth="178" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal"

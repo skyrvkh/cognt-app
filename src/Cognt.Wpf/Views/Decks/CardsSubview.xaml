@@ -8,24 +8,26 @@
              d:DesignHeight="860"
              d:DesignWidth="1292"
              HorizontalAlignment="Stretch"
-             MaxWidth="1292"
              Loaded="CardsSubview_Loaded"
              SizeChanged="CardsSubview_SizeChanged"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
              TextOptions.TextFormattingMode="Display">
     <UserControl.Resources>
-        <ContextMenu x:Key="CardRowContextMenu">
+        <ContextMenu x:Key="CardRowContextMenu"
+                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Edit Card"
                       Click="EditCardMenuItem_Click"
                       IsEnabled="{Binding CanEdit}" />
             <MenuItem Header="Edit Tags"
                       Click="EditTagsMenuItem_Click"
                       IsEnabled="{Binding CanSchedule}" />
+            <MenuItem Header="Delete Cards"
+                      Click="DeleteCardsMenuItem_Click"
+                      IsEnabled="{Binding CanSchedule}" />
             <Separator />
-            <MenuItem Header="{Binding SuspensionAction}"
-                      Command="{Binding DataContext.ToggleSuspensionCommand, Source={x:Reference CardsDataGrid}}"
-                      CommandParameter="{Binding}"
+            <MenuItem Header="Suspend / Unsuspend Selected"
+                      Click="ToggleSuspensionMenuItem_Click"
                       IsEnabled="{Binding CanSchedule}" />
             <MenuItem Header="Postpone 1 day"
                       Tag="1"
@@ -53,7 +55,7 @@
         </ContextMenu>
     </UserControl.Resources>
     <Grid x:Name="LayoutRoot"
-          MaxWidth="1292"
+          HorizontalAlignment="Stretch"
           Margin="16,16,16,22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -185,21 +187,19 @@
                         <DataGrid x:Name="CardsDataGrid"
                                   MinWidth="0"
                                   ItemsSource="{Binding CardLibraryRows}"
-                                  SelectedIndex="0"
                                   MinRowHeight="58"
                                   SelectionMode="Extended"
                                   SelectionUnit="FullRow"
                                   Style="{StaticResource FlashcardsDataGridStyle}">
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
+                                    <EventSetter Event="PreviewMouseLeftButtonDown"
+                                                 Handler="CardsDataGridRow_PreviewMouseLeftButtonDown" />
                                     <EventSetter Event="PreviewMouseRightButtonDown"
                                                  Handler="CardsDataGridRow_PreviewMouseRightButtonDown" />
                                     <Setter Property="ContextMenu" Value="{StaticResource CardRowContextMenu}" />
                                     <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                                        </DataTrigger>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Background" Value="{DynamicResource PanelAltBrush}" />
                                         </Trigger>
@@ -319,20 +319,10 @@
                         </DataGrid>
                     </StackPanel>
 
-                    <Grid Grid.Row="2"
-                          Margin="14,12,14,14">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Text="{Binding ShowingSummary}"
-                                   Style="{StaticResource MutedTextStyle}" />
-                    </Grid>
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding ShowingSummary}"
+                               Margin="14,12,14,14"
+                               Style="{StaticResource MutedTextStyle}" />
                 </Grid>
             </Border>
 

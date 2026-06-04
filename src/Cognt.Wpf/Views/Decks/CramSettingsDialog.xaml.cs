@@ -2,14 +2,16 @@ using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels.Decks;
 
+
 namespace CogntApp.Views.Decks;
 
 public partial class CramSettingsDialog : Window
 {
-    private readonly CramSettingsDialogViewModel viewModel = new();
+    private readonly CramSettingsDialogViewModel viewModel;
 
     public CramSettingsDialog()
     {
+        viewModel = new CramSettingsDialogViewModel();
         InitializeComponent();
         DataContext = viewModel;
         viewModel.StartRequested += ViewModel_StartRequested;

@@ -10,8 +10,6 @@ namespace CogntApp.Views.Decks;
 
 public partial class CardsSubview : UserControl
 {
-    private const double CompactHeaderBreakpoint = 900;
-    private const double StackedTextBreakpoint = 760;
     private double lastLayoutWidth = double.NaN;
 
     public CardsSubview()
@@ -38,46 +36,23 @@ public partial class CardsSubview : UserControl
             return;
         }
 
-        double width = lastLayoutWidth;
-        bool compactHeader = width < CompactHeaderBreakpoint;
-        bool stackedText = width < StackedTextBreakpoint;
+        CardsSubviewLayoutState layout = CardsSubviewLayoutPolicy.Create(lastLayoutWidth);
 
-        LayoutRoot.Margin = GetLayoutRootMargin(width);
-        SummaryMetricsGrid.Columns = GetSummaryMetricsColumnCount(width);
+        LayoutRoot.Margin = layout.LayoutRootMargin;
+        SummaryMetricsGrid.Columns = layout.SummaryMetricColumns;
 
         ResponsiveLayout.ApplyWrappingRow(
             HeaderActionsPanel,
-            compactHeader,
+            layout.UseCompactHeader,
             new Thickness(0, 14, 0, 0),
             ResponsiveLayout.ActionInlineMargin);
 
         ResponsiveLayout.ApplyWrappingRow(
             FilteredSummaryText,
-            stackedText,
+            layout.UseStackedFilterSummary,
             new Thickness(0, 6, 0, 0),
             ResponsiveLayout.NoMargin);
 
-    }
-
-    private static Thickness GetLayoutRootMargin(double width)
-    {
-        return width switch
-        {
-            < 700 => new Thickness(12, 12, 12, 18),
-            < 980 => new Thickness(14, 14, 14, 20),
-            _ => new Thickness(16, 16, 16, 22),
-        };
-    }
-
-    private static int GetSummaryMetricsColumnCount(double width)
-    {
-        return width switch
-        {
-            < 560 => 1,
-            < 820 => 2,
-            < 1100 => 3,
-            _ => 4,
-        };
     }
 
     private void CardsDataGridRow_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -88,15 +63,18 @@ public partial class CardsSubview : UserControl
             return;
         }
 
-        if (!row.IsSelected)
+        CardsSubviewSelection.SelectContextRowForRightClick(CardsDataGrid, row, card);
+    }
+
+    private void CardsDataGridRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not DataGridRow row
+            || row.DataContext is not CardLibraryRow card)
         {
-            CardsDataGrid.SelectedItems.Clear();
-            row.IsSelected = true;
-            CardsDataGrid.SelectedItem = card;
+            return;
         }
 
-        row.Focus();
-        row.ContextMenu!.PlacementTarget = row;
+        CardsSubviewSelection.SelectSingleRowForPlainLeftClick(CardsDataGrid, row, card);
     }
 
     private void CardFilterOptionRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -113,29 +91,45 @@ public partial class CardsSubview : UserControl
         {
             deckRow.IsSelected = !deckRow.IsSelected;
             e.Handled = true;
+            return;
         }
+
     }
 
     private async void PostponePresetMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card
             || !int.TryParse((sender as FrameworkElement)?.Tag?.ToString(), out int days))
         {
             return;
         }
 
-        await PostponeCardsAsync(GetContextSchedulableCards(card), days);
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextSchedulableCards(CardsDataGrid, card);
+        await PostponeCardsAsync(cards, days);
     }
 
-    private async void CustomPostponeMenuItem_Click(object sender, RoutedEventArgs e)
+    private async void ToggleSuspensionMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
         {
             return;
         }
 
-        CardLibraryRow[] cards = GetContextSchedulableCards(card);
-        PostponeCardDialog dialog = new(CreateDueDateArray(cards))
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextSchedulableCards(CardsDataGrid, card);
+        bool isSuspended = !AreAllCardsSuspended(cards);
+        await SetCardsSuspensionAsync(cards, isSuspended);
+    }
+
+    private async void CustomPostponeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
+        {
+            return;
+        }
+
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextSchedulableCards(CardsDataGrid, card);
+        PostponeCardDialog dialog = new(
+            CreateDueDateArray(cards))
         {
             Owner = Window.GetWindow(this)
         };
@@ -148,7 +142,7 @@ public partial class CardsSubview : UserControl
 
     private async void EditCardMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
         {
             return;
         }
@@ -158,42 +152,35 @@ public partial class CardsSubview : UserControl
 
     private async void EditTagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
         {
             return;
         }
 
-        await AddTagsToCardsAsync(GetContextCards(card));
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextCards(CardsDataGrid, card);
+        await AddTagsToCardsAsync(cards);
     }
 
     private async void AddTagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
         {
             return;
         }
 
-        await AddTagsToCardsAsync(GetContextCards(card));
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextCards(CardsDataGrid, card);
+        await AddTagsToCardsAsync(cards);
     }
 
     private async void DeleteCardsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is not CardLibraryRow card)
+        if (CardsSubviewSelection.ResolveContextCard(sender) is not CardLibraryRow card)
         {
             return;
         }
 
-        await DeleteCardsAsync(GetContextCards(card));
-    }
-
-    private async void AddTagsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await AddTagsToCardsAsync(GetSelectedCards());
-    }
-
-    private async void DeleteCardsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await DeleteCardsAsync(GetSelectedCards());
+        CardLibraryRow[] cards = CardsSubviewSelection.GetContextCards(CardsDataGrid, card);
+        await DeleteCardsAsync(cards);
     }
 
     private async Task PostponeCardsAsync(IReadOnlyList<CardLibraryRow> cards, int days)
@@ -204,6 +191,16 @@ public partial class CardsSubview : UserControl
         }
 
         await ViewModel.PostponeCardsAsync(cards, days);
+    }
+
+    private async Task SetCardsSuspensionAsync(IReadOnlyList<CardLibraryRow> cards, bool isSuspended)
+    {
+        if (ViewModel is null || cards.Count == 0)
+        {
+            return;
+        }
+
+        await ViewModel.SetCardsSuspensionAsync(cards, isSuspended);
     }
 
     private async Task EditCardAsync(CardLibraryRow card)
@@ -272,86 +269,11 @@ public partial class CardsSubview : UserControl
             message,
             "Delete cards",
             MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+        MessageBoxImage.Warning);
         if (result == MessageBoxResult.Yes)
         {
             await ViewModel.DeleteCardsAsync(cards);
         }
-    }
-
-    private CardLibraryRow[] GetContextSchedulableCards(CardLibraryRow contextCard)
-    {
-        return GetContextCards(contextCard, requireSchedulable: true);
-    }
-
-    private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard)
-    {
-        return GetContextCards(contextCard, requireSchedulable: false);
-    }
-
-    private CardLibraryRow[] GetContextCards(CardLibraryRow contextCard, bool requireSchedulable)
-    {
-        CardLibraryRow[] selectedCards = GetSelectedGridCards(requireSchedulable);
-
-        return ContainsCard(selectedCards, contextCard.Id)
-            ? selectedCards
-            : [contextCard];
-    }
-
-    private CardLibraryRow[] GetSelectedCards()
-    {
-        CardLibraryRow[] selectedCards = GetSelectedGridCards(requireSchedulable: false);
-
-        if (selectedCards.Length > 0)
-        {
-            return selectedCards;
-        }
-
-        return CardsDataGrid.SelectedItem is CardLibraryRow selectedCard && selectedCard.Id > 0
-            ? [selectedCard]
-            : [];
-    }
-
-    private CardLibraryRow[] GetSelectedGridCards(bool requireSchedulable)
-    {
-        if (CardsDataGrid.SelectedItems.Count == 0)
-        {
-            return [];
-        }
-
-        List<CardLibraryRow>? selectedCards = null;
-        foreach (object? item in CardsDataGrid.SelectedItems)
-        {
-            if (item is not CardLibraryRow card)
-            {
-                continue;
-            }
-
-            selectedCards ??= new List<CardLibraryRow>(CardsDataGrid.SelectedItems.Count);
-            selectedCards.Add(card);
-        }
-
-        if (selectedCards is null)
-        {
-            return [];
-        }
-
-        return requireSchedulable
-            ? CardLibraryRowSelection.DistinctSchedulable(selectedCards)
-            : CardLibraryRowSelection.DistinctPersisted(selectedCards);
-    }
-
-    private static bool ContainsCard(IReadOnlyList<CardLibraryRow> cards, long cardId)
-    {
-        foreach (CardLibraryRow card in cards)
-        {
-            if (card.Id == cardId)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static DateTimeOffset[] CreateDueDateArray(IReadOnlyList<CardLibraryRow> cards)
@@ -363,6 +285,24 @@ public partial class CardsSubview : UserControl
         }
 
         return dueDates;
+    }
+
+    private static bool AreAllCardsSuspended(IReadOnlyList<CardLibraryRow> cards)
+    {
+        if (cards.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (CardLibraryRow card in cards)
+        {
+            if (!card.IsSuspended)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string[] CreateAssignedTagsArray(IReadOnlyList<CardLibraryRow> cards)

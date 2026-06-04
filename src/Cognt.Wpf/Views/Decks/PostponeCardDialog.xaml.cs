@@ -59,8 +59,9 @@ public partial class PostponeCardDialog : Window
     private bool TryReadDays(out int days)
     {
         string value = DaysTextBox.Text.Trim();
-        return int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out days)
+        bool isValid = int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out days)
             && days is >= MinimumDays and <= MaximumDays;
+        return isValid;
     }
 
     private static string FormatDueRange(IReadOnlyList<DateTimeOffset> values)

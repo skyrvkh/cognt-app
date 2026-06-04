@@ -8,41 +8,41 @@
         </Style>
 
         <Style x:Key="PanelTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppDisplayFontFamily}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppDisplayFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizePanelTitle}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizePanelTitle}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="LineHeight" Value="{StaticResource LineHeightTitle}" />
         </Style>
 
         <Style x:Key="TableHeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="TableTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
         <Style x:Key="MutedTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
         <Style x:Key="SmallMutedTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
             <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
@@ -57,8 +57,8 @@
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -203,8 +203,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -226,8 +226,8 @@
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -351,8 +351,8 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBodyLarge}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBodyLarge}" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -387,8 +387,8 @@
         </Style>
 
         <Style x:Key="BadgeTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeMicro}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMicro}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
@@ -431,8 +431,8 @@
                         <Setter Property="BorderBrush" Value="{DynamicResource LineSoftBrush}" />
                         <Setter Property="BorderThickness" Value="0,0,0,1" />
                         <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-                        <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-                        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+                        <Setter Property="FontFamily" Value="{DynamicResource AppSansFontFamily}" />
+                        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
                         <Setter Property="FontWeight" Value="SemiBold" />
                         <Setter Property="Height" Value="40" />
                         <Setter Property="Padding" Value="12,0" />

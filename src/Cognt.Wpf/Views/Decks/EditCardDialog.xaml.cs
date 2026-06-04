@@ -1,15 +1,21 @@
 using System.Windows;
+using Cognt.Wpf.EditorHost.Models.Editor;
 using Cognt.Wpf.EditorHost.Views;
 using CogntApp.ViewModels.Decks.PresentationModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Views.Decks;
 
 public partial class EditCardDialog : Window
 {
+    private static ILoggerFactory? loggerFactory;
     private readonly Func<EditorView> createEditorView;
     private readonly CardLibraryRow card;
+    private readonly ILogger<EditCardDialog>? logger;
     private EditorView? frontEditorView;
     private EditorView? backEditorView;
+    private string? frontEditorContent;
+    private string? backEditorContent;
     private bool isEditorLoaded;
 
     public EditCardDialog(
@@ -21,6 +27,7 @@ public partial class EditCardDialog : Window
         ArgumentNullException.ThrowIfNull(card);
         ArgumentNullException.ThrowIfNull(deckNames);
 
+        logger = loggerFactory?.CreateLogger<EditCardDialog>();
         this.createEditorView = createEditorView;
         this.card = card;
 
@@ -29,12 +36,7 @@ public partial class EditCardDialog : Window
         DeckComboBox.ItemsSource = deckNames;
         DeckComboBox.Text = card.Deck;
         TagsTextBox.Text = string.Join(", ", card.Tags);
-        CardTypeText.Text = card.CardTypeLabel;
-        CardSummaryText.Text = string.IsNullOrWhiteSpace(card.Question)
-            ? $"Card #{card.Id}"
-            : card.Question;
-        SourceText.Text = card.SourceLabel;
-        SchedulingText.Text = card.SchedulingSummary;
+        SetFooterStatus();
         BackTab.Visibility = card.IsBasicCard ? Visibility.Visible : Visibility.Collapsed;
 
         if (!card.IsEditableCardType)
@@ -42,9 +44,10 @@ public partial class EditCardDialog : Window
             EditorTabs.Visibility = Visibility.Collapsed;
             UnsupportedPanel.Visibility = Visibility.Visible;
             UnsupportedText.Text = card.IsMultimodalCard
-                ? "Image occlusion and multimodal cloze cards should be edited from the note-to-card queue so masks, slots, and targets stay consistent."
+                ? "Image occlusion cards are not editable in this text editor yet. Use the original note/image mask workflow so masks, slots, and targets stay consistent."
                 : "This stored card format is not a supported Basic or Cloze card document.";
             SaveButton.IsEnabled = false;
+            SetFooterStatus("This card is read-only here.");
         }
 
         Loaded += EditCardDialog_Loaded;
@@ -52,6 +55,11 @@ public partial class EditCardDialog : Window
     }
 
     public CardEditResult? EditResult { get; private set; }
+
+    internal static void ConfigureLogging(ILoggerFactory factory)
+    {
+        loggerFactory = factory ?? throw new ArgumentNullException(nameof(factory));
+    }
 
     private async void EditCardDialog_Loaded(object sender, RoutedEventArgs e)
     {
@@ -65,6 +73,7 @@ public partial class EditCardDialog : Window
         try
         {
             frontEditorView = createEditorView();
+            WireCardEditor(frontEditorView);
             FrontEditorHost.Content = frontEditorView;
             await frontEditorView.LoadNoteAsync(
                 card.IsClozeCard ? "Edit Cloze Source" : "Edit Front",
@@ -74,6 +83,7 @@ public partial class EditCardDialog : Window
             if (card.IsBasicCard)
             {
                 backEditorView = createEditorView();
+                WireCardEditor(backEditorView);
                 BackEditorHost.Content = backEditorView;
                 await backEditorView.LoadNoteAsync(
                     "Edit Back",
@@ -81,10 +91,11 @@ public partial class EditCardDialog : Window
                     $"card-edit-{card.Id}-back.json");
             }
 
-            SetBusy(false, string.Empty);
+            SetBusy(false);
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Edit card dialog failed to load editor views. CardId={CardId}", card.Id);
             SetBusy(false, $"Card editor could not load: {ex.Message}");
         }
     }
@@ -99,16 +110,16 @@ public partial class EditCardDialog : Window
         string deckName = DeckComboBox.Text?.Trim() ?? string.Empty;
         if (deckName.Length == 0)
         {
-            StatusText.Text = "Deck is required.";
+            SetFooterStatus("Deck is required.");
             return;
         }
 
         SetBusy(true, "Saving card...");
         try
         {
-            string frontContent = await frontEditorView.GetContentAsync();
+            string frontContent = await GetEditorContentAsync(frontEditorView, frontEditorContent);
             string? backContent = card.IsBasicCard && backEditorView is not null
-                ? await backEditorView.GetContentAsync()
+                ? await GetEditorContentAsync(backEditorView, backEditorContent)
                 : null;
             EditResult = new CardEditResult(
                 frontContent,
@@ -119,6 +130,7 @@ public partial class EditCardDialog : Window
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Edit card save failed. CardId={CardId}", card.Id);
             SetBusy(false, $"Card could not be exported: {ex.Message}");
         }
     }
@@ -130,6 +142,10 @@ public partial class EditCardDialog : Window
 
     private void EditCardDialog_Closed(object? sender, EventArgs e)
     {
+        UnwireCardEditor(frontEditorView);
+        UnwireCardEditor(backEditorView);
+        frontEditorView?.DisposeEditorHost();
+        backEditorView?.DisposeEditorHost();
         FrontEditorHost.Content = null;
         BackEditorHost.Content = null;
     }
@@ -137,7 +153,65 @@ public partial class EditCardDialog : Window
     private void SetBusy(bool isBusy, string message)
     {
         SaveButton.IsEnabled = !isBusy && card.IsEditableCardType;
-        StatusText.Text = message;
+        SetFooterStatus(message);
+    }
+
+    private void SetBusy(bool isBusy)
+    {
+        SaveButton.IsEnabled = !isBusy && card.IsEditableCardType;
+        SetFooterStatus();
+    }
+
+    private void SetFooterStatus(string? message = null)
+    {
+        StatusText.Text = string.IsNullOrWhiteSpace(message)
+            ? card.SchedulingSummary
+            : message;
+    }
+
+    private void WireCardEditor(EditorView editorView)
+    {
+        editorView.ContentChanged += EditorView_ContentChanged;
+        editorView.SaveClozeRequested += EditorView_SaveClozeRequested;
+    }
+
+    private void UnwireCardEditor(EditorView? editorView)
+    {
+        if (editorView is null)
+        {
+            return;
+        }
+
+        editorView.ContentChanged -= EditorView_ContentChanged;
+        editorView.SaveClozeRequested -= EditorView_SaveClozeRequested;
+    }
+
+    private void EditorView_ContentChanged(object? sender, string content)
+    {
+        if (ReferenceEquals(sender, frontEditorView))
+        {
+            frontEditorContent = content;
+            return;
+        }
+
+        if (ReferenceEquals(sender, backEditorView))
+        {
+            backEditorContent = content;
+            return;
+        }
+    }
+
+    private void EditorView_SaveClozeRequested(object? sender, SaveClozeRequestedEventArgs e)
+    {
+        EditorView_ContentChanged(sender, e.Content);
+    }
+
+    private static async Task<string> GetEditorContentAsync(EditorView editorView, string? fallbackContent)
+    {
+        string content = await editorView.GetContentAsync();
+        return string.IsNullOrWhiteSpace(content) && !string.IsNullOrWhiteSpace(fallbackContent)
+            ? fallbackContent
+            : content;
     }
 
     private static string[] ParseTags(string? value)
