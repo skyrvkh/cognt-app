@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using static CogntApp.Views.TagEditDialogTagNormalizer;
 
 namespace CogntApp.Views;
 
@@ -30,6 +31,7 @@ public partial class TagEditDialog : Window
         InitializeComponent();
         Operation = operation;
         Title = "Edit Tags";
+        TargetTitleText.Text = title;
         ScopePanel.Visibility = showScope ? Visibility.Visible : Visibility.Collapsed;
         initialAssignedTags = NormalizeTags(assignedTags);
 
@@ -115,6 +117,7 @@ public partial class TagEditDialog : Window
         if ((sender as FrameworkElement)?.Tag is TagSuggestionViewModel suggestion)
         {
             SelectSuggestion(suggestion);
+            return;
         }
     }
 
@@ -202,7 +205,8 @@ public partial class TagEditDialog : Window
 
         string completedText = text[..commaIndex];
         string remainingText = text[(commaIndex + 1)..];
-        AddSelectedTags(NormalizeTags(completedText));
+        string[] completedTags = NormalizeTags(completedText);
+        AddSelectedTags(completedTags);
         SetSearchText(remainingText);
     }
 
@@ -286,67 +290,6 @@ public partial class TagEditDialog : Window
         }
     }
 
-    private static string NormalizeTag(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        string trimmed = value.Trim();
-        int whitespaceCount = 0;
-        foreach (char character in trimmed)
-        {
-            if (char.IsWhiteSpace(character))
-            {
-                whitespaceCount++;
-            }
-        }
-
-        if (whitespaceCount == 0)
-        {
-            return trimmed;
-        }
-
-        return string.Create(
-            trimmed.Length - whitespaceCount,
-            trimmed,
-            static (destination, source) =>
-            {
-                int index = 0;
-                foreach (char character in source)
-                {
-                    if (!char.IsWhiteSpace(character))
-                    {
-                        destination[index++] = character;
-                    }
-                }
-            });
-    }
-
-    private static string[] NormalizeTags(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value)
-            ? []
-            : NormalizeTags(value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-    }
-
-    private static string[] NormalizeTags(IEnumerable<string> values)
-    {
-        List<string> normalizedTags = [];
-        HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string value in values)
-        {
-            string tag = NormalizeTag(value);
-            if (tag.Length > 0 && seenTags.Add(tag))
-            {
-                normalizedTags.Add(tag);
-            }
-        }
-
-        return normalizedTags.ToArray();
-    }
-
     private void AddAvailableTags(IEnumerable<string> tags)
     {
         foreach (string tag in NormalizeTags(tags))
@@ -391,33 +334,6 @@ public partial class TagEditDialog : Window
         return false;
     }
 
-    private static string[] ExceptTags(
-        IReadOnlyList<string> source,
-        IReadOnlyList<string> excludedTags)
-    {
-        if (source.Count == 0)
-        {
-            return [];
-        }
-
-        if (excludedTags.Count == 0)
-        {
-            return source.ToArray();
-        }
-
-        HashSet<string> excludedTagSet = new(excludedTags, StringComparer.OrdinalIgnoreCase);
-        List<string>? result = null;
-        foreach (string tag in source)
-        {
-            if (!excludedTagSet.Contains(tag))
-            {
-                result ??= new List<string>(source.Count);
-                result.Add(tag);
-            }
-        }
-
-        return result?.ToArray() ?? [];
-    }
 }
 
 public sealed record TagSuggestionViewModel(string TagName, string Description)
