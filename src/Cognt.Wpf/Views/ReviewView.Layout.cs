@@ -32,13 +32,7 @@ public partial class ReviewView
         ExitReviewGlyph.Margin = ultraNarrow ? new Thickness(0) : new Thickness(0, 0, 8, 0);
         ExitReviewLabel.Visibility = ResponsiveLayout.VisibleWhen(!ultraNarrow);
 
-        StageRoot.MaxWidth = ultraNarrow
-            ? double.PositiveInfinity
-            : width >= 1500
-                ? 1520
-                : width >= 1180
-                    ? 1280
-                    : 980;
+        StageRoot.MaxWidth = double.PositiveInfinity;
         StageRoot.VerticalAlignment = shortViewport || width < 900 ? VerticalAlignment.Top : VerticalAlignment.Center;
         StageContainer.Margin = ultraNarrow
             ? new Thickness(8, 10, 8, 14)
@@ -48,7 +42,7 @@ public partial class ReviewView
                     ? new Thickness(20, 18, 20, 22)
                     : new Thickness(36, 26, 36, 30);
 
-        ReviewCardContentHost.Margin = ultraNarrow
+        ReviewCardContentScrollViewer.Margin = ultraNarrow
             ? new Thickness(10, 4, 10, 0)
             : veryNarrow
                 ? new Thickness(18, 4, 18, 0)
@@ -106,7 +100,7 @@ public partial class ReviewView
         double gaps = StageGapBeforeRatingsRow.Height.Value;
         double targetCardHeight = visibleContentHeight - verticalMargins - summaryHeight - shortcutHeight - ratingHeight - gaps;
         double minCardHeight = ultraNarrow ? 280 : veryNarrow || shortViewport ? 320 : 400;
-        double maxCardHeight = veryShortViewport ? 520 : height >= 980 ? 720 : 660;
+        double maxCardHeight = Math.Max(minCardHeight, targetCardHeight);
 
         CardContext.Height = Clamp(targetCardHeight, minCardHeight, maxCardHeight);
     }

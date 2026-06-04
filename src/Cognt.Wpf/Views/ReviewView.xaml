@@ -16,57 +16,11 @@
              TextOptions.TextFormattingMode="Display">
 
     <UserControl.Resources>
-        <Style x:Key="ReviewRatingButtonStyle"
-               TargetType="Button">
-            <Setter Property="Height" Value="108" />
-            <Setter Property="Padding" Value="20,0" />
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource PanelAltBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ShortcutKeyStyle" TargetType="Border">
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
-            <Setter Property="CornerRadius" Value="5" />
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ReviewViewResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid Background="{DynamicResource PageBrush}">
@@ -242,55 +196,62 @@
                                        FontSize="13"
                                        FontWeight="SemiBold" />
 
-                            <Grid x:Name="ReviewCardContentHost"
-                                  Grid.Row="1"
-                                  Margin="84,6,84,0">
-                                <TextBlock x:Name="ReviewCardText"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           MaxWidth="1180"
-                                           Foreground="{DynamicResource InkBrush}"
-                                           FontSize="34"
-                                           FontWeight="SemiBold"
-                                           LineHeight="43"
-                                           TextAlignment="Center"
-                                           TextWrapping="Wrap" />
-                                <StackPanel x:Name="ReviewCardMultimodalHost"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            MaxWidth="1180"
-                                            Visibility="Collapsed">
-                                    <RichTextBox x:Name="ReviewCardRichText"
-                                                 IsReadOnly="True"
-                                                 IsDocumentEnabled="False"
-                                                 Focusable="False"
-                                                 BorderThickness="0"
-                                                 Padding="0"
-                                                 Background="Transparent"
-                                                 HorizontalScrollBarVisibility="Disabled"
-                                                 VerticalScrollBarVisibility="Disabled"
-                                                 MinWidth="120"
-                                                 MaxWidth="1180" />
-                                    <Border x:Name="ReviewCardImageContainer"
-                                            Margin="0,22,0,0"
-                                            Padding="10"
-                                            Background="{DynamicResource PanelAltBrush}"
-                                            BorderBrush="{DynamicResource LineBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="10"
-                                            Visibility="Collapsed"
-                                            MaxWidth="860"
-                                            MaxHeight="320">
-                                        <Grid x:Name="ReviewCardImageHost"
-                                              SizeChanged="ReviewCardImageHost_SizeChanged">
-                                            <Image x:Name="ReviewCardImage"
-                                                   Stretch="Uniform" />
-                                            <Canvas x:Name="ReviewCardMaskCanvas"
-                                                    IsHitTestVisible="False" />
-                                        </Grid>
-                                    </Border>
-                                </StackPanel>
-                            </Grid>
+                            <ScrollViewer x:Name="ReviewCardContentScrollViewer"
+                                          Grid.Row="1"
+                                          Margin="84,6,84,0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          CanContentScroll="False"
+                                          PanningMode="VerticalOnly">
+                                <Grid x:Name="ReviewCardContentHost"
+                                      MinHeight="{Binding ViewportHeight, ElementName=ReviewCardContentScrollViewer}">
+                                    <TextBlock x:Name="ReviewCardText"
+                                               HorizontalAlignment="Stretch"
+                                               VerticalAlignment="Top"
+                                               MaxWidth="1180"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               FontSize="34"
+                                               FontWeight="SemiBold"
+                                               LineHeight="43"
+                                               TextAlignment="Left"
+                                               TextWrapping="Wrap" />
+                                    <StackPanel x:Name="ReviewCardMultimodalHost"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Top"
+                                                MaxWidth="1180"
+                                                Visibility="Collapsed">
+                                        <RichTextBox x:Name="ReviewCardRichText"
+                                                     IsReadOnly="True"
+                                                     IsDocumentEnabled="False"
+                                                     Focusable="False"
+                                                     BorderThickness="0"
+                                                     Padding="0"
+                                                     Background="Transparent"
+                                                     HorizontalScrollBarVisibility="Disabled"
+                                                     VerticalScrollBarVisibility="Disabled"
+                                                     MinWidth="120"
+                                                     MaxWidth="1180" />
+                                        <Border x:Name="ReviewCardImageContainer"
+                                                Margin="0,22,0,0"
+                                                Padding="10"
+                                                Background="{DynamicResource PanelAltBrush}"
+                                                BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Visibility="Collapsed"
+                                                MaxWidth="860"
+                                                MaxHeight="320">
+                                            <Grid x:Name="ReviewCardImageHost"
+                                                  SizeChanged="ReviewCardImageHost_SizeChanged">
+                                                <Image x:Name="ReviewCardImage"
+                                                       Stretch="Uniform" />
+                                                <Canvas x:Name="ReviewCardMaskCanvas"
+                                                        IsHitTestVisible="False" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
 
                             <Border Grid.Row="2"
                                     BorderBrush="{DynamicResource LineSoftBrush}"

@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Views;
 
@@ -16,6 +17,7 @@ public partial class ReviewView : UserControl
     private readonly RelayCommand rateHardCommand;
     private readonly RelayCommand rateGoodCommand;
     private readonly RelayCommand rateEasyCommand;
+    private readonly ILogger<ReviewView>? logger;
     private FlashcardReviewCardReadModel? currentCard;
     private bool isAnswerVisible;
     private bool isRatingInProgress;
@@ -37,8 +39,9 @@ public partial class ReviewView : UserControl
 
     public ICommand RateEasyCommand { get; }
 
-    internal ReviewView()
+    internal ReviewView(ILogger<ReviewView>? logger = null)
     {
+        this.logger = logger;
         revealAnswerCommand = new RelayCommand(_ => ExecuteRevealAnswerCommand(), _ => CanRevealAnswer);
         rateAgainCommand = new RelayCommand(_ => ExecuteRateCommand(FlashcardReviewRatingReadModel.Again), _ => CanRateCurrentCard);
         rateHardCommand = new RelayCommand(_ => ExecuteRateCommand(FlashcardReviewRatingReadModel.Hard), _ => CanRateCurrentCard);
@@ -62,6 +65,7 @@ public partial class ReviewView : UserControl
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Review reveal answer command failed. CurrentCardId={CurrentCardId}", currentCard?.Id);
             WarningMessageRequested?.Invoke(
                 this,
                 new UserMessageRequestedEventArgs("Review Renderer Not Ready", $"The card answer could not be shown: {ex.Message}"));
@@ -76,6 +80,7 @@ public partial class ReviewView : UserControl
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Review rating command failed. Rating={Rating} CurrentCardId={CurrentCardId}", rating, currentCard?.Id);
             WarningMessageRequested?.Invoke(
                 this,
                 new UserMessageRequestedEventArgs("Review", $"The review card could not be advanced: {ex.Message}"));

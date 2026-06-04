@@ -5,6 +5,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using CogntApp.Design;
@@ -24,6 +25,7 @@ public partial class ReviewView
 
         if (TryLoadMultimodalCard())
         {
+            ResetCardContentScrollPosition();
             return;
         }
 
@@ -34,6 +36,15 @@ public partial class ReviewView
         ReviewCardImage.Source = null;
         ReviewCardImageContainer.Visibility = Visibility.Collapsed;
         ReviewCardMaskCanvas.Children.Clear();
+        ResetCardContentScrollPosition();
+    }
+
+    private void ResetCardContentScrollPosition()
+    {
+        ReviewCardContentScrollViewer.ScrollToTop();
+        _ = Dispatcher.BeginInvoke(
+            () => ReviewCardContentScrollViewer.ScrollToTop(),
+            DispatcherPriority.Loaded);
     }
 
     private bool TryLoadMultimodalCard()
@@ -64,14 +75,14 @@ public partial class ReviewView
         FlowDocument document = new()
         {
             PagePadding = new Thickness(0),
-            TextAlignment = TextAlignment.Center,
+            TextAlignment = TextAlignment.Left,
             Background = Brushes.Transparent,
         };
 
         Paragraph paragraph = new()
         {
             Margin = new Thickness(0),
-            TextAlignment = TextAlignment.Center,
+            TextAlignment = TextAlignment.Left,
         };
 
         foreach (MultimodalTextSegmentReadModel segment in content.TextSegments)
@@ -114,9 +125,19 @@ public partial class ReviewView
         ReviewCardMaskCanvas.Children.Clear();
         ReviewCardImage.Source = null;
 
-        if (imageOcclusion is null
-            || string.IsNullOrWhiteSpace(imageOcclusion.ImageFullPath)
-            || !File.Exists(imageOcclusion.ImageFullPath))
+        if (imageOcclusion is null)
+        {
+            ReviewCardImageContainer.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(imageOcclusion.ImageFullPath))
+        {
+            ReviewCardImageContainer.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (!File.Exists(imageOcclusion.ImageFullPath))
         {
             ReviewCardImageContainer.Visibility = Visibility.Collapsed;
             return;
