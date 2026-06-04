@@ -9,89 +9,11 @@
              Background="{DynamicResource PageBrush}">
 
     <UserControl.Resources>
-        <Style x:Key="SettingsNumberTextBoxStyle"
-               TargetType="TextBox"
-               BasedOn="{StaticResource InputTextBoxStyle}">
-            <Setter Property="Width" Value="128" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="CaretBrush" Value="{DynamicResource AccentStrongBrush}" />
-            <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftBrush}" />
-            <Setter Property="TextAlignment" Value="Center" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
-                    <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}" />
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.65" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SettingsWideTextBoxStyle"
-               TargetType="TextBox"
-               BasedOn="{StaticResource SettingsNumberTextBoxStyle}">
-            <Setter Property="Width" Value="128" />
-            <Setter Property="TextAlignment" Value="Left" />
-        </Style>
-
-        <Style x:Key="SettingsToggleButtonStyle"
-               TargetType="{x:Type ToggleButton}">
-            <Setter Property="Width" Value="128" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ToggleButton}">
-                        <Border x:Name="Root"
-                                Background="{DynamicResource ControlBrush}"
-                                BorderBrush="{DynamicResource ControlBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <TextBlock x:Name="StateText"
-                                       Text="Off"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="{StaticResource FontSizeBody}"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource MutedBrush}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
-                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource ControlBorderHoverBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                <Setter TargetName="StateText" Property="Text" Value="On" />
-                                <Setter TargetName="StateText" Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.65" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SettingsViewResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -197,6 +119,174 @@
                             <TextBox Grid.Column="1"
                                      Style="{StaticResource SettingsNumberTextBoxStyle}"
                                      Text="{Binding GlobalTextFontSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <TextBlock Text="Typography"
+                                   Margin="0,24,0,0"
+                                   Style="{StaticResource PanelTitleStyle}" />
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="UI font family"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Applied to the application shell, navigation, controls, and shared text."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      Style="{StaticResource SettingsComboBoxStyle}"
+                                      ItemsSource="{Binding FontFamilyOptions}"
+                                      SelectedItem="{Binding InterfaceFontFamilyText, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Heading font family"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Applied to page titles, editor headings, and display text."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      Style="{StaticResource SettingsComboBoxStyle}"
+                                      ItemsSource="{Binding FontFamilyOptions}"
+                                      SelectedItem="{Binding DisplayFontFamilyText, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Editor font family"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Applied to note body content inside EditorWeb."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      Style="{StaticResource SettingsComboBoxStyle}"
+                                      ItemsSource="{Binding FontFamilyOptions}"
+                                      SelectedItem="{Binding ReadingFontFamilyText, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Code font family"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Applied to code blocks and code editor surfaces."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      Style="{StaticResource SettingsComboBoxStyle}"
+                                      ItemsSource="{Binding FontFamilyOptions}"
+                                      SelectedItem="{Binding CodeFontFamilyText, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Editor text size"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Base body text size for EditorWeb."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     Text="{Binding EditorTextFontSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Heading size"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Top heading size used to derive smaller heading levels."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     Text="{Binding EditorHeadingFontSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Code size"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Font size for code blocks and inline code."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     Text="{Binding EditorCodeFontSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="EditorWeb zoom"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkBrush}" />
+                                <TextBlock Text="Percentage zoom for the web editor. Default is 100."
+                                           Margin="0,4,0,0"
+                                           Style="{StaticResource MetaTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource SettingsNumberTextBoxStyle}"
+                                     Text="{Binding EditorZoomPercentText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <Grid Margin="0,18,0,0">
@@ -577,6 +667,46 @@
                                 <ToggleButton Grid.Column="1"
                                               Style="{StaticResource SettingsToggleButtonStyle}"
                                               IsChecked="{Binding IsFsrsOptimizationEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Cram mode"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Shows the hidden Cram action in Review when enabled for this collection."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1"
+                                              Style="{StaticResource SettingsToggleButtonStyle}"
+                                              IsChecked="{Binding IsCramEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Show flashcards in navigation"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Text="Shows cards generated from a note below that note in the navigation tree."
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MetaTextStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1"
+                                              Style="{StaticResource SettingsToggleButtonStyle}"
+                                              IsChecked="{Binding ShowFlashcardsInNavigationTree, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
 
                             <Expander Margin="0,16,0,0"
