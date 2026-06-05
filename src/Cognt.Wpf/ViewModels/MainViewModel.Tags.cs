@@ -6,16 +6,22 @@ public sealed partial class MainViewModel
 {
     internal IReadOnlyList<string> LoadAvailableTags()
     {
-        return string.IsNullOrWhiteSpace(openCollectionPath)
-            ? []
-            : noteService.LoadAvailableTags(openCollectionPath);
+        if (string.IsNullOrWhiteSpace(openCollectionPath))
+        {
+            return [];
+        }
+
+        return noteService.LoadAvailableTags(openCollectionPath);
     }
 
     internal IReadOnlyList<string> LoadAssignedTags(IReadOnlyList<long> itemIds)
     {
-        return string.IsNullOrWhiteSpace(openCollectionPath)
-            ? []
-            : noteService.LoadAssignedTags(openCollectionPath, itemIds);
+        if (string.IsNullOrWhiteSpace(openCollectionPath))
+        {
+            return [];
+        }
+
+        return noteService.LoadAssignedTags(openCollectionPath, itemIds);
     }
 
     internal KnowledgeTagOperationResult ApplyTags(

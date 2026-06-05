@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -7,7 +8,8 @@ public sealed partial class MainViewModel
 {
     public string ReadMentionPreview(string relativePath, int maxCharacters)
     {
-        return noteService.ReadMentionPreview(openCollectionPath, relativePath, maxCharacters);
+        string preview = noteService.ReadMentionPreview(openCollectionPath, relativePath, maxCharacters);
+        return preview;
     }
 
     public KnowledgeDocumentLinksReadModel ReadCurrentDocumentLinks(string currentContent)
@@ -17,10 +19,12 @@ public sealed partial class MainViewModel
             return new KnowledgeDocumentLinksReadModel([], []);
         }
 
-        return noteService.ReadDocumentLinks(
+        string relativePath = GetRequiredCurrentNoteRelativePath();
+        KnowledgeDocumentLinksReadModel links = noteService.ReadDocumentLinks(
             openCollectionPath,
-            GetRequiredCurrentNoteRelativePath(),
+            relativePath,
             currentContent);
+        return links;
     }
 
     internal KnowledgeDocumentLinksReadModel ReadDocumentLinks(
@@ -33,10 +37,11 @@ public sealed partial class MainViewModel
             return new KnowledgeDocumentLinksReadModel([], []);
         }
 
-        return noteService.ReadDocumentLinks(
+        KnowledgeDocumentLinksReadModel links = noteService.ReadDocumentLinks(
             collectionPath,
             relativePath,
             currentContent);
+        return links;
     }
 
     public void SaveMentionSource(string sourcePath, string content)
@@ -69,6 +74,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
+            logger?.LogError(ex, "List mention targets failed. CollectionPath={CollectionPath}", openCollectionPath);
             RaiseMessage("Mention Index Failed", $"Mentions could not be indexed: {ex.Message}");
             return [];
         }
@@ -83,10 +89,12 @@ public sealed partial class MainViewModel
 
         try
         {
-            return noteService.SearchMentionTargets(openCollectionPath, query, limit);
+            IReadOnlyList<KnowledgeMentionTargetReadModel> targets = noteService.SearchMentionTargets(openCollectionPath, query, limit);
+            return targets;
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
+            logger?.LogError(ex, "Search mention targets failed. CollectionPath={CollectionPath} QueryLength={QueryLength}", openCollectionPath, query.Length);
             RaiseMessage("Mention Search Failed", $"Mentions could not be searched: {ex.Message}");
             return [];
         }

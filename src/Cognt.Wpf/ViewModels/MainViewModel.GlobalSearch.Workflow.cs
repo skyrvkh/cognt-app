@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Search;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -81,6 +82,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Global search failed. QueryLength={QueryLength}", query.Length);
             GlobalSearchResults.Clear();
             GlobalSearchErrorMessage = $"Search failed: {ex.Message}";
             HasGlobalSearchError = true;

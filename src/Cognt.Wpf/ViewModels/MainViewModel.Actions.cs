@@ -1,4 +1,3 @@
-using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Navigation = CogntApp.ViewModels.Navigation;
 
@@ -98,25 +97,97 @@ public sealed partial class MainViewModel
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public Task DeleteNodeAsync(NoteTreeNodeViewModel node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        return DeleteNodesCoreAsync([node]);
+    }
+
     public void DeleteNode(NoteTreeNodeViewModel node)
     {
-        EnsureCanModifyNode(node, "deleted");
-        SaveCurrentNoteFromEditor();
+        DeleteNodeAsync(node).GetAwaiter().GetResult();
+    }
 
-        IReadOnlyList<string> deletedNotePaths = noteService.DeleteItem(openCollectionPath, node.Id);
-        string[] deletedFullNotePaths = CreateDeletedFullNotePaths(deletedNotePaths);
-        string? currentNoteRelativePath = TryGetCurrentNoteRelativePath();
-        bool deletesCurrentNote = currentNoteRelativePath is not null
-            && ContainsDeletedRelativePath(deletedNotePaths, currentNoteRelativePath);
-        bool deletesCurrentSelection = currentNoteItemId == node.Id;
+    public Task DeleteNodesAsync(IReadOnlyList<NoteTreeNodeViewModel> nodes)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+        return DeleteNodesCoreAsync(nodes);
+    }
 
-        RemoveLoadedTreeNode(node);
+    private async Task DeleteNodesCoreAsync(IReadOnlyList<NoteTreeNodeViewModel> nodes)
+    {
+        NoteTreeNodeViewModel[] deleteNodes = nodes
+            .GroupBy(node => node.Id)
+            .Select(group => group.First())
+            .ToArray();
+        if (deleteNodes.Length == 0)
+        {
+            return;
+        }
+
+        foreach (NoteTreeNodeViewModel node in deleteNodes)
+        {
+            EnsureCanModifyNode(node, "deleted");
+        }
+
+        List<string> pendingDeletedNotePaths = [];
+        HashSet<string> pendingDeletedPathSet = new(StringComparer.OrdinalIgnoreCase);
+        foreach (NoteTreeNodeViewModel node in deleteNodes)
+        {
+            foreach (string notePath in noteService.PreviewDeleteItemNotePaths(openCollectionPath, node.Id))
+            {
+                if (pendingDeletedPathSet.Add(notePath))
+                {
+                    pendingDeletedNotePaths.Add(notePath);
+                }
+            }
+        }
+
+        string[] pendingDeletedFullNotePaths = NoteActionStateBuilder.CreateDeletedFullNotePaths(
+            openCollectionPath,
+            pendingDeletedNotePaths);
+        string? currentNoteRelativePathBeforeClose = TryGetCurrentNoteRelativePath();
+        bool deletesCurrentNoteBeforeClose = currentNoteRelativePathBeforeClose is not null
+            && NoteActionStateBuilder.ContainsDeletedRelativePath(pendingDeletedNotePaths, currentNoteRelativePathBeforeClose);
+
+        if (!deletesCurrentNoteBeforeClose)
+        {
+            SaveCurrentNoteFromEditor();
+        }
+
+        await RaiseNoteDocumentsDeletingAsync(pendingDeletedFullNotePaths);
+
+        List<string> deletedNotePaths = [];
+        HashSet<string> deletedPathSet = new(StringComparer.OrdinalIgnoreCase);
+        foreach (NoteTreeNodeViewModel node in deleteNodes)
+        {
+            foreach (string notePath in noteService.DeleteItem(openCollectionPath, node.Id))
+            {
+                if (deletedPathSet.Add(notePath))
+                {
+                    deletedNotePaths.Add(notePath);
+                }
+            }
+
+            RemoveLoadedTreeNode(node);
+        }
+
+        string[] deletedFullNotePaths = NoteActionStateBuilder.CreateDeletedFullNotePaths(
+            openCollectionPath,
+            deletedNotePaths);
+
+        string? currentNoteRelativePathAfterClose = TryGetCurrentNoteRelativePath();
+        bool deletesCurrentNoteAfterClose = currentNoteRelativePathAfterClose is not null
+            && NoteActionStateBuilder.ContainsDeletedRelativePath(deletedNotePaths, currentNoteRelativePathAfterClose);
+        bool deletesCurrentSelection = currentNoteItemId.HasValue
+            && deleteNodes.Any(node => currentNoteItemId == node.Id);
+
         foreach (string notePath in deletedNotePaths)
         {
             RemoveRecentNote(ResolveCollectionFilePath(openCollectionPath, notePath));
         }
 
-        if (deletesCurrentNote || deletesCurrentSelection)
+        if (deletesCurrentNoteAfterClose || deletesCurrentSelection)
         {
             ClearCurrentNoteState();
         }
@@ -131,38 +202,24 @@ public sealed partial class MainViewModel
         MentionTargetsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private string[] CreateDeletedFullNotePaths(IReadOnlyList<string> deletedNotePaths)
+    private async Task RaiseNoteDocumentsDeletingAsync(IReadOnlyList<string> notePaths)
     {
-        HashSet<string> seenFullPaths = new(StringComparer.OrdinalIgnoreCase);
-        List<string> fullPaths = new(deletedNotePaths.Count);
-        foreach (string notePath in deletedNotePaths)
+        Func<object?, Navigation.NoteDocumentsDeletedEventArgs, Task>? handlers = NoteDocumentsDeleting;
+        if (handlers is null || notePaths.Count == 0)
         {
-            string fullPath = Path.GetFullPath(ResolveCollectionFilePath(openCollectionPath, notePath));
-            if (seenFullPaths.Add(fullPath))
-            {
-                fullPaths.Add(fullPath);
-            }
+            return;
         }
 
-        return fullPaths.ToArray();
-    }
+        Navigation.NoteDocumentsDeletedEventArgs args = new(notePaths);
+        Func<object?, Navigation.NoteDocumentsDeletedEventArgs, Task>[] invocationList = handlers
+            .GetInvocationList()
+            .Cast<Func<object?, Navigation.NoteDocumentsDeletedEventArgs, Task>>()
+            .ToArray();
 
-    private static bool ContainsDeletedRelativePath(
-        IReadOnlyList<string> deletedNotePaths,
-        string currentNoteRelativePath)
-    {
-        foreach (string notePath in deletedNotePaths)
+        foreach (Func<object?, Navigation.NoteDocumentsDeletedEventArgs, Task> handler in invocationList)
         {
-            if (string.Equals(
-                NormalizeRelativePath(notePath),
-                currentNoteRelativePath,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            await handler(this, args);
         }
-
-        return false;
     }
 
     public string DuplicateNote(NoteTreeNodeViewModel node)
@@ -178,7 +235,7 @@ public sealed partial class MainViewModel
             ? NormalizeRelativePath(node.FileRelPath)
             : GetRequiredRelativeNotePath(node.NotePath);
         KnowledgeOpenedNoteReadModel sourceNote = noteService.ReadNoteForOpen(openCollectionPath, sourceRelativePath);
-        string duplicateTitle = CreateDuplicateNoteTitle(sourceNote.Title);
+        string duplicateTitle = NoteActionStateBuilder.CreateDuplicateNoteTitle(sourceNote.Title);
         KnowledgeCreatedNoteReadModel createdNote = noteService.CreateNote(
             openCollectionPath,
             node.ParentId,
@@ -240,6 +297,65 @@ public sealed partial class MainViewModel
         RefreshEditorBreadcrumb();
     }
 
+    public void MoveTreeNodes(
+        IReadOnlyList<long> itemIds,
+        long? newParentId,
+        long? previousSiblingId,
+        long? nextSiblingId)
+    {
+        ArgumentNullException.ThrowIfNull(itemIds);
+
+        long[] moveItemIds = [.. itemIds.Where(static itemId => itemId > 0).Distinct()];
+        if (moveItemIds.Length == 0)
+        {
+            return;
+        }
+
+        if (moveItemIds.Length == 1)
+        {
+            MoveTreeNode(moveItemIds[0], newParentId, previousSiblingId, nextSiblingId);
+            return;
+        }
+
+        PrepareLoadedParentForMove(newParentId);
+
+        bool shouldRefreshTree = false;
+        long? currentPreviousSiblingId = previousSiblingId;
+        long? currentNextSiblingId = nextSiblingId;
+
+        foreach (long itemId in moveItemIds)
+        {
+            NoteTreeNodeViewModel? node = FindTreeNode(itemId);
+            long? oldParentId = node?.ParentId;
+
+            noteService.MoveItem(
+                openCollectionPath,
+                itemId,
+                newParentId,
+                currentPreviousSiblingId,
+                currentNextSiblingId);
+
+            if (node is not null)
+            {
+                MoveLoadedTreeNode(node, oldParentId, newParentId, currentPreviousSiblingId, currentNextSiblingId);
+            }
+            else
+            {
+                shouldRefreshTree = true;
+            }
+
+            currentPreviousSiblingId = itemId;
+            currentNextSiblingId = nextSiblingId;
+        }
+
+        if (shouldRefreshTree)
+        {
+            RefreshNotesTree(preserveExpansion: true);
+        }
+
+        RefreshEditorBreadcrumb();
+    }
+
     private void ShowAllNotes()
     {
         SaveCurrentNoteFromEditor();
@@ -264,13 +380,5 @@ public sealed partial class MainViewModel
         RefreshReviewSettings();
         RefreshGraphSettings();
         OverlayRequested?.Invoke(this, new Navigation.OverlayRequestedEventArgs(Navigation.OverlayViewKind.Settings));
-    }
-
-    private static string CreateDuplicateNoteTitle(string title)
-    {
-        string trimmedTitle = string.IsNullOrWhiteSpace(title)
-            ? "Untitled"
-            : title.Trim();
-        return $"{trimmedTitle} Copy";
     }
 }

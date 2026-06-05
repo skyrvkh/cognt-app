@@ -112,6 +112,7 @@ public sealed partial class MainViewModel
         if (!string.IsNullOrWhiteSpace(GlobalSearchQuery))
         {
             IsGlobalSearchPopupOpen = true;
+            return;
         }
     }
 }

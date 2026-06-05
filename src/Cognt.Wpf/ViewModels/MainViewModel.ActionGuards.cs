@@ -19,6 +19,7 @@ public sealed partial class MainViewModel
     {
         return node is not null
             && !node.IsPlaceholder
+            && !node.IsFlashcardNode
             && node.Kind == KnowledgeItemKind.Note
             && !string.IsNullOrWhiteSpace(openCollectionPath);
     }
@@ -44,10 +45,17 @@ public sealed partial class MainViewModel
             && (node is null || node.CanContainChildren);
     }
 
+    public bool CanCreateNoteInNode(NoteTreeNodeViewModel? node)
+    {
+        return !string.IsNullOrWhiteSpace(openCollectionPath)
+            && (node is null || node.CanContainChildren);
+    }
+
     public bool CanMoveNode(NoteTreeNodeViewModel? node)
     {
         return node is not null
-            && !node.IsPlaceholder;
+            && !node.IsPlaceholder
+            && !node.IsFlashcardNode;
     }
 
     private bool CanModifyNode(NoteTreeNodeViewModel? node)
