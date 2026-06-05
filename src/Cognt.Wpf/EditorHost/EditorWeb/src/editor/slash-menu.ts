@@ -8,10 +8,6 @@ import {
   type AffineSlashSubMenu,
 } from '@blocksuite/blocks';
 import type { Doc } from '@blocksuite/store';
-import {
-  createDefaultPropertiesRows,
-  insertCogntPropertiesBlock,
-} from '../blocks/properties';
 import type { CogntSlashMenuRootComponent } from '../blocksuite-compat';
 import { reportDiagnostic } from '../host';
 
@@ -25,9 +21,6 @@ export type CogntSlashMenuEditor = {
     viewMode: LinkedNoteViewMode,
     context: AffineSlashMenuContext
   ): Promise<void>;
-
-  insertPropertiesBlockFromSlashMenu(context: AffineSlashMenuContext): Promise<void>;
-
   insertImageFromSlashMenu(context: AffineSlashMenuContext): Promise<void>;
 };
 
@@ -56,27 +49,6 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
     }
 
     await editor.createLinkedNoteFromSlashMenu(viewMode, context);
-  };
-
-  const runInsertPropertiesBlockAction = async (context: AffineSlashMenuContext) => {
-    const rootComponent = context.rootComponent as unknown as CogntSlashMenuRootComponent;
-    const editor = options.getEditor(rootComponent.doc);
-
-    if (!editor) {
-      try {
-        insertCogntPropertiesBlock(context, createDefaultPropertiesRows(rootComponent.doc));
-        reportDiagnostic(
-          'warn',
-          'Added properties block without editor save hook; waiting for the document change listener to persist it.'
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        reportDiagnostic('error', `Could not add properties block: ${message}`);
-      }
-      return;
-    }
-
-    await editor.insertPropertiesBlockFromSlashMenu(context);
   };
 
   const runInsertImageAction = async (context: AffineSlashMenuContext) => {
@@ -156,14 +128,6 @@ export function configureCogntSlashMenu(options: ConfigureCogntSlashMenuOptions)
         alias: ['picture', 'photo', 'attachment'],
         action: context => {
           void runInsertImageAction(context);
-        },
-      },
-      {
-        name: 'Properties',
-        description: 'Add editable document properties.',
-        alias: ['metadata', 'frontmatter', 'fields', 'props'],
-        action: context => {
-          void runInsertPropertiesBlockAction(context);
         },
       },
       ...filterSlashMenuItems(config.items, filterSlashMenuStaticItem),

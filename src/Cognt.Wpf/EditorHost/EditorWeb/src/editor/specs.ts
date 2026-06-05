@@ -8,7 +8,6 @@ import type {
   NativeInlineEditor,
   NativeLinkedMenuGroup,
 } from '../mention-controller-types';
-import { CogntPropertiesBlockSpec } from '../blocks/properties';
 import { CogntReferencesBlockSpec } from '../blocks/references';
 
 export function createEditorSpecs(
@@ -21,7 +20,6 @@ export function createEditorSpecs(
 ) {
   return [
     ...PageEditorBlockSpecs,
-    ...CogntPropertiesBlockSpec,
     ...CogntReferencesBlockSpec,
     ConfigExtension('affine:page' as never, {
       linkedWidget: {
@@ -33,7 +31,9 @@ export function createEditorSpecs(
           _editorHost: EditorHost,
           inlineEditor: NativeInlineEditor,
           abortSignal: AbortSignal
-        ) => getMenus(query, abort, inlineEditor, abortSignal),
+        ) => {
+          return getMenus(query, abort, inlineEditor, abortSignal);
+        },
       },
     }),
   ];
