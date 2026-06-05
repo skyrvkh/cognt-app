@@ -15,6 +15,7 @@ using CogntApp.Design;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Shell.Collections;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 using PkmNoteService = Cognt.Modules.PersonalKnowledgeManagement.Application.Notes.INoteService;
 
@@ -25,15 +26,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly PkmNoteService noteService;
     private readonly IKnowledgeDocumentContentFactory documentContentFactory;
     private readonly IKnowledgeCollectionPathResolver collectionPathResolver;
+    private readonly IKnownCollectionStore knownCollectionStore;
     private readonly IGlobalSearchService globalSearchService;
     private readonly ICollectionProgressAnalyticsDashboardQuery collectionProgressAnalyticsDashboardQuery;
     private readonly INoteToCardQueueQuery noteToCardQueueQuery;
     private readonly IFlashcardDeckSummariesQuery flashcardDeckSummariesQuery;
+    private readonly IFlashcardCardsQuery flashcardCardsQuery;
     private readonly ICreateCardsFromCardContextCommand createCardsFromCardContextCommand;
+    private readonly IImportFlashcardCollectionCommand importFlashcardCollectionCommand;
     private readonly IFlashcardReviewSettingsQuery flashcardReviewSettingsQuery;
     private readonly IUpdateFlashcardReviewSettingsCommand updateFlashcardReviewSettingsCommand;
     private readonly IThemeService themeService;
     private readonly IEditorSettingsService editorSettingsService;
+    private readonly ILogger<MainViewModel>? logger;
     private readonly SemaphoreSlim noteSaveSemaphore = new(1, 1);
     private string collectionPath = string.Empty;
     private string openCollectionPath = string.Empty;
@@ -53,24 +58,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PkmNoteService noteService,
         IKnowledgeDocumentContentFactory documentContentFactory,
         IKnowledgeCollectionPathResolver collectionPathResolver,
+        IKnownCollectionStore knownCollectionStore,
         IGlobalSearchService globalSearchService,
         ICollectionProgressAnalyticsDashboardQuery collectionProgressAnalyticsDashboardQuery,
         INoteToCardQueueQuery noteToCardQueueQuery,
         IFlashcardDeckSummariesQuery flashcardDeckSummariesQuery,
+        IFlashcardCardsQuery flashcardCardsQuery,
         ICreateCardsFromCardContextCommand createCardsFromCardContextCommand,
+        IImportFlashcardCollectionCommand importFlashcardCollectionCommand,
         IFlashcardReviewSettingsQuery flashcardReviewSettingsQuery,
         IUpdateFlashcardReviewSettingsCommand updateFlashcardReviewSettingsCommand,
         IThemeService themeService,
-        IEditorSettingsService editorSettingsService)
+        IEditorSettingsService editorSettingsService,
+        ILogger<MainViewModel>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(noteService);
         ArgumentNullException.ThrowIfNull(documentContentFactory);
         ArgumentNullException.ThrowIfNull(collectionPathResolver);
+        ArgumentNullException.ThrowIfNull(knownCollectionStore);
         ArgumentNullException.ThrowIfNull(globalSearchService);
         ArgumentNullException.ThrowIfNull(collectionProgressAnalyticsDashboardQuery);
         ArgumentNullException.ThrowIfNull(noteToCardQueueQuery);
         ArgumentNullException.ThrowIfNull(flashcardDeckSummariesQuery);
+        ArgumentNullException.ThrowIfNull(flashcardCardsQuery);
         ArgumentNullException.ThrowIfNull(createCardsFromCardContextCommand);
+        ArgumentNullException.ThrowIfNull(importFlashcardCollectionCommand);
         ArgumentNullException.ThrowIfNull(flashcardReviewSettingsQuery);
         ArgumentNullException.ThrowIfNull(updateFlashcardReviewSettingsCommand);
         ArgumentNullException.ThrowIfNull(themeService);
@@ -79,18 +91,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         this.noteService = noteService;
         this.documentContentFactory = documentContentFactory;
         this.collectionPathResolver = collectionPathResolver;
+        this.knownCollectionStore = knownCollectionStore;
         this.globalSearchService = globalSearchService;
         this.collectionProgressAnalyticsDashboardQuery = collectionProgressAnalyticsDashboardQuery;
         this.noteToCardQueueQuery = noteToCardQueueQuery;
         this.flashcardDeckSummariesQuery = flashcardDeckSummariesQuery;
+        this.flashcardCardsQuery = flashcardCardsQuery;
         this.createCardsFromCardContextCommand = createCardsFromCardContextCommand;
+        this.importFlashcardCollectionCommand = importFlashcardCollectionCommand;
         this.flashcardReviewSettingsQuery = flashcardReviewSettingsQuery;
         this.updateFlashcardReviewSettingsCommand = updateFlashcardReviewSettingsCommand;
         this.themeService = themeService;
         this.editorSettingsService = editorSettingsService;
+        this.logger = logger;
 
         InitializeReviewParameterSettings();
         InitializeThemeOptions();
+        InitializeFontFamilyOptions();
         InitializeEditorSettings();
         InitializeCommands();
         InitializeNoteToCardPresentationOptions();
@@ -102,6 +119,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler<Navigation.OpenNoteRequestedEventArgs>? OpenNoteRequested;
 
+    internal event Func<object?, Navigation.NoteDocumentsDeletedEventArgs, Task>? NoteDocumentsDeleting;
+
     internal event EventHandler<Navigation.NoteDocumentsDeletedEventArgs>? NoteDocumentsDeleted;
 
     internal event EventHandler<Navigation.OpenPdfRequestedEventArgs>? OpenPdfRequested;
@@ -112,17 +131,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler<CardCandidatePreviewRequestedEventArgs>? CardCandidatePreviewRequested;
 
-    internal event EventHandler? CreateCardContextFromSelectionRequested;
-
     internal event EventHandler? AddSelectedTextToSelectedCardSlotRequested;
+
+    internal event EventHandler? CreateCardContextFromSelectionRequested;
 
     internal event EventHandler<string>? CurrentNoteTitleChanged;
 
     internal event EventHandler<string>? CurrentNoteContentChanged;
 
+    internal event EventHandler<string>? CurrentNoteEditorContentReplacementRequested;
+
+    internal event EventHandler<Navigation.OpenFlashcardRequestedEventArgs>? OpenFlashcardRequested;
+
     internal event EventHandler<bool>? EditorReadOnlyChanged;
 
     internal event EventHandler? AutoSaveSettingsChanged;
+
+    public Func<string?>? GetCurrentEditorNotePath { get; set; }
 
     public Func<string>? GetCurrentEditorContent { get; set; }
 
@@ -145,6 +170,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<GlobalSearchResultReadModel> GlobalSearchResults { get; } = [];
 
     public ObservableCollection<ThemeOptionViewModel> ThemeOptions { get; } = [];
+
+    public ObservableCollection<string> FontFamilyOptions { get; } = [];
 
     public string CollectionPath
     {
@@ -226,6 +253,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 globalTextFontSizeText = normalized.ToString("0", CultureInfo.InvariantCulture);
                 OnPropertyChanged(nameof(GlobalTextFontSizeText));
                 AutoSaveSettingsStatusMessage = string.Empty;
+                HandleEditorVisualSettingsChanged();
                 RaiseEditorSettingsCommandStates();
             }
         }
@@ -244,7 +272,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out double fontSize))
             {
                 GlobalTextFontSize = fontSize;
+                return;
             }
+
+            AutoSaveSettingsStatusMessage = string.Empty;
+            HandleEditorVisualSettingsChanged();
+            RaiseEditorSettingsCommandStates();
         }
     }
 

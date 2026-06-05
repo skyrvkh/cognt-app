@@ -2,6 +2,7 @@ using System.Globalization;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -35,7 +36,9 @@ public sealed partial class MainViewModel
                     normalized.LearningSteps,
                     normalized.RelearningSteps,
                     normalized.IsOptimizationEnabled,
-                    normalized.FsrsParameters)).GetAwaiter().GetResult();
+                    normalized.FsrsParameters,
+                    normalized.IsCramEnabled,
+                    normalized.ShowFlashcardsInNavigationTree)).GetAwaiter().GetResult();
 
             persistedReviewSettings = normalized;
             ApplyReviewSettings(normalized);
@@ -43,6 +46,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Save review settings failed. CollectionPath={CollectionPath}", openCollectionPath);
             ReviewSettingsErrorMessage = $"Settings could not be saved: {ex.Message}";
             ReviewSettingsStatusMessage = string.Empty;
         }
@@ -73,6 +77,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Refresh review settings failed. CollectionPath={CollectionPath}", openCollectionPath);
             persistedReviewSettings = FlashcardReviewSettingsReadModel.Default;
             ApplyReviewSettings(persistedReviewSettings);
             ReviewSettingsValidationMessage = string.Empty;
@@ -88,14 +93,24 @@ public sealed partial class MainViewModel
     private void ApplyReviewSettings(FlashcardReviewSettingsReadModel settings)
     {
         FlashcardReviewSettingsReadModel normalized = settings.Normalize();
+        bool previousShowFlashcardsInNavigationTree = ShowFlashcardsInNavigationTree;
         ReviewSettingsDailyLimitText = normalized.MaximumReviewCardsPerDay.ToString(CultureInfo.InvariantCulture);
         ReviewSettingsNewCardsLimitText = normalized.MaximumNewCardsPerDay.ToString(CultureInfo.InvariantCulture);
         ReviewSettingsDesiredRetention = normalized.DesiredRetention;
-        ReviewSettingsLearningStepsText = FormatReviewSteps(normalized.LearningSteps);
-        ReviewSettingsRelearningStepsText = FormatReviewSteps(normalized.RelearningSteps);
+        ReviewSettingsLearningStepsText = ReviewSettingsFactory.FormatSteps(normalized.LearningSteps);
+        ReviewSettingsRelearningStepsText = ReviewSettingsFactory.FormatSteps(normalized.RelearningSteps);
         IsFsrsOptimizationEnabled = normalized.IsOptimizationEnabled;
+        IsCramEnabled = normalized.IsCramEnabled;
+        ShowFlashcardsInNavigationTree = normalized.ShowFlashcardsInNavigationTree;
         ApplyFsrsParameterSettings(normalized.FsrsParameters);
         UpdateReviewSettingsValidation();
+
+        if (HasOpenCollection
+            && IsReviewSettingsLoading
+            && previousShowFlashcardsInNavigationTree != ShowFlashcardsInNavigationTree)
+        {
+            RefreshNotesTree(preserveExpansion: true);
+        }
     }
 
     private void ResetReviewSettings()

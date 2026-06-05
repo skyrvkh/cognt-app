@@ -1,5 +1,6 @@
 using System.Globalization;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -156,6 +157,7 @@ public sealed partial class MainViewModel
     {
         if (!HasOpenCollection)
         {
+
             GraphSettingsErrorMessage = "Select a collection to edit its graph settings.";
             GraphSettingsStatusMessage = string.Empty;
             return;
@@ -178,6 +180,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Save graph settings failed. CollectionPath={CollectionPath}", openCollectionPath);
             GraphSettingsErrorMessage = $"Graph settings could not be saved: {ex.Message}";
             GraphSettingsStatusMessage = string.Empty;
         }
@@ -207,6 +210,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Refresh graph settings failed. CollectionPath={CollectionPath}", openCollectionPath);
             persistedGraphSettings = KnowledgeGraphSettingsReadModel.Default;
             ApplyGraphSettings(persistedGraphSettings);
             GraphSettingsValidationMessage = string.Empty;
@@ -236,30 +240,13 @@ public sealed partial class MainViewModel
 
     private bool TryCreateValidatedGraphSettings(out KnowledgeGraphSettingsReadModel settings)
     {
-        List<string> errors = [];
-
-        if (!int.TryParse(GraphSettingsNeighborDepthText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int neighborDepth)
-            || neighborDepth < KnowledgeGraphSettingsReadModel.MinimumNeighborDepth
-            || neighborDepth > KnowledgeGraphSettingsReadModel.MaximumNeighborDepth)
+        GraphSettingsDraft draft = new(GraphSettingsNeighborDepthText, GraphSettingsMaxNodesText);
+        if (!GraphSettingsFactory.TryCreate(draft, out settings, out string validationMessage))
         {
-            errors.Add("Graph depth must be between 1 and 4 hops.");
-        }
-
-        if (!int.TryParse(GraphSettingsMaxNodesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int maxNodes)
-            || maxNodes < KnowledgeGraphSettingsReadModel.MinimumMaxNodes
-            || maxNodes > KnowledgeGraphSettingsReadModel.MaximumMaxNodes)
-        {
-            errors.Add("Graph max nodes must be between 10 and 300.");
-        }
-
-        if (errors.Count > 0)
-        {
-            settings = KnowledgeGraphSettingsReadModel.Default;
-            GraphSettingsValidationMessage = string.Join(Environment.NewLine, errors);
+            GraphSettingsValidationMessage = validationMessage;
             return false;
         }
 
-        settings = new KnowledgeGraphSettingsReadModel(neighborDepth, maxNodes).Normalize();
         GraphSettingsValidationMessage = string.Empty;
         return true;
     }

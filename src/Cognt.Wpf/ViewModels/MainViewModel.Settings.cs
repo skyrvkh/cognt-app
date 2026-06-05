@@ -1,3 +1,4 @@
+
 namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
