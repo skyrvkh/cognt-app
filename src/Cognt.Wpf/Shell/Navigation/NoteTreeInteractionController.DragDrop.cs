@@ -34,15 +34,14 @@ internal sealed partial class NoteTreeInteractionController
 
     internal void DragOver(DragEventArgs e)
     {
-        e.Effects = TryGetTreeDropTarget(e, out _, out _)
-            ? DragDropEffects.Move
-            : DragDropEffects.None;
+        bool hasTarget = TryGetTreeDropTarget(e, out IReadOnlyList<long> itemIds, out TreeDropTarget target);
+        e.Effects = hasTarget ? DragDropEffects.Move : DragDropEffects.None;
         e.Handled = true;
     }
 
     internal void Drop(DragEventArgs e)
     {
-        if (!TryGetTreeDropTarget(e, out long itemId, out TreeDropTarget target))
+        if (!TryGetTreeDropTarget(e, out IReadOnlyList<long> itemIds, out TreeDropTarget target))
         {
             e.Effects = DragDropEffects.None;
             e.Handled = true;
@@ -54,39 +53,42 @@ internal sealed partial class NoteTreeInteractionController
 
         NavigationShellOperationGuard.RunWithWarning(
             () => RunWithSuppressedTreeSelection(
-                () => viewModel.MoveTreeNode(itemId, target.ParentId, target.PreviousSiblingId, target.NextSiblingId),
+                () => viewModel.MoveTreeNodes(itemIds, target.ParentId, target.PreviousSiblingId, target.NextSiblingId),
                 deferRestore: true),
             dialogs,
             "Drag and Drop Failed",
-            $"The item could not be moved:{Environment.NewLine}");
+            $"The item could not be moved:{Environment.NewLine}",
+            logger);
     }
 
     private bool TryGetTreeDropTarget(
         DragEventArgs e,
-        out long itemId,
+        out IReadOnlyList<long> itemIds,
         out TreeDropTarget target)
     {
-        itemId = 0;
+        itemIds = [];
         target = default;
 
-        if (!e.Data.GetDataPresent(NoteTreeDragDataFormat)
-            || e.Data.GetData(NoteTreeDragDataFormat) is not long draggedItemId
-            || draggedItemId <= 0)
+        if (!TryGetDraggedItemIds(e.Data, out long[] draggedItemIds))
         {
             return false;
         }
 
-        itemId = draggedItemId;
+        itemIds = draggedItemIds;
+        HashSet<long> draggedItemIdSet = [.. draggedItemIds];
 
         if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem targetItem)
         {
             target = new TreeDropTarget(ParentId: null, PreviousSiblingId: null, NextSiblingId: null);
-            return !string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath);
+            bool canDropAtRoot = !string.IsNullOrWhiteSpace(viewModel.OpenCollectionPath);
+            return canDropAtRoot;
         }
 
         if (targetItem.DataContext is not NoteTreeNodeViewModel targetNode
             || targetNode.IsPlaceholder
-            || draggedItemId == targetNode.Id)
+            || targetNode.IsFlashcardNode
+            || draggedItemIdSet.Contains(targetNode.Id)
+            || IsDropTargetInsideDraggedSubtree(targetNode, draggedItemIdSet))
         {
             return false;
         }
@@ -101,14 +103,57 @@ internal sealed partial class NoteTreeInteractionController
 
         long? parentId = targetNode.ParentId;
         long? previousSiblingId = placement == TreeDropPlacement.Before
-            ? GetPreviousSiblingId(targetNode, draggedItemId)
+            ? GetPreviousSiblingId(targetNode, draggedItemIdSet)
             : targetNode.Id;
         long? nextSiblingId = placement == TreeDropPlacement.Before
             ? targetNode.Id
-            : GetNextSiblingId(targetNode, draggedItemId);
+            : GetNextSiblingId(targetNode, draggedItemIdSet);
 
         target = new TreeDropTarget(parentId, previousSiblingId, nextSiblingId);
         return true;
+    }
+
+    private static bool TryGetDraggedItemIds(IDataObject data, out long[] itemIds)
+    {
+        itemIds = [];
+
+        if (data.GetDataPresent(NoteTreeDragItemIdsDataFormat)
+            && data.GetData(NoteTreeDragItemIdsDataFormat) is long[] draggedItemIds)
+        {
+            itemIds = [.. draggedItemIds.Where(static id => id > 0).Distinct()];
+            return itemIds.Length > 0;
+        }
+
+        if (data.GetDataPresent(NoteTreeDragDataFormat)
+            && data.GetData(NoteTreeDragDataFormat) is long draggedItemId
+            && draggedItemId > 0)
+        {
+            itemIds = [draggedItemId];
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsDropTargetInsideDraggedSubtree(
+        NoteTreeNodeViewModel targetNode,
+        IReadOnlySet<long> draggedItemIds)
+    {
+        if (!viewModel.TryGetLoadedTreePathById(targetNode.Id, out IReadOnlyList<NoteTreeNodeViewModel>? path)
+            || path is null)
+        {
+            return false;
+        }
+
+        foreach (NoteTreeNodeViewModel pathNode in path)
+        {
+            if (!pathNode.IsPlaceholder && draggedItemIds.Contains(pathNode.Id))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static TreeDropPlacement GetDropPlacement(
@@ -129,19 +174,19 @@ internal sealed partial class NoteTreeInteractionController
             : TreeDropPlacement.After;
     }
 
-    private long? GetPreviousSiblingId(NoteTreeNodeViewModel targetNode, long draggedItemId)
+    private long? GetPreviousSiblingId(NoteTreeNodeViewModel targetNode, IReadOnlySet<long> draggedItemIds)
     {
-        return GetAdjacentSiblingId(targetNode, draggedItemId, direction: -1);
+        return GetAdjacentSiblingId(targetNode, draggedItemIds, direction: -1);
     }
 
-    private long? GetNextSiblingId(NoteTreeNodeViewModel targetNode, long draggedItemId)
+    private long? GetNextSiblingId(NoteTreeNodeViewModel targetNode, IReadOnlySet<long> draggedItemIds)
     {
-        return GetAdjacentSiblingId(targetNode, draggedItemId, direction: 1);
+        return GetAdjacentSiblingId(targetNode, draggedItemIds, direction: 1);
     }
 
     private long? GetAdjacentSiblingId(
         NoteTreeNodeViewModel targetNode,
-        long draggedItemId,
+        IReadOnlySet<long> draggedItemIds,
         int direction)
     {
         IReadOnlyList<NoteTreeNodeViewModel>? siblings = viewModel.GetLoadedSiblingList(targetNode);
@@ -162,7 +207,7 @@ internal sealed partial class NoteTreeInteractionController
                  siblingIndex += direction)
             {
                 NoteTreeNodeViewModel candidate = siblings[siblingIndex];
-                if (!candidate.IsPlaceholder && candidate.Id != draggedItemId)
+                if (!candidate.IsPlaceholder && !draggedItemIds.Contains(candidate.Id))
                 {
                     return candidate.Id;
                 }

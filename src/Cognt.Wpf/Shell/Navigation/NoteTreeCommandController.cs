@@ -1,5 +1,7 @@
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Navigation;
 
@@ -7,16 +9,25 @@ internal sealed class NoteTreeCommandController
 {
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<NoteTreeCommandController> logger;
+
+    internal NoteTreeCommandController(MainViewModel viewModel, IShellDialogService dialogs)
+        : this(viewModel, dialogs, NullLogger<NoteTreeCommandController>.Instance)
+    {
+    }
 
     internal NoteTreeCommandController(
         MainViewModel viewModel,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<NoteTreeCommandController> logger)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(logger);
 
         this.viewModel = viewModel;
         this.dialogs = dialogs;
+        this.logger = logger;
     }
 
     internal void CreateFolder(NoteTreeNodeViewModel? node, Action<string> beginInlineRenameById)
@@ -44,6 +55,33 @@ internal sealed class NoteTreeCommandController
             dialogs,
             "New Folder Failed",
             $"The folder could not be created:{Environment.NewLine}");
+    }
+
+    internal void CreateNote(NoteTreeNodeViewModel? node, Action<string> beginInlineRenameById)
+    {
+        ArgumentNullException.ThrowIfNull(beginInlineRenameById);
+
+        if (!viewModel.CanCreateNoteInNode(node))
+        {
+            dialogs.ShowInfo("New Note", "A note cannot be created here.");
+            return;
+        }
+
+        NavigationShellOperationGuard.RunWithWarning(
+            () =>
+            {
+                if (node is { CanContainChildren: true })
+                {
+                    node.IsExpanded = true;
+                    viewModel.LoadChildren(node);
+                }
+
+                string createdId = viewModel.CreateNote(node, "Untitled");
+                beginInlineRenameById(createdId);
+            },
+            dialogs,
+            "New Note Failed",
+            $"The note could not be created:{Environment.NewLine}");
     }
 
     internal void BeginInlineRename(NoteTreeNodeViewModel? node)
@@ -107,17 +145,59 @@ internal sealed class NoteTreeCommandController
         }
     }
 
+    internal Task<bool> DeleteNodeAsync(NoteTreeNodeViewModel? node)
+    {
+        return node is null
+            ? Task.FromResult(false)
+            : DeleteNodesAsync([node]);
+    }
+
     internal void DeleteNode(NoteTreeNodeViewModel? node)
     {
-        if (node is null)
+        DeleteNodeAsync(node).GetAwaiter().GetResult();
+    }
+
+    internal async Task<bool> DeleteNodesAsync(IReadOnlyList<NoteTreeNodeViewModel> nodes)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+
+        NoteTreeNodeViewModel[] deletableNodes = nodes
+            .Where(viewModel.CanDeleteNode)
+            .GroupBy(node => node.Id)
+            .Select(group => group.First())
+            .ToArray();
+        if (deletableNodes.Length == 0)
         {
-            return;
+            return false;
         }
 
+        if (deletableNodes.Length == 1)
+        {
+            return await DeleteSingleNodeAsync(deletableNodes[0]);
+        }
+
+        string message = $"Delete {deletableNodes.Length} selected items and everything inside them?";
+        if (!dialogs.ConfirmWarning("Confirm Delete", message))
+        {
+            return false;
+        }
+
+        return await NavigationShellOperationGuard.RunWithWarningAsync(
+            async () =>
+            {
+                await viewModel.DeleteNodesAsync(deletableNodes);
+            },
+            dialogs,
+            "Delete Failed",
+            $"The selected items could not be deleted:{Environment.NewLine}");
+    }
+
+    private async Task<bool> DeleteSingleNodeAsync(NoteTreeNodeViewModel node)
+    {
         if (!viewModel.CanDeleteNode(node))
         {
             dialogs.ShowInfo("Delete", "This item cannot be deleted.");
-            return;
+            return false;
         }
 
         string itemKind = viewModel.GetNodeKind(node);
@@ -132,15 +212,32 @@ internal sealed class NoteTreeCommandController
 
         if (!dialogs.ConfirmWarning("Confirm Delete", message))
         {
-            return;
+            return false;
         }
 
-        NavigationShellOperationGuard.RunWithWarning(
-            () => viewModel.DeleteNode(node),
+        return await NavigationShellOperationGuard.RunWithWarningAsync(
+            async () =>
+            {
+                try
+                {
+                    await viewModel.DeleteNodeAsync(node);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "Navigation item delete failed. ItemId={ItemId} Kind={ItemKind} Name={ItemName}",
+                        node.Id,
+                        itemKind,
+                        itemName);
+                    throw;
+                }
+            },
             dialogs,
             "Delete Failed",
             $"The {itemKind} could not be deleted:{Environment.NewLine}");
     }
+
 
     internal void DuplicateNode(NoteTreeNodeViewModel? node)
     {

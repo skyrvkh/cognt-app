@@ -1,6 +1,8 @@
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Navigation;
 
@@ -8,16 +10,25 @@ internal sealed class BreadcrumbCommandController
 {
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<BreadcrumbCommandController> logger;
+
+    internal BreadcrumbCommandController(MainViewModel viewModel, IShellDialogService dialogs)
+        : this(viewModel, dialogs, NullLogger<BreadcrumbCommandController>.Instance)
+    {
+    }
 
     internal BreadcrumbCommandController(
         MainViewModel viewModel,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<BreadcrumbCommandController> logger)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(logger);
 
         this.viewModel = viewModel;
         this.dialogs = dialogs;
+        this.logger = logger;
     }
 
     internal bool NavigateTo(EditorBreadcrumbItemViewModel item)
@@ -75,7 +86,10 @@ internal sealed class BreadcrumbCommandController
 
         if (!renameSucceeded)
         {
+            logger.LogWarning("Breadcrumb rename failed; returning to edit mode. ItemId={ItemId} NewName={NewName}", item.Id, newName);
             item.BeginEdit();
+            return;
         }
+
     }
 }

@@ -13,12 +13,18 @@ namespace CogntApp.Shell.Navigation;
 internal sealed partial class NoteTreeInteractionController
 {
     private const string NoteTreeDragDataFormat = "CogntApp.NoteTree.ItemId";
+    private const string NoteTreeDragItemIdsDataFormat = "CogntApp.NoteTree.ItemIds";
 
     private readonly TreeView notesTree;
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
     private readonly ILogger<NoteTreeInteractionController> logger;
+    private readonly HashSet<long> selectedNodeIds = [];
     private Point? dragStartPoint;
+    private TreeViewItem? dragStartItem;
+    private NoteTreeNodeViewModel? dragStartNode;
+    private NoteTreeNodeViewModel? pendingClickOpenNode;
+    private NoteTreeNodeViewModel? selectionAnchorNode;
     private int selectionSuppressionDepth;
 
     internal NoteTreeInteractionController(
@@ -42,11 +48,6 @@ internal sealed partial class NoteTreeInteractionController
 
     internal void HandleSelectedItemChanged(object? selectedItem)
     {
-        logger.LogDebug(
-            "Note tree selection changed. SelectedType={SelectedType} IsLoadingCollection={IsLoadingCollection} Suppressed={Suppressed}",
-            selectedItem?.GetType().Name,
-            viewModel.IsLoadingCollection,
-            IsSelectionHandlingSuppressed);
         if (viewModel.IsLoadingCollection || IsSelectionHandlingSuppressed)
         {
             return;
@@ -54,19 +55,49 @@ internal sealed partial class NoteTreeInteractionController
 
         if (selectedItem is NoteTreeNodeViewModel node)
         {
-            logger.LogInformation(
-                "Handling note tree selection. NodeTitle={Title} NodeKind={Kind} NotePath={NotePath} IsPlaceholder={IsPlaceholder}",
-                node.Title,
-                node.Kind,
-                node.NotePath,
-                node.IsPlaceholder);
+            if (Mouse.LeftButton == MouseButtonState.Pressed || dragStartNode is not null)
+            {
+                pendingClickOpenNode = IsPlainSingleSelectionGesture() ? node : null;
+            }
+        }
+    }
+
+    internal void OpenSelectedItem()
+    {
+        OpenNode(notesTree.SelectedItem as NoteTreeNodeViewModel);
+    }
+
+    internal void OpenNode(NoteTreeNodeViewModel? node)
+    {
+        if (node is null || node.IsPlaceholder || !IsOpenableNode(node))
+        {
+            return;
         }
 
+        string title = node.IsFlashcardNode ? "Open Card Failed" : "Open Note Failed";
+        string message = node.IsFlashcardNode
+            ? "The selected flashcard could not be opened: "
+            : "The selected note could not be opened: ";
         NavigationShellOperationGuard.RunWithWarning(
-            () => viewModel.SelectTreeNode(selectedItem as NoteTreeNodeViewModel),
+            () => viewModel.SelectTreeNode(node),
             dialogs,
-            "Open Note Failed",
-            "The selected note could not be opened: ");
+            title,
+            message);
+    }
+
+    internal void ClearTreeSelection()
+    {
+        ClearMultiSelection();
+        ClearDragStart();
+        ClearPendingClickOpen();
+        selectionAnchorNode = null;
+
+        if (notesTree.SelectedItem is not NoteTreeNodeViewModel selectedNode)
+        {
+            return;
+        }
+
+        RunWithSuppressedTreeSelection(() => selectedNode.IsSelected = false);
     }
 
     internal void HandleExpanded(RoutedEventArgs e)
@@ -109,53 +140,98 @@ internal sealed partial class NoteTreeInteractionController
         MouseButtonEventArgs e,
         Action<NoteTreeNodeViewModel> beginInlineRename)
     {
+        TreeViewItem? item = FindTreeViewItem(e.OriginalSource);
+        NoteTreeNodeViewModel? node = item?.DataContext as NoteTreeNodeViewModel;
+
         if (e.ClickCount >= 2
-            && FindTreeViewItem(e.OriginalSource) is TreeViewItem item
-            && item.DataContext is NoteTreeNodeViewModel node)
+            && item is not null
+            && node is not null)
         {
             e.Handled = true;
+            ClearPendingClickOpen();
+            ClearMultiSelection();
             RunWithSuppressedTreeSelection(() =>
             {
                 item.IsSelected = true;
                 item.Focus();
             });
+            if (IsOpenableNode(node))
+            {
+                OpenNode(node);
+                ClearDragStart();
+                return;
+            }
+
             beginInlineRename(node);
-            dragStartPoint = null;
+            ClearDragStart();
             return;
         }
 
-        if (FindTreeViewItem(e.OriginalSource) is TreeViewItem selectedItem
-            && selectedItem.IsSelected
-            && selectedItem.DataContext is NoteTreeNodeViewModel selectedNode
-            && IsOpenableNode(selectedNode)
-            && !viewModel.IsLoadingCollection
-            && !IsSelectionHandlingSuppressed)
+        if (item is null || node is null)
         {
-            logger.LogDebug(
-                "Retrying open for already-selected tree item. NodeTitle={Title} NodeKind={Kind} NotePath={NotePath}",
-                selectedNode.Title,
-                selectedNode.Kind,
-                selectedNode.NotePath);
-            notesTree.Dispatcher.BeginInvoke(
-                () => HandleSelectedItemChanged(selectedNode),
-                DispatcherPriority.Background);
+            ClearTreeSelection();
+            return;
         }
 
         dragStartPoint = e.GetPosition(notesTree);
+        dragStartItem = item;
+        dragStartNode = node;
+
+        if (TryHandleMultiSelectionGesture(item, node, e))
+        {
+            return;
+        }
+
+        if (!node.IsMultiSelected || selectedNodeIds.Count <= 1)
+        {
+            ClearMultiSelection();
+        }
+
+        selectionAnchorNode = node;
     }
 
-    private static bool IsOpenableNode(NoteTreeNodeViewModel node)
+    internal void PreviewMouseLeftButtonUp(MouseButtonEventArgs e)
     {
-        return !node.IsPlaceholder
-            && (node.Kind == KnowledgeItemKind.Note
-                || node.Kind == KnowledgeItemKind.PdfDocument);
+        TreeViewItem? item = FindTreeViewItem(e.OriginalSource);
+        NoteTreeNodeViewModel? node = item?.DataContext as NoteTreeNodeViewModel;
+        NoteTreeNodeViewModel? pendingNode = dragStartNode;
+        TreeViewItem? pendingItem = dragStartItem;
+        NoteTreeNodeViewModel? pendingOpenNode = pendingClickOpenNode;
+        ClearDragStart();
+        ClearPendingClickOpen();
+
+        bool isSameMouseDownItem = item is not null
+            && node is not null
+            && pendingItem is not null
+            && pendingNode is not null
+            && ReferenceEquals(item, pendingItem)
+            && IsSameNode(node, pendingNode);
+        bool isPendingSelectedItem = item is not null
+            && node is not null
+            && pendingOpenNode is not null
+            && IsSameNode(node, pendingOpenNode);
+
+        if (!isSameMouseDownItem && !isPendingSelectedItem)
+        {
+            return;
+        }
+
+        if (!IsPlainSingleSelectionGesture())
+        {
+            return;
+        }
+
+        NoteTreeNodeViewModel nodeToOpen = isPendingSelectedItem
+            ? pendingOpenNode!
+            : node!;
+        OpenNode(nodeToOpen);
     }
 
     internal void PreviewMouseMove(MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || dragStartPoint is not Point startPoint)
         {
-            dragStartPoint = null;
+            ClearDragStart();
             return;
         }
 
@@ -166,15 +242,63 @@ internal sealed partial class NoteTreeInteractionController
             return;
         }
 
-        if (FindTreeViewItem(e.OriginalSource) is not TreeViewItem item
-            || item.DataContext is not NoteTreeNodeViewModel node
+        if (dragStartNode is not NoteTreeNodeViewModel node
             || !viewModel.CanMoveNode(node))
         {
             return;
         }
 
+        long[] draggedItemIds = CreateDragItemIds(node);
+        if (draggedItemIds.Length == 0)
+        {
+            return;
+        }
+
+        DependencyObject dragSource = dragStartItem is not null ? dragStartItem : notesTree;
+        ClearDragStart();
+        ClearPendingClickOpen();
+        DragDrop.DoDragDrop(dragSource, CreateDragDataObject(draggedItemIds), DragDropEffects.Move);
+    }
+
+    private bool IsPlainSingleSelectionGesture()
+    {
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        return !viewModel.IsLoadingCollection
+            && !IsSelectionHandlingSuppressed
+            && (modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == ModifierKeys.None
+            && selectedNodeIds.Count <= 1;
+    }
+
+    private static bool IsSameNode(NoteTreeNodeViewModel left, NoteTreeNodeViewModel right)
+    {
+        return ReferenceEquals(left, right) || left.Id == right.Id;
+    }
+
+    private static bool IsOpenableNode(NoteTreeNodeViewModel node)
+    {
+        return node.IsFlashcardNode
+            || node.Kind == KnowledgeItemKind.PdfDocument
+            || !string.IsNullOrWhiteSpace(node.NotePath);
+    }
+
+    private void ClearPendingClickOpen()
+    {
+        pendingClickOpenNode = null;
+    }
+
+    private static DataObject CreateDragDataObject(IReadOnlyList<long> draggedItemIds)
+    {
+        DataObject data = new();
+        data.SetData(NoteTreeDragDataFormat, draggedItemIds[0]);
+        data.SetData(NoteTreeDragItemIdsDataFormat, draggedItemIds.ToArray());
+        return data;
+    }
+
+    private void ClearDragStart()
+    {
         dragStartPoint = null;
-        DragDrop.DoDragDrop(item, new DataObject(NoteTreeDragDataFormat, node.Id), DragDropEffects.Move);
+        dragStartItem = null;
+        dragStartNode = null;
     }
 
     internal void RunWithSuppressedTreeSelection(Action action, bool deferRestore = false)
