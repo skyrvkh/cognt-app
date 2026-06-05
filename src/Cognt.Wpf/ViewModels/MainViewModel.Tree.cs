@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -8,6 +11,7 @@ public sealed partial class MainViewModel
 {
     private void RefreshNotesTree(bool preserveExpansion = false)
     {
+
         HashSet<long> expandedItemIds = preserveExpansion
             ? CaptureExpandedItemIds()
             : [];
@@ -41,6 +45,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
+            logger?.LogError(ex, "Refresh notes tree failed with recoverable file-system exception. OpenCollectionPath={OpenCollectionPath}", openCollectionPath);
             NoteRoots.Clear();
             ResetLoadedTreeNodeIndex();
             RecentNotes.Clear();
@@ -50,6 +55,7 @@ public sealed partial class MainViewModel
         {
             IsLoadingCollection = false;
             OnPropertyChanged(nameof(ShouldShowNoNotesState));
+
         }
     }
 
@@ -82,31 +88,49 @@ public sealed partial class MainViewModel
             IndexLoadedTreeSubtree(childNode);
         }
 
+        AddFlashcardChildNodes(node);
         node.MarkChildrenLoaded();
     }
 
     private NoteTreeNodeViewModel CreateTreeNode(KnowledgeTreeItemReadModel item)
     {
-        string? notePath = ResolveNotePath(item);
+        NoteTreeNodePresentation presentation =
+            NoteTreeNodePresentationBuilder.CreateTreeNode(item, ResolveNotePath(item));
 
-        NoteTreeNodeViewModel node = new(
-            item.Id,
-            item.ParentId,
-            item.Kind,
-            item.Title,
-            item.FileRelPath,
-            notePath,
-            item.ChildCount)
+        if (presentation.ShouldLoadFlashcardChildrenImmediately)
         {
-            IsExpanded = false,
-        };
-
-        if (item.ChildCount > 0 && node.CanContainChildren)
-        {
-            node.Children.Add(NoteTreeNodeViewModel.CreatePlaceholder());
+            AddFlashcardChildNodes(presentation.Node);
+            if (presentation.Node.Children.Count > 0)
+            {
+                presentation.Node.MarkChildrenLoaded();
+            }
         }
 
-        return node;
+        return presentation.Node;
+    }
+
+    private void AddFlashcardChildNodes(NoteTreeNodeViewModel node)
+    {
+        if (!ShowFlashcardsInNavigationTree
+            || node.IsPlaceholder
+            || node.Kind != KnowledgeItemKind.Note
+            || string.IsNullOrWhiteSpace(node.FileRelPath))
+        {
+            return;
+        }
+
+        IReadOnlyList<FlashcardCardSummaryReadModel> cards = flashcardCardsQuery.Execute(
+            new FlashcardCardsQueryRequest(
+                openCollectionPath,
+                SourceRelPath: node.FileRelPath,
+                Limit: 1_000));
+
+        foreach (FlashcardCardSummaryReadModel card in cards)
+        {
+            NoteTreeNodeViewModel cardNode = NoteTreeNodePresentationBuilder.CreateFlashcardNode(card, node);
+            node.Children.Add(cardNode);
+            IndexLoadedTreeSubtree(cardNode);
+        }
     }
 
     private HashSet<long> CaptureExpandedItemIds()

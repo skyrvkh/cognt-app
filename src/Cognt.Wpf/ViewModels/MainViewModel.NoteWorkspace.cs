@@ -1,6 +1,7 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Models.Editor;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -28,8 +29,21 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(CurrentNotePath));
         OnPropertyChanged(nameof(CurrentNoteRelativePath));
         RefreshEditorBreadcrumb();
-        ReloadCurrentNoteToCardQueue(GetRequiredRelativeNotePath(currentNotePath), content);
+        ReloadCurrentNoteToCardQueue(
+            GetRequiredRelativeNotePath(currentNotePath),
+            content,
+            discardSavedDraft: true);
         CurrentNoteContentChanged?.Invoke(this, content);
+    }
+
+    internal void ClearActiveWorkspaceNoteIfMatches(string notePath)
+    {
+        if (!string.IsNullOrWhiteSpace(currentNotePath)
+            && AreSamePath(currentNotePath, notePath))
+        {
+            ClearCurrentNoteState();
+            return;
+        }
     }
 
     public FlashcardSourceContext GetFlashcardSourceContext()
@@ -62,7 +76,9 @@ public sealed partial class MainViewModel
         if (parameter is string notePath && !string.IsNullOrWhiteSpace(notePath))
         {
             RequestOpenResolvedNotePath(notePath, selectInTree: true);
+            return;
         }
+
     }
 
     private void RequestOpenResolvedNotePath(string notePath, bool selectInTree)
@@ -91,6 +107,7 @@ public sealed partial class MainViewModel
         string notePath = ResolveCollectionFilePath(collectionPath, normalizedRelativePath);
         if (!File.Exists(notePath))
         {
+            logger?.LogWarning("Open note by relative path failed because file is missing. CollectionPath={CollectionPath} RelativePath={RelativePath} NotePath={NotePath}", collectionPath, normalizedRelativePath, notePath);
             throw new InvalidOperationException("The selected note file could not be found in this collection.");
         }
 

@@ -2,6 +2,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Windows;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -56,6 +57,18 @@ public sealed partial class MainViewModel
             return;
         }
 
+        string? editorNotePath = GetCurrentEditorNotePath?.Invoke();
+        if (GetCurrentEditorNotePath is not null
+            && (string.IsNullOrWhiteSpace(editorNotePath)
+                || !AreSamePath(editorNotePath, currentNotePath)))
+        {
+            logger?.LogWarning(
+                "Skipped current note save because active editor path does not match current note. CurrentNotePath={CurrentNotePath} EditorNotePath={EditorNotePath}",
+                currentNotePath,
+                editorNotePath);
+            return;
+        }
+
         SaveNoteIfChanged(GetCurrentEditorContent?.Invoke() ?? string.Empty);
     }
 
@@ -72,17 +85,15 @@ public sealed partial class MainViewModel
 
     public void SaveNoteIfChanged(string notePath, string content)
     {
-        if (string.IsNullOrWhiteSpace(notePath)
-            || string.IsNullOrWhiteSpace(openCollectionPath))
-        {
-            return;
-        }
-
-        string fullNotePath = Path.GetFullPath(notePath);
-        string collectionPath = openCollectionPath;
-        string relativePath = GetRequiredRelativeNotePath(fullNotePath);
-        if (IsCurrentSavedNote(fullNotePath, collectionPath)
-            && string.Equals(content, lastSavedContent, StringComparison.Ordinal))
+        NoteSaveRequest? request = NoteSaveRequestBuilder.Create(
+            notePath,
+            content,
+            openCollectionPath,
+            currentNotePath,
+            lastSavedContent,
+            GetRequiredRelativeNotePath,
+            LargeDocumentSaveLogThreshold);
+        if (request is null)
         {
             return;
         }
@@ -90,14 +101,14 @@ public sealed partial class MainViewModel
         noteSaveSemaphore.Wait();
         try
         {
-            noteService.SaveNote(collectionPath, relativePath, content);
+            noteService.SaveNote(request.CollectionPath, request.RelativePath, request.Content);
         }
         finally
         {
             noteSaveSemaphore.Release();
         }
 
-        MarkSavedNote(fullNotePath, collectionPath, relativePath, content);
+        MarkSavedNote(request);
     }
 
     public Task SaveNoteIfChangedAsync(string content)
@@ -113,41 +124,44 @@ public sealed partial class MainViewModel
 
     public Task SaveNoteIfChangedAsync(string notePath, string content)
     {
-        if (string.IsNullOrWhiteSpace(notePath)
-            || string.IsNullOrWhiteSpace(openCollectionPath))
+        NoteSaveRequest? request = NoteSaveRequestBuilder.Create(
+            notePath,
+            content,
+            openCollectionPath,
+            currentNotePath,
+            lastSavedContent,
+            GetRequiredRelativeNotePath,
+            LargeDocumentSaveLogThreshold);
+        if (request is null)
         {
             return Task.CompletedTask;
         }
 
-        string fullNotePath = Path.GetFullPath(notePath);
-        string collectionPath = openCollectionPath;
-        string relativePath = GetRequiredRelativeNotePath(fullNotePath);
-        if (IsCurrentSavedNote(fullNotePath, collectionPath)
-            && string.Equals(content, lastSavedContent, StringComparison.Ordinal))
+        if (request.ShouldLogLargeSave)
         {
-            return Task.CompletedTask;
-        }
-
-        bool logLargeSave = content.Length >= LargeDocumentSaveLogThreshold;
-        if (logLargeSave)
-        {
-            Debug.WriteLine($"Queued large note save for {relativePath}: {content.Length} chars.");
+            logger?.LogInformation(
+                "Large note save queued. RelativePath={RelativePath} ContentLength={ContentLength}",
+                request.RelativePath,
+                request.Content.Length);
         }
 
         return Task.Run(async () =>
         {
             await noteSaveSemaphore.WaitAsync().ConfigureAwait(false);
-            Stopwatch? stopwatch = logLargeSave ? Stopwatch.StartNew() : null;
+            Stopwatch? stopwatch = request.ShouldLogLargeSave ? Stopwatch.StartNew() : null;
             try
             {
-                noteService.SaveNote(collectionPath, relativePath, content);
+                noteService.SaveNote(request.CollectionPath, request.RelativePath, request.Content);
             }
             finally
             {
                 if (stopwatch is not null)
                 {
                     stopwatch.Stop();
-                    Debug.WriteLine($"Large note save write/index for {relativePath}: {stopwatch.ElapsedMilliseconds}ms.");
+                    logger?.LogInformation(
+                        "Large note save completed. RelativePath={RelativePath} ElapsedMs={ElapsedMs}",
+                        request.RelativePath,
+                        stopwatch.ElapsedMilliseconds);
                 }
 
                 noteSaveSemaphore.Release();
@@ -155,17 +169,17 @@ public sealed partial class MainViewModel
 
             await InvokeOnUiThreadAsync(() =>
             {
-                MarkSavedNote(fullNotePath, collectionPath, relativePath, content);
+                MarkSavedNote(request);
             }).ConfigureAwait(false);
         });
     }
 
-    private bool IsCurrentSavedNote(string notePath, string collectionPath)
-    {
-        return !string.IsNullOrWhiteSpace(currentNotePath)
-            && string.Equals(Path.GetFullPath(currentNotePath), notePath, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(openCollectionPath, collectionPath, StringComparison.OrdinalIgnoreCase);
-    }
+    private void MarkSavedNote(NoteSaveRequest request)
+        => MarkSavedNote(
+            request.FullNotePath,
+            request.CollectionPath,
+            request.RelativePath,
+            request.Content);
 
     private void MarkSavedNote(
         string notePath,
@@ -173,7 +187,11 @@ public sealed partial class MainViewModel
         string relativePath,
         string content)
     {
-        if (!IsCurrentSavedNote(notePath, collectionPath))
+        if (!NoteSaveRequestBuilder.IsCurrentSavedNote(
+            currentNotePath,
+            openCollectionPath,
+            notePath,
+            collectionPath))
         {
             return;
         }
@@ -200,6 +218,17 @@ public sealed partial class MainViewModel
         if (node is null || node.IsPlaceholder)
         {
             ClearCurrentNote();
+            return;
+        }
+
+        if (node.FlashcardCardId is long cardId)
+        {
+            OpenFlashcardRequested?.Invoke(
+                this,
+                new Navigation.OpenFlashcardRequestedEventArgs(
+                    cardId,
+                    node.FileRelPath,
+                    node.Title));
             return;
         }
 

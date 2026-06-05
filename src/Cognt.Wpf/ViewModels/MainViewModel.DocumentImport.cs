@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -55,6 +56,12 @@ public sealed partial class MainViewModel
             OpenNoteByRelativePath(createdNote.RelativePath, selectInTree: true);
         }
 
+        logger?.LogInformation(
+            "Native document import completed. CollectionPath={CollectionPath} SourcePath={SourcePath} Format={Format} CreatedNotePath={CreatedNotePath}",
+            openCollectionPath,
+            sourcePath,
+            format,
+            createdNote.RelativePath);
         return createdNote;
     }
 

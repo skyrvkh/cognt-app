@@ -7,7 +7,8 @@ public sealed partial class MainViewModel
     internal IReadOnlyList<NoteTreeNodeViewModel>? GetLoadedSiblingList(NoteTreeNodeViewModel target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        return FindOwningCollection(target);
+        IReadOnlyList<NoteTreeNodeViewModel>? siblings = FindOwningCollection(target);
+        return siblings;
     }
 
     private ObservableCollection<NoteTreeNodeViewModel>? FindLoadedSiblingCollection(long? parentId)
@@ -18,22 +19,25 @@ public sealed partial class MainViewModel
         }
 
         NoteTreeNodeViewModel? parent = FindTreeNode(parentId.Value);
-        return parent is { AreChildrenLoaded: true } ? parent.Children : null;
+        ObservableCollection<NoteTreeNodeViewModel>? siblings = parent is { AreChildrenLoaded: true } ? parent.Children : null;
+        return siblings;
     }
 
     private ObservableCollection<NoteTreeNodeViewModel>? FindOwningCollection(NoteTreeNodeViewModel target)
     {
         if (target.ParentId is null)
         {
-            return NoteRoots.Contains(target)
+            ObservableCollection<NoteTreeNodeViewModel>? roots = NoteRoots.Contains(target)
                 ? NoteRoots
                 : null;
+            return roots;
         }
 
-        return FindTreeNode(target.ParentId.Value) is { AreChildrenLoaded: true } parent
+        ObservableCollection<NoteTreeNodeViewModel>? siblings = FindTreeNode(target.ParentId.Value) is { AreChildrenLoaded: true } parent
             && parent.Children.Contains(target)
                 ? parent.Children
                 : null;
+        return siblings;
     }
 
     private static void RemoveNodeById(ObservableCollection<NoteTreeNodeViewModel> nodes, long id)
@@ -50,7 +54,8 @@ public sealed partial class MainViewModel
 
     private NoteTreeNodeViewModel? FindTreeNode(long id)
     {
-        return loadedTreeNodesById.GetValueOrDefault(id);
+        NoteTreeNodeViewModel? node = loadedTreeNodesById.GetValueOrDefault(id);
+        return node;
     }
 
     private static int IndexOfNode(IReadOnlyList<NoteTreeNodeViewModel> nodes, long id)

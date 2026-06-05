@@ -24,6 +24,8 @@ public sealed partial class MainViewModel
 
     public ICommand RemoveCollectionCommand { get; private set; } = null!;
 
+    public ICommand DeleteCollectionCommand { get; private set; } = null!;
+
     public ICommand AddNoteCommand { get; private set; } = null!;
 
     public ICommand OpenNoteCommand { get; private set; } = null!;
@@ -52,8 +54,6 @@ public sealed partial class MainViewModel
 
     public ICommand PreviewSelectedCardCandidateCommand { get; private set; } = null!;
 
-    public ICommand CreateCardContextFromSelectionCommand { get; private set; } = null!;
-
     public ICommand AddSelectedTextToSelectedCardSlotCommand { get; private set; } = null!;
 
     public ICommand DisableSelectedCardCandidateCommand { get; private set; } = null!;
@@ -76,7 +76,8 @@ public sealed partial class MainViewModel
         ShowSettingsCommand = CreateUserActionCommand("Navigation Failed", ShowSettings);
         SelectCollectionCommand = CreateUserActionCommand("Switch Collection Failed", SelectCollection);
         AddCollectionCommand = CreateUserActionCommand("Create Collection Failed", AddCollection);
-        RemoveCollectionCommand = CreateUserActionCommand("Remove Collection Failed", RemoveCurrentCollection);
+        RemoveCollectionCommand = CreateUserActionCommand("Remove Collection Failed", RemoveCollectionFromList);
+        DeleteCollectionCommand = CreateUserActionCommand("Delete Collection Failed", DeleteCollectionFromDisk);
         AddNoteCommand = CreateUserActionCommand("Create Note Failed", AddNote);
         OpenNoteCommand = CreateUserActionCommand("Open Note Failed", OpenNoteFromCommand);
         OpenGlobalSearchResultCommand = CreateUserActionCommand("Open Search Result Failed", OpenGlobalSearchResult);
@@ -91,7 +92,6 @@ public sealed partial class MainViewModel
         GenerateReadyNoteCardsCommand = new RelayCommand(() => _ = GenerateReadyCardCandidatesAsync());
         GenerateSelectedNoteCardCommand = new RelayCommand(() => _ = GenerateSelectedCardCandidateAsync());
         PreviewSelectedCardCandidateCommand = new RelayCommand(PreviewSelectedCardCandidate);
-        CreateCardContextFromSelectionCommand = new RelayCommand(RaiseCreateCardContextFromSelectionRequest);
         AddSelectedTextToSelectedCardSlotCommand = new RelayCommand(RaiseAddSelectedTextToSelectedCardSlotRequest);
         DisableSelectedCardCandidateCommand = new RelayCommand(DisableCurrentlySelectedCardCandidate);
         AddNoteToCardTagCommand = new RelayCommand(CommitPendingNoteToCardTags);

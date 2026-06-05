@@ -1,4 +1,5 @@
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -40,6 +41,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (IsRecoverableFileSystemException(ex))
         {
+            logger?.LogError(ex, "Load breadcrumb chain failed. CollectionPath={CollectionPath} ItemId={ItemId}", openCollectionPath, itemId);
             return [];
         }
     }

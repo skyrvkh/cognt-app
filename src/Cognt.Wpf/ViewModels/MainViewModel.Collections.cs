@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -6,6 +7,12 @@ public sealed partial class MainViewModel
 {
     public void LoadCollection(string directoryPath, bool clearEditor = true)
     {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            RaiseMessage("Invalid Collection", "The collection path is required.");
+            return;
+        }
+
         string fullPath;
 
         try
@@ -14,6 +21,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogWarning(ex, "Collection path normalization failed. DirectoryPath={DirectoryPath}", directoryPath);
             RaiseMessage("Invalid Collection", $"The collection path is invalid: {ex.Message}");
             return;
         }
@@ -44,6 +52,7 @@ public sealed partial class MainViewModel
 
         openCollectionPath = fullPath;
         CollectionPath = openCollectionPath;
+        knownCollectionStore.RememberCollectionPath(openCollectionPath);
         OnPropertyChanged(nameof(OpenCollectionPath));
         OnPropertyChanged(nameof(CurrentCollectionPath));
         OnPropertyChanged(nameof(CurrentCollectionName));
@@ -76,7 +85,9 @@ public sealed partial class MainViewModel
     }
 
     public void RefreshCollectionSummaries()
-        => RefreshAvailableCollections();
+    {
+        RefreshAvailableCollections();
+    }
 
     private void AddCollection(object? parameter)
     {
@@ -110,25 +121,94 @@ public sealed partial class MainViewModel
         }
 
         Directory.CreateDirectory(collectionPath);
+
         LoadCollection(collectionPath);
     }
 
-    private void RemoveCurrentCollection()
+    private void RemoveCollectionFromList(object? parameter)
     {
-        Navigation.CollectionRemovalPlan plan = GetCurrentCollectionRemovalPlan();
+        Navigation.CollectionRemovalPlan plan = GetCollectionListRemovalPlan(parameter as Navigation.CollectionOptionViewModel);
         if (!plan.CanRemove)
         {
             throw new InvalidOperationException(plan.Message);
         }
 
-        string deletedPath = Path.GetFullPath(CurrentCollectionPath);
-        string? nextCollectionPath = FindNextAvailableCollectionPath(deletedPath);
+        if (!TryNormalizeCollectionActionPath(parameter, out string removedPath))
+        {
+            throw new InvalidOperationException("Choose a collection to remove from the list.");
+        }
 
-        SaveCurrentNoteFromEditor();
-        noteService.CloseCurrentCollection();
+        bool isCurrentCollection = AreSamePath(removedPath, CurrentCollectionPath);
+        string? nextCollectionPath = isCurrentCollection
+            ? FindNextAvailableCollectionPath(removedPath)
+            : null;
+
+        if (isCurrentCollection)
+        {
+            SaveCurrentNoteFromEditor();
+            noteService.CloseCurrentCollection();
+        }
+
+        knownCollectionStore.HideCollectionPath(removedPath);
+        logger?.LogInformation(
+            "Removed collection from selector list. RemovedPath={RemovedPath} NextCollectionPath={NextCollectionPath}",
+            removedPath,
+            nextCollectionPath);
+
+        if (isCurrentCollection)
+        {
+            OpenNextCollectionOrClear(nextCollectionPath);
+            return;
+        }
+
+        RefreshAvailableCollections();
+    }
+
+    private void DeleteCollectionFromDisk(object? parameter)
+    {
+        Navigation.CollectionRemovalPlan plan = GetCollectionDeletionPlan(parameter as Navigation.CollectionOptionViewModel);
+        if (!plan.CanRemove)
+        {
+            throw new InvalidOperationException(plan.Message);
+        }
+
+        if (!TryNormalizeCollectionActionPath(parameter, out string deletedPath)
+            || !Directory.Exists(deletedPath))
+        {
+            throw new InvalidOperationException("Choose an existing collection to delete.");
+        }
+
+        bool isCurrentCollection = AreSamePath(deletedPath, CurrentCollectionPath);
+        string? nextCollectionPath = isCurrentCollection
+            ? FindNextAvailableCollectionPath(deletedPath)
+            : null;
+
+        if (isCurrentCollection)
+        {
+            SaveCurrentNoteFromEditor();
+            noteService.CloseCurrentCollection();
+        }
+
+        knownCollectionStore.ForgetCollectionPath(deletedPath);
+        knownCollectionStore.UnhideCollectionPath(deletedPath);
         Directory.Delete(deletedPath, recursive: true);
+        logger?.LogInformation(
+            "Deleted collection from disk. DeletedPath={DeletedPath} NextCollectionPath={NextCollectionPath}",
+            deletedPath,
+            nextCollectionPath);
 
-        if (!string.IsNullOrWhiteSpace(nextCollectionPath))
+        if (isCurrentCollection)
+        {
+            OpenNextCollectionOrClear(nextCollectionPath);
+            return;
+        }
+
+        RefreshAvailableCollections();
+    }
+
+    private void OpenNextCollectionOrClear(string? nextCollectionPath)
+    {
+        if (!string.IsNullOrWhiteSpace(nextCollectionPath) && Directory.Exists(nextCollectionPath))
         {
             LoadCollection(nextCollectionPath);
             return;

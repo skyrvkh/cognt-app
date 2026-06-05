@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
@@ -7,6 +8,7 @@ namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private readonly ConcurrentDictionary<string, string> transientNoteToCardDrafts = new(StringComparer.OrdinalIgnoreCase);
     private int noteToCardQueueRefreshVersion;
 
     private void ScheduleCurrentNoteToCardQueueRefresh(string relativePath, string content)
@@ -22,9 +24,19 @@ public sealed partial class MainViewModel
                 TaskScheduler.Default);
     }
 
-    private void ReloadCurrentNoteToCardQueue(string relativePath, string content)
+    private void ReloadCurrentNoteToCardQueue(
+        string relativePath,
+        string content,
+        bool discardSavedDraft = false)
     {
         noteToCardQueueRefreshVersion++;
+        if (discardSavedDraft)
+        {
+            ClearNoteToCardDraftState(openCollectionPath, relativePath);
+            CurrentNoteToCardQueue = null;
+            return;
+        }
+
         string? existingContent = noteService.ReadCardContextDrafts(openCollectionPath, relativePath);
         if (string.IsNullOrWhiteSpace(existingContent))
         {
@@ -187,6 +199,22 @@ public sealed partial class MainViewModel
                 : CardContextDraftDocumentCodec.Write(refreshed));
 
         return refreshed;
+    }
+
+    private void ClearNoteToCardDraftState(string collectionPath, string relativePath)
+    {
+        transientNoteToCardDrafts.TryRemove(CreateNoteToCardDraftKey(collectionPath, relativePath), out _);
+        DeletePersistentNoteToCardDraft(collectionPath, relativePath);
+    }
+
+    private void DeletePersistentNoteToCardDraft(string collectionPath, string relativePath)
+    {
+        noteService.SaveCardContextDrafts(collectionPath, relativePath, content: null);
+    }
+
+    private static string CreateNoteToCardDraftKey(string collectionPath, string relativePath)
+    {
+        return $"{Path.GetFullPath(collectionPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)}|{NormalizeRelativePath(relativePath)}";
     }
 
     private static CardContextDraftNoteDocument ReplaceDraftContext(

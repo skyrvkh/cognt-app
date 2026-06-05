@@ -1,38 +1,56 @@
 using System.IO;
-using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
 
 public sealed partial class MainViewModel
 {
     private Dictionary<string, string> collectionPathsById = new(StringComparer.OrdinalIgnoreCase);
-    private void AddCollectionPath(SortedSet<string> paths, string path)
+    private void AddCollectionPath(SortedSet<string> paths, string path, bool includeHidden = false)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        if (TryNormalizeExistingCollectionPath(path, out string? fullPath))
         {
+            if (!includeHidden && knownCollectionStore.IsCollectionPathHidden(fullPath))
+            {
+                return;
+            }
+
+            editorSettingsService.EnsureCollectionSettingsFile(fullPath);
+            paths.Add(fullPath);
             return;
         }
 
-        try
+    }
+
+    private bool IsExistingCollectionPath(string path)
+        => TryNormalizeExistingCollectionPath(path, out _);
+
+    private bool TryNormalizeCollectionActionPath(object? parameter, out string fullPath)
+    {
+        string? path = parameter switch
         {
-            string fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim()));
-            if (collectionPathResolver.IsCollectionPath(fullPath) && Directory.Exists(fullPath))
-            {
-                paths.Add(fullPath);
-            }
-        }
-        catch (ArgumentException)
+            Navigation.CollectionOptionViewModel collection => collection.Path,
+            string text => text,
+            null => CurrentCollectionPath,
+            _ => null
+        };
+
+        if (!CollectionPathUtilities.TryGetFullPath(path, out fullPath))
         {
+            return false;
         }
-        catch (IOException)
+
+        return collectionPathResolver.IsCollectionPath(fullPath);
+    }
+
+    private bool TryNormalizeExistingCollectionPath(string path, out string fullPath)
+    {
+        if (!CollectionPathUtilities.TryGetFullPath(path, out fullPath))
         {
+            return false;
         }
-        catch (UnauthorizedAccessException)
-        {
-        }
-        catch (NotSupportedException)
-        {
-        }
+
+        bool isValid = collectionPathResolver.IsCollectionPath(fullPath) && Directory.Exists(fullPath);
+        return isValid;
     }
 
     private string? ResolveCollectionPathFromId(string collectionId)
@@ -47,9 +65,13 @@ public sealed partial class MainViewModel
             return collectionPath;
         }
 
-        return Directory.Exists(collectionId)
-            ? Path.GetFullPath(collectionId)
-            : null;
+        if (Directory.Exists(collectionId))
+        {
+            string fullPath = Path.GetFullPath(collectionId);
+            return fullPath;
+        }
+
+        return null;
     }
 
     private string ResolveCollectionCreationParentPath()
@@ -69,120 +91,21 @@ public sealed partial class MainViewModel
     }
 
     private string NormalizeCollectionDirectoryName(string rawName)
-    {
-        string name = rawName.Trim();
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new InvalidOperationException("Collection name is required.");
-        }
-
-        string extension = collectionPathResolver.CollectionDirectoryExtension;
-        if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-        {
-            name = name[..^extension.Length].TrimEnd();
-        }
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new InvalidOperationException("Collection name is required.");
-        }
-
-        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal)
-            || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new InvalidOperationException("Collection name contains invalid file name characters.");
-        }
-
-        if (name.EndsWith(".", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Collection name cannot end with a period.");
-        }
-
-        return $"{name}{extension}";
-    }
+        => CollectionPathUtilities.NormalizeDirectoryName(
+            rawName,
+            collectionPathResolver.CollectionDirectoryExtension);
 
     private static string? GetCollectionParentPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return null;
-        }
-
-        try
-        {
-            return Directory.GetParent(Path.GetFullPath(path))?.FullName;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
+        => CollectionPathUtilities.GetParentPath(path);
 
     private string FormatCollectionName(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return "No Collection";
-        }
-
-        string name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "No Collection";
-        }
-
-        string extension = collectionPathResolver.CollectionDirectoryExtension;
-        return name.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
-            ? name[..^extension.Length]
-            : name;
-    }
+        => CollectionPathUtilities.FormatName(
+            path,
+            collectionPathResolver.CollectionDirectoryExtension);
 
     private static bool AreSamePath(string first, string second)
-    {
-        if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(second))
-        {
-            return false;
-        }
-
-        try
-        {
-            return string.Equals(
-                Path.GetFullPath(first),
-                Path.GetFullPath(second),
-                StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
-        }
-        catch (IOException)
-        {
-            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
-        }
-        catch (NotSupportedException)
-        {
-            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
-        }
-    }
+        => CollectionPathUtilities.AreSamePath(first, second);
 
     private static bool IsPdfPath(string path)
-    {
-        return string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase);
-    }
+        => CollectionPathUtilities.IsPdfPath(path);
 }

@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -52,7 +53,7 @@ public sealed partial class MainViewModel
             loadedTreeNodesByNotePath[normalizedPath] = node;
         }
 
-        if (!string.IsNullOrWhiteSpace(node.FileRelPath))
+        if (!node.IsFlashcardNode && !string.IsNullOrWhiteSpace(node.FileRelPath))
         {
             loadedTreeNodesByRelativePath[NormalizeRelativePath(node.FileRelPath)] = node;
         }
@@ -79,7 +80,7 @@ public sealed partial class MainViewModel
                 loadedTreeNodesByNotePath.Remove(normalizedPath);
             }
 
-            if (!string.IsNullOrWhiteSpace(node.FileRelPath))
+            if (!node.IsFlashcardNode && !string.IsNullOrWhiteSpace(node.FileRelPath))
             {
                 loadedTreeNodesByRelativePath.Remove(NormalizeRelativePath(node.FileRelPath));
             }
@@ -103,6 +104,7 @@ public sealed partial class MainViewModel
         {
             if (!current.IsPlaceholder && !visitedIds.Add(current.Id))
             {
+                logger?.LogWarning("Loaded tree path build detected a cycle. NodeId={NodeId}", current.Id);
                 path = null;
                 return false;
             }

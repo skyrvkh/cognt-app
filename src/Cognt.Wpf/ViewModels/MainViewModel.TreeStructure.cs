@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -12,6 +13,7 @@ public sealed partial class MainViewModel
     {
         if (item is null)
         {
+            logger?.LogWarning("Add loaded tree node received null item; refreshing full tree.");
             RefreshNotesTree(preserveExpansion: true);
             return;
         }

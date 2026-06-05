@@ -9,6 +9,7 @@ public sealed partial class MainViewModel
 {
     private void OpenAttachment(KnowledgeAttachmentReadModel attachment)
     {
+
         if (string.IsNullOrWhiteSpace(openCollectionPath))
         {
             throw new InvalidOperationException("Open a collection before opening an attachment.");
@@ -16,14 +17,13 @@ public sealed partial class MainViewModel
 
         if (attachment.Kind == KnowledgeAttachmentKind.Pdf)
         {
+
             OpenPdfDocument(CreatePdfDocument(attachment));
             return;
         }
 
-        string message = attachment.Kind == KnowledgeAttachmentKind.Image
-            ? $"Image preview is not available yet.{Environment.NewLine}{Environment.NewLine}File: {attachment.OriginalFileName}{Environment.NewLine}Stored at: {attachment.RelativePath}"
-            : $"Document preview is not available yet.{Environment.NewLine}{Environment.NewLine}File: {attachment.OriginalFileName}{Environment.NewLine}Stored at: {attachment.RelativePath}";
-        RaiseMessage("Attachment", message);
+
+        RaiseMessage("Attachment", AttachmentPreviewMessageFactory.CreateUnavailablePreviewMessage(attachment));
     }
 
     private void OpenPdfDocumentFromTreeNode(NoteTreeNodeViewModel node)
@@ -123,7 +123,8 @@ public sealed partial class MainViewModel
             throw new InvalidOperationException("A stored document relative path is required.");
         }
 
-        return ResolveCollectionFilePath(openCollectionPath, NormalizeRelativePath(relativePath));
+        string resolvedPath = ResolveCollectionFilePath(openCollectionPath, NormalizeRelativePath(relativePath));
+        return resolvedPath;
     }
 
     private static KnowledgePdfDocumentReadModel CreatePdfDocument(KnowledgeAttachmentReadModel attachment)

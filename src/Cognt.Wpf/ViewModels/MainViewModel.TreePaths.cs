@@ -1,5 +1,6 @@
 using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -7,9 +8,10 @@ public sealed partial class MainViewModel
 {
     private string? ResolveNotePath(KnowledgeTreeItemReadModel item)
     {
-        return item.Kind == KnowledgeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath)
+        string? notePath = item.Kind == KnowledgeItemKind.Note && !string.IsNullOrWhiteSpace(item.FileRelPath)
             ? ResolveCollectionFilePath(openCollectionPath, item.FileRelPath)
             : null;
+        return notePath;
     }
 
     private static string ResolveCollectionFilePath(string collectionPath, string relativePath)
@@ -21,12 +23,14 @@ public sealed partial class MainViewModel
 
     private string GetRequiredCurrentNoteRelativePath()
     {
-        return GetRequiredRelativeNotePath(currentNotePath);
+        string relativePath = GetRequiredRelativeNotePath(currentNotePath);
+        return relativePath;
     }
 
     private string? TryGetCurrentNoteRelativePath()
     {
-        return TryGetRelativeNotePath(currentNotePath);
+        string? relativePath = TryGetRelativeNotePath(currentNotePath);
+        return relativePath;
     }
 
     private string GetRequiredRelativeNotePath(string? notePath)
@@ -49,10 +53,12 @@ public sealed partial class MainViewModel
 
         if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
         {
+            logger?.LogWarning("Note path is outside current collection. CollectionRoot={CollectionRoot} NotePath={NotePath}", root, fullPath);
             return null;
         }
 
-        return NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
+        string relativePath = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
+        return relativePath;
     }
 
     private static string NormalizeRelativePath(string relativePath)

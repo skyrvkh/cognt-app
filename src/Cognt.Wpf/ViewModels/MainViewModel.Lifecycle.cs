@@ -2,6 +2,7 @@ using System.IO;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.Design;
+using Microsoft.Extensions.Logging;
 using Navigation = CogntApp.ViewModels.Navigation;
 
 namespace CogntApp.ViewModels;
@@ -10,17 +11,29 @@ public sealed partial class MainViewModel
 {
     public void Initialize()
     {
-        string defaultCollectionPath = collectionPathResolver.ResolveDefaultCollectionPath();
-        EnsureDefaultCollectionExists(defaultCollectionPath);
-        CollectionPath = defaultCollectionPath;
+        ClearOpenCollectionState();
         RefreshAvailableCollections();
-
-        if (Directory.Exists(defaultCollectionPath) && collectionPathResolver.IsCollectionPath(defaultCollectionPath))
-        {
-            LoadCollection(defaultCollectionPath, clearEditor: false);
-        }
+        OpenRecentCollection();
 
         ShowDashboard();
+    }
+
+    private void OpenRecentCollection()
+    {
+        string? recentCollectionPath = knownCollectionStore.LoadRecentCollectionPath();
+        if (string.IsNullOrWhiteSpace(recentCollectionPath))
+        {
+            return;
+        }
+
+        if (TryNormalizeExistingCollectionPath(recentCollectionPath, out string fullPath))
+        {
+            LoadCollection(fullPath, clearEditor: false);
+            return;
+        }
+
+        logger?.LogWarning("Recent collection path is invalid and will be forgotten. RecentCollectionPath={RecentCollectionPath}", recentCollectionPath);
+        knownCollectionStore.ForgetCollectionPath(recentCollectionPath);
     }
 
     private void ClearCurrentNoteState(bool clearPdfDocument = true)
@@ -49,6 +62,7 @@ public sealed partial class MainViewModel
         currentCollectionCardCount = 0;
         NoteRoots.Clear();
         ResetLoadedTreeNodeIndex();
+        transientNoteToCardDrafts.Clear();
         RecentNotes.Clear();
         DashboardMetrics.Clear();
         DashboardStudyHeatmapCells.Clear();
@@ -82,6 +96,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "User action failed. ErrorTitle={Title}", title);
             RaiseMessage(title, ex.Message);
         }
     }
