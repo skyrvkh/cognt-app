@@ -1,13 +1,15 @@
 import type { Doc } from '@blocksuite/store';
 import {
+  getNativeClozeSelection,
   getNextClozeIndex,
   replaceSelectionWithCloze,
   type TextSelection,
 } from '../cloze';
 import {
-  prepareKeyboardSelectionCommand,
-  prepareSelectionCommand,
-} from './command-guards';
+  getCurrentSelection,
+  type CurrentSelection,
+} from '../documents/selection-export';
+import { reportDiagnostic } from '../host';
 
 export type SaveClozeCommandMessage = {
   type: 'saveCloze';
@@ -46,39 +48,58 @@ export async function runClozeCommand(
   event?: KeyboardEvent,
   options: ClozeCommandOptions = {}
 ) {
-  const selection = event
-    ? prepareKeyboardSelectionCommand(
-        host,
-        event,
-        'Wait for the full note to finish loading before creating cloze text.',
-        'Select text before creating a cloze.'
-      )
-    : prepareSelectionCommand(
-        host,
-        'Wait for the full note to finish loading before creating cloze text.',
-        'Select text before creating a cloze.'
-      );
+  reportDiagnostic(
+    'info',
+    `Cloze command requested (context=${options.cardContextId ?? ''}, slot=${options.slotId ?? ''}, displayIndex=${options.displayClozeIndex ?? ''}).`
+  );
+
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (host.isInputLocked()) {
+    host.showStatus('Wait for the full note to finish loading before creating cloze text.');
+    reportDiagnostic('info', 'Cloze command skipped: editor input is locked.');
+    return;
+  }
+
+  const nativeClozeSelection = getNativeClozeSelection(host.getEditorRoot(), host.getCurrentDoc());
+  const selection = createSelectionFromNativeCloze(nativeClozeSelection) ?? getCurrentSelection();
   if (!selection) {
+    host.showStatus('Select text, code, or an equation before creating a cloze.');
+    reportDiagnostic('info', 'Cloze command skipped: no usable selection.');
     return;
   }
 
   let clozeText: string;
   const textSelection = host.getTextSelection();
-  const blockId = getSelectionBlockId(textSelection);
+  const blockId = getSelectionBlockId(textSelection)
+    ?? nativeClozeSelection?.blockId;
   if (!blockId) {
-    host.showStatus('Cloze requires a single BlockSuite text selection.');
+    host.showStatus('Cloze requires a single BlockSuite text, code, or equation selection.');
+    reportDiagnostic(
+      'info',
+      `Cloze command skipped: selected text has no BlockSuite block id (text=${selection.plainText.length}).`
+    );
     return;
   }
 
+  let clozeIndex: number;
   try {
-    const clozeIndex =
+    clozeIndex =
       typeof options.displayClozeIndex === 'number' && Number.isFinite(options.displayClozeIndex)
         ? Math.max(1, Math.trunc(options.displayClozeIndex))
         : getNextClozeIndex(host.getEditorRoot());
+    reportDiagnostic(
+      'info',
+      `Cloze command replacing selection (path=${host.getCurrentPath()}, block=${blockId}, text=${selection.plainText.length}, index=${clozeIndex}).`
+    );
     clozeText = replaceSelectionWithCloze(
       {
         doc: host.getCurrentDoc(),
         textSelection: host.getTextSelection(),
+        editorRoot: host.getEditorRoot(),
       },
       selection.plainText,
       clozeIndex
@@ -87,6 +108,7 @@ export async function runClozeCommand(
     host.showStatus(
       error instanceof Error ? error.message : 'Could not hide the selected text in place.'
     );
+    reportDiagnostic('error', `Cloze command failed while replacing selection: ${errorMessage(error)}`);
     return;
   }
 
@@ -108,10 +130,30 @@ export async function runClozeCommand(
         ? Math.max(1, Math.trunc(options.displayClozeIndex))
         : null,
   });
+  reportDiagnostic(
+    'info',
+    `Cloze command saved draft request (path=${host.getCurrentPath()}, block=${blockId}, text=${selection.plainText.length}, cloze=${clozeText.length}, index=${clozeIndex}).`
+  );
   host.showStatus('Selection hidden in place with cloze.');
+}
+
+function createSelectionFromNativeCloze(
+  nativeSelection: ReturnType<typeof getNativeClozeSelection>
+): CurrentSelection | null {
+  if (!nativeSelection?.plainText.trim()) {
+    return null;
+  }
+
+  return {
+    plainText: nativeSelection.plainText,
+  };
 }
 
 function getSelectionBlockId(selection: TextSelection | null | undefined) {
   const point = selection?.start ?? selection?.from ?? null;
   return point?.blockId?.trim() || null;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }

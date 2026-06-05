@@ -1,41 +1,44 @@
 import type { Doc } from '@blocksuite/store';
+import { getLatexBlockSelectionCandidate } from './cloze/cloze-block-latex';
+import { getNativeCodeBlockSelectionCandidate } from './cloze/cloze-code-block';
+import { getInlineLatexSelectionCandidate } from './cloze/cloze-inline-latex';
+import { replaceSelectionWithCloze, toClozeText } from './cloze/cloze-replacement';
+import { collectClozeTextNodes } from './cloze/cloze-text';
 
-type TextSelectionPoint = {
-  blockId: string;
-  index: number;
-  length: number;
-};
+export { replaceSelectionWithCloze, toClozeText };
+export type { ClozeContext, NativeClozeSelection, TextSelection } from './cloze/cloze-types';
 
-export type TextSelection = {
-  from: TextSelectionPoint;
-  to: TextSelectionPoint | null;
-  start?: TextSelectionPoint;
-  end?: TextSelectionPoint;
-  isCollapsed(): boolean;
-  isInSameBlock(): boolean;
-};
-
-type ClozeContext = {
-  doc: Doc | null;
-  textSelection: TextSelection | null | undefined;
-};
-
-export function toClozeText(text: string, index = 1) {
-  return `{{c${Math.max(1, index)}::${normalizeSelectionText(text)}}}`;
+export function getNativeCodeBlockSelectionBlockId(root: Node) {
+  return getNativeCodeBlockSelectionCandidate(root)?.model.id?.trim() || null;
 }
 
-export function replaceSelectionWithCloze(
-  context: ClozeContext,
-  selectedPlainText: string,
-  clozeIndex = 1
-) {
-  const clozeText = toClozeText(selectedPlainText, clozeIndex);
-
-  if (replaceTextSelectionWithCloze(context, clozeText)) {
-    return clozeText;
+export function getNativeClozeSelection(root: Node, doc: Doc | null) {
+  const codeCandidate = getNativeCodeBlockSelectionCandidate(root);
+  const codeBlockId = codeCandidate?.model.id?.trim();
+  if (codeCandidate && codeBlockId) {
+    return {
+      blockId: codeBlockId,
+      plainText: window.getSelection()?.toString().trim() || '',
+    };
   }
 
-  throw new Error('Cloze requires a single BlockSuite text selection.');
+  const inlineLatexCandidate = getInlineLatexSelectionCandidate(root);
+  if (inlineLatexCandidate) {
+    return {
+      blockId: inlineLatexCandidate.blockId,
+      plainText: inlineLatexCandidate.latex,
+    };
+  }
+
+  const blockLatexCandidate = getLatexBlockSelectionCandidate(root, doc);
+  if (blockLatexCandidate) {
+    return {
+      blockId: blockLatexCandidate.blockId,
+      plainText: blockLatexCandidate.latex,
+    };
+  }
+
+  return null;
 }
 
 export function getNextClozeIndex(root: Node) {
@@ -52,110 +55,4 @@ export function getNextClozeIndex(root: Node) {
   }
 
   return maxIndex + 1;
-}
-
-function replaceTextSelectionWithCloze(context: ClozeContext, clozeText: string) {
-  if (!context.doc) {
-    return false;
-  }
-
-  const textSelection = context.textSelection;
-  if (!textSelection || textSelection.isCollapsed() || !textSelection.isInSameBlock()) {
-    return false;
-  }
-
-  const range = getTextSelectionRange(textSelection);
-  if (!range) {
-    return false;
-  }
-
-  const model = context.doc.getBlockById(range.blockId) as
-    | { text?: { replace(index: number, length: number, content: string): void } }
-    | null;
-  if (!model?.text) {
-    return false;
-  }
-
-  try {
-    context.doc.transact(() => {
-      model.text!.replace(range.index, range.length, clozeText);
-    });
-    return true;
-  } catch (error) {
-    console.warn('Text selection cloze replacement failed.', error);
-    return false;
-  }
-}
-
-function getTextSelectionRange(textSelection: TextSelection) {
-  const start = textSelection.start ?? textSelection.from;
-  const end = textSelection.end ?? textSelection.to ?? textSelection.from;
-
-  if (start.blockId !== end.blockId) {
-    return null;
-  }
-
-  const index = Math.min(start.index, end.index);
-  const selectionEnd = Math.max(start.index + start.length, end.index + end.length);
-  const length = selectionEnd - index;
-
-  return length > 0
-    ? {
-        blockId: start.blockId,
-        index,
-        length,
-      }
-    : null;
-}
-
-function normalizeSelectionText(text: string) {
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-function collectClozeTextNodes(root: Node) {
-  const nodes: Text[] = [];
-
-  const visit = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if ((node.textContent ?? '').includes('{{')) {
-        nodes.push(node as Text);
-      }
-      return;
-    }
-
-    if (!canContainTextNodes(node)) {
-      return;
-    }
-
-    if (node instanceof Element && node.shadowRoot) {
-      visit(node.shadowRoot);
-    }
-
-    const walker = document.createTreeWalker(
-      node,
-      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
-    );
-
-    for (let current = walker.nextNode(); current; current = walker.nextNode()) {
-      if (current.nodeType === Node.TEXT_NODE) {
-        const textNode = current as Text;
-        if ((textNode.textContent ?? '').includes('{{')) {
-          nodes.push(textNode);
-        }
-        continue;
-      }
-
-      const element = current as Element;
-      if (element.shadowRoot) {
-        visit(element.shadowRoot);
-      }
-    }
-  };
-
-  visit(root);
-  return nodes;
-}
-
-function canContainTextNodes(node: Node) {
-  return node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE;
 }
