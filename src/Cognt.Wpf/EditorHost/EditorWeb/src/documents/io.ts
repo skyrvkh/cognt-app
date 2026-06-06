@@ -17,6 +17,7 @@ import {
   upgradeSerializedCogntPropertiesSnapshots,
 } from '../blocks/properties';
 import { stripSerializedCogntReferencesSnapshots } from '../blocks/references';
+import type { BlobSource } from '../editor/blob-source';
 import {
   cogntBlockSuiteDocumentKind,
   cogntBlockSuiteDocumentVersion,
@@ -40,9 +41,12 @@ type CogntBlockSuiteDocument = {
   snapshot?: DocSnapshot | null;
 };
 
-export function createEmptyMarkdownDoc() {
+export function createEmptyMarkdownDoc(blobSource?: BlobSource) {
   const schema = new Schema().register(createCogntSchemas());
-  const collection = new DocCollection({ schema });
+  const collection = new DocCollection({
+    schema,
+    ...(blobSource ? { blobSources: { main: blobSource } } : {}),
+  });
   collection.meta.initialize();
   const doc = collection.createDoc();
   doc.load();
@@ -56,11 +60,12 @@ export function createEmptyMarkdownDoc() {
 export async function createDocFromBlockSuiteJson(
   content: string,
   onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
-  resolveTitle?: LinkedNoteTitleResolver
+  resolveTitle?: LinkedNoteTitleResolver,
+  blobSource?: BlobSource
 ) {
   const snapshot = parseBlockSuiteDocumentSnapshot(content);
   if (!snapshot) {
-    const doc = createEmptyMarkdownDoc();
+    const doc = createEmptyMarkdownDoc(blobSource);
     doc.resetHistory();
     return doc;
   }
@@ -68,7 +73,7 @@ export async function createDocFromBlockSuiteJson(
   upgradeSerializedRawCogntInlineMentionSnapshots(snapshot);
   upgradeSerializedCogntPropertiesSnapshots(snapshot);
   stripSerializedCogntReferencesSnapshots(snapshot);
-  const seedDoc = createEmptyMarkdownDoc();
+  const seedDoc = createEmptyMarkdownDoc(blobSource);
   const job = new Job({ collection: seedDoc.collection });
   const doc = await job.snapshotToDoc(snapshot);
   if (!doc) {
@@ -118,9 +123,10 @@ export async function importBlockSuiteJsonIntoExistingDoc(
 export async function createDocFromMarkdown(
   markdown: string,
   onLinkedDoc?: (linkedDoc: CogntLinkedDoc) => void,
-  resolveTitle?: LinkedNoteTitleResolver
+  resolveTitle?: LinkedNoteTitleResolver,
+  blobSource?: BlobSource
 ) {
-  const doc = createEmptyMarkdownDoc();
+  const doc = createEmptyMarkdownDoc(blobSource);
   const note = clearNoteChildren(doc);
 
   if (markdown.trim().length === 0) {
