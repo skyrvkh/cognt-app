@@ -15,6 +15,11 @@ import {
   defineCogntReferencesBlockElement,
 } from './blocks/references';
 import { type TextSelection } from './cloze';
+import type { EditorCaretState } from './editor/contracts';
+import {
+  getCaretState as getEditorCaretState,
+  restoreCaretState as restoreEditorCaretState,
+} from './editor/editor-interaction-caret';
 import {
   type CreateExtractCommandMessage,
   type PendingExtract,
@@ -609,6 +614,46 @@ export class MarkdownBlockSuiteEditor {
     this.showStatus('Moved to heading.');
   }
 
+  public getCaretState(): EditorCaretState | null {
+    return getEditorCaretState(
+      {
+        editor: this.editor,
+        getCurrentDoc: () => this.currentDoc,
+        getTextSelection: () => this.getTextSelection(),
+        getCurrentInsertionBlockModel: () =>
+          this.currentDoc?.getBlocks().find(block => block.role === 'content' && block.text) ?? null,
+        resolveOutlineBlockId: blockId => this.resolveOutlineBlockId(blockId),
+        getRenderedBlockElement: blockId => this.getRenderedBlockElement(blockId),
+        showStatus: message => this.showStatus(message),
+      },
+      {
+        readOnlyMode: this.readOnlyMode,
+        lastKnownTextSelectionForPaste: null,
+        setLastKnownTextSelectionForPaste: () => {},
+      }
+    );
+  }
+
+  public async restoreCaretState(state?: EditorCaretState | null) {
+    await restoreEditorCaretState(
+      {
+        editor: this.editor,
+        getCurrentDoc: () => this.currentDoc,
+        getTextSelection: () => this.getTextSelection(),
+        getCurrentInsertionBlockModel: () =>
+          this.currentDoc?.getBlocks().find(block => block.role === 'content' && block.text) ?? null,
+        resolveOutlineBlockId: blockId => this.resolveOutlineBlockId(blockId),
+        getRenderedBlockElement: blockId => this.getRenderedBlockElement(blockId),
+        showStatus: message => this.showStatus(message),
+      },
+      {
+        readOnlyMode: this.readOnlyMode,
+        lastKnownTextSelectionForPaste: null,
+        setLastKnownTextSelectionForPaste: () => {},
+      },
+      state
+    );
+  }
   public getSelectedImageBlock(): SelectedImageBlock | null {
     const selectedBlockIds = uniqueBlockIds([
       ...this.getBlockSelectionBlockIds(),
