@@ -7,7 +7,6 @@ export {
   type CogntPropertiesBlockProps,
   type CogntPropertyRow,
 } from './properties-schema';
-export { defineCogntPropertiesBlockElement } from './properties-view';
 export { insertCogntPropertiesBlock } from './properties-insert';
 export {
   createDefaultPropertiesRows,
