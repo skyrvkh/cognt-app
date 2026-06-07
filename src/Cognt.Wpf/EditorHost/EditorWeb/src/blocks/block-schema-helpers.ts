@@ -19,7 +19,7 @@ export function createContentBlockSchema<TProps extends object, TFlavour extends
       parent: ['affine:note'],
       children: [],
     },
-    props: () => createProps(),
+    props: createProps,
     toModel: () => new BlockModel<TProps>(),
   });
 }
