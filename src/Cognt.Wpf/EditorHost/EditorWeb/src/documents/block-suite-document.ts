@@ -1,4 +1,5 @@
 import type { BlockSnapshot } from '@blocksuite/store';
+import { reportDiagnostic } from '../host';
 
 export const cogntBlockSuiteDocumentKind = 'cognt-blocksuite-doc';
 export const cogntBlockSuiteDocumentVersion = 1;
@@ -10,7 +11,7 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
   const pageId = createBlockId();
   const noteId = createBlockId();
 
-  return `${JSON.stringify(
+  const content = `${JSON.stringify(
     {
       kind: cogntBlockSuiteDocumentKind,
       version: cogntBlockSuiteDocumentVersion,
@@ -61,6 +62,7 @@ export function createBlockSuiteDocumentJsonFromBlockSnapshots(
     null,
     2
   )}\n`;
+  return content;
 }
 
 export function createBlockSuiteDocumentJsonFromPlainText(text: string, title: string) {
@@ -78,7 +80,8 @@ export function createBlockSuiteDocumentJsonFromPlainText(text: string, title: s
     children: [],
   };
 
-  return createBlockSuiteDocumentJsonFromBlockSnapshots([paragraph], title);
+  const content = createBlockSuiteDocumentJsonFromBlockSnapshots([paragraph], title);
+  return content;
 }
 
 export function createBlockSuiteTextValue(value: string) {
@@ -95,10 +98,12 @@ export function createBlockId() {
 export function createTitleFromPlainText(text: string, fallback: string) {
   const title = text.replace(/\s+/g, ' ').trim();
   if (title.length === 0) {
+    reportDiagnostic('info', `Created fallback title from empty plain text (fallback=${fallback}).`);
     return fallback;
   }
 
-  return title.length <= 60 ? title : title.slice(0, 60).trimEnd();
+  const result = title.length <= 60 ? title : title.slice(0, 60).trimEnd();
+  return result;
 }
 
 export function normalizeSelectionText(text: string) {

@@ -1,35 +1,46 @@
 import type { BlockSnapshot, DocSnapshot } from '@blocksuite/store';
 import { isBlockSnapshot } from '../documents/block-suite-document';
+import { reportDiagnostic } from '../host';
 import { cogntPropertiesFlavour } from './properties-schema';
-import { normalizeCogntProperties } from './properties-normalize';
 
-export function upgradeSerializedCogntPropertiesSnapshots(snapshot: DocSnapshot) {
-  upgradeSerializedCogntPropertiesBlockSnapshot(snapshot.blocks);
+export function stripSerializedCogntPropertiesSnapshots(snapshot: DocSnapshot) {
+  const removedCount = stripSerializedCogntPropertiesBlockSnapshot(snapshot.blocks);
+  reportDiagnostic('info', 'Stripped serialized Cognt properties snapshots.', {
+    removedCount,
+  });
 }
 
-function upgradeSerializedCogntPropertiesBlockSnapshot(snapshot: BlockSnapshot) {
-  const props = snapshot.props;
-  const isLegacyPropertiesParagraph =
-    snapshot.flavour === 'affine:paragraph'
-    && props.cogntBlockKind === 'properties'
-    && Array.isArray(props.cogntProperties);
-
-  if (snapshot.flavour === cogntPropertiesFlavour || isLegacyPropertiesParagraph) {
-    snapshot.flavour = cogntPropertiesFlavour;
-    snapshot.version = 1;
-    snapshot.props = {
-      title: typeof props.title === 'string' ? props.title : 'Properties',
-      properties: normalizeCogntProperties(
-        Array.isArray(props.cogntProperties) ? props.cogntProperties : props.properties
-      ),
-    };
-    snapshot.children = [];
-    return;
+function stripSerializedCogntPropertiesBlockSnapshot(snapshot: BlockSnapshot) {
+  if (!Array.isArray(snapshot.children) || snapshot.children.length === 0) {
+    reportDiagnostic('info', 'Skipped Cognt properties snapshot strip for block without children.', {
+      flavour: snapshot.flavour,
+    });
+    return 0;
   }
 
-  snapshot.children.forEach(child => {
-    if (isBlockSnapshot(child)) {
-      upgradeSerializedCogntPropertiesBlockSnapshot(child);
+  let removedCount = 0;
+  snapshot.children = snapshot.children.filter(child => {
+    if (!isBlockSnapshot(child)) {
+      return true;
     }
+
+    const childProps = child.props;
+    const isLegacyPropertiesParagraph =
+      child.flavour === 'affine:paragraph'
+      && childProps.cogntBlockKind === 'properties'
+      && Array.isArray(childProps.cogntProperties);
+
+    if (child.flavour === cogntPropertiesFlavour || isLegacyPropertiesParagraph) {
+      removedCount += 1;
+      reportDiagnostic('info', 'Removed serialized Cognt properties block snapshot.', {
+        flavour: child.flavour,
+        legacy: isLegacyPropertiesParagraph,
+      });
+      return false;
+    }
+
+    removedCount += stripSerializedCogntPropertiesBlockSnapshot(child);
+    return true;
   });
+  return removedCount;
 }

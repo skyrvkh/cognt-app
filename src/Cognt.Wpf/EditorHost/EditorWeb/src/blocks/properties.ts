@@ -12,4 +12,4 @@ export {
   createDefaultPropertiesRows,
   normalizeCogntProperties,
 } from './properties-normalize';
-export { upgradeSerializedCogntPropertiesSnapshots } from './properties-snapshot';
+export { stripSerializedCogntPropertiesSnapshots } from './properties-snapshot';
