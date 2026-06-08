@@ -6,12 +6,9 @@ public partial class EditorView
 {
     public Task ClearNoteAsync()
     {
-        ++loadRequestId;
+        CancelOutstandingLoadRequests();
         ClearTransientEditorState();
-        currentContent = string.Empty;
-        currentTitle = string.Empty;
-        currentSourcePath = null;
-        currentCollectionRoot = null;
+        ResetCurrentNoteState();
         ShowNoNoteState();
         return Task.CompletedTask;
     }

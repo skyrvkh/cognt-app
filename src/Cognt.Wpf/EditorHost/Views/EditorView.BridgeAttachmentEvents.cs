@@ -38,4 +38,23 @@ public partial class EditorView
                 e.SourcePath,
                 e.ImageSource));
     }
+
+    private Task BlockSuiteBridge_AttachImageSourceRequested(
+        object? sender,
+        AttachImageSourceRequestedEventArgs e)
+    {
+        return DispatchCurrentSourceAsyncBridgeRequest(
+            AttachImageSourceRequested,
+            e,
+            e.SourcePath,
+            e.Complete,
+            AttachFileResult.Fail,
+            "The image source attachment is not for the current note file.",
+            "No image source attachment handler is registered.",
+            ex => logger.LogWarning(
+                ex,
+                "BlockSuite attach-image-source bridge handler failed. SourcePath={SourcePath} ImageSource={ImageSource}",
+                e.SourcePath,
+                e.ImageSource));
+    }
 }

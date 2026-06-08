@@ -3,135 +3,26 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Cognt.Wpf.EditorHost.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
 public partial class EditorView
 {
-    public async Task EditTransientNoteInHostAsync(
-        ITransientEditorHost host,
-        string title,
-        string content,
-        Action<string> contentChanged)
-    {
-        int requestId = ++loadRequestId;
-
-        await WarmUpAsync();
-
-        if (requestId != loadRequestId)
-        {
-            return;
-        }
-
-        SetBlockSuiteHostVisible(false);
-        AttachBlockSuiteHostTo(host);
-        PrepareInteractiveBlockSuiteHost(host);
-        transientContentChanged = contentChanged;
-
-        try
-        {
-            await WaitWithTimeoutAsync(
-                blockSuiteBridge.ActivateEditorAsync(),
-                EditorOperationTimeout,
-                "The shared BlockSuite editor did not leave read-only mode.");
-
-            await WaitWithTimeoutAsync(
-                blockSuiteBridge.LoadNoteAsync("card-workbench.json", title, content),
-                GetDocumentLoadTimeout(content),
-                "The shared BlockSuite editor did not finish loading the card text.");
-
-            if (requestId != loadRequestId)
-            {
-                ClearTransientEditorState();
-                return;
-            }
-
-            SetBlockSuiteHostVisible(true);
-            await FocusBlockSuiteHostAsync(host);
-
-            await WaitWithTimeoutAsync(
-                blockSuiteBridge.FocusEditorAsync(),
-                EditorOperationTimeout,
-                "The shared BlockSuite editor did not accept focus.");
-
-            if (requestId == loadRequestId)
-            {
-                isShowingTransientEditor = true;
-            }
-        }
-        catch
-        {
-            if (requestId == loadRequestId)
-            {
-                ClearTransientEditorState();
-                AttachBlockSuiteHostToEditor();
-            }
-
-            throw;
-        }
-        finally
-        {
-            if (requestId == loadRequestId)
-            {
-                SetBlockSuiteHostVisible(true);
-            }
-        }
-    }
-
-    public async Task RestoreNoteAfterTransientEditorAsync()
-    {
-        bool shouldRestore = isShowingTransientEditor;
-        if (!shouldRestore)
-        {
-            return;
-        }
-
-        if (shouldRestore)
-        {
-            SetBlockSuiteHostVisible(false);
-        }
-
-        ClearTransientEditorState();
-        AttachBlockSuiteHostToEditor();
-
-        if (string.IsNullOrWhiteSpace(currentSourcePath))
-        {
-            ShowNoNoteState();
-            return;
-        }
-
-        try
-        {
-            ShowLoadingState("Loading editor", "Restoring the current note...");
-            await WaitWithTimeoutAsync(
-                blockSuiteBridge.LoadNoteAsync(currentSourcePath, currentTitle, currentContent, currentCollectionRoot),
-                GetDocumentLoadTimeout(currentContent),
-                "The editor did not restore the current note after card editing.");
-            await FlushMentionTargetsAsync();
-            ShowReadyState();
-        }
-        finally
-        {
-            SetBlockSuiteHostVisible(true);
-        }
-    }
-
-    private void AttachBlockSuiteHostTo(ITransientEditorHost host)
-    {
-        RemoveBlockSuiteHostFromParent();
-        host.Mount(BlockSuiteHostView);
-        PrepareInteractiveBlockSuiteHost(host);
-    }
-
     public void AttachBlockSuiteHostToEditor()
     {
-        if (ReferenceEquals(EditorWebViewFrame.Child, BlockSuiteHostView))
+        MountBlockSuiteHostInEditorFrame();
+    }
+
+    public async Task FocusEditorAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentSourcePath))
         {
             return;
         }
 
-        RemoveBlockSuiteHostFromParent();
-        EditorWebViewFrame.Child = BlockSuiteHostView;
+        await FocusEditorHostAsync();
+        await FocusEditorDocumentAsync();
     }
 
     public void DetachBlockSuiteHost()
@@ -142,23 +33,26 @@ public partial class EditorView
 
     public void DisposeEditorHost()
     {
-        suppressBridgeCommands = true;
-        Loaded -= EditorView_Loaded;
-        Unloaded -= EditorView_Unloaded;
-        ClearTransientEditorState();
-        RemoveBlockSuiteHostFromParent();
+        BeginEditorHostDisposal();
+    }
 
-        try
+    private void MountBlockSuiteHostInEditorFrame()
+    {
+        if (ReferenceEquals(EditorWebViewFrame.Child, BlockSuiteHostView))
         {
-            if (BlockSuiteHostView is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            return;
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
-        {
-            System.Diagnostics.Debug.WriteLine($"Editor host disposal skipped: {ex.Message}");
-        }
+
+        RemoveBlockSuiteHostFromParent();
+        EditorWebViewFrame.Child = BlockSuiteHostView;
+    }
+
+    private void MountBlockSuiteHostInTransientHost(ITransientEditorHost host)
+    {
+        RemoveBlockSuiteHostFromParent();
+        host.Mount(BlockSuiteHostView);
+        host.PrepareForInput();
+        PrepareBlockSuiteHostForInput();
     }
 
     private void RemoveBlockSuiteHostFromParent()
@@ -179,38 +73,143 @@ public partial class EditorView
         }
     }
 
-    private void SetBlockSuiteHostVisible(bool isVisible)
+    private void PrepareBlockSuiteHostForInput()
     {
         BlockSuiteHostView.Visibility = Visibility.Visible;
         BlockSuiteHostView.IsEnabled = true;
         BlockSuiteHostView.Focusable = true;
+    }
+
+    private void SetBlockSuiteHostVisible(bool isVisible)
+    {
+        PrepareBlockSuiteHostForInput();
         BlockSuiteHostView.Opacity = isVisible ? 1 : 0;
         BlockSuiteHostView.IsHitTestVisible = isVisible;
     }
 
-    private void ClearTransientEditorState()
+    private async Task FocusMountedBlockSuiteHostAsync(
+        Action? updateHostLayout = null,
+        Action? focusHost = null,
+        Action<IInputElement>? setFocusedElement = null)
     {
-        transientContentChanged = null;
-        isShowingTransientEditor = false;
-    }
-
-    private void PrepareInteractiveBlockSuiteHost(ITransientEditorHost host)
-    {
-        host.PrepareForInput();
-        BlockSuiteHostView.Visibility = Visibility.Visible;
-        BlockSuiteHostView.IsEnabled = true;
-        BlockSuiteHostView.Focusable = true;
-    }
-
-    private async Task FocusBlockSuiteHostAsync(ITransientEditorHost host)
-    {
-        PrepareInteractiveBlockSuiteHost(host);
-        host.UpdateHostLayout();
+        PrepareBlockSuiteHostForInput();
+        updateHostLayout?.Invoke();
         BlockSuiteHostView.UpdateLayout();
         await Dispatcher.Yield(DispatcherPriority.Input);
-        host.FocusHost();
+        Focus();
+        focusHost?.Invoke();
         BlockSuiteHostView.Focus();
         Keyboard.Focus(BlockSuiteHostView);
-        host.SetFocusedElement(BlockSuiteHostView);
+        setFocusedElement?.Invoke(BlockSuiteHostView);
+    }
+
+    private async Task FocusEditorHostAsync()
+    {
+        SetBlockSuiteHostVisible(true);
+        await FocusMountedBlockSuiteHostAsync();
+
+        if (!IsHostReady)
+        {
+            await WarmUpAsync();
+        }
+    }
+
+    private async Task FocusEditorDocumentAsync()
+    {
+        try
+        {
+            await blockSuiteBridge.FocusEditorAsync().WaitAsync(EditorFocusRequestTimeout);
+        }
+        catch (TimeoutException ex)
+        {
+            logger.LogDebug(ex, "EditorView focus request timed out.");
+        }
+    }
+
+    private void BeginEditorHostDisposal()
+    {
+        if (isDisposingEditorHost)
+        {
+            return;
+        }
+
+        isDisposingEditorHost = true;
+        suppressBridgeCommands = true;
+        Loaded -= EditorView_Loaded;
+        Unloaded -= EditorView_Unloaded;
+        ClearTransientEditorState();
+        RemoveBlockSuiteHostFromParent();
+
+        _ = DisposeEditorHostAsync();
+    }
+
+    private async Task DisposeEditorHostAsync()
+    {
+        Task? disposeTask = TryStartEditorHostDisposal();
+        if (disposeTask is null)
+        {
+            return;
+        }
+
+        if (!await TryAwaitEditorHostDisposalAsync(disposeTask))
+        {
+            return;
+        }
+
+        await CompleteEditorHostDisposalAsync(disposeTask);
+    }
+
+    private Task? TryStartEditorHostDisposal()
+    {
+        try
+        {
+            return BlockSuiteHostView.DisposeAsync().AsTask();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "EditorView DisposeEditorHost could not start.");
+            return null;
+        }
+    }
+
+    private async Task<bool> TryAwaitEditorHostDisposalAsync(Task disposeTask)
+    {
+        Task completedTask = await Task.WhenAny(disposeTask, Task.Delay(EditorHostDisposeTimeout));
+        if (completedTask == disposeTask)
+        {
+            return true;
+        }
+
+        logger.LogWarning(
+            "EditorView DisposeEditorHost timed out. Timeout={Timeout} HostState={HostState} BridgeReady={BridgeReady}",
+            EditorHostDisposeTimeout,
+            hostState,
+            blockSuiteBridge.IsReady);
+        _ = ObserveLateEditorHostDisposalAsync(disposeTask);
+        return false;
+    }
+
+    private async Task CompleteEditorHostDisposalAsync(Task disposeTask)
+    {
+        try
+        {
+            await disposeTask;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "EditorView DisposeEditorHost failed.");
+        }
+    }
+
+    private async Task ObserveLateEditorHostDisposalAsync(Task disposeTask)
+    {
+        try
+        {
+            await disposeTask;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "EditorView DisposeEditorHost completed with an exception after timeout.");
+        }
     }
 }

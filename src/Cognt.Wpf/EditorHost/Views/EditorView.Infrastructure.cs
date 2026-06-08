@@ -1,16 +1,10 @@
 using Cognt.Wpf.EditorHost.Components;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
-using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
 public partial class EditorView
 {
-    private static readonly TimeSpan EditorOperationTimeout = TimeSpan.FromSeconds(8);
-    private static readonly TimeSpan HostStartupTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan MinimumDocumentLoadTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan MaximumDocumentLoadTimeout = TimeSpan.FromMinutes(4);
-
     private void ConfigureBlockSuiteHost()
     {
         BlockSuiteHostView.Services = serviceProvider;
@@ -37,75 +31,11 @@ public partial class EditorView
         blockSuiteBridge.OpenMentionRequested += BlockSuiteBridge_OpenMentionRequested;
         blockSuiteBridge.CreateLinkedNoteRequested += BlockSuiteBridge_CreateLinkedNoteRequested;
         blockSuiteBridge.AttachFileRequested += BlockSuiteBridge_AttachFileRequested;
+        blockSuiteBridge.AttachImageSourceRequested += BlockSuiteBridge_AttachImageSourceRequested;
         blockSuiteBridge.ReadAttachmentRequested += BlockSuiteBridge_ReadAttachmentRequested;
+        blockSuiteBridge.StoreEditorBlobRequested += BlockSuiteBridge_StoreEditorBlobRequested;
+        blockSuiteBridge.ReadEditorBlobRequested += BlockSuiteBridge_ReadEditorBlobRequested;
+        blockSuiteBridge.ListEditorBlobsRequested += BlockSuiteBridge_ListEditorBlobsRequested;
         blockSuiteBridge.DiagnosticReceived += BlockSuiteBridge_DiagnosticReceived;
-    }
-
-    private async Task WaitWithTimeoutAsync(Task task, TimeSpan timeout, string timeoutMessage)
-    {
-        Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
-
-        if (completedTask != task)
-        {
-            logger.LogError(
-                "Editor operation timed out. Operation={Operation} Timeout={Timeout}",
-                timeoutMessage,
-                timeout);
-            RunBlockSuiteCommand(task, "timed-out operation");
-            throw new TimeoutException(timeoutMessage);
-        }
-
-        await task;
-    }
-
-    private async Task<T> WaitWithTimeoutAsync<T>(Task<T> task, TimeSpan timeout, string timeoutMessage)
-    {
-        Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
-
-        if (completedTask != task)
-        {
-            logger.LogError(
-                "Editor operation timed out. Operation={Operation} Timeout={Timeout}",
-                timeoutMessage,
-                timeout);
-            RunBlockSuiteCommand(task, "timed-out operation");
-            throw new TimeoutException(timeoutMessage);
-        }
-
-        return await task;
-    }
-
-    private static TimeSpan GetDocumentLoadTimeout(string? content)
-    {
-        int contentLength = content?.Length ?? 0;
-        int totalSeconds = 30 + (int)Math.Ceiling(contentLength / 10_000d);
-
-        return TimeSpan.FromSeconds(Math.Clamp(
-            totalSeconds,
-            (int)MinimumDocumentLoadTimeout.TotalSeconds,
-            (int)MaximumDocumentLoadTimeout.TotalSeconds));
-    }
-
-    private void RunBlockSuiteCommand(Task task, string operation)
-    {
-        if (suppressBridgeCommands)
-        {
-            return;
-        }
-
-        _ = ObserveBlockSuiteCommandAsync(task, operation);
-    }
-
-    private async Task ObserveBlockSuiteCommandAsync(Task task, string operation)
-    {
-        try
-        {
-            await task;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "BlockSuite command failed. Operation={Operation}", operation);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite {operation} failed: {ex}");
-        }
     }
 }
