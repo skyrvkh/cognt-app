@@ -19,6 +19,10 @@ internal interface IBlockSuiteHostClient
 
     Task FocusBlockAsync(string blockId);
 
+    Task<EditorCaretState?> GetCaretStateAsync();
+
+    Task RestoreCaretStateAsync(EditorCaretState caret);
+
     Task CreateClozeFromSelectionAsync(
         string? cardContextId = null,
         string? slotId = null,

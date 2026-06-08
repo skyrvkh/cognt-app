@@ -1,4 +1,5 @@
 using System.IO;
+using Cognt.Wpf.EditorHost.Services;
 using Cognt.Wpf.EditorHost.Models.Editor;
 using Microsoft.Extensions.Logging;
 
@@ -204,12 +205,12 @@ public partial class EditorView
         }
     }
 
-    private void BlockSuiteBridge_DiagnosticReceived(object? sender, string message)
+    private void BlockSuiteBridge_DiagnosticReceived(object? sender, EditorDiagnosticReceivedEventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(message))
+        if (!string.IsNullOrWhiteSpace(e.Message))
         {
-            logger.LogDebug("BlockSuite host diagnostic: {Message}", message);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite host: {message}");
+            logger.LogDebug("BlockSuite host diagnostic: {Message}", e.Message);
+            System.Diagnostics.Debug.WriteLine($"BlockSuite host: {e.Message}");
         }
     }
 }

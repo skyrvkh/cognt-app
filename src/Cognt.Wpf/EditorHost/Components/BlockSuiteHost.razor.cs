@@ -11,6 +11,7 @@ namespace Cognt.Wpf.EditorHost.Components;
 public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 {
     private const string EditorModulePath = "./editorweb/assets/blazor-blocksuite.js";
+    private static readonly TimeSpan DisposalOperationTimeout = TimeSpan.FromSeconds(2);
 
     private DotNetObjectReference<BlockSuiteHost>? dotNetReference;
     private IJSObjectReference? module;
@@ -40,9 +41,7 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
         try
         {
-            Logger.LogInformation("BlockSuiteHost first render started.");
             dotNetReference = DotNetObjectReference.Create(this);
-            Logger.LogDebug("Importing BlockSuite module. ModulePath={ModulePath}", EditorModulePath);
             module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", EditorModulePath);
             instanceId = await module.InvokeAsync<int>(
                 "mountBlockSuite",
@@ -50,59 +49,228 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
                 DocumentLinksElement,
                 StatusElement,
                 dotNetReference);
-
-            Logger.LogInformation("BlockSuiteHost mounted. InstanceId={InstanceId}", instanceId);
             Bridge.Register(this);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "BlockSuiteHost startup failed.");
             Bridge.RegisterStartupFailure(ex);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite host startup failed: {ex}");
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module is not null && instanceId != 0)
+            {
+                await WaitForDisposalOperationAsync(
+                    module.InvokeVoidAsync("disposeBlockSuite", instanceId).AsTask(),
+                    "disposeBlockSuite");
+            }
+
+            if (module is not null)
+            {
+                await WaitForDisposalOperationAsync(
+                    module.DisposeAsync().AsTask(),
+                    "module.DisposeAsync");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "BlockSuiteHost disposal skipped. InstanceId={InstanceId}", instanceId);
+        }
+        finally
+        {
+            if (instanceId == 0)
+            {
+                Bridge.FailPendingStartup(new InvalidOperationException(
+                    "The BlockSuite host was disposed before the JavaScript editor mounted."));
+            }
+
+            Bridge.Unregister(this);
+            dotNetReference?.Dispose();
+        }
+    }
+
+    [JSInvokable]
+    public void HandleHostMessage(JsonElement message)
+    {
+        Bridge.RaiseHostMessage(message);
+    }
+
+    [JSInvokable]
+    public void HandleContentChanged(string content)
+    {
+        Bridge.RaiseContentChanged(content);
+    }
+
+    [JSInvokable]
+    public void HandleDocumentChanged()
+    {
+        Bridge.RaiseDocumentChanged();
+    }
+
+    [JSInvokable]
+    public void HandleCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)
+    {
+        Bridge.RaiseCreateExtract(sourcePath, selectedContent, selectedPlainText);
+    }
+
+    [JSInvokable]
+    public void HandleSaveCloze(
+        string sourcePath,
+        string blockId,
+        string selectedPlainText,
+        string clozeText,
+        string content,
+        string? cardContextId = null,
+        string? slotId = null,
+        int? displayClozeIndex = null)
+    {
+        Bridge.RaiseSaveCloze(
+            sourcePath,
+            blockId,
+            selectedPlainText,
+            clozeText,
+            content,
+            cardContextId,
+            slotId,
+            displayClozeIndex);
+    }
+
+    [JSInvokable]
+    public void HandleOpenImageOcclusion(
+        string sourcePath,
+        string imageBlockId,
+        string imageRelPath,
+        string content)
+    {
+        Bridge.RaiseOpenImageOcclusion(sourcePath, imageBlockId, imageRelPath, content);
+    }
+
+    [JSInvokable]
+    public IReadOnlyList<object> HandleSearchMentionTargets(string sourcePath, string query, int limit)
+    {
+        return CreateMentionTargetPayloads(Bridge.RaiseMentionSearch(sourcePath, query, limit));
+    }
+
+    [JSInvokable]
+    public void HandleRequestMentionPreview(
+        string requestId,
+        string sourcePath,
+        string relativePath,
+        string mode,
+        int maxCharacters)
+    {
+        Bridge.RaiseMentionPreview(requestId, sourcePath, relativePath, mode, maxCharacters);
+    }
+
+    [JSInvokable]
+    public void HandleOpenMention(string sourcePath, string relativePath, string content)
+    {
+        Bridge.RaiseOpenMention(sourcePath, relativePath, content);
+    }
+
+    [JSInvokable]
+    public CreateLinkedNoteResult HandleCreateLinkedNote(string sourcePath, string viewMode)
+    {
+        return Bridge.RaiseCreateLinkedNote(sourcePath, viewMode);
+    }
+
+    [JSInvokable]
+    public Task<AttachFileResult> HandleAttachFile(
+        string sourcePath,
+        string fileName,
+        string contentBase64)
+    {
+        return Bridge.RaiseAttachFileAsync(sourcePath, fileName, contentBase64);
+    }
+
+    [JSInvokable]
+    public Task<AttachFileResult> HandleAttachImageSource(
+        string sourcePath,
+        string imageSource,
+        string fallbackFileName)
+    {
+        return Bridge.RaiseAttachImageSourceAsync(sourcePath, imageSource, fallbackFileName);
+    }
+
+    [JSInvokable]
+    public Task<ReadAttachmentResult> HandleReadAttachment(
+        string sourcePath,
+        string imageSource)
+    {
+        return Bridge.RaiseReadAttachmentAsync(sourcePath, imageSource);
+    }
+
+    [JSInvokable]
+    public Task<EditorBlobResult> HandleStoreEditorBlob(
+        string sourcePath,
+        string blobId,
+        string contentType,
+        string contentBase64)
+    {
+        return Bridge.RaiseStoreEditorBlobAsync(sourcePath, blobId, contentType, contentBase64);
+    }
+
+    [JSInvokable]
+    public Task<EditorBlobReadResult> HandleReadEditorBlob(
+        string sourcePath,
+        string blobId)
+    {
+        return Bridge.RaiseReadEditorBlobAsync(sourcePath, blobId);
+    }
+
+    [JSInvokable]
+    public Task<EditorBlobListResult> HandleListEditorBlobs(string sourcePath)
+    {
+        return Bridge.RaiseListEditorBlobsAsync(sourcePath);
     }
 
     async Task IBlockSuiteHostClient.LoadNoteAsync(string? path, string title, string content, string? collectionRoot)
     {
-        Logger.LogInformation(
-            "BlockSuiteHost loading note. InstanceId={InstanceId} Path={Path} Title={Title} ContentLength={ContentLength}",
-            instanceId,
-            path,
-            title,
-            content.Length);
-        await RequireModule().InvokeVoidAsync("loadNote", instanceId, path, title, content, collectionRoot);
-        Logger.LogInformation("BlockSuiteHost loaded note. InstanceId={InstanceId} Path={Path}", instanceId, path);
+        await InvokeHostVoidAsync("loadNote", instanceId, path, title, content, collectionRoot);
     }
 
     async Task<string> IBlockSuiteHostClient.ExportContentAsync()
     {
-        return await RequireModule().InvokeAsync<string>("exportContent", instanceId);
+        return await InvokeHostAsync<string>("exportContent", instanceId);
     }
 
     async Task IBlockSuiteHostClient.ActivateEditorAsync()
     {
-        await RequireModule().InvokeVoidAsync("activateEditor", instanceId);
+        await InvokeHostVoidAsync("activateEditor", instanceId);
     }
 
     async Task IBlockSuiteHostClient.SetReadOnlyModeAsync(bool isReadOnly)
     {
-        await RequireModule().InvokeVoidAsync("setReadOnlyMode", instanceId, isReadOnly);
+        await InvokeHostVoidAsync("setReadOnlyMode", instanceId, isReadOnly);
     }
 
     async Task IBlockSuiteHostClient.ApplyThemeAsync(EditorTheme theme)
     {
-        Logger.LogDebug("BlockSuiteHost applying theme. InstanceId={InstanceId} Theme={ThemeName}", instanceId, theme.Name);
-        await RequireModule().InvokeVoidAsync("applyTheme", instanceId, theme);
+        await InvokeHostVoidAsync("applyTheme", instanceId, theme);
     }
 
     async Task IBlockSuiteHostClient.FocusEditorAsync()
     {
-        await RequireModule().InvokeVoidAsync("focusEditor", instanceId);
+        await InvokeHostVoidAsync("focusEditor", instanceId);
     }
 
     async Task IBlockSuiteHostClient.FocusBlockAsync(string blockId)
     {
-        await RequireModule().InvokeVoidAsync("focusBlock", instanceId, blockId);
+        await InvokeHostVoidAsync("focusBlock", instanceId, blockId);
+    }
+
+    async Task<EditorCaretState?> IBlockSuiteHostClient.GetCaretStateAsync()
+    {
+        return await InvokeHostAsync<EditorCaretState?>("getCaretState", instanceId);
+    }
+
+    async Task IBlockSuiteHostClient.RestoreCaretStateAsync(EditorCaretState caret)
+    {
+        await InvokeHostVoidAsync("restoreCaretState", instanceId, caret);
     }
 
     async Task IBlockSuiteHostClient.CreateClozeFromSelectionAsync(
@@ -110,7 +278,7 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         string? slotId,
         int? displayClozeIndex)
     {
-        await RequireModule().InvokeVoidAsync(
+        await InvokeHostVoidAsync(
             "createClozeFromSelection",
             instanceId,
             cardContextId,
@@ -120,44 +288,34 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
     async Task<SelectedImageBlockReadModel?> IBlockSuiteHostClient.GetSelectedImageBlockAsync()
     {
-        return await RequireModule().InvokeAsync<SelectedImageBlockReadModel?>(
-            "getSelectedImageBlock",
-            instanceId);
+        return await InvokeHostAsync<SelectedImageBlockReadModel?>("getSelectedImageBlock", instanceId);
     }
 
     async Task<SelectedCardContextBlocksReadModel?> IBlockSuiteHostClient.GetSelectedCardContextBlocksAsync()
     {
-        return await RequireModule().InvokeAsync<SelectedCardContextBlocksReadModel?>(
+        return await InvokeHostAsync<SelectedCardContextBlocksReadModel?>(
             "getSelectedCardContextBlocks",
             instanceId);
     }
 
     async Task IBlockSuiteHostClient.ShowSaveResultAsync(bool ok, string? error)
     {
-        await RequireModule().InvokeVoidAsync("showSaveResult", instanceId, ok, error);
+        await InvokeHostVoidAsync("showSaveResult", instanceId, ok, error);
     }
 
     async Task IBlockSuiteHostClient.ShowExtractResultAsync(bool ok, string? createdPath, string? error)
     {
-        await RequireModule().InvokeVoidAsync("showExtractResult", instanceId, ok, createdPath, error);
+        await InvokeHostVoidAsync("showExtractResult", instanceId, ok, createdPath, error);
     }
 
     async Task IBlockSuiteHostClient.SetMentionTargetsAsync(IEnumerable<KnowledgeMentionTargetReadModel> targets)
     {
-        IEnumerable<object> payload = targets.Select(CreateMentionTargetPayload);
-
-        await RequireModule().InvokeVoidAsync("setMentionTargets", instanceId, payload);
+        await InvokeHostVoidAsync("setMentionTargets", instanceId, CreateMentionTargetPayloads(targets));
     }
 
     async Task IBlockSuiteHostClient.SetDocumentLinksAsync(KnowledgeDocumentLinksReadModel links)
     {
-        var payload = new
-        {
-            incoming = links.Incoming.Select(CreateDocumentLinkPayload),
-            outgoing = links.Outgoing.Select(CreateDocumentLinkPayload),
-        };
-
-        await RequireModule().InvokeVoidAsync("setDocumentLinks", instanceId, payload);
+        await InvokeHostVoidAsync("setDocumentLinks", instanceId, CreateDocumentLinksPayload(links));
     }
 
     async Task IBlockSuiteHostClient.HandleMentionPreviewResultAsync(
@@ -168,7 +326,7 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
         string? documentContent,
         string? error)
     {
-        await RequireModule().InvokeVoidAsync(
+        await InvokeHostVoidAsync(
             "handleMentionPreviewResult",
             instanceId,
             requestId,
@@ -181,39 +339,90 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
 
     async Task IBlockSuiteHostClient.HandleMentionOpenResultAsync(bool ok, string? error)
     {
-        await RequireModule().InvokeVoidAsync("handleMentionOpenResult", instanceId, ok, error);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        try
-        {
-            Logger.LogInformation("BlockSuiteHost disposing. InstanceId={InstanceId}", instanceId);
-            if (module is not null && instanceId != 0)
-            {
-                await module.InvokeVoidAsync("disposeBlockSuite", instanceId);
-            }
-
-            if (module is not null)
-            {
-                await module.DisposeAsync();
-            }
-        }
-        catch (Exception ex) when (ex is JSException or InvalidOperationException or ObjectDisposedException)
-        {
-            Logger.LogWarning(ex, "BlockSuiteHost disposal skipped. InstanceId={InstanceId}", instanceId);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite host disposal skipped: {ex.Message}");
-        }
-        finally
-        {
-            Logger.LogDebug("BlockSuiteHost unregistering. InstanceId={InstanceId}", instanceId);
-            Bridge.Unregister(this);
-            dotNetReference?.Dispose();
-        }
+        await InvokeHostVoidAsync("handleMentionOpenResult", instanceId, ok, error);
     }
 
     private IJSObjectReference RequireModule()
     {
         return module ?? throw new InvalidOperationException("The BlockSuite JavaScript module is not ready.");
+    }
+
+    private async Task WaitForDisposalOperationAsync(Task task, string operation)
+    {
+        Task completedTask = await Task.WhenAny(task, Task.Delay(DisposalOperationTimeout));
+        if (completedTask != task)
+        {
+            Logger.LogWarning(
+                "BlockSuiteHost disposal operation timed out. InstanceId={InstanceId} Operation={Operation} Timeout={Timeout}",
+                instanceId,
+                operation,
+                DisposalOperationTimeout);
+            _ = ObserveLateDisposalOperationAsync(task, operation);
+            return;
+        }
+
+        await task;
+    }
+
+    private async Task ObserveLateDisposalOperationAsync(Task task, string operation)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(
+                ex,
+                "BlockSuiteHost disposal operation failed after timeout. InstanceId={InstanceId} Operation={Operation}",
+                instanceId,
+                operation);
+        }
+    }
+
+    private async Task InvokeHostVoidAsync(string method, params object?[] args)
+    {
+        await RequireModule().InvokeVoidAsync(method, args);
+    }
+
+    private async Task<TResult> InvokeHostAsync<TResult>(string method, params object?[] args)
+    {
+        return await RequireModule().InvokeAsync<TResult>(method, args);
+    }
+
+    private static IReadOnlyList<object> CreateMentionTargetPayloads(
+        IEnumerable<KnowledgeMentionTargetReadModel> targets)
+    {
+        return targets.Select(CreateMentionTargetPayload).ToArray();
+    }
+
+    private static object CreateMentionTargetPayload(KnowledgeMentionTargetReadModel target)
+    {
+        return new
+        {
+            relativePath = target.RelativePath,
+            title = target.Title,
+        };
+    }
+
+    private static object CreateDocumentLinksPayload(KnowledgeDocumentLinksReadModel links)
+    {
+        return new
+        {
+            incoming = links.Incoming.Select(CreateDocumentLinkPayload).ToArray(),
+            outgoing = links.Outgoing.Select(CreateDocumentLinkPayload).ToArray(),
+        };
+    }
+
+    private static object CreateDocumentLinkPayload(KnowledgeDocumentLinkReadModel link)
+    {
+        return new
+        {
+            openRelativePath = link.OpenRelativePath,
+            displayTitle = link.DisplayTitle,
+            snippet = link.Snippet,
+            matchedText = link.MatchedText,
+            updatedAt = link.UpdatedAt,
+        };
     }
 }
