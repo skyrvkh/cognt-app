@@ -1,9 +1,37 @@
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.DocumentImport;
 
 internal sealed partial class DocumentImportViewModel
 {
+    internal async Task ImportExistingCollectionAsync(string collectionPath)
+    {
+        if (IsImporting)
+        {
+            return;
+        }
+
+        IsImporting = true;
+        UpdateMessageState(string.Empty, isError: false);
+
+        try
+        {
+            string message = await target.ImportExistingCollectionAsync(collectionPath);
+            UpdateMessageState(message, isError: false);
+        }
+        catch (Exception ex)
+        {
+            UpdateMessageState(ex.Message, isError: true);
+            logger?.LogError(ex, "Collection import failed. CollectionPath={CollectionPath}", collectionPath);
+        }
+        finally
+        {
+            IsImporting = false;
+            RefreshDerivedState();
+        }
+    }
+
     private async Task ImportAsync()
     {
         if (!CanImport)
@@ -25,16 +53,20 @@ internal sealed partial class DocumentImportViewModel
         IsImporting = false;
 
         UpdateMessageState(
-            failedFileCount == 0
-                ? $"Imported {importedFileCount:N0} document{(importedFileCount == 1 ? string.Empty : "s")}."
-                : $"Imported {importedFileCount:N0} document{(importedFileCount == 1 ? string.Empty : "s")}. {failedFileCount:N0} failed.",
-            isError: failedFileCount > 0);
+            queueState.FormatCompletionMessage(),
+            isError: queueState.HasFailures);
         RefreshDerivedState();
+        logger?.LogInformation(
+            "Document import batch completed. TotalFiles={TotalFiles} SuccessCount={SuccessCount} FailedCount={FailedCount}",
+            Files.Count,
+            Files.Count(file => file.Status == DocumentImportStatus.Success),
+            Files.Count(file => file.Status == DocumentImportStatus.Failed));
     }
 
     private DocumentImportQueueItem[] CreateImportableFileSnapshot()
     {
-        List<DocumentImportQueueItem> importableFiles = new(importableFileCount > 0 ? importableFileCount : Files.Count);
+        List<DocumentImportQueueItem> importableFiles = new(
+            queueState.ImportableFileCount > 0 ? queueState.ImportableFileCount : Files.Count);
         foreach (DocumentImportQueueItem file in Files)
         {
             if (file.Status is DocumentImportStatus.Ready or DocumentImportStatus.Failed)
@@ -80,6 +112,12 @@ internal sealed partial class DocumentImportViewModel
         {
             file.ErrorMessage = ex.Message;
             file.Status = DocumentImportStatus.Failed;
+            logger?.LogError(
+                ex,
+                "Document import file failed. Path={Path} Type={Type} Mode={Mode}",
+                file.FullPath,
+                file.Type,
+                file.Mode);
         }
         finally
         {

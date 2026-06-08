@@ -34,6 +34,21 @@ internal static class DocumentImportPolicy
         return SupportedExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
     }
 
+    internal static bool IsSupportedImportDropPath(string path)
+    {
+        if (File.Exists(path))
+        {
+            return IsSupportedPath(path);
+        }
+
+        return Directory.Exists(path);
+    }
+
+    internal static bool IsCollectionFolderPath(string path)
+    {
+        return string.Equals(Path.GetExtension(TrimDirectorySeparators(path)), ".cognt", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static DocumentImportType GetImportType(string path)
     {
         return Path.GetExtension(path).ToLowerInvariant() switch
@@ -87,5 +102,12 @@ internal static class DocumentImportPolicy
         }
 
         return unit == 0 ? $"{bytes} {units[unit]}" : $"{value:0.#} {units[unit]}";
+    }
+
+    private static string TrimDirectorySeparators(string path)
+    {
+        return string.IsNullOrWhiteSpace(path)
+            ? string.Empty
+            : path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 }

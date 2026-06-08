@@ -202,13 +202,13 @@
                         </Style>
                     </StackPanel.Style>
 
-                    <TextBlock Text="Import documents DOCX, PDF, and MD"
+                    <TextBlock Text="Import documents, folders, or collections"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
                                FontSize="21"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource InkBrush}" />
-                    <TextBlock Text="Import DOCX, PDF, or MD files only. DOCX and MD become editable notes; PDFs stay readable in the PDF viewer."
+                    <TextBlock Text="Select DOCX, PDF, or MD files with Explorer, or drop folders and Cognt collections into this window."
                                Margin="0,7,0,0"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
@@ -216,14 +216,25 @@
                                FontSize="12.5"
                                Foreground="{DynamicResource MutedBrush}" />
 
-                    <Button Margin="0,18,0,0"
-                            HorizontalAlignment="Center"
-                            AutomationProperties.Name="Import files"
-                            Click="AddFilesButton_Click"
-                            Style="{StaticResource PrimaryDocumentImportButtonStyle}">
-                        <TextBlock Text="Import files"
-                                    />
-                    </Button>
+                    <TextBlock Text="{Binding Message}"
+                               Margin="0,14,0,0"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               AutomationProperties.LiveSetting="Polite"
+                               Visibility="{Binding HasMessage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMessageError}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
 
                 <Grid>
@@ -263,11 +274,6 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource MutedBrush}" />
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    Content="Import files"
-                                    AutomationProperties.Name="Import files"
-                                    Click="AddFilesButton_Click"
-                                    Style="{StaticResource DocumentImportButtonStyle}" />
                         </Grid>
                     </Border>
 
@@ -401,16 +407,26 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
+                <Button Grid.Column="0"
+                        Content="Import"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.Name="Import"
+                        Click="ImportSourceButton_Click"
+                        IsEnabled="{Binding CanImportCollection}"
+                        Style="{StaticResource PrimaryDocumentImportButtonStyle}" />
                 <Button Grid.Column="1"
                         Content="Cancel"
                         IsCancel="True"
                         Style="{StaticResource DocumentImportButtonStyle}" />
-                <Button Grid.Column="3"
+                <Button Grid.Column="5"
                         Command="{Binding ImportCommand}"
                         IsDefault="True"
-                        AutomationProperties.Name="Import"
+                        AutomationProperties.Name="Add queued documents to collection"
+                        Visibility="{Binding HasFiles, Converter={StaticResource BooleanToVisibilityConverter}}"
                         Style="{StaticResource PrimaryDocumentImportButtonStyle}">
                     <TextBlock Text="{Binding ImportButtonText}"
                                 />

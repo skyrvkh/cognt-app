@@ -2,27 +2,30 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.DocumentImport;
 
 internal sealed partial class DocumentImportViewModel : ObservableObject
 {
     private readonly MainViewModel target;
+    private readonly ILogger<DocumentImportViewModel>? logger;
     private bool isImporting;
     private bool openImportedDocumentAfterImport = true;
     private string message = string.Empty;
     private bool isMessageError;
-    private string queueSummary = "No files selected";
+    private DocumentImportQueueSnapshot queueState = DocumentImportQueueSnapshot.Empty;
+    private string queueSummary = DocumentImportQueueSnapshot.Empty.QueueSummary;
     private bool canImport;
-    private int importableFileCount;
-    private int importedFileCount;
-    private int failedFileCount;
 
-    internal DocumentImportViewModel(MainViewModel target)
+    internal DocumentImportViewModel(
+        MainViewModel target,
+        ILogger<DocumentImportViewModel>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(target);
 
         this.target = target;
+        this.logger = logger;
         RemoveFileCommand = new RelayCommand(RemoveFile, parameter => parameter is DocumentImportQueueItem { CanRemove: true });
         ImportCommand = new RelayCommand(_ => { _ = ImportAsync(); }, _ => CanImport);
     }
@@ -83,22 +86,23 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
 
     public bool CanImport => canImport;
 
-    public string ImportButtonText => IsImporting ? "Importing..." : "Import";
+    public bool CanImportCollection => !IsImporting;
+
+    public string ImportButtonText => IsImporting ? "Adding..." : "Add to collection";
+
+    internal string DefaultCollectionParentPath => target.GetDefaultCollectionCreationParentPath();
 
     internal void AddFiles(IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
+        string[] pathSnapshot = paths.ToArray();
         List<string> rejected = [];
         HashSet<string> existingPaths = CreateExistingFullPathSet();
 
-        foreach (string path in paths)
+        foreach (string path in pathSnapshot)
         {
-            string addError = TryQueueFile(path, existingPaths);
-            if (!string.IsNullOrWhiteSpace(addError))
-            {
-                rejected.Add(addError);
-            }
+            QueueImportPath(path, existingPaths, rejected);
         }
 
         UpdateMessageState(
@@ -109,17 +113,15 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
 
     private void RefreshDerivedState()
     {
-        DocumentImportQueueState state = CreateQueueState(Files, IsImporting);
-        queueSummary = state.QueueSummary;
-        canImport = state.CanImport;
-        importableFileCount = state.ImportableFileCount;
-        importedFileCount = state.ImportedFileCount;
-        failedFileCount = state.FailedFileCount;
+        queueState = DocumentImportQueueSnapshot.Create(Files, IsImporting);
+        queueSummary = queueState.QueueSummary;
+        canImport = queueState.CanImport;
 
         OnPropertyChanged(nameof(HasFiles));
         OnPropertyChanged(nameof(HasNoFiles));
         OnPropertyChanged(nameof(QueueSummary));
         OnPropertyChanged(nameof(CanImport));
+        OnPropertyChanged(nameof(CanImportCollection));
         OnPropertyChanged(nameof(ImportButtonText));
         if (ImportCommand is RelayCommand importCommand)
         {
@@ -130,43 +132,6 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
         {
             removeCommand.RaiseCanExecuteChanged();
         }
-    }
-
-    private static DocumentImportQueueState CreateQueueState(
-        IReadOnlyCollection<DocumentImportQueueItem> files,
-        bool isImporting)
-    {
-        int importableCount = 0;
-        int importedCount = 0;
-        int failedCount = 0;
-
-        foreach (DocumentImportQueueItem file in files)
-        {
-            switch (file.Status)
-            {
-                case DocumentImportStatus.Ready:
-                    importableCount++;
-                    break;
-                case DocumentImportStatus.Failed:
-                    importableCount++;
-                    failedCount++;
-                    break;
-                case DocumentImportStatus.Success:
-                    importedCount++;
-                    break;
-            }
-        }
-
-        string summary = files.Count == 0
-            ? "No files selected"
-            : $"{files.Count:N0} file{(files.Count == 1 ? string.Empty : "s")} selected";
-
-        return new DocumentImportQueueState(
-            summary,
-            CanImport: !isImporting && importableCount > 0,
-            ImportableFileCount: importableCount,
-            ImportedFileCount: importedCount,
-            FailedFileCount: failedCount);
     }
 
     private void UpdateMessageState(string value, bool isError)
@@ -186,10 +151,4 @@ internal sealed partial class DocumentImportViewModel : ObservableObject
         return existingPaths;
     }
 
-    private readonly record struct DocumentImportQueueState(
-        string QueueSummary,
-        bool CanImport,
-        int ImportableFileCount,
-        int ImportedFileCount,
-        int FailedFileCount);
 }
