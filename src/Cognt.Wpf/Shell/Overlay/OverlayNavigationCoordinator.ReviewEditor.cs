@@ -1,4 +1,5 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Overlay;
 
@@ -31,6 +32,7 @@ internal sealed partial class OverlayNavigationCoordinator
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Review exit failed. RequestId={RequestId}", editorOpenRequestId);
             dialogs.ShowWarning("Review", $"Review mode could not close cleanly: {ex.Message}");
             editorView.AttachBlockSuiteHostToEditor();
             ShowDecksOverlay();

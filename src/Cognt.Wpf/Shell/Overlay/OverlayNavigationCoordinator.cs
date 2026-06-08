@@ -7,6 +7,8 @@ using CogntApp.ViewModels;
 using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Overlay;
 
@@ -24,6 +26,8 @@ internal sealed partial class OverlayNavigationCoordinator
     private readonly OverlayHostController overlayHost;
     private readonly EditorView editorView;
     private readonly ReviewOverlayCoordinator reviewOverlay;
+    private readonly ILogger<OverlayNavigationCoordinator> logger;
+    private readonly ILoggerFactory loggerFactory;
     private int editorOpenRequestId;
     private PdfReaderView? pdfReaderView;
 
@@ -40,6 +44,39 @@ internal sealed partial class OverlayNavigationCoordinator
         OverlayHostController overlayHost,
         EditorView editorView,
         ReviewOverlayCoordinator reviewOverlay)
+        : this(
+            dialogs,
+            viewModel,
+            allNotesViewModel,
+            graphViewModel,
+            dashboardView,
+            allNotesView,
+            graphView,
+            decksView,
+            settingsView,
+            overlayHost,
+            editorView,
+            reviewOverlay,
+            NullLogger<OverlayNavigationCoordinator>.Instance,
+            NullLoggerFactory.Instance)
+    {
+    }
+
+    internal OverlayNavigationCoordinator(
+        IShellDialogService dialogs,
+        MainViewModel viewModel,
+        AllNotesViewModel allNotesViewModel,
+        GraphViewModel graphViewModel,
+        DashboardView dashboardView,
+        AllNotesView allNotesView,
+        GraphView graphView,
+        DecksView decksView,
+        SettingsView settingsView,
+        OverlayHostController overlayHost,
+        EditorView editorView,
+        ReviewOverlayCoordinator reviewOverlay,
+        ILogger<OverlayNavigationCoordinator> logger,
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(dialogs);
         ArgumentNullException.ThrowIfNull(viewModel);
@@ -53,6 +90,8 @@ internal sealed partial class OverlayNavigationCoordinator
         ArgumentNullException.ThrowIfNull(overlayHost);
         ArgumentNullException.ThrowIfNull(editorView);
         ArgumentNullException.ThrowIfNull(reviewOverlay);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
 
         this.dialogs = dialogs;
         this.viewModel = viewModel;
@@ -66,6 +105,8 @@ internal sealed partial class OverlayNavigationCoordinator
         this.overlayHost = overlayHost;
         this.editorView = editorView;
         this.reviewOverlay = reviewOverlay;
+        this.logger = logger;
+        this.loggerFactory = loggerFactory;
     }
 
     internal async Task HandleOverlayRequestedAsync(OverlayRequestedEventArgs e)
@@ -110,6 +151,7 @@ internal sealed partial class OverlayNavigationCoordinator
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Overlay navigation failed. ViewKind={ViewKind} RequestId={RequestId}", e.ViewKind, editorOpenRequestId);
             dialogs.ShowWarning("Navigation Failed", $"The view could not be changed: {ex.Message}");
             editorView.AttachBlockSuiteHostToEditor();
         }
@@ -121,13 +163,14 @@ internal sealed partial class OverlayNavigationCoordinator
         {
             editorOpenRequestId++;
             await CloseOverlayWorkflowsAsync();
-            pdfReaderView ??= new PdfReaderView();
+            pdfReaderView ??= new PdfReaderView(loggerFactory.CreateLogger<PdfReaderView>());
             ShowOverlay(pdfReaderView);
             string documentPath = viewModel.ResolveDocumentPath(e.Document.RelativePath);
             await pdfReaderView.LoadPdfAsync(e.Document, documentPath);
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Open PDF overlay failed. RelativePath={RelativePath} RequestId={RequestId}", e.Document.RelativePath, editorOpenRequestId);
             dialogs.ShowWarning("Open PDF Failed", $"The PDF could not be opened:{Environment.NewLine}{ex.Message}");
         }
     }
@@ -143,6 +186,7 @@ internal sealed partial class OverlayNavigationCoordinator
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "All notes open failed. RelativePath={RelativePath}", e.RelativePath);
             dialogs.ShowWarning("Open Note Failed", $"The note could not be opened: {ex.Message}");
         }
 
@@ -157,6 +201,7 @@ internal sealed partial class OverlayNavigationCoordinator
         {
             editorOpenRequestId++;
             await CloseOverlayWorkflowsAsync();
+            decksView.SetCramEnabled(viewModel.IsCramEnabled);
             decksView.ShowCardsForSource(
                 viewModel.OpenCollectionPath,
                 e.RelativePath,
@@ -165,7 +210,31 @@ internal sealed partial class OverlayNavigationCoordinator
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Note cards overlay failed. RelativePath={RelativePath} RequestId={RequestId}", e.RelativePath, editorOpenRequestId);
             dialogs.ShowWarning("Cards Not Ready", $"The note's cards could not be opened: {ex.Message}");
+        }
+    }
+
+    internal async Task HandleFlashcardRequestedAsync(OpenFlashcardRequestedEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        try
+        {
+            editorOpenRequestId++;
+            await CloseOverlayWorkflowsAsync();
+            decksView.SetCramEnabled(viewModel.IsCramEnabled);
+            ShowOverlay(decksView);
+            await decksView.OpenCardEditorAsync(
+                viewModel.OpenCollectionPath,
+                e.CardId,
+                e.SourceRelPath,
+                e.Title);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Flashcard overlay failed. CardId={CardId} SourceRelPath={SourceRelPath} RequestId={RequestId}", e.CardId, e.SourceRelPath, editorOpenRequestId);
+            dialogs.ShowWarning("Card Not Ready", $"The selected flashcard could not be opened: {ex.Message}");
         }
     }
 

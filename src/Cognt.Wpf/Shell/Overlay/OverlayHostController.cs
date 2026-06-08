@@ -9,7 +9,9 @@ internal sealed class OverlayHostController
     private readonly ContentControl overlayHost;
     private readonly EditorView editorView;
 
-    internal OverlayHostController(ContentControl overlayHost, EditorView editorView)
+    internal OverlayHostController(
+        ContentControl overlayHost,
+        EditorView editorView)
     {
         ArgumentNullException.ThrowIfNull(overlayHost);
         ArgumentNullException.ThrowIfNull(editorView);
@@ -49,5 +51,13 @@ internal sealed class OverlayHostController
         {
             Hide();
         }
+    }
+
+    internal bool IsShowing(UIElement overlay)
+    {
+        ArgumentNullException.ThrowIfNull(overlay);
+
+        bool isShowing = ReferenceEquals(overlayHost.Content, overlay);
+        return isShowing;
     }
 }

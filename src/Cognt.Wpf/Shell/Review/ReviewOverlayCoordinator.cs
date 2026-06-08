@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
@@ -7,6 +8,8 @@ using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Overlay;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Review;
 
@@ -18,10 +21,10 @@ internal sealed partial class ReviewOverlayCoordinator
     private readonly IRecordFlashcardReviewCommand recordFlashcardReviewCommand;
     private readonly ICramSessionEngine cramSessionEngine;
     private readonly Func<string> collectionIdProvider;
+    private readonly ILogger<ReviewOverlayCoordinator> logger;
+    private readonly ILoggerFactory loggerFactory;
+    private readonly ReviewOverlayQueueState queueState = new();
     private ReviewView? reviewView;
-    private string? activeCollectionId;
-    private FlashcardReviewQueueMode activeQueueMode = FlashcardReviewQueueMode.Scheduled;
-    private CramScope activeCramScope = CramScope.All;
     private Dictionary<long, FlashcardReviewCardReadModel> activeCramCardsById = [];
     private FlashcardReviewQueueSummaryReadModel? activeCramSummary;
     private CramSessionState? activeCramState;
@@ -34,6 +37,27 @@ internal sealed partial class ReviewOverlayCoordinator
         IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
         ICramSessionEngine cramSessionEngine,
         Func<string> collectionIdProvider)
+        : this(
+            overlayHost,
+            dialogs,
+            reviewQueueQuery,
+            recordFlashcardReviewCommand,
+            cramSessionEngine,
+            collectionIdProvider,
+            NullLogger<ReviewOverlayCoordinator>.Instance,
+            NullLoggerFactory.Instance)
+    {
+    }
+
+    internal ReviewOverlayCoordinator(
+        OverlayHostController overlayHost,
+        IShellDialogService dialogs,
+        IFlashcardReviewQueueQuery reviewQueueQuery,
+        IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
+        ICramSessionEngine cramSessionEngine,
+        Func<string> collectionIdProvider,
+        ILogger<ReviewOverlayCoordinator> logger,
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(overlayHost);
         ArgumentNullException.ThrowIfNull(dialogs);
@@ -41,6 +65,8 @@ internal sealed partial class ReviewOverlayCoordinator
         ArgumentNullException.ThrowIfNull(recordFlashcardReviewCommand);
         ArgumentNullException.ThrowIfNull(cramSessionEngine);
         ArgumentNullException.ThrowIfNull(collectionIdProvider);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
 
         this.overlayHost = overlayHost;
         this.dialogs = dialogs;
@@ -48,20 +74,23 @@ internal sealed partial class ReviewOverlayCoordinator
         this.recordFlashcardReviewCommand = recordFlashcardReviewCommand;
         this.cramSessionEngine = cramSessionEngine;
         this.collectionIdProvider = collectionIdProvider;
+        this.logger = logger;
+        this.loggerFactory = loggerFactory;
     }
 
     internal event EventHandler? ExitReviewRequested;
 
+    internal bool IsReviewActive => reviewView is not null;
+
     internal async Task ShowReviewOverlayAsync()
     {
         string collectionId = GetRequiredCollectionId();
-        activeQueueMode = FlashcardReviewQueueMode.Scheduled;
-        activeCramScope = CramScope.All;
+        queueState.BeginScheduled(collectionId);
         ClearCramSession();
         FlashcardReviewQueueReadModel reviewQueue = LoadReviewQueue(collectionId);
+        queueState.CacheScheduledQueue(reviewQueue);
         EnsureReviewQueueAvailable(reviewQueue);
 
-        activeCollectionId = collectionId;
         ReviewView review = EnsureReviewView();
         overlayHost.Show(review);
         await ShowReviewQueueAsync(reviewQueue, exitWhenUnavailable: false);
@@ -73,12 +102,10 @@ internal sealed partial class ReviewOverlayCoordinator
         ArgumentNullException.ThrowIfNull(settings);
 
         string collectionId = GetRequiredCollectionId();
-        activeQueueMode = FlashcardReviewQueueMode.Cram;
-        activeCramScope = scope.Normalize();
+        queueState.BeginCram(collectionId, scope);
         StopQueueRefreshTimer();
         FlashcardReviewQueueReadModel reviewQueue = LoadReviewQueue(collectionId);
 
-        activeCollectionId = collectionId;
         ReviewView review = EnsureReviewView();
         overlayHost.Show(review);
         if (reviewQueue.Cards.Count == 0)
@@ -101,9 +128,7 @@ internal sealed partial class ReviewOverlayCoordinator
 
         ReviewView view = reviewView;
         reviewView = null;
-        activeCollectionId = null;
-        activeQueueMode = FlashcardReviewQueueMode.Scheduled;
-        activeCramScope = CramScope.All;
+        queueState.Reset();
         ClearCramSession();
         StopQueueRefreshTimer();
 
@@ -120,7 +145,7 @@ internal sealed partial class ReviewOverlayCoordinator
     {
         if (reviewView is null)
         {
-            reviewView = new ReviewView();
+            reviewView = new ReviewView(loggerFactory.CreateLogger<ReviewView>());
             reviewView.ExitReviewRequested += ReviewView_ExitReviewRequested;
             reviewView.RatingRequested += ReviewView_RatingRequested;
             reviewView.WarningMessageRequested += ReviewView_WarningMessageRequested;
@@ -147,25 +172,33 @@ internal sealed partial class ReviewOverlayCoordinator
             return;
         }
 
-        string collectionId = activeCollectionId
+        string collectionId = queueState.ActiveCollectionId
             ?? throw new InvalidOperationException("No active review session exists.");
 
         review.SetRatingInProgress(true);
         try
         {
-            if (activeQueueMode == FlashcardReviewQueueMode.Cram)
+            if (queueState.ActiveQueueMode == FlashcardReviewQueueMode.Cram)
             {
                 await RecordCramRatingAsync(collectionId, e);
             }
             else
             {
-                await recordFlashcardReviewCommand.ExecuteAsync(
+                RecordedFlashcardReviewReadModel reviewResult = await recordFlashcardReviewCommand.ExecuteAsync(
                     new RecordFlashcardReviewRequest(collectionId, e.CardId, e.Rating));
-                await ReloadReviewQueueAsync(collectionId, exitWhenUnavailable: true);
+                if (TryAdvanceScheduledQueueFromCache(reviewResult, out FlashcardReviewQueueReadModel? cachedQueue))
+                {
+                    await ShowReviewQueueAsync(cachedQueue, exitWhenUnavailable: true);
+                }
+                else
+                {
+                    await ReloadReviewQueueAsync(collectionId, exitWhenUnavailable: true);
+                }
             }
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Review rating failed. CollectionId={CollectionId} CardId={CardId} Rating={Rating}", collectionId, e.CardId, e.Rating);
             dialogs.ShowWarning("Review", $"The review card could not be advanced: {ex.Message}");
         }
         finally
@@ -226,7 +259,7 @@ internal sealed partial class ReviewOverlayCoordinator
         if (state.Settings.AffectNormalSchedule
             && activeCramSchedulerRecordedCardIds.Add(e.CardId))
         {
-            await recordFlashcardReviewCommand.ExecuteAsync(
+            _ = await recordFlashcardReviewCommand.ExecuteAsync(
                 new RecordFlashcardReviewRequest(collectionId, e.CardId, e.Rating));
         }
 
@@ -250,5 +283,13 @@ internal sealed partial class ReviewOverlayCoordinator
         }
 
         return collectionId;
+    }
+
+    private bool TryAdvanceScheduledQueueFromCache(
+        RecordedFlashcardReviewReadModel reviewResult,
+        [NotNullWhen(true)]
+        out FlashcardReviewQueueReadModel? reviewQueue)
+    {
+        return queueState.TryAdvanceScheduledQueue(reviewResult, DateTimeOffset.UtcNow, out reviewQueue);
     }
 }

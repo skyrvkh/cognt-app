@@ -3,6 +3,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Review;
 
@@ -55,15 +56,15 @@ internal sealed partial class ReviewOverlayCoordinator
 
     private FlashcardReviewQueueReadModel LoadReviewQueue(string collectionId)
     {
-        return reviewQueueQuery.Execute(new FlashcardReviewQueueQueryRequest(
-            collectionId,
-            activeQueueMode,
-            activeQueueMode == FlashcardReviewQueueMode.Cram ? activeCramScope : null));
+        FlashcardReviewQueueQueryRequest request = queueState.CreateQueueRequest(collectionId);
+        FlashcardReviewQueueReadModel queue = reviewQueueQuery.Execute(request);
+        return queue;
     }
 
     private async Task ReloadReviewQueueAsync(string collectionId, bool exitWhenUnavailable)
     {
         FlashcardReviewQueueReadModel reviewQueue = LoadReviewQueue(collectionId);
+        queueState.CacheScheduledQueue(reviewQueue);
         await ShowReviewQueueAsync(reviewQueue, exitWhenUnavailable);
     }
 
@@ -160,6 +161,7 @@ internal sealed partial class ReviewOverlayCoordinator
     private async void QueueRefreshTimer_Tick(object? sender, EventArgs e)
     {
         StopQueueRefreshTimer();
+        string? activeCollectionId = queueState.ActiveCollectionId;
         if (reviewView is null || string.IsNullOrWhiteSpace(activeCollectionId))
         {
             return;
@@ -167,10 +169,17 @@ internal sealed partial class ReviewOverlayCoordinator
 
         try
         {
+            if (TryCreateDueScheduledQueueFromCache(out FlashcardReviewQueueReadModel? cachedQueue))
+            {
+                await ShowReviewQueueAsync(cachedQueue, exitWhenUnavailable: true);
+                return;
+            }
+
             await ReloadReviewQueueAsync(activeCollectionId, exitWhenUnavailable: true);
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Review queue refresh tick failed. CollectionId={CollectionId}", activeCollectionId);
             dialogs.ShowWarning("Review", $"The practice queue could not be refreshed: {ex.Message}");
             ExitReviewRequested?.Invoke(this, EventArgs.Empty);
         }
@@ -217,5 +226,12 @@ internal sealed partial class ReviewOverlayCoordinator
         }
 
         return reviewQueue.NextIntradayDueUtc ?? reviewQueue.NextDueUtc;
+    }
+
+    private bool TryCreateDueScheduledQueueFromCache(
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)]
+        out FlashcardReviewQueueReadModel? reviewQueue)
+    {
+        return queueState.TryCreateDueScheduledQueue(DateTimeOffset.UtcNow, out reviewQueue);
     }
 }

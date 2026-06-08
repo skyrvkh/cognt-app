@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 
 namespace CogntApp.Views;
@@ -9,9 +10,11 @@ namespace CogntApp.Views;
 public partial class PdfReaderView : UserControl
 {
     private bool hasCurrentDocument;
+    private readonly ILogger<PdfReaderView>? logger;
 
-    public PdfReaderView()
+    public PdfReaderView(ILogger<PdfReaderView>? logger = null)
     {
+        this.logger = logger;
         InitializeComponent();
         ShowEmptyState();
     }
@@ -28,6 +31,10 @@ public partial class PdfReaderView : UserControl
 
         if (!File.Exists(documentPath))
         {
+            logger?.LogWarning(
+                "PDF reader load skipped because file is missing. RelativePath={RelativePath} DocumentPath={DocumentPath}",
+                document.RelativePath,
+                documentPath);
             ShowState(
                 "Missing PDF file",
                 "The selected PDF file is missing from workspace storage.");
@@ -46,6 +53,7 @@ public partial class PdfReaderView : UserControl
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "PDF reader load failed. RelativePath={RelativePath} DocumentPath={DocumentPath}", document.RelativePath, documentPath);
             ShowState("Failed to load PDF", ex.Message);
         }
     }
@@ -80,6 +88,7 @@ public partial class PdfReaderView : UserControl
             return;
         }
 
+        logger?.LogWarning("PDF reader navigation completed with error. Uri={Uri} WebErrorStatus={WebErrorStatus}", PdfWebView.Source, e.WebErrorStatus);
         ShowState("Failed to load PDF", $"WebView2 could not open the PDF. Error: {e.WebErrorStatus}");
     }
 

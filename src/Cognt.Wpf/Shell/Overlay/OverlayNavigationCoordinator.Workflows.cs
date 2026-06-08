@@ -1,6 +1,7 @@
 using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Overlay;
 
@@ -40,6 +41,7 @@ internal sealed partial class OverlayNavigationCoordinator
                 return;
             }
 
+            logger.LogError(ex, "Scheduled review overlay start failed. RequestId={RequestId}", requestId);
             dialogs.ShowWarning("Review Not Ready", $"Review mode could not start: {ex.Message}");
             await CloseReviewIfActiveAsync();
             ShowDecksOverlay();
@@ -63,6 +65,7 @@ internal sealed partial class OverlayNavigationCoordinator
                 return;
             }
 
+            logger.LogError(ex, "Cram overlay start failed. RequestId={RequestId} Scope={Scope}", requestId, scope);
             dialogs.ShowWarning("Cram Not Ready", $"Cram mode could not start: {ex.Message}");
             await CloseReviewIfActiveAsync();
             ShowDecksOverlay();
@@ -77,6 +80,7 @@ internal sealed partial class OverlayNavigationCoordinator
     private void ShowDecksOverlay()
     {
         FlashcardSourceContext sourceContext = viewModel.GetFlashcardSourceContext();
+        decksView.SetCramEnabled(viewModel.IsCramEnabled);
         decksView.SetCollectionContext(
             viewModel.OpenCollectionPath,
             sourceContext.SourceRelPath,
