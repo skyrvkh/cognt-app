@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
 
@@ -17,57 +18,32 @@ public partial class EditorView
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"BlockSuite mention target update failed: {ex}");
+            logger.LogWarning(ex, "BlockSuite mention target update failed.");
         }
     }
 
-    private bool TryHandleCurrentSourcePath(string? path, Action onMismatch)
-    {
-        if (suppressBridgeCommands)
-        {
-            return false;
-        }
-
-        if (IsCurrentSourcePath(path))
-        {
-            return true;
-        }
-
-        onMismatch();
-        return false;
-    }
-
-    private void TryInvokeHandler<TEventArgs>(
-        EventHandler<TEventArgs>? handler,
+    private Task DispatchCurrentSourceAsyncBridgeRequest<TEventArgs, TResult>(
+        Func<object?, TEventArgs, Task>? handler,
         TEventArgs eventArgs,
-        Action onMissing,
-        Action<Exception> onFailure)
+        string? sourcePath,
+        Action<TResult> complete,
+        Func<string, TResult> fail,
+        string sourceMismatchMessage,
+        string missingHandlerMessage,
+        Action<Exception> logFailure)
     {
-        TryInvokeHandler(handler, eventArgs, static () => { }, onMissing, onFailure);
-    }
-
-    private void TryInvokeHandler<TEventArgs>(
-        EventHandler<TEventArgs>? handler,
-        TEventArgs eventArgs,
-        Action beforeInvoke,
-        Action onMissing,
-        Action<Exception> onFailure)
-    {
-        if (handler is null)
-        {
-            onMissing();
-            return;
-        }
-
-        try
-        {
-            beforeInvoke();
-            handler.Invoke(this, eventArgs);
-        }
-        catch (Exception ex)
-        {
-            onFailure(ex);
-        }
+        return BlockSuiteBridgeDispatch.TryInvokeCurrentSourceAsyncHandler(
+            this,
+            handler,
+            eventArgs,
+            sourcePath,
+            suppressBridgeCommands,
+            IsCurrentSourcePath,
+            complete,
+            fail,
+            sourceMismatchMessage,
+            missingHandlerMessage,
+            logFailure);
     }
 
     private bool IsCurrentSourcePath(string? path)

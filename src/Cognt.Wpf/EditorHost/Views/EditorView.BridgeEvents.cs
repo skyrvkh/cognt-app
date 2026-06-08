@@ -1,6 +1,5 @@
-using System.IO;
-using Cognt.Wpf.EditorHost.Services;
 using Cognt.Wpf.EditorHost.Models.Editor;
+using Cognt.Wpf.EditorHost.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Cognt.Wpf.EditorHost.Views;
@@ -27,14 +26,15 @@ public partial class EditorView
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"BlockSuite content change handling failed: {ex}");
+            logger.LogError(ex, "BlockSuite content change handling failed.");
             PostSaveResult(ok: false, error: ex.Message);
         }
     }
 
     private void BlockSuiteBridge_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
     {
-        TryInvokeHandler(
+        BlockSuiteBridgeDispatch.TryInvokeHandler(
+            this,
             CreateExtractRequested,
             e,
             onMissing: () => PostExtractResult(ok: false, error: "No extract handler is registered."),
@@ -49,7 +49,8 @@ public partial class EditorView
             return;
         }
 
-        TryInvokeHandler(
+        BlockSuiteBridgeDispatch.TryInvokeHandler(
+            this,
             SaveClozeRequested,
             e,
             beforeInvoke: () => currentContent = e.Content,
@@ -65,152 +66,12 @@ public partial class EditorView
             return;
         }
 
-        TryInvokeHandler(
+        BlockSuiteBridgeDispatch.TryInvokeHandler(
+            this,
             OpenImageOcclusionRequested,
             e,
             beforeInvoke: () => currentContent = e.Content,
             onMissing: () => PostSaveResult(ok: false, error: "No image occlusion handler is registered."),
             onFailure: ex => PostSaveResult(ok: false, error: ex.Message));
-    }
-
-    private void BlockSuiteBridge_MentionSearchRequested(object? sender, MentionSearchRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(e.SourcePath, () => e.Complete([])))
-        {
-            return;
-        }
-
-        TryInvokeHandler(
-            MentionSearchRequested,
-            e,
-            onMissing: () => e.Complete([]),
-            onFailure: ex =>
-            {
-                System.Diagnostics.Debug.WriteLine($"BlockSuite mention search failed: {ex}");
-                e.Complete([]);
-            });
-    }
-
-    private void BlockSuiteBridge_MentionPreviewRequested(object? sender, MentionPreviewRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(
-                e.SourcePath,
-                () => PostMentionPreviewResult(
-                    e.RequestId,
-                    e.RelativePath,
-                    e.Mode,
-                    ok: false,
-                    error: "The mention preview source is not the current note file.")))
-        {
-            return;
-        }
-
-        TryInvokeHandler(
-            MentionPreviewRequested,
-            e,
-            onMissing: () => PostMentionPreviewResult(
-                e.RequestId,
-                e.RelativePath,
-                e.Mode,
-                ok: false,
-                error: "No mention preview handler is registered."),
-            onFailure: ex => PostMentionPreviewResult(
-                e.RequestId,
-                e.RelativePath,
-                e.Mode,
-                ok: false,
-                error: ex.Message));
-    }
-
-    private void BlockSuiteBridge_OpenMentionRequested(object? sender, OpenMentionRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(
-                e.SourcePath,
-                () => PostMentionOpenResult(ok: false, error: "The mention source is not the current note file.")))
-        {
-            return;
-        }
-
-        TryInvokeHandler(
-            OpenMentionRequested,
-            e,
-            beforeInvoke: () => currentContent = e.Content,
-            onMissing: () => PostMentionOpenResult(ok: false, error: "No mention open handler is registered."),
-            onFailure: ex => PostMentionOpenResult(ok: false, error: ex.Message));
-    }
-
-    private void BlockSuiteBridge_CreateLinkedNoteRequested(object? sender, CreateLinkedNoteRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(
-                e.SourcePath,
-                () => e.Complete(CreateLinkedNoteResult.Fail("The linked note source is not the current note file."))))
-        {
-            return;
-        }
-
-        TryInvokeHandler(
-            CreateLinkedNoteRequested,
-            e,
-            onMissing: () => e.Complete(CreateLinkedNoteResult.Fail("No linked note handler is registered.")),
-            onFailure: ex => e.Complete(CreateLinkedNoteResult.Fail(ex.Message)));
-    }
-
-    private async Task BlockSuiteBridge_AttachFileRequested(object? sender, AttachFileRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(
-                e.SourcePath,
-                () => e.Complete(AttachFileResult.Fail("The attachment source is not the current note file."))))
-        {
-            return;
-        }
-
-        if (AttachFileRequested is null)
-        {
-            e.Complete(AttachFileResult.Fail("No attachment handler is registered."));
-            return;
-        }
-
-        try
-        {
-            await AttachFileRequested.Invoke(this, e);
-        }
-        catch (Exception ex)
-        {
-            e.Complete(AttachFileResult.Fail(ex.Message));
-        }
-    }
-
-    private async Task BlockSuiteBridge_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
-    {
-        if (!TryHandleCurrentSourcePath(
-                e.SourcePath,
-                () => e.Complete(ReadAttachmentResult.Fail("The attachment source is not the current note file."))))
-        {
-            return;
-        }
-
-        if (ReadAttachmentRequested is null)
-        {
-            e.Complete(ReadAttachmentResult.Fail("No attachment reader is registered."));
-            return;
-        }
-
-        try
-        {
-            await ReadAttachmentRequested.Invoke(this, e);
-        }
-        catch (Exception ex)
-        {
-            e.Complete(ReadAttachmentResult.Fail(ex.Message));
-        }
-    }
-
-    private void BlockSuiteBridge_DiagnosticReceived(object? sender, EditorDiagnosticReceivedEventArgs e)
-    {
-        if (!string.IsNullOrWhiteSpace(e.Message))
-        {
-            logger.LogDebug("BlockSuite host diagnostic: {Message}", e.Message);
-            System.Diagnostics.Debug.WriteLine($"BlockSuite host: {e.Message}");
-        }
     }
 }
