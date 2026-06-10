@@ -107,7 +107,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         ApplyShellTheme();
         shellDialogs = new WindowShellDialogService(this);
-        attachmentWorkflow = new AttachmentWorkflowController(viewModel, shellDialogs);
+        attachmentWorkflow = new AttachmentWorkflowController(
+            viewModel,
+            shellDialogs,
+            loggerFactory.CreateLogger<AttachmentWorkflowController>(),
+            loggerFactory);
         collectionWorkflow = new CollectionWorkflowController(viewModel, shellDialogs);
         InspectorToolHost.Content = noteInspectorView;
         GraphToolHost.Content = noteGraphToolView;
@@ -263,65 +267,6 @@ public partial class MainWindow : Window
 
         isStartupInitialized = true;
         await startupWorkflow.InitializeAsync();
-    }
-
-    private void CollectionSelectorButton_Click(object sender, RoutedEventArgs e)
-    {
-        collectionWorkflow.OpenSelector(CollectionSelectorPopup);
-    }
-
-    private void CollectionOptionButton_Click(object sender, RoutedEventArgs e)
-    {
-        collectionWorkflow.SelectCollection(
-            (sender as FrameworkElement)?.DataContext as CollectionOptionViewModel,
-            CollectionSelectorPopup);
-    }
-
-    private void AddCollectionButton_Click(object sender, RoutedEventArgs e)
-    {
-        collectionWorkflow.CreateCollection(CollectionSelectorPopup);
-    }
-
-    private void OpenExistingCollectionButton_Click(object sender, RoutedEventArgs e)
-    {
-        collectionWorkflow.OpenExistingCollection(CollectionSelectorPopup);
-    }
-
-    private void ImportButton_Click(object sender, RoutedEventArgs e)
-    {
-        attachmentWorkflow.ShowDocumentImport(this);
-    }
-
-    private async void ImportAttachmentMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        string importKind = (sender as FrameworkElement)?.Tag as string ?? "Document";
-        await attachmentWorkflow.ImportAttachmentAsync(this, importKind);
-    }
-
-    private void SidebarSearchTextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        viewModel.ShowGlobalSearchPopup();
-    }
-
-    private void SidebarSearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape)
-        {
-            return;
-        }
-
-        viewModel.DismissGlobalSearchPopup();
-        e.Handled = true;
-    }
-
-    private void EditorViewHost_DragOver(object sender, DragEventArgs e)
-    {
-        attachmentWorkflow.HandleDragOver(e);
-    }
-
-    private async void EditorViewHost_Drop(object sender, DragEventArgs e)
-    {
-        await attachmentWorkflow.HandleDropAsync(e);
     }
 
     private void RemoveCollectionButton_Click(object sender, RoutedEventArgs e)

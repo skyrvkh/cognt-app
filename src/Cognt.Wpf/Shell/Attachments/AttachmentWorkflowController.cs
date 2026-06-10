@@ -1,9 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.IO;
 using Microsoft.Win32;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.DocumentImport;
 using CogntApp.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Shell.Attachments;
 
@@ -11,16 +13,24 @@ internal sealed class AttachmentWorkflowController
 {
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
+    private readonly ILogger<AttachmentWorkflowController> logger;
+    private readonly ILoggerFactory loggerFactory;
 
     internal AttachmentWorkflowController(
         MainViewModel viewModel,
-        IShellDialogService dialogs)
+        IShellDialogService dialogs,
+        ILogger<AttachmentWorkflowController> logger,
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
 
         this.viewModel = viewModel;
         this.dialogs = dialogs;
+        this.logger = logger;
+        this.loggerFactory = loggerFactory;
     }
 
     internal void ShowImportMenu(Button? button)
@@ -34,15 +44,44 @@ internal sealed class AttachmentWorkflowController
         button.ContextMenu.IsOpen = true;
     }
 
-    internal void ShowDocumentImport(Window owner)
+    internal void ShowDocumentImport(Window owner, IEnumerable<string>? initialPaths = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        DocumentImportWindow dialog = new(new DocumentImportViewModel(viewModel))
+        DocumentImportViewModel importViewModel = new(
+            viewModel,
+            loggerFactory.CreateLogger<DocumentImportViewModel>());
+        string[] initialPathSnapshot = initialPaths?.ToArray() ?? [];
+        string? initialCollectionPath = TryGetSingleCollectionImportPath(initialPathSnapshot);
+
+        if (initialCollectionPath is null && initialPathSnapshot.Length > 0)
+        {
+            importViewModel.AddFiles(initialPathSnapshot);
+        }
+
+        DocumentImportWindow dialog = new(importViewModel)
         {
             Owner = owner
         };
+        if (initialCollectionPath is not null)
+        {
+            dialog.Loaded += async (_, _) => await importViewModel.ImportExistingCollectionAsync(initialCollectionPath);
+        }
+
         dialog.ShowDialog();
+    }
+
+    private static string? TryGetSingleCollectionImportPath(IReadOnlyList<string> paths)
+    {
+        if (paths.Count != 1
+            || string.IsNullOrWhiteSpace(paths[0])
+            || !Directory.Exists(paths[0])
+            || !DocumentImportPolicy.IsCollectionFolderPath(paths[0]))
+        {
+            return null;
+        }
+
+        return paths[0].Trim();
     }
 
     internal async Task ImportAttachmentAsync(Window owner, string importKind)
@@ -98,6 +137,7 @@ internal sealed class AttachmentWorkflowController
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Attachment drop failed. AttachmentCount={AttachmentCount}", attachmentPaths.Count);
             dialogs.ShowWarning("Attach File Failed", $"The attachment could not be attached:{Environment.NewLine}{ex.Message}");
             e.Effects = DragDropEffects.None;
         }
@@ -141,6 +181,7 @@ internal sealed class AttachmentWorkflowController
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Attachment operation failed. Title={Title}", title);
             dialogs.ShowWarning(title, $"{failurePrefix}{ex.Message}");
         }
     }
