@@ -210,7 +210,7 @@
                         <ItemsControl ItemsSource="{Binding DashboardStudyHeatmapCells}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="52" Rows="7" />
+                                    <UniformGrid Columns="53" Rows="7" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>

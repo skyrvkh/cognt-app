@@ -1,14 +1,18 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 
 namespace CogntApp.Views;
 
 public partial class BrowserPaneView : UserControl
 {
-    public BrowserPaneView()
+    private readonly ILogger<BrowserPaneView>? logger;
+
+    public BrowserPaneView(ILogger<BrowserPaneView>? logger = null)
     {
+        this.logger = logger;
         InitializeComponent();
     }
 
@@ -40,6 +44,7 @@ public partial class BrowserPaneView : UserControl
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Browser navigation failed before dispatch. Target={Target}", target);
             ShowState("Failed to open page", ex.Message);
         }
     }
@@ -71,6 +76,7 @@ public partial class BrowserPaneView : UserControl
             return;
         }
 
+        logger?.LogWarning("Browser navigation completed with error. Uri={Uri} WebErrorStatus={WebErrorStatus}", BrowserWebView.Source, e.WebErrorStatus);
         ShowState("Failed to open page", $"WebView2 could not open the page. Error: {e.WebErrorStatus}");
     }
 
