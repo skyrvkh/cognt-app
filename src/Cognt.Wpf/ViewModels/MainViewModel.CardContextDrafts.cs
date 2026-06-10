@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -18,7 +19,7 @@ public sealed partial class MainViewModel
 
         _ = Task.Run(() => RefreshCardContextDraftState(collectionPath, relativePath, content))
             .ContinueWith(
-                task => ApplyScheduledNoteToCardQueueRefresh(refreshVersion, relativePath, task),
+                task => ApplyScheduledNoteToCardQueueRefresh(refreshVersion, collectionPath, relativePath, task),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
@@ -37,7 +38,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        string? existingContent = noteService.ReadCardContextDrafts(openCollectionPath, relativePath);
+        string? existingContent = ReadNoteToCardDraftContent(openCollectionPath, relativePath);
         if (string.IsNullOrWhiteSpace(existingContent))
         {
             CurrentNoteToCardQueue = null;
@@ -64,7 +65,7 @@ public sealed partial class MainViewModel
         string relativePath,
         string content)
     {
-        string? existingContent = noteService.ReadCardContextDrafts(collectionPath, relativePath);
+        string? existingContent = ReadNoteToCardDraftContent(collectionPath, relativePath);
         if (string.IsNullOrWhiteSpace(existingContent))
         {
             return null;
@@ -82,16 +83,18 @@ public sealed partial class MainViewModel
             content,
             document);
 
-        return noteToCardQueueQuery.Execute(
+        NoteToCardQueueReadModel result = noteToCardQueueQuery.Execute(
             new NoteToCardQueueQueryRequest(
                 collectionPath,
                 relativePath,
                 content,
                 refreshed));
+        return result;
     }
 
     private void ApplyScheduledNoteToCardQueueRefresh(
         int refreshVersion,
+        string collectionPath,
         string relativePath,
         Task<NoteToCardQueueReadModel?> task)
     {
@@ -109,7 +112,12 @@ public sealed partial class MainViewModel
             }
             else if (task.Exception is not null)
             {
-                System.Diagnostics.Debug.WriteLine($"Note-to-card queue refresh failed: {task.Exception}");
+                logger?.LogError(
+                    task.Exception.GetBaseException(),
+                    "Scheduled note-to-card queue refresh failed. CollectionPath={CollectionPath} Version={Version} RelativePath={RelativePath}",
+                    collectionPath,
+                    refreshVersion,
+                    relativePath);
             }
         }
 
@@ -135,20 +143,28 @@ public sealed partial class MainViewModel
         {
             if (!absoluteUri.IsFile)
             {
+                logger?.LogWarning(
+                    "Collection image path rejected because URI is not a file. CollectionPath={CollectionPath} ImageRelPath={ImageRelPath} UriScheme={UriScheme}",
+                    openCollectionPath,
+                    imageRelPath,
+                    absoluteUri.Scheme);
                 throw new InvalidOperationException("Only collection-local image files can be masked.");
             }
 
-            return GetRequiredRelativeCollectionPath(absoluteUri.LocalPath);
+            string relativeFilePath = GetRequiredRelativeCollectionPath(absoluteUri.LocalPath);
+            return relativeFilePath;
         }
 
         if (Path.IsPathRooted(candidate))
         {
-            return GetRequiredRelativeCollectionPath(candidate);
+            string relativeRootedPath = GetRequiredRelativeCollectionPath(candidate);
+            return relativeRootedPath;
         }
 
         string fullPath = ResolveCollectionFilePath(openCollectionPath, candidate);
         _ = GetRequiredRelativeCollectionPath(fullPath);
-        return candidate.Replace('\\', '/').Trim('/');
+        string normalized = candidate.Replace('\\', '/').Trim('/');
+        return normalized;
     }
 
     private string GetRequiredRelativeCollectionPath(string fullPath)
@@ -159,17 +175,23 @@ public sealed partial class MainViewModel
         string normalizedFullPath = Path.GetFullPath(fullPath);
         if (!normalizedFullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
         {
+            logger?.LogWarning(
+                "Relative collection path resolution failed because file is outside collection. CollectionRoot={CollectionRoot} FullPath={FullPath}",
+                root,
+                normalizedFullPath);
             throw new InvalidOperationException("The selected image must be inside the current collection.");
         }
 
-        return NormalizeRelativePath(Path.GetRelativePath(root, normalizedFullPath));
+        string relativePath = NormalizeRelativePath(Path.GetRelativePath(root, normalizedFullPath));
+        return relativePath;
     }
 
     private CardContextDraftNoteDocument ReadCardContextDraftDocument(string relativePath)
     {
-        return CardContextDraftDocumentCodec.Read(
-            noteService.ReadCardContextDrafts(openCollectionPath, relativePath),
+        CardContextDraftNoteDocument document = CardContextDraftDocumentCodec.Read(
+            ReadNoteToCardDraftContent(openCollectionPath, relativePath),
             relativePath);
+        return document;
     }
 
     private void PersistCardContextDraftDocument(
@@ -191,7 +213,7 @@ public sealed partial class MainViewModel
             noteContent,
             document);
 
-        noteService.SaveCardContextDrafts(
+        WriteNoteToCardDraftContent(
             collectionPath,
             relativePath,
             refreshed.Contexts.Count == 0
@@ -199,6 +221,29 @@ public sealed partial class MainViewModel
                 : CardContextDraftDocumentCodec.Write(refreshed));
 
         return refreshed;
+    }
+
+    private string? ReadNoteToCardDraftContent(string collectionPath, string relativePath)
+    {
+        bool found = transientNoteToCardDrafts.TryGetValue(
+            CreateNoteToCardDraftKey(collectionPath, relativePath),
+            out string? content);
+        return found ? content : null;
+    }
+
+    private void WriteNoteToCardDraftContent(string collectionPath, string relativePath, string? content)
+    {
+        string key = CreateNoteToCardDraftKey(collectionPath, relativePath);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            transientNoteToCardDrafts.TryRemove(key, out _);
+        }
+        else
+        {
+            transientNoteToCardDrafts[key] = content;
+        }
+
+        DeletePersistentNoteToCardDraft(collectionPath, relativePath);
     }
 
     private void ClearNoteToCardDraftState(string collectionPath, string relativePath)
@@ -221,60 +266,13 @@ public sealed partial class MainViewModel
         CardContextDraftNoteDocument document,
         CardContext updatedContext)
     {
-        int contextIndex = FindDraftContextIndexById(document.Contexts, updatedContext.Id);
-
-        if (contextIndex < 0)
-        {
-            return document with { Contexts = AppendDraftContext(document.Contexts, updatedContext) };
-        }
-
-        CardContext[] contexts = document.Contexts.ToArray();
-        contexts[contextIndex] = updatedContext;
-        return document with { Contexts = contexts };
-    }
-
-    private static CardContext[] AppendDraftContext(
-        IReadOnlyList<CardContext> contexts,
-        CardContext context)
-    {
-        CardContext[] nextContexts = new CardContext[contexts.Count + 1];
-        for (int index = 0; index < contexts.Count; index++)
-        {
-            nextContexts[index] = contexts[index];
-        }
-
-        nextContexts[^1] = context;
-        return nextContexts;
-    }
-
-    private static int FindDraftContextIndexById(IReadOnlyList<CardContext> contexts, string contextId)
-    {
-        for (int index = 0; index < contexts.Count; index++)
-        {
-            if (string.Equals(contexts[index].Id, contextId, StringComparison.Ordinal))
-            {
-                return index;
-            }
-        }
-
-        return -1;
+        return CardContextDraftDocumentEditor.ReplaceContext(document, updatedContext);
     }
 
     private static CardContext ResolveRequestedDraftContext(
         CardContextDraftNoteDocument document,
         string? cardContextId)
     {
-        if (string.IsNullOrWhiteSpace(cardContextId))
-        {
-            return document.Contexts[0];
-        }
-
-        int contextIndex = FindDraftContextIndexById(document.Contexts, cardContextId);
-        if (contextIndex < 0)
-        {
-            throw new InvalidOperationException("The selected card context no longer exists.");
-        }
-
-        return document.Contexts[contextIndex];
+        return CardContextDraftDocumentEditor.ResolveRequestedContext(document, cardContextId);
     }
 }

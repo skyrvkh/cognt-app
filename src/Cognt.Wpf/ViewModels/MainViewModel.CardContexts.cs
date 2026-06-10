@@ -103,7 +103,7 @@ public sealed partial class MainViewModel
             };
         }
 
-        return new OpenImageMaskEditorRequest(
+        OpenImageMaskEditorRequest request = new(
             openCollectionPath,
             relativePath,
             imageBlockId.Trim(),
@@ -111,6 +111,7 @@ public sealed partial class MainViewModel
             imageFullPath,
             context,
             context.Id);
+        return request;
     }
 
     private static IReadOnlyList<string> AddContextBlockId(
@@ -158,115 +159,6 @@ public sealed partial class MainViewModel
         ReloadCurrentNoteToCardQueue(relativePath, noteContent);
     }
 
-    internal CardContext CreateCardContextFromSelection(
-        IReadOnlyList<string> selectedBlockIds,
-        string? title,
-        string noteContent)
-    {
-        ArgumentNullException.ThrowIfNull(selectedBlockIds);
-
-        string relativePath = GetRequiredCurrentNoteRelativePath();
-        SaveNoteIfChanged(noteContent);
-
-        CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-        int order = GetNextDraftContextOrder(document.Contexts);
-        CardContext context = CardContextAuthoring.CreateContextForSelectedBlocks(
-            selectedBlockIds,
-            title,
-            order);
-
-        CardContextDraftNoteDocument updatedDocument = document with
-        {
-            Contexts = AppendDraftContext(document.Contexts, context),
-        };
-
-        PersistCardContextDraftDocument(relativePath, noteContent, updatedDocument);
-        ReloadCurrentNoteToCardQueue(relativePath, noteContent);
-        RaiseMessage(
-            "Note Cards",
-            $"Created a draft card context from {context.ContextBlockIds.Count} selected block(s).");
-        return context;
-    }
-
-    private static CardContext FilterContextForGeneration(
-        CardContext context,
-        IReadOnlySet<string> slotIds)
-    {
-        var slots = new List<CardSlot>();
-        var selectedSlotIds = new HashSet<string>(StringComparer.Ordinal);
-        var selectedTargetIds = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (CardSlot slot in context.Slots)
-        {
-            if (!slotIds.Contains(slot.Id))
-            {
-                continue;
-            }
-
-            slots.Add(slot);
-            selectedSlotIds.Add(slot.Id);
-
-            foreach (string targetId in slot.TargetIds)
-            {
-                if (!string.IsNullOrWhiteSpace(targetId))
-                {
-                    selectedTargetIds.Add(targetId);
-                }
-            }
-        }
-
-        foreach (CardTarget target in context.Targets)
-        {
-            if (selectedSlotIds.Contains(target.SlotId))
-            {
-                selectedTargetIds.Add(target.Id);
-            }
-        }
-
-        var targets = new List<CardTarget>();
-        var selectedMaskIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (CardTarget target in context.Targets)
-        {
-            if (!selectedTargetIds.Contains(target.Id))
-            {
-                continue;
-            }
-
-            targets.Add(target);
-
-            foreach (ImageMaskAnchor anchor in target.ImageAnchors)
-            {
-                selectedMaskIds.Add(anchor.MaskId);
-            }
-        }
-
-        var images = new List<CardContextImageSurface>();
-        foreach (CardContextImageSurface image in context.Images)
-        {
-            var masks = new List<ImageOcclusionMask>();
-            foreach (ImageOcclusionMask mask in image.Masks)
-            {
-                if (selectedTargetIds.Contains(mask.TargetId) || selectedMaskIds.Contains(mask.Id))
-                {
-                    masks.Add(mask);
-                }
-            }
-
-            if (masks.Count > 0)
-            {
-                images.Add(image with { Masks = masks });
-            }
-        }
-
-        return context with
-        {
-            Slots = slots,
-            Targets = targets,
-            Images = images,
-        };
-    }
-
-
     private void ReloadNoteToCardDeckNames()
     {
         string previousSelection = NoteToCardDeckName;
@@ -276,37 +168,28 @@ public sealed partial class MainViewModel
 
         if (!string.IsNullOrWhiteSpace(openCollectionPath) && Directory.Exists(openCollectionPath))
         {
-            List<string> deckNames = LoadDistinctNoteToCardDeckNames(out string? firstDeckName);
-            deckNames.Sort(StringComparer.OrdinalIgnoreCase);
-            noteToCardDeckNameCatalog = deckNames;
+            NoteToCardDeckCatalog catalog = LoadNoteToCardDeckCatalog();
+            noteToCardDeckNameCatalog = catalog.DeckNames;
 
-            foreach (string deckName in deckNames)
+            foreach (string deckName in catalog.DeckNames)
             {
                 NoteToCardDeckNames.Add(deckName);
                 noteToCardDeckNameSet.Add(deckName);
             }
 
-            if (string.IsNullOrWhiteSpace(previousSelection) && firstDeckName is not null)
-            {
-                previousSelection = firstDeckName;
-            }
+            previousSelection = NoteToCardDeckCatalogBuilder.ResolveSelection(
+                previousSelection,
+                catalog.DeckNames,
+                catalog.FirstDeckName);
         }
 
         isUpdatingNoteToCardDeckCatalog = true;
         try
         {
-            if (!string.IsNullOrWhiteSpace(previousSelection))
-            {
-                NoteToCardDeckName = previousSelection;
-            }
-            else if (NoteToCardDeckNames.Count > 0)
-            {
-                NoteToCardDeckName = NoteToCardDeckNames[0];
-            }
-            else
-            {
-                NoteToCardDeckName = string.Empty;
-            }
+            NoteToCardDeckName = NoteToCardDeckCatalogBuilder.ResolveSelection(
+                previousSelection,
+                noteToCardDeckNameCatalog,
+                firstDeckName: null);
         }
         finally
         {
@@ -316,47 +199,23 @@ public sealed partial class MainViewModel
         RefreshNoteToCardDeckSearchResults();
     }
 
-    private List<string> LoadDistinctNoteToCardDeckNames(out string? firstDeckName)
+    private NoteToCardDeckCatalog LoadNoteToCardDeckCatalog()
     {
-        var deckNames = new List<string>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        firstDeckName = null;
-
-        foreach (FlashcardDeckSummaryReadModel deck in flashcardDeckSummariesQuery.Execute(
-                     new FlashcardCollectionQueryRequest(openCollectionPath)))
-        {
-            string name = deck.Name;
-            if (string.IsNullOrWhiteSpace(name) || !seenNames.Add(name))
-            {
-                continue;
-            }
-
-            firstDeckName ??= name;
-            deckNames.Add(name);
-        }
-
-        return deckNames;
+        return NoteToCardDeckCatalogBuilder.Create(flashcardDeckSummariesQuery.Execute(
+            new FlashcardCollectionQueryRequest(openCollectionPath)));
     }
 
     private void RefreshNoteToCardDeckSearchResults()
     {
         FilteredNoteToCardDeckNames.Clear();
 
-        string query = NoteToCardDeckName.Trim();
-        if (string.IsNullOrWhiteSpace(query)
-            || noteToCardDeckNameSet.Contains(query))
+        foreach (string deckName in NoteToCardDeckCatalogBuilder.FilterSearchResults(
+                     noteToCardDeckNameCatalog,
+                     noteToCardDeckNameSet,
+                     NoteToCardDeckName,
+                     limit: 6))
         {
-            OnPropertyChanged(nameof(HasFilteredNoteToCardDeckNames));
-            return;
-        }
-
-        for (int index = 0; index < noteToCardDeckNameCatalog.Count && FilteredNoteToCardDeckNames.Count < 6; index++)
-        {
-            string deckName = noteToCardDeckNameCatalog[index];
-            if (deckName.Contains(query, StringComparison.OrdinalIgnoreCase))
-            {
-                FilteredNoteToCardDeckNames.Add(deckName);
-            }
+            FilteredNoteToCardDeckNames.Add(deckName);
         }
 
         OnPropertyChanged(nameof(HasFilteredNoteToCardDeckNames));
@@ -402,22 +261,14 @@ public sealed partial class MainViewModel
 
     private string[] AppendNoteToCardTags(IEnumerable<string> tags)
     {
-        List<string> addedTags = [];
-        var knownTags = new HashSet<string>(NoteToCardTags, StringComparer.OrdinalIgnoreCase);
+        string[] addedTags = NoteToCardTagSetBuilder.CreateAdditions(NoteToCardTags, tags);
 
-        foreach (string value in tags)
+        foreach (string tag in addedTags)
         {
-            string tag = NormalizeTagDisplayName(value);
-            if (tag.Length == 0 || !knownTags.Add(tag))
-            {
-                continue;
-            }
-
             NoteToCardTags.Add(tag);
-            addedTags.Add(tag);
         }
 
-        return addedTags.ToArray();
+        return addedTags;
     }
 
     private void ClearNoteToCardTags()
@@ -480,22 +331,6 @@ public sealed partial class MainViewModel
             ?? throw new InvalidOperationException("The selected card slot no longer exists.");
     }
 
-    private static int GetNextDraftContextOrder(IReadOnlyList<CardContext> contexts)
-    {
-        if (contexts.Count == 0)
-        {
-            return 0;
-        }
-
-        int maxOrder = contexts[0].Order;
-        for (int index = 1; index < contexts.Count; index++)
-        {
-            maxOrder = Math.Max(maxOrder, contexts[index].Order);
-        }
-
-        return maxOrder + 1;
-    }
-
     private string? FindNoteToCardTag(string tag)
     {
         foreach (string candidate in NoteToCardTags)
@@ -509,29 +344,4 @@ public sealed partial class MainViewModel
         return null;
     }
 
-    private static string NormalizeTagDisplayName(string? tag)
-    {
-        if (string.IsNullOrWhiteSpace(tag))
-        {
-            return string.Empty;
-        }
-
-        ReadOnlySpan<char> trimmedTag = tag.Trim();
-        Span<char> normalized = trimmedTag.Length <= 256
-            ? stackalloc char[trimmedTag.Length]
-            : new char[trimmedTag.Length];
-        int normalizedLength = 0;
-
-        foreach (char character in trimmedTag)
-        {
-            if (!char.IsWhiteSpace(character))
-            {
-                normalized[normalizedLength++] = character;
-            }
-        }
-
-        return normalizedLength == 0
-            ? string.Empty
-            : new string(normalized[..normalizedLength]);
-    }
 }

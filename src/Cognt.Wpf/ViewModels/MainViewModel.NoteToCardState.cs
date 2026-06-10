@@ -45,7 +45,9 @@ public sealed partial class MainViewModel
         {
             if (SetProperty(ref currentNoteToCardQueue, value))
             {
-                (noteCardCandidatesByContextAndSlot, visibleNoteCardCandidates) = CreateNoteCardQueueState(value);
+                NoteCardQueueState queueState = NoteCardQueueStateBuilder.Create(value);
+                noteCardCandidatesByContextAndSlot = queueState.Lookup;
+                visibleNoteCardCandidates = queueState.VisibleCandidates;
                 OnPropertyChanged(nameof(HasNoteCardCandidates));
                 OnPropertyChanged(nameof(NoteCardCandidates));
                 OnPropertyChanged(nameof(HasVisibleNoteCardCandidates));
@@ -175,51 +177,9 @@ public sealed partial class MainViewModel
 
     private CardCandidateReadModel? FindCurrentNoteCardCandidate(string contextId, string slotId)
     {
-        return noteCardCandidatesByContextAndSlot.TryGetValue((contextId, slotId), out CardCandidateReadModel? candidate)
+        bool found = noteCardCandidatesByContextAndSlot.TryGetValue((contextId, slotId), out CardCandidateReadModel? candidate);
+        return found
             ? candidate
             : null;
-    }
-
-    private static (
-        Dictionary<(string ContextId, string SlotId), CardCandidateReadModel> Lookup,
-        IReadOnlyList<CardCandidateReadModel> VisibleCandidates) CreateNoteCardQueueState(NoteToCardQueueReadModel? queue)
-    {
-        if (queue is null || queue.Items.Count == 0)
-        {
-            return ([], Array.Empty<CardCandidateReadModel>());
-        }
-
-        Dictionary<(string ContextId, string SlotId), CardCandidateReadModel> lookup = new(queue.Items.Count);
-        List<CardCandidateReadModel>? visibleCandidates = null;
-
-        for (int index = 0; index < queue.Items.Count; index++)
-        {
-            CardCandidateReadModel candidate = queue.Items[index];
-            lookup[(candidate.ContextId, candidate.SlotId)] = candidate;
-
-            if (candidate.Status == CardCandidateStatus.Disabled)
-            {
-                visibleCandidates ??= CopyCandidatesBeforeDisabledItem(queue.Items, index);
-                continue;
-            }
-
-            visibleCandidates?.Add(candidate);
-        }
-
-        return (lookup, visibleCandidates ?? queue.Items);
-    }
-
-    private static List<CardCandidateReadModel> CopyCandidatesBeforeDisabledItem(
-        IReadOnlyList<CardCandidateReadModel> candidates,
-        int disabledItemIndex)
-    {
-        var visibleCandidates = new List<CardCandidateReadModel>(candidates.Count - 1);
-
-        for (int index = 0; index < disabledItemIndex; index++)
-        {
-            visibleCandidates.Add(candidates[index]);
-        }
-
-        return visibleCandidates;
     }
 }

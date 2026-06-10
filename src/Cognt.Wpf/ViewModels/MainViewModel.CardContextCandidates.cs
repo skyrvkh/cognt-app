@@ -3,6 +3,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -42,17 +43,6 @@ public sealed partial class MainViewModel
         await GenerateCardsFromCandidatesAsync(
             [SelectedCardCandidate],
             "The selected card candidate cannot be generated yet.");
-    }
-
-    private void RaiseCreateCardContextFromSelectionRequest()
-    {
-        if (string.IsNullOrWhiteSpace(currentNotePath))
-        {
-            RaiseMessage("Note Cards", "Open a note before creating a card context.");
-            return;
-        }
-
-        CreateCardContextFromSelectionRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void RaiseAddSelectedTextToSelectedCardSlotRequest()
@@ -105,6 +95,15 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            CardCandidateReadModel? selected = SelectedCardCandidate;
+            logger?.LogError(
+                ex,
+                "Disable selected card candidate failed. CollectionPath={CollectionPath} CurrentNotePath={CurrentNotePath} CandidateContextId={CandidateContextId} CandidateSlotId={CandidateSlotId} CandidateStatus={CandidateStatus}",
+                openCollectionPath,
+                currentNotePath,
+                selected?.ContextId,
+                selected?.SlotId,
+                selected?.Status);
             RaiseMessage("Disable Card Candidate", ex.Message);
         }
     }
@@ -145,7 +144,7 @@ public sealed partial class MainViewModel
                     continue;
                 }
 
-                CardContext filteredContext = FilterContextForGeneration(context, slotIds);
+                CardContext filteredContext = CardContextGenerationFilter.Filter(context, slotIds);
                 if (filteredContext.Slots.Count == 0)
                 {
                     continue;
@@ -167,11 +166,21 @@ public sealed partial class MainViewModel
             }
 
             ReloadNoteToCardDeckNames();
-            ReloadCurrentNoteToCardQueue(relativePath, noteContent);
+            string cleanedNoteContent = CardContextContentSanitizer.RemoveClozeMarkup(noteContent);
+            SaveNoteIfChanged(cleanedNoteContent);
+            ClearCurrentNoteToCardDrafts(relativePath);
+            CurrentNoteEditorContentReplacementRequested?.Invoke(this, cleanedNoteContent);
             RaiseMessage("Note Cards", $"Generated {created} new card(s) and updated {updated} existing card(s).");
         }
         catch (Exception ex)
         {
+            logger?.LogError(
+                ex,
+                "Generate cards from candidates failed. CollectionPath={CollectionPath} CurrentNotePath={CurrentNotePath} DeckName={DeckName} CandidateCount={CandidateCount}",
+                openCollectionPath,
+                currentNotePath,
+                NoteToCardDeckName,
+                candidates.Count);
             RaiseMessage("Generate Cards", ex.Message);
         }
     }
@@ -214,5 +223,13 @@ public sealed partial class MainViewModel
         }
 
         return slotIdsByContextId;
+    }
+
+    private void ClearCurrentNoteToCardDrafts(string relativePath)
+    {
+        noteToCardQueueRefreshVersion++;
+        ClearNoteToCardDraftState(openCollectionPath, relativePath);
+        CurrentNoteToCardQueue = null;
+        SelectedCardCandidate = null;
     }
 }

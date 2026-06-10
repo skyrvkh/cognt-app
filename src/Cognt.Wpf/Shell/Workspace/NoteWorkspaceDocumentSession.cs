@@ -716,26 +716,8 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal async Task CreateCardContextFromSelectionAsync()
     {
-        EditorView? activeEditor = editorView;
-        if (activeEditor is null)
-        {
-            return;
-        }
-
-        Activate(selectInTree: false);
-        SelectedCardContextBlocksReadModel? selection = await activeEditor.GetSelectedCardContextBlocksAsync();
-        if (selection is null || selection.BlockIds.Count == 0)
-        {
-            dialogs.ShowWarning(
-                "Card Context",
-                "Select one or more note blocks before creating a card context.");
-            return;
-        }
-
-        string content = GetContent();
-        viewModel.CreateCardContextFromSelection(selection.BlockIds, selection.Title, content);
-        MarkContentPersisted(content);
-        activeEditor.PostSaveResult(ok: true);
+        await Task.CompletedTask;
+        dialogs.ShowWarning("Card Context", "Card context creation is handled from the note card queue.");
     }
 
     internal async Task AddSelectedTextToSelectedCardSlotAsync()

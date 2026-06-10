@@ -3,6 +3,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -18,12 +19,22 @@ public sealed partial class MainViewModel
                 return;
             }
 
+            CardCandidatePreviewViewModel preview = BuildCardCandidatePreviewModel(SelectedCardCandidate);
             CardCandidatePreviewRequested?.Invoke(
                 this,
-                new CardCandidatePreviewRequestedEventArgs(BuildCardCandidatePreviewModel(SelectedCardCandidate)));
+                new CardCandidatePreviewRequestedEventArgs(preview));
         }
         catch (Exception ex)
         {
+            CardCandidateReadModel? selected = SelectedCardCandidate;
+            logger?.LogError(
+                ex,
+                "Preview selected card candidate failed. CollectionPath={CollectionPath} CurrentNotePath={CurrentNotePath} CandidateContextId={CandidateContextId} CandidateSlotId={CandidateSlotId} CandidateStatus={CandidateStatus}",
+                openCollectionPath,
+                currentNotePath,
+                selected?.ContextId,
+                selected?.SlotId,
+                selected?.Status);
             RaiseMessage("Preview Card Candidate", ex.Message);
         }
     }

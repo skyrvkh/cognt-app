@@ -1,5 +1,6 @@
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using CogntApp.Features.NoteToCard;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.ViewModels;
 
@@ -34,59 +35,18 @@ public sealed partial class MainViewModel
     private void RefreshNoteToCardPresentationAvailability()
     {
         IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
-        bool hasTargets = targets.Count > 0;
-        bool allTargetsHaveTextAnchors = hasTargets;
-        bool allTargetsHaveImageAnchors = hasTargets;
+        IReadOnlyList<NoteToCardPresentationPresetAvailability> availability =
+            NoteToCardPresentationAvailabilityBuilder.Create(
+                NoteToCardPresentationPresets.Select(option => option.Preset),
+                targets,
+                SelectedCardCandidate is not null);
 
-        if (hasTargets)
+        for (int index = 0; index < NoteToCardPresentationPresets.Count; index++)
         {
-            foreach (CardCandidateReadModel candidate in targets)
-            {
-                if (allTargetsHaveTextAnchors && candidate.TextAnchors.Count == 0)
-                {
-                    allTargetsHaveTextAnchors = false;
-                }
-
-                if (allTargetsHaveImageAnchors && candidate.ImageAnchors.Count == 0)
-                {
-                    allTargetsHaveImageAnchors = false;
-                }
-
-                if (!allTargetsHaveTextAnchors && !allTargetsHaveImageAnchors)
-                {
-                    break;
-                }
-            }
-        }
-
-        foreach (CardPresentationPresetOptionViewModel option in NoteToCardPresentationPresets)
-        {
-            if (!hasTargets)
-            {
-                option.SetAvailability(enabled: false, "Create or select a card candidate.");
-                continue;
-            }
-
-            if (option.Preset == CardPresentationPreset.Custom)
-            {
-                option.SetAvailability(enabled: true);
-                continue;
-            }
-
-            CardPresentationPolicy policy = CardPresentationPolicies.ForPreset(option.Preset);
-            bool needsImage = policy.ImageFrontMode != ImageOcclusionFrontMode.None;
-            bool canUse = needsImage
-                ? allTargetsHaveImageAnchors
-                : allTargetsHaveTextAnchors;
-            option.SetAvailability(
-                canUse,
-                needsImage
-                    ? SelectedCardCandidate is null
-                        ? "All cards in the queue must have image masks."
-                        : "Requires an image mask candidate."
-                    : SelectedCardCandidate is null
-                        ? "All cards in the queue must have text clozes."
-                        : "Requires a text cloze candidate.");
+            NoteToCardPresentationPresetAvailability presetAvailability = availability[index];
+            NoteToCardPresentationPresets[index].SetAvailability(
+                presetAvailability.IsEnabled,
+                presetAvailability.DisabledReason);
         }
     }
 
@@ -102,75 +62,18 @@ public sealed partial class MainViewModel
             string relativePath = GetRequiredCurrentNoteRelativePath();
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
             IReadOnlyList<CardCandidateReadModel> targets = GetPresentationTargets();
-            if (targets.Count == 0)
-            {
-                return null;
-            }
-
-            Dictionary<string, CardContext> contextsById = CreateCardContextLookup(document.Contexts);
-            Dictionary<string, Dictionary<string, CardSlot>> slotLookupsByContextId = new(StringComparer.Ordinal);
-            CardPresentationPolicy? sharedPolicy = null;
-
-            foreach (CardCandidateReadModel candidate in targets)
-            {
-                if (!contextsById.TryGetValue(candidate.ContextId, out CardContext? context))
-                {
-                    return null;
-                }
-
-                if (!slotLookupsByContextId.TryGetValue(context.Id, out Dictionary<string, CardSlot>? slotsById))
-                {
-                    slotsById = CreateCardSlotLookup(context.Slots);
-                    slotLookupsByContextId.Add(context.Id, slotsById);
-                }
-
-                slotsById.TryGetValue(candidate.SlotId, out CardSlot? slot);
-                CardPresentationPolicy? policy = CardPresentationPolicies.Resolve(context, slot);
-                if (policy is null)
-                {
-                    return null;
-                }
-
-                if (sharedPolicy is null)
-                {
-                    sharedPolicy = policy;
-                    continue;
-                }
-
-                if (!Equals(sharedPolicy, policy))
-                {
-                    return null;
-                }
-            }
-
-            return sharedPolicy;
+            CardPresentationPolicy? policy = NoteToCardPresentationPolicyResolver.ResolveSharedPolicy(document, targets);
+            return policy;
         }
-        catch
+        catch (Exception ex)
         {
+            logger?.LogDebug(
+                ex,
+                "Current note-to-card presentation policy resolution failed. CollectionPath={CollectionPath} CurrentNotePath={CurrentNotePath}",
+                openCollectionPath,
+                currentNotePath);
             return null;
         }
-    }
-
-    private static Dictionary<string, CardContext> CreateCardContextLookup(IReadOnlyList<CardContext> contexts)
-    {
-        Dictionary<string, CardContext> lookup = new(contexts.Count, StringComparer.Ordinal);
-        foreach (CardContext context in contexts)
-        {
-            lookup[context.Id] = context;
-        }
-
-        return lookup;
-    }
-
-    private static Dictionary<string, CardSlot> CreateCardSlotLookup(IReadOnlyList<CardSlot> slots)
-    {
-        Dictionary<string, CardSlot> lookup = new(slots.Count, StringComparer.Ordinal);
-        foreach (CardSlot slot in slots)
-        {
-            lookup[slot.Id] = slot;
-        }
-
-        return lookup;
     }
 
     private void ApplySelectedNoteToCardPresentationPreset(CardPresentationPreset? preset)
@@ -236,73 +139,14 @@ public sealed partial class MainViewModel
             SaveNoteIfChanged(noteContent);
 
             CardContextDraftNoteDocument document = ReadCardContextDraftDocument(relativePath);
-            HashSet<string> targetContextIds = targets
-                .Select(candidate => candidate.ContextId)
-                .ToHashSet(StringComparer.Ordinal);
-
-            CardContext[] updatedContexts = document.Contexts
-                .Select(context =>
-                {
-                    if (!targetContextIds.Contains(context.Id))
-                    {
-                        return context;
-                    }
-
-                    if (selected is not null)
-                    {
-                        if (!string.Equals(context.Id, selected.ContextId, StringComparison.Ordinal))
-                        {
-                            return context;
-                        }
-
-                        bool changedSelectedSlot = false;
-                        CardSlot[] selectedSlots = context.Slots
-                            .Select(slot =>
-                            {
-                                if (!string.Equals(slot.Id, selected.SlotId, StringComparison.Ordinal))
-                                {
-                                    return slot;
-                                }
-
-                                changedSelectedSlot = !Equals(slot.PresentationOverride ?? context.DefaultPresentationPolicy, policy)
-                                    || !Equals(slot.PresentationOverride, policy);
-                                return slot with { PresentationOverride = policy };
-                            })
-                            .ToArray();
-
-                        return changedSelectedSlot
-                            ? context with { Slots = selectedSlots }
-                            : context;
-                    }
-
-                    bool alreadyApplied = Equals(context.DefaultPresentationPolicy, policy)
-                        && context.TextCueMode is null
-                        && context.ImageCueMode is null
-                        && context.Slots.All(slot => slot.PresentationOverride is null);
-                    if (alreadyApplied)
-                    {
-                        return context;
-                    }
-
-                    CardSlot[] updatedSlots = context.Slots
-                        .Select(slot => slot with { PresentationOverride = null })
-                        .ToArray();
-                    return context with
-                    {
-                        DefaultPresentationPolicy = policy,
-                        Slots = updatedSlots,
-                        TextCueMode = null,
-                        ImageCueMode = null,
-                    };
-                })
-                .ToArray();
-
-            if (document.Contexts.SequenceEqual(updatedContexts))
+            NoteToCardPresentationPolicyApplication application =
+                NoteToCardPresentationPolicyApplicator.Apply(document, targets, selected, policy);
+            if (!application.HasChanges)
             {
                 return;
             }
 
-            PersistCardContextDraftDocument(relativePath, noteContent, document with { Contexts = updatedContexts });
+            PersistCardContextDraftDocument(relativePath, noteContent, application.Document);
             ReloadCurrentNoteToCardQueue(relativePath, noteContent);
             if (selected is not null)
             {
@@ -316,6 +160,15 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            CardCandidateReadModel? selected = SelectedCardCandidate;
+            logger?.LogError(
+                ex,
+                "Apply note-to-card presentation policy failed. CollectionPath={CollectionPath} CurrentNotePath={CurrentNotePath} Preset={Preset} CandidateContextId={CandidateContextId} CandidateSlotId={CandidateSlotId}",
+                openCollectionPath,
+                currentNotePath,
+                policy.Preset,
+                selected?.ContextId,
+                selected?.SlotId);
             RaiseMessage("Card Presentation", ex.Message);
             SynchronizeSelectedNoteToCardPresentationPreset();
         }
