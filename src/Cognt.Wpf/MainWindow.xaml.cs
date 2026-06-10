@@ -317,8 +317,4 @@ public partial class MainWindow : Window
         await RestoreWorkspaceSessionForCurrentCollectionAsync();
     }
 
-    private void RemoveCollectionButton_Click(object sender, RoutedEventArgs e)
-    {
-        collectionWorkflow.RemoveCurrentCollection(CollectionSelectorPopup);
-    }
 }

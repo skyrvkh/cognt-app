@@ -19,6 +19,7 @@ public partial class MainWindow
                 if (!viewModel.TryGetLoadedTreePathById(id, out IReadOnlyList<NoteTreeNodeViewModel>? path)
                     || path is null)
                 {
+
                     return;
                 }
 
@@ -34,7 +35,9 @@ public partial class MainWindow
             && path is not null)
         {
             SelectTreeNodePath(path);
+            return;
         }
+
     }
 
     private void SelectTreeItemById(long itemId)
@@ -43,7 +46,9 @@ public partial class MainWindow
             && path is not null)
         {
             SelectTreeNodePath(path);
+            return;
         }
+
     }
 
     private void SelectTreeNodePath(IReadOnlyList<NoteTreeNodeViewModel> path)

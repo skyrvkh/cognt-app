@@ -14,542 +14,21 @@
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/icon.ico"
         Background="{DynamicResource PageBrush}"
-        FontFamily="{StaticResource AppSansFontFamily}"
-        FontSize="{StaticResource FontSizeBody}"
+        FontFamily="{DynamicResource AppSansFontFamily}"
+        FontSize="{DynamicResource FontSizeBody}"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
+        AllowDrop="True"
         Loaded="MainWindow_Loaded"
-        PreviewKeyDown="MainWindow_PreviewKeyDown">
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
+        PreviewDragOver="MainWindow_PreviewDragOver"
+        PreviewDrop="MainWindow_PreviewDrop">
     <Window.Resources>
-        <sys:Double x:Key="EditorBreadcrumbFontSize">11</sys:Double>
-
-        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
-            <Setter Property="Margin" Value="0,12,0,6" />
-        </Style>
-
-        <Style x:Key="SidebarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Padding" Value="9,0" />
-            <Setter Property="Margin" Value="0,1" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="PrimarySidebarButtonStyle"
-               BasedOn="{StaticResource SidebarButtonStyle}"
-               TargetType="Button">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
-        </Style>
-
-        <Style x:Key="NoteTreeViewItemStyle" TargetType="TreeViewItem">
-            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-            <Setter Property="MinHeight" Value="24" />
-            <Setter Property="Padding" Value="4,2" />
-            <Setter Property="Margin" Value="0,1" />
-        </Style>
-
-        <Style x:Key="NavigationTreeExpanderStyle" TargetType="ToggleButton">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Width" Value="10" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="ExpanderBorder"
-                                Width="10"
-                                Height="24"
-                                Background="Transparent"
-                                CornerRadius="4">
-                            <Path x:Name="ExpanderGlyph"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Data="M3,8 L6.5,12 L3,16"
-                                  Stroke="{DynamicResource DimBrush}"
-                                  StrokeThickness="1.6"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  StrokeLineJoin="Round" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ExpanderGlyph" Property="Data" Value="M1.5,10 L5,14 L8.5,10" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ExpanderBorder" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="NavigationTreeViewItemStyle"
-               TargetType="TreeViewItem"
-               BasedOn="{StaticResource NoteTreeViewItemStyle}">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TreeViewItem">
-                        <Grid SnapsToDevicePixels="True">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="10" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <ToggleButton x:Name="Expander"
-                                          Grid.Row="0"
-                                          Grid.Column="0"
-                                          Margin="0,0,0,0"
-                                          VerticalAlignment="Top"
-                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press"
-                                          Style="{StaticResource NavigationTreeExpanderStyle}" />
-
-                            <Border x:Name="ItemBorder"
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Margin="{TemplateBinding Margin}"
-                                    Padding="{TemplateBinding Padding}"
-                                    Background="Transparent"
-                                    CornerRadius="6">
-                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                  ContentSource="Header"
-                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                            </Border>
-
-                            <ItemsPresenter x:Name="ItemsHost"
-                                            Grid.Row="1"
-                                            Grid.Column="1"
-                                            Margin="0" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="HasItems" Value="False">
-                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
-                            </Trigger>
-                            <Trigger Property="IsExpanded" Value="False">
-                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsSelected" Value="True" />
-                                    <Condition Property="IsSelectionActive" Value="False" />
-                                </MultiTrigger.Conditions>
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
-                            </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SidebarNavigationPathStyle" TargetType="Path">
-            <Setter Property="Width" Value="16" />
-            <Setter Property="Height" Value="16" />
-            <Setter Property="Stretch" Value="Uniform" />
-            <Setter Property="StrokeThickness" Value="1.8" />
-            <Setter Property="StrokeStartLineCap" Value="Round" />
-            <Setter Property="StrokeEndLineCap" Value="Round" />
-            <Setter Property="StrokeLineJoin" Value="Round" />
-            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-        </Style>
-
-        <Style x:Key="NoteTreeNodePathStyle" TargetType="Path">
-            <Setter Property="Width" Value="16" />
-            <Setter Property="Height" Value="16" />
-            <Setter Property="Margin" Value="0,0,7,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Stretch" Value="Uniform" />
-            <Setter Property="Stroke" Value="{DynamicResource FolderStrokeBrush}" />
-            <Setter Property="Fill" Value="{DynamicResource FolderFillBrush}" />
-            <Setter Property="StrokeThickness" Value="1.5" />
-            <Setter Property="StrokeStartLineCap" Value="Round" />
-            <Setter Property="StrokeEndLineCap" Value="Round" />
-            <Setter Property="StrokeLineJoin" Value="Round" />
-            <Setter Property="Data" Value="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Prefix}" Value="[N]">
-                    <Setter Property="Stroke" Value="{DynamicResource AccentStrongBrush}" />
-                    <Setter Property="Fill" Value="{DynamicResource NoteFillBrush}" />
-                    <Setter Property="Data" Value="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.8,12 L15.2,12 M8.8,15 L15.2,15" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Prefix}" Value="[PDF]">
-                    <Setter Property="Stroke" Value="{DynamicResource PdfStrokeBrush}" />
-                    <Setter Property="Fill" Value="{DynamicResource PdfFillBrush}" />
-                    <Setter Property="Data" Value="M6,3.5 L14,3.5 L18,7.5 L18,20.5 L6,20.5 Z M14,3.5 L14,8 L18,8 M8.5,12.2 L15.5,12.2 M8.5,15.2 L14,15.2 M8.5,18.2 L12.8,18.2" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SidebarIconButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="7,6" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SidebarCollectionSelectorButtonStyle"
-               BasedOn="{StaticResource SidebarButtonStyle}"
-               TargetType="Button">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-
-        <Style x:Key="SidebarSearchTextBoxStyle" TargetType="TextBox">
-            <Setter Property="MinHeight" Value="32" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Grid>
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="0"
-                                          VerticalAlignment="Center" />
-                            <TextBlock Margin="0"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource DimBrush}"
-                                       IsHitTestVisible="False"
-                                       Text="{TemplateBinding Tag}">
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="NavigationTreeItemTextStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-        </Style>
-
-        <Style x:Key="CollectionPopoverButtonStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Margin" Value="0,1" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="CollectionSwitcherRowButtonStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="62" />
-            <Setter Property="Padding" Value="9" />
-            <Setter Property="Margin" Value="0,3" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="CollectionSwitcherPrimaryButtonStyle" TargetType="Button">
-            <Style.Resources>
-                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                        <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-            </Style.Resources>
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="12,0" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-            <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource VibrantButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource VibrantButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-                                <Setter Property="TextElement.Foreground" Value="{DynamicResource VibrantButtonForegroundBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledSurfaceBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource DisabledTextBrush}" />
-                                <Setter Property="TextElement.Foreground" Value="{DynamicResource DisabledTextBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="CollectionSwitcherDangerButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="38" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource DangerLineBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DangerLineBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="EditorBreadcrumbButtonStyle" TargetType="Button">
-            <Setter Property="Padding" Value="5,2" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentStrongBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource EditorBreadcrumbFontSize}" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7">
-                            <Border.Resources>
-                                <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource ButtonTemplateTextForegroundStyle}" />
-                                <Style TargetType="{x:Type AccessText}" BasedOn="{StaticResource ButtonTemplateAccessTextForegroundStyle}" />
-                            </Border.Resources>
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              RecognizesAccessKey="True"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="EditorBreadcrumbTextBoxStyle" TargetType="TextBox">
-            <Setter Property="MinWidth" Value="80" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Padding" Value="5,1" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
-            <Setter Property="FontFamily" Value="{StaticResource AppSansFontFamily}" />
-            <Setter Property="FontSize" Value="{StaticResource EditorBreadcrumbFontSize}" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Views/MainWindowResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Background="{DynamicResource PageBrush}"
@@ -613,7 +92,7 @@
                                Text="Cognt"
                                Margin="8,0,0,0"
                                VerticalAlignment="Center"
-                               FontFamily="{StaticResource AppDisplayFontFamily}"
+                               FontFamily="{DynamicResource AppDisplayFontFamily}"
                                FontSize="15"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource InkBrush}"
@@ -855,6 +334,7 @@
                                           ItemsSource="{Binding NoteRoots}"
                                           PreviewKeyDown="NotesTree_PreviewKeyDown"
                                       PreviewMouseLeftButtonDown="NotesTree_PreviewMouseLeftButtonDown"
+                                      PreviewMouseLeftButtonUp="NotesTree_PreviewMouseLeftButtonUp"
                                       PreviewMouseDoubleClick="NotesTree_PreviewMouseDoubleClick"
                                       PreviewMouseRightButtonDown="NotesTree_PreviewMouseRightButtonDown"
                                       PreviewMouseMove="NotesTree_PreviewMouseMove"
@@ -863,7 +343,11 @@
                                       SelectedItemChanged="NotesTree_SelectedItemChanged">
                                 <TreeView.ContextMenu>
                                     <ContextMenu Opened="NotesTreeContextMenu_Opened">
-                                        <MenuItem Header="New Folder"
+                                        <MenuItem x:Name="NewNoteTreeMenuItem"
+                                                  Header="New Note"
+                                                  Click="NewNoteTreeItem_Click" />
+                                        <MenuItem x:Name="NewFolderTreeMenuItem"
+                                                  Header="New Folder"
                                                   Click="NewFolderTreeItem_Click" />
                                         <MenuItem x:Name="DuplicateTreeMenuItem"
                                                   Header="Duplicate"
@@ -1107,8 +591,6 @@
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
@@ -1142,8 +624,8 @@
                                                     Margin="10,0,0,0"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="Collections"
-                                                       FontFamily="{StaticResource AppDisplayFontFamily}"
-                                                       FontSize="{StaticResource FontSizeBodyLarge}"
+                                                       FontFamily="{DynamicResource AppDisplayFontFamily}"
+                                                       FontSize="{DynamicResource FontSizeBodyLarge}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource InkBrush}" />
                                             <TextBlock Text="Switch workspace or create a new one."
@@ -1154,82 +636,9 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <Border Grid.Row="1"
-                                            Margin="0,12,0,10"
-                                            Padding="11"
-                                            Background="{DynamicResource PanelAltBrush}"
-                                            BorderBrush="{DynamicResource LineBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="12">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-
-                                            <Border Width="30"
-                                                    Height="30"
-                                                    Background="{DynamicResource NoteFillBrush}"
-                                                    BorderBrush="{DynamicResource AccentSoftBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="9">
-                                                <Path Data="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z"
-                                                      Width="15"
-                                                      Height="15"
-                                                      HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Stretch="Uniform"
-                                                      Stroke="{DynamicResource AccentStrongBrush}"
-                                                      StrokeThickness="1.5"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round"
-                                                      StrokeLineJoin="Round" />
-                                            </Border>
-
-                                            <StackPanel Grid.Column="1"
-                                                        Margin="9,0,0,0">
-                                               <TextBlock Text="Active collection"
-                                                           FontSize="{StaticResource FontSizeMicro}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource DimBrush}" />
-                                                <TextBlock Text="{Binding CurrentCollectionName}"
-                                                           Margin="0,3,0,0"
-                                                           FontSize="{Binding GlobalTextFontSize}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource InkBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           ToolTip="{Binding CurrentCollectionName}" />
-                                                <TextBlock Text="{Binding CurrentCollectionSummary}"
-                                                           Margin="0,2,0,0"
-                                                           FontSize="11"
-                                                           Foreground="{DynamicResource MutedBrush}"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding OpenCollectionPath}"
-                                                           Margin="0,2,0,0"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource DimBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           ToolTip="{Binding OpenCollectionPath}" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-
-                                    <Grid Grid.Row="2"
-                                          Margin="0,0,0,5">
-                                        <TextBlock Text="Available"
-                                                   HorizontalAlignment="Left"
-                                                   FontSize="11"
-                                                   FontFamily="{StaticResource AppSansFontFamily}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource DimBrush}" />
-                                        <TextBlock Text="Click to open"
-                                                   HorizontalAlignment="Right"
-                                                   FontSize="10"
-                                                   Foreground="{DynamicResource DimBrush}" />
-                                    </Grid>
-
-                                    <ListBox Grid.Row="3"
-                                             MaxHeight="190"
+                                    <ListBox Grid.Row="1"
+                                             MaxHeight="260"
+                                             Margin="0,12,0,0"
                                              ItemsSource="{Binding AvailableCollections}">
                                         <ListBox.Style>
                                             <Style TargetType="ListBox"
@@ -1244,100 +653,114 @@
                                         </ListBox.Style>
                                         <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Button Style="{StaticResource CollectionSwitcherRowButtonStyle}"
-                                                            AutomationProperties.Name="{Binding Name}"
-                                                            Click="CollectionOptionButton_Click">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto" />
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
+                                                    <Grid Margin="0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="4" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
 
-                                                            <Border Width="34"
-                                                                    Height="34"
-                                                                    VerticalAlignment="Top"
-                                                                    Background="{DynamicResource NoteFillBrush}"
-                                                                    BorderBrush="{DynamicResource AccentSoftBrush}"
-                                                                    BorderThickness="1"
-                                                                    CornerRadius="10">
-                                                                <Path Data="M2.5,6.8 L8,6.8 L9.8,8.7 L21.5,8.7 L21.5,18.5 L2.5,18.5 Z"
-                                                                      Width="17"
-                                                                      Height="17"
-                                                                      HorizontalAlignment="Center"
-                                                                      VerticalAlignment="Center"
-                                                                      Stretch="Uniform"
-                                                                      Stroke="{DynamicResource AccentStrongBrush}"
-                                                                      StrokeThickness="1.5"
-                                                                      StrokeStartLineCap="Round"
-                                                                      StrokeEndLineCap="Round"
-                                                                      StrokeLineJoin="Round" />
-                                                            </Border>
+                                                        <Button Grid.Column="0"
+                                                                Style="{StaticResource CollectionSwitcherRowButtonStyle}"
+                                                                AutomationProperties.Name="{Binding Name}"
+                                                                Margin="0"
+                                                                Click="CollectionOptionButton_Click">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
 
-                                                            <StackPanel Grid.Column="1"
-                                                                        Margin="10,0,8,0">
                                                                 <TextBlock Text="{Binding Name}"
+                                                                           Margin="2,0,8,0"
+                                                                           VerticalAlignment="Center"
                                                                            FontSize="{Binding DataContext.GlobalTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                            FontWeight="SemiBold"
                                                                            Foreground="{DynamicResource InkBrush}"
                                                                            TextTrimming="CharacterEllipsis"
                                                                            ToolTip="{Binding Name}" />
-                                                                <TextBlock Text="{Binding CountsSummary}"
-                                                                           Margin="0,3,0,0"
-                                                                           FontSize="11"
-                                                                           Foreground="{DynamicResource MutedBrush}"
-                                                                           TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding Path}"
-                                                                           Margin="0,2,0,0"
-                                                                           FontSize="10"
-                                                                           Foreground="{DynamicResource DimBrush}"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           ToolTip="{Binding Path}" />
-                                                            </StackPanel>
 
-                                                            <Grid Grid.Column="2"
-                                                                  Width="18"
-                                                                  Height="18"
-                                                                  VerticalAlignment="Top"
-                                                                  Margin="0,3,0,0">
-                                                                <Ellipse Fill="{DynamicResource AccentBrush}">
-                                                                    <Ellipse.Style>
-                                                                        <Style TargetType="{x:Type Ellipse}">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Ellipse.Style>
-                                                                </Ellipse>
-                                                                <Path Data="M5,9.5 L8,12.5 L13.5,6.5"
-                                                                      Stretch="Uniform"
-                                                                      Stroke="{DynamicResource VibrantButtonForegroundBrush}"
-                                                                      StrokeThickness="1.8"
-                                                                      StrokeStartLineCap="Round"
-                                                                      StrokeEndLineCap="Round"
-                                                                      StrokeLineJoin="Round">
-                                                                    <Path.Style>
-                                                                        <Style TargetType="{x:Type Path}">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Path.Style>
-                                                                </Path>
-                                                            </Grid>
+                                                                <Grid Grid.Column="1"
+                                                                      Width="18"
+                                                                      Height="18"
+                                                                      VerticalAlignment="Center">
+                                                                    <Ellipse Fill="{DynamicResource AccentBrush}">
+                                                                        <Ellipse.Style>
+                                                                            <Style TargetType="{x:Type Ellipse}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Ellipse.Style>
+                                                                    </Ellipse>
+                                                                    <Path Data="M5,9.5 L8,12.5 L13.5,6.5"
+                                                                          Stretch="Uniform"
+                                                                          Stroke="{DynamicResource VibrantButtonForegroundBrush}"
+                                                                          StrokeThickness="1.8"
+                                                                          StrokeStartLineCap="Round"
+                                                                          StrokeEndLineCap="Round"
+                                                                          StrokeLineJoin="Round">
+                                                                        <Path.Style>
+                                                                            <Style TargetType="{x:Type Path}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Path.Style>
+                                                                    </Path>
+                                                                </Grid>
                                                             </Grid>
                                                         </Button>
-                                                    </DataTemplate>
+
+                                                        <Button Grid.Column="2"
+                                                                Style="{StaticResource CollectionSwitcherActionButtonStyle}"
+                                                                MinHeight="44"
+                                                                ToolTip="Remove from collection list"
+                                                                AutomationProperties.Name="Remove collection from list"
+                                                                Click="RemoveCollectionFromListButton_Click">
+                                                            <Path Data="M4,7 L8,7 L9.5,9 L16,9 L16,15 L4,15 Z M7,12 L13,12"
+                                                                  Width="15"
+                                                                  Height="15"
+                                                                  Stretch="Uniform"
+                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                                                                  StrokeThickness="1.7"
+                                                                  StrokeStartLineCap="Round"
+                                                                  StrokeEndLineCap="Round"
+                                                                  StrokeLineJoin="Round" />
+                                                        </Button>
+
+                                                        <Button Grid.Column="4"
+                                                                Style="{StaticResource CollectionSwitcherDangerButtonStyle}"
+                                                                Width="34"
+                                                                MinHeight="44"
+                                                                ToolTip="Delete collection from hard drive"
+                                                                AutomationProperties.Name="Delete collection from hard drive"
+                                                                Click="DeleteCollectionButton_Click">
+                                                            <Path Data="M5,6 L15,6 M8,6 L8,4 L12,4 L12,6 M7,8 L7.5,16 M10,8 L10,16 M13,8 L12.5,16 M6,6 L7,17 L13,17 L14,6"
+                                                                  Width="15"
+                                                                  Height="15"
+                                                                  Stretch="Uniform"
+                                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
+                                                                  StrokeThickness="1.6"
+                                                                  StrokeStartLineCap="Round"
+                                                                  StrokeEndLineCap="Round"
+                                                                  StrokeLineJoin="Round" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
 
-                                    <Border Grid.Row="3"
+                                    <Border Grid.Row="1"
+                                            Margin="0,12,0,0"
                                             Padding="12"
                                             Background="{DynamicResource PanelAltBrush}"
                                             BorderBrush="{DynamicResource LineBrush}"
@@ -1366,12 +789,10 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <Grid Grid.Row="4"
+                                    <Grid Grid.Row="2"
                                           Margin="0,12,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel>
@@ -1421,23 +842,8 @@
                                                                FontWeight="SemiBold" />
                                                 </StackPanel>
                                             </Button>
-                                        </StackPanel>
 
-                                        <Button Grid.Column="2"
-                                                Style="{StaticResource CollectionSwitcherDangerButtonStyle}"
-                                                VerticalAlignment="Top"
-                                                ToolTip="Remove current collection"
-                                                AutomationProperties.Name="Remove current collection"
-                                                Click="RemoveCollectionButton_Click">
-                                            <Path Data="M5,5 L13,13 M13,5 L5,13"
-                                                  Width="12"
-                                                  Height="12"
-                                                  Stretch="Uniform"
-                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}}}"
-                                                  StrokeThickness="1.8"
-                                                  StrokeStartLineCap="Round"
-                                                  StrokeEndLineCap="Round" />
-                                        </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </Grid>
                             </Border>
