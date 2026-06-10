@@ -1,5 +1,6 @@
 using System.IO;
-using System.Diagnostics;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Windows;
 using System.Windows.Controls;
 using AvalonDock.Layout;
@@ -19,9 +20,12 @@ namespace CogntApp.Shell.Workspace;
 
 internal sealed class NoteWorkspaceDocumentSession
 {
-    private const int LargeDocumentContentLength = 200_000;
     private static readonly TimeSpan EditorViewLoadTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan DocumentLinksRefreshDelay = TimeSpan.FromMilliseconds(750);
+    private static readonly HttpClient PastedImageHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(20)
+    };
 
     private readonly MainViewModel viewModel;
     private readonly IEditorViewFactory editorViewFactory;
@@ -49,6 +53,8 @@ internal sealed class NoteWorkspaceDocumentSession
     private int autoSaveVersion;
     private CancellationTokenSource? scheduledDocumentLinksRefreshCancellation;
     private CancellationTokenSource? scheduledAutoSaveCancellation;
+    private EditorCaretState? lastKnownCaretState;
+    private EditorCaretState? pendingRestoreCaretState;
 
     internal NoteWorkspaceDocumentSession(
         MainViewModel viewModel,
@@ -59,7 +65,8 @@ internal sealed class NoteWorkspaceDocumentSession
         Action mentionTargetsChanged,
         Func<EditorTheme> getEditorTheme,
         ILogger<NoteWorkspaceDocumentSession> logger,
-        PreparedNote note)
+        PreparedNote note,
+        EditorCaretState? restoreCaretState = null)
     {
         this.viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         this.editorViewFactory = editorViewFactory ?? throw new ArgumentNullException(nameof(editorViewFactory));
@@ -76,6 +83,8 @@ internal sealed class NoteWorkspaceDocumentSession
         Title = note.Title;
         currentContent = note.Content;
         lastPersistedContent = note.Content;
+        lastKnownCaretState = NormalizeCaretState(restoreCaretState);
+        pendingRestoreCaretState = lastKnownCaretState;
         viewModel.AutoSaveSettingsChanged += ViewModel_AutoSaveSettingsChanged;
 
         LayoutDocument = new LayoutDocument
@@ -87,11 +96,6 @@ internal sealed class NoteWorkspaceDocumentSession
             Content = dockedHost,
         };
         LayoutDocument.Closed += LayoutDocument_Closed;
-        this.logger.LogDebug(
-            "Created note workspace session. NotePath={NotePath} Title={Title} ContentLength={ContentLength}",
-            NotePath,
-            Title,
-            currentContent.Length);
     }
 
     internal LayoutDocument LayoutDocument { get; }
@@ -112,13 +116,95 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal bool IsClosed => state == NoteWorkspaceDocumentState.Closed;
 
-    internal bool HasMountedEditor => editorView is not null
+    internal bool HasAttachedEditor => editorView is not null
         && activeHost is not null
         && ReferenceEquals(activeHost.Content, editorView);
 
     internal bool IsHostReady => editorView?.IsHostReady == true;
 
-    internal string GetContent() => editorView?.GetContent() ?? currentContent;
+    internal bool HasMountedEditor => HasAttachedEditor && IsHostReady;
+
+    internal string GetContent()
+    {
+        if (editorView is null || isLoadingEditorNote || !IsHostReady)
+        {
+            return currentContent;
+        }
+
+        return editorView.GetContent();
+    }
+
+    internal async Task<EditorCaretState?> GetCaretStateAsync()
+    {
+        if (editorView?.IsHostReady != true)
+        {
+            return lastKnownCaretState;
+        }
+
+        try
+        {
+            EditorCaretState? caret = NormalizeCaretState(await editorView.GetCaretStateAsync());
+            if (caret is not null)
+            {
+                lastKnownCaretState = caret;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Editor caret state read failed. NotePath={NotePath}", NotePath);
+        }
+
+        return lastKnownCaretState;
+    }
+
+    internal async Task RestoreCaretStateAsync(EditorCaretState? caret)
+    {
+        pendingRestoreCaretState = NormalizeCaretState(caret);
+        if (pendingRestoreCaretState is null || editorView?.IsHostReady != true)
+        {
+            return;
+        }
+
+        await RestorePendingCaretStateAsync(editorView);
+    }
+
+    internal async Task ReplaceContentAsync(string content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        currentContent = content;
+        lastPersistedContent = content;
+        hasPendingContentChanges = false;
+
+        if (editorView is null)
+        {
+            return;
+        }
+
+        isLoadingEditorNote = true;
+        try
+        {
+            await editorView.LoadNoteAsync(
+                Title,
+                content,
+                NotePath,
+                viewModel.OpenCollectionPath);
+            currentContent = editorView.GetContent();
+            MarkContentPersisted(currentContent);
+
+            if (currentReadOnlyState)
+            {
+                await editorView.SetReadOnlyAsync(true);
+            }
+
+            await RefreshMentionTargetsAsync();
+            RefreshDocumentLinks();
+        }
+        finally
+        {
+            isLoadingEditorNote = false;
+        }
+    }
 
     internal void ApplyTheme(EditorTheme theme)
     {
@@ -133,19 +219,15 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal async Task InitializeAsync()
     {
-        logger.LogDebug("Initializing session. NotePath={NotePath}", NotePath);
         isInitialized = true;
         activeHost = dockedHost;
         await MountEditorIntoHostAsync(dockedHost);
-        logger.LogInformation("Session initialized. NotePath={NotePath} HasMountedEditor={HasMountedEditor}", NotePath, HasMountedEditor);
     }
 
     internal async Task MountDockedAsync(LayoutDocumentPane documentPane)
     {
-        logger.LogInformation("Mounting docked session. NotePath={NotePath}", NotePath);
         if (IsClosed)
         {
-            logger.LogWarning("Skipped docked mount because session is closed. NotePath={NotePath}", NotePath);
             return;
         }
 
@@ -172,10 +254,8 @@ internal sealed class NoteWorkspaceDocumentSession
         Func<NoteWorkspaceDocumentSession, Task> redockAsync,
         Func<Rect, bool> shouldRedock)
     {
-        logger.LogInformation("Detaching session to window. NotePath={NotePath}", NotePath);
         if (!IsDocked || IsClosed)
         {
-            logger.LogWarning("Skipped detach. NotePath={NotePath} IsDocked={IsDocked} IsClosed={IsClosed}", NotePath, IsDocked, IsClosed);
             return;
         }
 
@@ -188,7 +268,7 @@ internal sealed class NoteWorkspaceDocumentSession
             documentPane.Children.Remove(LayoutDocument);
         }
 
-        DetachedNoteWindow window = new(Title)
+        DetachedNoteWindow window = new(Title, logger)
         {
             Owner = owner,
             Left = Math.Max(0, screenPoint.X - 140),
@@ -214,10 +294,8 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal async Task RedockAsync(LayoutDocumentPane documentPane)
     {
-        logger.LogInformation("Redocking session. NotePath={NotePath}", NotePath);
         if (!IsDetached || IsClosed)
         {
-            logger.LogWarning("Skipped redock. NotePath={NotePath} IsDetached={IsDetached} IsClosed={IsClosed}", NotePath, IsDetached, IsClosed);
             return;
         }
 
@@ -240,10 +318,8 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal async Task CloseAsync(bool savePendingChanges = true)
     {
-        logger.LogInformation("Closing session. NotePath={NotePath}", NotePath);
         if (IsClosed)
         {
-            logger.LogDebug("Close skipped because session already closed. NotePath={NotePath}", NotePath);
             return;
         }
 
@@ -264,7 +340,7 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal Task SavePendingChangesAsync()
     {
-        return SavePendingChangesAsync(postResult: false, reason: "close");
+        return SavePendingChangesAsync(postResult: false);
     }
 
     internal void SavePendingChanges()
@@ -282,8 +358,6 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal bool Activate(bool selectInTree)
     {
-        logger.LogDebug("Activating session. NotePath={NotePath} SelectInTree={SelectInTree}", NotePath, selectInTree);
-        viewModel.GetCurrentEditorContent = GetContent;
         if (string.Equals(viewModel.CurrentNotePath, NotePath, StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -299,11 +373,16 @@ internal sealed class NoteWorkspaceDocumentSession
         return true;
     }
 
-    internal void Focus()
+    internal void Focus(bool focusEditor = true)
     {
         if (IsDetached)
         {
             detachedWindow?.Activate();
+            if (focusEditor)
+            {
+                _ = FocusEditorHostAsync();
+            }
+
             return;
         }
 
@@ -315,6 +394,11 @@ internal sealed class NoteWorkspaceDocumentSession
         if (!LayoutDocument.IsActive)
         {
             LayoutDocument.IsActive = true;
+        }
+
+        if (focusEditor)
+        {
+            _ = FocusEditorHostAsync();
         }
     }
 
@@ -359,7 +443,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {ex}");
+            logger.LogWarning(ex, "Document links refresh failed before reading editor content. NotePath={NotePath}", NotePath);
             activeEditor.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
             return;
         }
@@ -472,7 +556,7 @@ internal sealed class NoteWorkspaceDocumentSession
         int saveVersion,
         CancellationToken cancellationToken)
     {
-        return InvokeOnUiThreadAsync(async () =>
+        return WorkspaceDispatcher.InvokeAsync(async () =>
         {
             if (cancellationToken.IsCancellationRequested
                 || !ReferenceEquals(scheduledAutoSaveCancellation, cancellation)
@@ -486,7 +570,7 @@ internal sealed class NoteWorkspaceDocumentSession
 
             try
             {
-                await SavePendingChangesAsync(postResult: true, reason: "interval auto-save");
+                await SavePendingChangesAsync(postResult: true);
             }
             catch (Exception ex)
             {
@@ -509,7 +593,7 @@ internal sealed class NoteWorkspaceDocumentSession
         scheduledAutoSaveCancellation = null;
     }
 
-    private async Task SavePendingChangesAsync(bool postResult, string reason)
+    private async Task SavePendingChangesAsync(bool postResult)
     {
         CancelScheduledAutoSave();
         currentContent = await GetLatestContentAsync();
@@ -519,24 +603,10 @@ internal sealed class NoteWorkspaceDocumentSession
         }
 
         string contentToSave = currentContent;
-        Stopwatch? saveTiming = contentToSave.Length >= LargeDocumentContentLength
-            ? Stopwatch.StartNew()
-            : null;
 
         try
         {
             await viewModel.SaveNoteIfChangedAsync(NotePath, contentToSave);
-            if (saveTiming is not null)
-            {
-                saveTiming.Stop();
-                logger.LogDebug(
-                    "Large note save completed. NotePath={NotePath} Reason={Reason} ContentLength={ContentLength} ElapsedMs={ElapsedMs}",
-                    NotePath,
-                    reason,
-                    contentToSave.Length,
-                    saveTiming.ElapsedMilliseconds);
-            }
-
             MarkContentPersisted(contentToSave);
             if (postResult)
             {
@@ -556,7 +626,12 @@ internal sealed class NoteWorkspaceDocumentSession
 
     private Task<string> GetLatestContentAsync()
     {
-        return editorView?.GetContentAsync() ?? Task.FromResult(currentContent);
+        if (editorView is null || isLoadingEditorNote || !IsHostReady)
+        {
+            return Task.FromResult(currentContent);
+        }
+
+        return editorView.GetContentAsync();
     }
 
     private bool HasPendingContentChanges()
@@ -589,17 +664,6 @@ internal sealed class NoteWorkspaceDocumentSession
         }
     }
 
-    private static Task InvokeOnUiThreadAsync(Func<Task> action)
-    {
-        if (Application.Current?.Dispatcher is not { } dispatcher
-            || dispatcher.CheckAccess())
-        {
-            return action();
-        }
-
-        return dispatcher.InvokeAsync(action).Task.Unwrap();
-    }
-
     private void PostDocumentLinksResult(
         EditorView targetEditor,
         int refreshVersion,
@@ -622,7 +686,7 @@ internal sealed class NoteWorkspaceDocumentSession
 
             if (task.Exception is not null)
             {
-                System.Diagnostics.Debug.WriteLine($"Document links refresh failed: {task.Exception}");
+                logger.LogWarning(task.Exception, "Document links refresh failed while reading links. NotePath={NotePath}", NotePath);
             }
 
             targetEditor.PostDocumentLinks(new KnowledgeDocumentLinksReadModel([], []));
@@ -753,7 +817,6 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal void Dispose()
     {
-        logger.LogInformation("Disposing session. NotePath={NotePath} State={State} HasMountedEditor={HasMountedEditor}", NotePath, state, HasMountedEditor);
         LayoutDocument.Closed -= LayoutDocument_Closed;
         viewModel.AutoSaveSettingsChanged -= ViewModel_AutoSaveSettingsChanged;
         CancelScheduledDocumentLinksRefresh();
@@ -802,60 +865,62 @@ internal sealed class NoteWorkspaceDocumentSession
 
     private async Task MountEditorIntoHostAsync(ContentControl host)
     {
-        logger.LogDebug(
-            "Mount editor requested. NotePath={NotePath} IsInitialized={IsInitialized} IsClosed={IsClosed} IsMountingEditor={IsMountingEditor}",
-            NotePath,
-            isInitialized,
-            IsClosed,
-            isMountingEditor);
         if (!isInitialized || IsClosed || isMountingEditor)
         {
-            logger.LogWarning(
-                "Mount editor skipped. NotePath={NotePath} IsInitialized={IsInitialized} IsClosed={IsClosed} IsMountingEditor={IsMountingEditor}",
-                NotePath,
-                isInitialized,
-                IsClosed,
-                isMountingEditor);
             return;
         }
 
         isMountingEditor = true;
+        EditorView? nextEditor = null;
 
         try
         {
-            logger.LogInformation("Creating EditorView for session. NotePath={NotePath}", NotePath);
-            EditorView nextEditor = editorViewFactory.Create();
+            nextEditor = editorViewFactory.Create();
             nextEditor.ApplyTheme(getEditorTheme());
             WireEditorView(nextEditor);
             editorView = nextEditor;
             activeHost = host;
             host.Content = nextEditor;
 
-            logger.LogDebug("Waiting for EditorView Loaded. NotePath={NotePath}", NotePath);
-            await WaitForEditorLoadedAsync(nextEditor);
-            logger.LogDebug("EditorView Loaded. NotePath={NotePath}", NotePath);
-            isLoadingEditorNote = true;
-            bool hadPendingChangesBeforeLoad = HasPendingContentChanges();
-            logger.LogInformation(
-                "Loading note into EditorView. NotePath={NotePath} Title={Title} ContentLength={ContentLength}",
-                NotePath,
-                Title,
-                currentContent.Length);
-            await nextEditor.LoadNoteAsync(
-                Title,
-                currentContent,
-                NotePath,
-                viewModel.OpenCollectionPath);
-            currentContent = nextEditor.GetContent();
-            if (!hadPendingChangesBeforeLoad)
+            await WorkspaceEditorViewLoadAwaiter.WaitAsync(nextEditor, EditorViewLoadTimeout, logger);
+            if (!IsCurrentMount(nextEditor, host))
             {
-                lastPersistedContent = currentContent;
+                return;
             }
 
-            hasPendingContentChanges = hadPendingChangesBeforeLoad
-                && !string.Equals(currentContent, lastPersistedContent, StringComparison.Ordinal);
-            isLoadingEditorNote = false;
-            logger.LogInformation("Note loaded into EditorView. NotePath={NotePath} CurrentContentLength={ContentLength}", NotePath, currentContent.Length);
+            isLoadingEditorNote = true;
+            try
+            {
+                bool hadPendingChangesBeforeLoad = HasPendingContentChanges();
+                await nextEditor.LoadNoteAsync(
+                    Title,
+                    currentContent,
+                    NotePath,
+                    viewModel.OpenCollectionPath);
+                if (!IsCurrentMount(nextEditor, host))
+                {
+                    return;
+                }
+
+                await RestorePendingCaretStateAsync(nextEditor);
+                if (!IsCurrentMount(nextEditor, host))
+                {
+                    return;
+                }
+
+                currentContent = nextEditor.GetContent();
+                if (!hadPendingChangesBeforeLoad)
+                {
+                    lastPersistedContent = currentContent;
+                }
+
+                hasPendingContentChanges = hadPendingChangesBeforeLoad
+                    && !string.Equals(currentContent, lastPersistedContent, StringComparison.Ordinal);
+            }
+            finally
+            {
+                isLoadingEditorNote = false;
+            }
 
             if (currentReadOnlyState)
             {
@@ -864,6 +929,13 @@ internal sealed class NoteWorkspaceDocumentSession
 
             await RefreshMentionTargetsAsync();
             RefreshDocumentLinks();
+        }
+        catch (Exception ex) when (nextEditor is not null && !IsCurrentMount(nextEditor, host))
+        {
+            logger.LogDebug(
+                ex,
+                "Editor mount stopped because the note session was closed or superseded. NotePath={NotePath}",
+                NotePath);
         }
         catch (Exception ex)
         {
@@ -891,9 +963,16 @@ internal sealed class NoteWorkspaceDocumentSession
         }
     }
 
+    private bool IsCurrentMount(EditorView editor, ContentControl host)
+    {
+        return !IsClosed
+            && ReferenceEquals(editorView, editor)
+            && ReferenceEquals(activeHost, host)
+            && ReferenceEquals(host.Content, editor);
+    }
+
     private void UnmountEditor()
     {
-        logger.LogDebug("Unmounting editor. NotePath={NotePath} HasEditor={HasEditor}", NotePath, editorView is not null);
         EditorView? existingEditor = editorView;
         isLoadingEditorNote = false;
         CancelScheduledDocumentLinksRefresh();
@@ -929,45 +1008,6 @@ internal sealed class NoteWorkspaceDocumentSession
         }
     }
 
-    private async Task WaitForEditorLoadedAsync(EditorView nextEditor)
-    {
-        if (nextEditor.IsLoaded)
-        {
-            logger.LogDebug("EditorView was already WPF-loaded. NotePath={NotePath}", NotePath);
-            return;
-        }
-
-        logger.LogDebug("Waiting for EditorView WPF Loaded event. NotePath={NotePath}", NotePath);
-        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        void OnLoaded(object? sender, RoutedEventArgs e)
-        {
-            nextEditor.Loaded -= OnLoaded;
-            completion.TrySetResult();
-        }
-
-        nextEditor.Loaded += OnLoaded;
-        try
-        {
-            Task completedTask = await Task.WhenAny(completion.Task, Task.Delay(EditorViewLoadTimeout));
-            if (completedTask != completion.Task)
-            {
-                logger.LogError(
-                    "EditorView WPF Loaded event timed out. NotePath={NotePath} Timeout={Timeout}",
-                    NotePath,
-                    EditorViewLoadTimeout);
-                throw new TimeoutException("The editor view did not finish loading.");
-            }
-
-            await completion.Task;
-            logger.LogDebug("EditorView WPF Loaded event observed. NotePath={NotePath}", NotePath);
-        }
-        finally
-        {
-            nextEditor.Loaded -= OnLoaded;
-        }
-    }
-
     private void WireEditorView(EditorView nextEditor)
     {
         nextEditor.DocumentChanged += EditorView_DocumentChanged;
@@ -980,7 +1020,63 @@ internal sealed class NoteWorkspaceDocumentSession
         nextEditor.OpenMentionRequested += EditorView_OpenMentionRequested;
         nextEditor.CreateLinkedNoteRequested += EditorView_CreateLinkedNoteRequested;
         nextEditor.AttachFileRequested += EditorView_AttachFileRequested;
+        nextEditor.AttachImageSourceRequested += EditorView_AttachImageSourceRequested;
         nextEditor.ReadAttachmentRequested += EditorView_ReadAttachmentRequested;
+        nextEditor.StoreEditorBlobRequested += EditorView_StoreEditorBlobRequested;
+        nextEditor.ReadEditorBlobRequested += EditorView_ReadEditorBlobRequested;
+        nextEditor.ListEditorBlobsRequested += EditorView_ListEditorBlobsRequested;
+    }
+
+    private async Task RestorePendingCaretStateAsync(EditorView targetEditor)
+    {
+        EditorCaretState? caret = pendingRestoreCaretState;
+        if (caret?.IsValid != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await targetEditor.RestoreCaretStateAsync(caret);
+            lastKnownCaretState = caret;
+            pendingRestoreCaretState = null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Editor caret state restore failed. NotePath={NotePath}", NotePath);
+        }
+    }
+
+    private async Task FocusEditorHostAsync()
+    {
+        try
+        {
+            if (editorView is null || !IsHostReady)
+            {
+                return;
+            }
+
+            await editorView.FocusEditorAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Editor focus failed. NotePath={NotePath}", NotePath);
+        }
+    }
+
+    private static EditorCaretState? NormalizeCaretState(EditorCaretState? caret)
+    {
+        if (caret?.IsValid != true)
+        {
+            return null;
+        }
+
+        return new EditorCaretState
+        {
+            BlockId = caret.BlockId.Trim(),
+            Index = Math.Max(0, caret.Index),
+            Length = Math.Max(0, caret.Length),
+        };
     }
 
     private void UnwireEditorView(EditorView? existingEditor)
@@ -1000,11 +1096,20 @@ internal sealed class NoteWorkspaceDocumentSession
         existingEditor.OpenMentionRequested -= EditorView_OpenMentionRequested;
         existingEditor.CreateLinkedNoteRequested -= EditorView_CreateLinkedNoteRequested;
         existingEditor.AttachFileRequested -= EditorView_AttachFileRequested;
+        existingEditor.AttachImageSourceRequested -= EditorView_AttachImageSourceRequested;
         existingEditor.ReadAttachmentRequested -= EditorView_ReadAttachmentRequested;
+        existingEditor.StoreEditorBlobRequested -= EditorView_StoreEditorBlobRequested;
+        existingEditor.ReadEditorBlobRequested -= EditorView_ReadEditorBlobRequested;
+        existingEditor.ListEditorBlobsRequested -= EditorView_ListEditorBlobsRequested;
     }
 
     private async void EditorView_ContentChanged(object? sender, string content)
     {
+        if (IsClosed || !ReferenceEquals(sender, editorView))
+        {
+            return;
+        }
+
         if (isLoadingEditorNote)
         {
             currentContent = content;
@@ -1023,12 +1128,18 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Editor content-change handling failed. NotePath={NotePath}", NotePath);
             editorView?.PostSaveResult(ok: false, error: ex.Message);
         }
     }
 
     private void EditorView_DocumentChanged(object? sender, EventArgs e)
     {
+        if (IsClosed || !ReferenceEquals(sender, editorView))
+        {
+            return;
+        }
+
         if (isLoadingEditorNote)
         {
             return;
@@ -1065,6 +1176,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Create extract note request failed. NotePath={NotePath} SourcePath={SourcePath}", NotePath, e.SourcePath);
             editorView?.PostExtractResult(ok: false, error: ex.Message);
         }
     }
@@ -1096,6 +1208,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Editor cloze save failed. NotePath={NotePath} SourcePath={SourcePath} BlockId={BlockId}", NotePath, e.SourcePath, e.BlockId);
             editorView?.PostSaveResult(ok: false, error: ex.Message);
         }
     }
@@ -1147,6 +1260,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Mention preview request failed. NotePath={NotePath} RelativePath={RelativePath}", NotePath, e.RelativePath);
             editorView?.PostMentionPreviewResult(
                 e.RequestId,
                 e.RelativePath,
@@ -1183,6 +1297,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Open mention request failed. NotePath={NotePath} SourcePath={SourcePath} RelativePath={RelativePath}", NotePath, e.SourcePath, e.RelativePath);
             editorView?.PostMentionOpenResult(ok: false, error: ex.Message);
         }
     }
@@ -1204,6 +1319,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Create linked note request failed. NotePath={NotePath} SourcePath={SourcePath}", NotePath, e.SourcePath);
             e.Complete(CreateLinkedNoteResult.Fail(ex.Message));
         }
     }
@@ -1221,7 +1337,8 @@ internal sealed class NoteWorkspaceDocumentSession
             Activate(selectInTree: false);
             byte[] content = Convert.FromBase64String(e.ContentBase64);
             using MemoryStream stream = new(content, writable: false);
-            KnowledgeAttachmentReadModel attachment = await viewModel.AttachAttachmentStreamToCurrentNoteAsync(
+            KnowledgeAttachmentReadModel attachment = await viewModel.AttachAttachmentStreamToNoteAsync(
+                e.SourcePath,
                 e.FileName,
                 stream);
 
@@ -1232,21 +1349,51 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Editor attachment request failed. NotePath={NotePath} FileName={FileName}", NotePath, e.FileName);
             e.Complete(AttachFileResult.Fail(ex.Message));
         }
     }
 
-    private async Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    private async Task EditorView_AttachImageSourceRequested(object? sender, AttachImageSourceRequestedEventArgs e)
     {
         if (isLoadingEditorNote)
         {
-            e.Complete(ReadAttachmentResult.Fail("The note is still loading."));
+            e.Complete(AttachFileResult.Fail("The note is still loading."));
             return;
         }
 
         try
         {
             Activate(selectInTree: false);
+            PastedImageSourceContent sourceContent = await ReadPastedImageSourceAsync(
+                e.ImageSource,
+                e.FallbackFileName);
+            await using MemoryStream stream = new(sourceContent.Content, writable: false);
+            KnowledgeAttachmentReadModel attachment = await viewModel.AttachAttachmentStreamToNoteAsync(
+                e.SourcePath,
+                sourceContent.FileName,
+                stream);
+
+            e.Complete(AttachFileResult.Success(
+                attachment.OriginalFileName,
+                attachment.RelativePath,
+                attachment.Kind.ToString()));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Editor image source attachment request failed. NotePath={NotePath} ImageSource={ImageSource}",
+                NotePath,
+                e.ImageSource);
+            e.Complete(AttachFileResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_ReadAttachmentRequested(object? sender, ReadAttachmentRequestedEventArgs e)
+    {
+        try
+        {
             ReadAttachmentResult result = await viewModel.ReadImageAttachmentForCurrentNoteAsync(
                 e.SourcePath,
                 e.ImageSource);
@@ -1254,9 +1401,259 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Editor attachment read failed. NotePath={NotePath} SourcePath={SourcePath} ImageSource={ImageSource}", NotePath, e.SourcePath, e.ImageSource);
             e.Complete(ReadAttachmentResult.Fail(ex.Message));
         }
     }
+
+    private async Task EditorView_StoreEditorBlobRequested(object? sender, StoreEditorBlobRequestedEventArgs e)
+    {
+        try
+        {
+            await viewModel.StoreEditorBlobAsync(
+                e.SourcePath,
+                e.BlobId,
+                e.ContentType,
+                e.ContentBase64);
+            e.Complete(EditorBlobResult.Success());
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Editor blob store failed. NotePath={NotePath} SourcePath={SourcePath} BlobId={BlobId}",
+                NotePath,
+                e.SourcePath,
+                e.BlobId);
+            e.Complete(EditorBlobResult.Fail(ex.Message));
+        }
+    }
+
+    private async Task EditorView_ReadEditorBlobRequested(object? sender, ReadEditorBlobRequestedEventArgs e)
+    {
+        try
+        {
+            EditorBlobReadResult result = await viewModel.ReadEditorBlobAsync(e.SourcePath, e.BlobId);
+            e.Complete(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Editor blob read failed. NotePath={NotePath} SourcePath={SourcePath} BlobId={BlobId}",
+                NotePath,
+                e.SourcePath,
+                e.BlobId);
+            e.Complete(EditorBlobReadResult.Fail(ex.Message));
+        }
+    }
+
+    private Task EditorView_ListEditorBlobsRequested(object? sender, ListEditorBlobsRequestedEventArgs e)
+    {
+        try
+        {
+            IReadOnlyList<string> blobIds = viewModel.ListEditorBlobIds(e.SourcePath);
+            e.Complete(EditorBlobListResult.Success(blobIds));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Editor blob list failed. NotePath={NotePath} SourcePath={SourcePath}",
+                NotePath,
+                e.SourcePath);
+            e.Complete(EditorBlobListResult.Fail(ex.Message));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static async Task<PastedImageSourceContent> ReadPastedImageSourceAsync(
+        string imageSource,
+        string fallbackFileName)
+    {
+        string source = imageSource.Trim();
+        if (source.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            PastedImageSourceContent? dataContent = TryReadDataImageSource(source, fallbackFileName);
+            return dataContent ?? throw new InvalidOperationException("The pasted data image source is invalid.");
+        }
+
+        if (Uri.TryCreate(source, UriKind.Absolute, out Uri? uri))
+        {
+            return uri.Scheme.ToLowerInvariant() switch
+            {
+                "http" or "https" => await DownloadPastedHttpImageAsync(uri, fallbackFileName),
+                "file" => await ReadPastedLocalImageAsync(uri.LocalPath, fallbackFileName, source),
+                _ => throw new InvalidOperationException("The pasted image source scheme is not supported.")
+            };
+        }
+
+        return await ReadPastedLocalImageAsync(source, fallbackFileName, source);
+    }
+
+    private static PastedImageSourceContent? TryReadDataImageSource(string source, string fallbackFileName)
+    {
+        int commaIndex = source.IndexOf(',');
+        if (commaIndex < 0)
+        {
+            return null;
+        }
+
+        string metadata = source[5..commaIndex];
+        string payload = source[(commaIndex + 1)..];
+        string mediaType = metadata.Split(';', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "text/plain";
+        if (!mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        byte[] content = metadata.Contains(";base64", StringComparison.OrdinalIgnoreCase)
+            ? Convert.FromBase64String(payload)
+            : System.Text.Encoding.UTF8.GetBytes(Uri.UnescapeDataString(payload));
+        if (content.Length == 0)
+        {
+            return null;
+        }
+
+        string fileName = CreatePastedImageFileName(fallbackFileName, source, mediaType);
+        return new PastedImageSourceContent(fileName, content);
+    }
+
+    private static async Task<PastedImageSourceContent> DownloadPastedHttpImageAsync(
+        Uri uri,
+        string fallbackFileName)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Get, uri);
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cognt", "1.0"));
+        using HttpResponseMessage response = await PastedImageHttpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        string contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        if (!IsSupportedPastedImageContentType(contentType)
+            && !IsSupportedPastedImagePath(uri.LocalPath))
+        {
+            throw new InvalidOperationException("The pasted image URL did not return a supported image type.");
+        }
+
+        byte[] content = await response.Content.ReadAsByteArrayAsync();
+        if (content.Length == 0)
+        {
+            throw new InvalidOperationException("The pasted image URL returned empty content.");
+        }
+
+        string fileName = CreatePastedImageFileName(
+            GetPreferredPastedImageFileName(fallbackFileName, uri.LocalPath),
+            uri.LocalPath,
+            contentType);
+        return new PastedImageSourceContent(fileName, content);
+    }
+
+    private static async Task<PastedImageSourceContent> ReadPastedLocalImageAsync(
+        string path,
+        string fallbackFileName,
+        string source)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The pasted image file could not be found.", fullPath);
+        }
+
+        if (!IsSupportedPastedImagePath(fullPath))
+        {
+            throw new InvalidOperationException("The pasted image file type is not supported.");
+        }
+
+        byte[] content = await File.ReadAllBytesAsync(fullPath);
+        if (content.Length == 0)
+        {
+            throw new InvalidOperationException("The pasted image file is empty.");
+        }
+
+        string fileName = CreatePastedImageFileName(
+            GetPreferredPastedImageFileName(fallbackFileName, fullPath),
+            source,
+            string.Empty);
+        return new PastedImageSourceContent(fileName, content);
+    }
+
+    private static string GetPreferredPastedImageFileName(string fallbackFileName, string sourcePath)
+    {
+        string sourceFileName = Path.GetFileName(sourcePath);
+        return string.IsNullOrWhiteSpace(sourceFileName)
+            ? fallbackFileName
+            : sourceFileName;
+    }
+
+    private static string CreatePastedImageFileName(
+        string preferredFileName,
+        string source,
+        string contentType)
+    {
+        string fileName = SanitizePastedImageFileName(preferredFileName);
+        if (!string.IsNullOrWhiteSpace(Path.GetExtension(fileName)))
+        {
+            return fileName;
+        }
+
+        return fileName + InferPastedImageExtension(contentType, source);
+    }
+
+    private static string SanitizePastedImageFileName(string value)
+    {
+        string fileName = Path.GetFileName(value.Trim());
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = "pasted-image";
+        }
+
+        foreach (char invalidChar in Path.GetInvalidFileNameChars())
+        {
+            fileName = fileName.Replace(invalidChar, '-');
+        }
+
+        return string.IsNullOrWhiteSpace(fileName)
+            ? "pasted-image"
+            : fileName;
+    }
+
+    private static string InferPastedImageExtension(string contentType, string source)
+    {
+        string normalizedContentType = contentType.Trim().ToLowerInvariant();
+        return normalizedContentType switch
+        {
+            "image/jpeg" or "image/jpg" => ".jpg",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            "image/png" => ".png",
+            _ => Path.GetExtension(source).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => ".jpg",
+                ".webp" => ".webp",
+                ".gif" => ".gif",
+                _ => ".png"
+            }
+        };
+    }
+
+    private static bool IsSupportedPastedImageContentType(string contentType)
+    {
+        return contentType.Equals("image/png", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("image/webp", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSupportedPastedImagePath(string path)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".webp" or ".gif";
+    }
+
+    private sealed record PastedImageSourceContent(string FileName, byte[] Content);
 
     private async Task OpenImageOcclusionForImageAsync(
         string imageBlockId,
@@ -1291,6 +1688,7 @@ internal sealed class NoteWorkspaceDocumentSession
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Image occlusion editor failed. NotePath={NotePath} ImageBlockId={ImageBlockId} ImageRelPath={ImageRelPath}", NotePath, imageBlockId, imageRelPath);
             dialogs.ShowWarning("Image Occlusion", ex.Message);
         }
     }

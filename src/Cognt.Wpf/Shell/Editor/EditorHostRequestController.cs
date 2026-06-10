@@ -31,5 +31,9 @@ internal sealed class EditorHostRequestController
             editorView,
             openNoteAsync,
             logger);
+        _ = new EditorAssetRequestController(
+            viewModel,
+            editorView,
+            logger);
     }
 }
