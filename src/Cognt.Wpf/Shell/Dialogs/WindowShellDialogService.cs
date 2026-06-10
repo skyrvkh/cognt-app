@@ -2,20 +2,30 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using CogntApp.Design;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Dialogs;
 
-internal sealed partial class WindowShellDialogService(Window owner) : IShellDialogService
+internal sealed partial class WindowShellDialogService(Window owner, ILogger<WindowShellDialogService> dialogLogger) : IShellDialogService
 {
     private readonly Window ownerWindow = owner ?? throw new ArgumentNullException(nameof(owner));
+    private readonly ILogger<WindowShellDialogService> logger = dialogLogger ?? throw new ArgumentNullException(nameof(dialogLogger));
+
+    internal WindowShellDialogService(Window owner)
+        : this(owner, NullLogger<WindowShellDialogService>.Instance)
+    {
+    }
 
     public void ShowInfo(string title, string message)
     {
+        ArgumentNullException.ThrowIfNull(message);
         ShowMessageBox(title, message, MessageBoxImage.Information);
     }
 
     public void ShowWarning(string title, string message)
     {
+        ArgumentNullException.ThrowIfNull(message);
         ShowMessageBox(title, message, MessageBoxImage.Warning);
     }
 
@@ -23,7 +33,8 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
     {
         EnsureMessageDialogArgs(title, message);
 
-        return MessageBox.Show(ownerWindow, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+        bool confirmed = MessageBox.Show(ownerWindow, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+        return confirmed;
     }
 
     private Window CreateDialogWindow(string title, double height, double width, object content)
@@ -36,7 +47,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = ThemeResourceLookup.Brush("PanelBrush", Brushes.White),
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = 13,
             Owner = ownerWindow,
             Content = content,
@@ -53,7 +64,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             Margin = margin ?? default,
             IsDefault = isDefault,
             IsCancel = isCancel,
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = 13,
         };
 
@@ -112,7 +123,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
         {
             Text = text,
             Foreground = foreground,
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = fontSize,
             FontWeight = fontWeight ?? FontWeights.Normal,
             Margin = margin ?? new Thickness(0, 0, 0, 8),
@@ -138,7 +149,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             BorderBrush = borderBrush ?? SystemColors.ActiveBorderBrush,
             Foreground = foreground ?? ThemeResourceLookup.Brush("InkBrush", Brushes.Black),
             BorderThickness = new Thickness(1),
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = fontSize,
         };
     }
@@ -171,7 +182,7 @@ internal sealed partial class WindowShellDialogService(Window owner) : IShellDia
             BorderThickness = new Thickness(1),
             IsDefault = isDefault,
             IsCancel = isCancel,
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = fontSize,
             FontWeight = fontWeight,
             Cursor = System.Windows.Input.Cursors.Hand,

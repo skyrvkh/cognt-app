@@ -16,7 +16,6 @@ internal sealed class CollectionWorkflowController
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(dialogs);
-
         this.viewModel = viewModel;
         this.dialogs = dialogs;
     }
@@ -37,7 +36,6 @@ internal sealed class CollectionWorkflowController
         {
             viewModel.SelectCollectionCommand.Execute(collection);
         }
-
         popup.IsOpen = false;
     }
 
@@ -60,7 +58,6 @@ internal sealed class CollectionWorkflowController
         {
             viewModel.AddCollectionCommand.Execute(request);
         }
-
         popup.IsOpen = false;
     }
 
@@ -81,11 +78,11 @@ internal sealed class CollectionWorkflowController
         popup.IsOpen = false;
     }
 
-    internal void RemoveCurrentCollection(Popup popup)
+    internal void RemoveCollectionFromList(CollectionOptionViewModel? collection, Popup popup)
     {
         ArgumentNullException.ThrowIfNull(popup);
 
-        CollectionRemovalPlan plan = viewModel.GetCurrentCollectionRemovalPlan();
+        CollectionRemovalPlan plan = viewModel.GetCollectionListRemovalPlan(collection);
         if (!plan.CanRemove)
         {
             dialogs.ShowInfo("Remove Collection", plan.Message);
@@ -97,11 +94,42 @@ internal sealed class CollectionWorkflowController
             return;
         }
 
-        if (viewModel.RemoveCollectionCommand.CanExecute(null))
+        if (viewModel.RemoveCollectionCommand.CanExecute(collection))
         {
-            viewModel.RemoveCollectionCommand.Execute(null);
+            viewModel.RemoveCollectionCommand.Execute(collection);
+        }
+        popup.IsOpen = false;
+    }
+
+    internal void RemoveCurrentCollection(Popup popup)
+    {
+        ArgumentNullException.ThrowIfNull(popup);
+
+        CollectionOptionViewModel? currentCollection = viewModel.AvailableCollections.FirstOrDefault(collection =>
+            string.Equals(collection.Path, viewModel.CurrentCollectionPath, StringComparison.OrdinalIgnoreCase));
+        RemoveCollectionFromList(currentCollection, popup);
+    }
+
+    internal void DeleteCollectionFromDisk(CollectionOptionViewModel? collection, Popup popup)
+    {
+        ArgumentNullException.ThrowIfNull(popup);
+
+        CollectionRemovalPlan plan = viewModel.GetCollectionDeletionPlan(collection);
+        if (!plan.CanRemove)
+        {
+            dialogs.ShowInfo("Delete Collection", plan.Message);
+            return;
         }
 
+        if (!dialogs.ConfirmWarning("Delete Collection", plan.Message))
+        {
+            return;
+        }
+
+        if (viewModel.DeleteCollectionCommand.CanExecute(collection))
+        {
+            viewModel.DeleteCollectionCommand.Execute(collection);
+        }
         popup.IsOpen = false;
     }
 }

@@ -50,6 +50,11 @@ internal sealed partial class WindowShellDialogService
             dialog.DialogResult = true;
         };
 
-        return dialog.ShowDialog() == true ? nameTextBox.Text.Trim() : null;
+        if (dialog.ShowDialog() == true)
+        {
+            return nameTextBox.Text.Trim();
+        }
+
+        return null;
     }
 }

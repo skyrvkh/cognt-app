@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using CogntApp.Design;
-using Microsoft.Win32;
 
 namespace CogntApp.Shell.Dialogs;
 
@@ -85,7 +84,7 @@ internal sealed partial class WindowShellDialogService
         {
             Text = title,
             Foreground = ThemeResourceLookup.Brush("InkBrush", Brushes.Black),
-            FontFamily = ThemeResourceLookup.FontFamily("AppDisplayFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppDisplayFontFamily", EditorSettings.DefaultDisplayFontFamily),
             FontSize = 22,
             FontWeight = FontWeights.SemiBold,
         });
@@ -93,7 +92,7 @@ internal sealed partial class WindowShellDialogService
         {
             Text = "Choose a name and parent folder for the new workspace.",
             Foreground = ThemeResourceLookup.Brush("MutedBrush", Brushes.DimGray),
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = 13,
             Margin = new Thickness(0, 7, 0, 0),
             TextWrapping = TextWrapping.Wrap,
@@ -108,7 +107,7 @@ internal sealed partial class WindowShellDialogService
         {
             Text = "The app will create a .cognt folder inside this location.",
             Foreground = ThemeResourceLookup.Brush("DimBrush", Brushes.Gray),
-            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", "Inter, Roboto, Noto Sans, Segoe UI"),
+            FontFamily = ThemeResourceLookup.FontFamily("AppSansFontFamily", EditorSettings.DefaultInterfaceFontFamily),
             FontSize = 12,
             Margin = new Thickness(0, 10, 0, 0),
             TextWrapping = TextWrapping.Wrap,
@@ -154,61 +153,12 @@ internal sealed partial class WindowShellDialogService
             dialog.DialogResult = true;
         };
 
-        return dialog.ShowDialog() == true
-            ? new CollectionCreationPromptResult(nameTextBox.Text.Trim(), locationTextBox.Text.Trim())
-            : null;
-    }
-
-    public string? PromptForExistingCollectionPath(
-        string title,
-        string defaultParentPath,
-        string collectionDirectoryExtension)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(title);
-        ArgumentException.ThrowIfNullOrWhiteSpace(defaultParentPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(collectionDirectoryExtension);
-
-        OpenFolderDialog folderDialog = new()
+        if (dialog.ShowDialog() == true)
         {
-            Title = title,
-            InitialDirectory = Directory.Exists(defaultParentPath)
-                ? defaultParentPath
-                : Environment.CurrentDirectory,
-            Multiselect = false,
-        };
-
-        if (folderDialog.ShowDialog(ownerWindow) != true)
-        {
-            return null;
+            return new CollectionCreationPromptResult(nameTextBox.Text.Trim(), locationTextBox.Text.Trim());
         }
 
-        string selectedPath = folderDialog.FolderName.Trim();
-        string directoryName = Path.GetFileName(Path.TrimEndingDirectorySeparator(selectedPath));
-        if (!directoryName.EndsWith(collectionDirectoryExtension, StringComparison.OrdinalIgnoreCase))
-        {
-            ShowWarning(
-                title,
-                $"Choose a collection folder ending with \"{collectionDirectoryExtension}\".");
-            return null;
-        }
-
-        return selectedPath;
+        return null;
     }
 
-    private void ShowCollectionLocationPicker(TextBox locationTextBox, string defaultParentPath)
-    {
-        OpenFolderDialog folderDialog = new()
-        {
-            Title = "Choose collection location",
-            InitialDirectory = Directory.Exists(locationTextBox.Text)
-                ? locationTextBox.Text
-                : defaultParentPath,
-            Multiselect = false,
-        };
-
-        if (folderDialog.ShowDialog(ownerWindow) == true)
-        {
-            locationTextBox.Text = folderDialog.FolderName;
-        }
-    }
 }
