@@ -1,10 +1,9 @@
 using AvalonDock;
 using AvalonDock.Controls;
 using AvalonDock.Layout;
+using Cognt.Wpf.EditorHost.Models.Editor;
 using CogntApp.Shell.Workspace;
 using CogntApp.ViewModels.Navigation;
-using System.Collections;
-using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,71 +16,102 @@ namespace CogntApp;
 
 public partial class MainWindow
 {
-    private const double RightPaneDockWidth = 420.0d;
-    private readonly Dictionary<LayoutFloatingWindowControl, CancelEventHandler> protectedToolWindowHandlers = new();
+    private WorkspaceToolDockingPolicy? rightPaneDockingPolicy;
     private bool isCommittingNoteTabRename;
+
+    private WorkspaceToolDockingPolicy RightPaneDockingPolicy => rightPaneDockingPolicy ??= new(
+        Dispatcher,
+        RightToolPaneGroup,
+        InspectorAnchorable,
+        GraphAnchorable,
+        CardsAnchorable,
+        PdfAnchorable,
+        BrowserAnchorable);
 
     private Task QueueOpenNoteDocumentAsync(string notePath, bool selectInTree)
     {
-        logger.LogDebug(
-            "Queueing note open. NotePath={NotePath} SelectInTree={SelectInTree}",
-            notePath,
-            selectInTree);
-        return OpenSerializedNoteDocumentAsync(notePath, selectInTree);
+        return QueueOpenNoteDocumentAsync(notePath, selectInTree, isSessionRestoreRequest: false);
     }
 
-    private async Task OpenSerializedNoteDocumentAsync(string notePath, bool selectInTree)
+    private Task QueueRestoreOpenNoteDocumentAsync(string notePath, bool selectInTree)
     {
-        logger.LogDebug("Waiting for note open gate. NotePath={NotePath}", notePath);
+        return QueueOpenNoteDocumentAsync(notePath, selectInTree, isSessionRestoreRequest: true);
+    }
+
+    private Task QueueOpenNoteDocumentAsync(string notePath, bool selectInTree, bool isSessionRestoreRequest)
+    {
+        if (!isSessionRestoreRequest && isRestoringWorkspaceSession)
+        {
+            isWorkspaceSessionRestoreInterrupted = true;
+        }
+
+        if (openingNoteDocument is { } openingSession
+            && !openingSession.IsClosed
+            && IsSamePath(openingSession.NotePath, notePath))
+        {
+            return Task.CompletedTask;
+        }
+
+        int requestVersion = ++noteOpenRequestVersion;
+        CancelSupersededOpeningNoteDocument(notePath, requestVersion);
+        return OpenSerializedNoteDocumentAsync(notePath, selectInTree, requestVersion);
+    }
+
+    private async Task OpenSerializedNoteDocumentAsync(string notePath, bool selectInTree, int requestVersion)
+    {
         await openNoteDocumentGate.WaitAsync();
 
         try
         {
-            logger.LogDebug("Entered note open gate. NotePath={NotePath}", notePath);
-            await OpenOrActivateNoteDocumentAsync(notePath, selectInTree);
+            if (IsSupersededNoteOpenRequest(requestVersion))
+            {
+                return;
+            }
+
+            await OpenOrActivateNoteDocumentAsync(notePath, selectInTree, requestVersion);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Serialized note open failed. NotePath={NotePath}", notePath);
-            shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
+            if (!IsSupersededNoteOpenRequest(requestVersion) && !isRestoringWorkspaceSession)
+            {
+                shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
+            }
         }
         finally
         {
-            logger.LogDebug("Leaving note open gate. NotePath={NotePath}", notePath);
             openNoteDocumentGate.Release();
         }
     }
 
-    private async Task OpenOrActivateNoteDocumentAsync(string notePath, bool selectInTree)
+    private async Task OpenOrActivateNoteDocumentAsync(string notePath, bool selectInTree, int requestVersion)
     {
         if (openNoteDocuments.TryGetValue(notePath, out NoteWorkspaceDocumentSession? existingSession))
         {
-            logger.LogDebug(
-                "Found existing note session. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor} IsDetached={IsDetached}",
-                notePath,
-                existingSession.IsClosed,
-                existingSession.HasMountedEditor,
-                existingSession.IsDetached);
             if (existingSession.IsClosed || !existingSession.HasMountedEditor)
             {
                 logger.LogWarning(
-                    "Discarding stale note session before reopening. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor}",
+                    "Discarding stale note session before reopening. NotePath={NotePath} IsClosed={IsClosed} HasAttachedEditor={HasAttachedEditor} IsHostReady={IsHostReady}",
                     notePath,
                     existingSession.IsClosed,
-                    existingSession.HasMountedEditor);
+                    existingSession.HasAttachedEditor,
+                    existingSession.IsHostReady);
                 DiscardNoteDocumentSession(existingSession);
             }
             else
             {
                 if (existingSession.IsDetached)
                 {
-                    logger.LogInformation("Redocking existing note session. NotePath={NotePath}", notePath);
                     await existingSession.RedockAsync(WorkspaceDocumentPane);
                 }
 
-                logger.LogInformation("Activating existing note session. NotePath={NotePath}", notePath);
                 ActivateMainWorkspaceWindow();
                 ActivateNoteDocument(existingSession, selectInTree);
+                if (TakePendingCaretRestoreState(notePath) is { } pendingCaret)
+                {
+                    await existingSession.RestoreCaretStateAsync(pendingCaret);
+                }
+
                 existingSession.Focus();
                 return;
             }
@@ -90,7 +120,6 @@ public partial class MainWindow
         PreparedNote? note;
         try
         {
-            logger.LogDebug("Preparing note for open. NotePath={NotePath}", notePath);
             note = viewModel.PrepareNoteForOpen(notePath, forceRead: true);
         }
         catch (Exception ex)
@@ -107,23 +136,17 @@ public partial class MainWindow
             {
                 if (currentSession.IsClosed || !currentSession.HasMountedEditor)
                 {
-                    logger.LogWarning("Discarding null-prepare stale note session. NotePath={NotePath}", notePath);
                     DiscardNoteDocumentSession(currentSession);
                     return;
                 }
 
-                logger.LogInformation("Activating current note session after null prepare. NotePath={NotePath}", notePath);
                 ActivateNoteDocument(currentSession, selectInTree);
             }
 
             return;
         }
 
-        logger.LogInformation(
-            "Creating note document session. NotePath={NotePath} Title={Title} ContentLength={ContentLength}",
-            note.NotePath,
-            note.Title,
-            note.Content.Length);
+        EditorCaretState? restoreCaretState = TakePendingCaretRestoreState(note.NotePath);
         NoteWorkspaceDocumentSession session = new(
             viewModel,
             editorViewFactory,
@@ -133,11 +156,13 @@ public partial class MainWindow
             RefreshOpenDocumentMentionTargets,
             CreateEditorTheme,
             loggerFactory.CreateLogger<NoteWorkspaceDocumentSession>(),
-            note);
+            note,
+            restoreCaretState);
         session.Closed += NoteDocumentSession_Closed;
         session.Activated += NoteDocumentSession_Activated;
 
         openNoteDocuments[note.NotePath] = session;
+        openingNoteDocument = session;
         session.LayoutDocument.CanFloat = false;
         WorkspaceDocumentPane.Children.Add(session.LayoutDocument);
         session.LayoutDocument.IsSelected = true;
@@ -148,40 +173,85 @@ public partial class MainWindow
         try
         {
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
-            logger.LogDebug("Initializing note document session. NotePath={NotePath}", note.NotePath);
+            if (IsSupersededNoteOpenRequest(requestVersion))
+            {
+                DiscardNoteDocumentSession(session);
+                return;
+            }
+
             await session.InitializeAsync();
-            logger.LogInformation("Note document session initialized. NotePath={NotePath}", note.NotePath);
+            if (IsSupersededNoteOpenRequest(requestVersion))
+            {
+                DiscardNoteDocumentSession(session);
+                return;
+            }
+
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Note document session initialization failed. NotePath={NotePath}", note.NotePath);
             DiscardNoteDocumentSession(session);
-            shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
+            if (!IsSupersededNoteOpenRequest(requestVersion) && !isRestoringWorkspaceSession)
+            {
+                shellDialogs.ShowWarning("Open Note Failed", $"The editor could not open this note: {ex.Message}");
+            }
+            else
+            {
+                logger.LogWarning(
+                    ex,
+                    "Note document session failure warning suppressed because the request was superseded or session restore is active. NotePath={NotePath}",
+                    note.NotePath);
+            }
+
             return;
+        }
+        finally
+        {
+            if (ReferenceEquals(openingNoteDocument, session))
+            {
+                openingNoteDocument = null;
+            }
         }
 
         ActivateNoteDocument(session, selectInTree);
     }
 
+    private bool IsSupersededNoteOpenRequest(int requestVersion)
+    {
+        return requestVersion != noteOpenRequestVersion;
+    }
+
+    private void CancelSupersededOpeningNoteDocument(string requestedNotePath, int requestVersion)
+    {
+        NoteWorkspaceDocumentSession? session = openingNoteDocument;
+        if (session is null
+            || session.IsClosed
+            || IsSamePath(session.NotePath, requestedNotePath))
+        {
+            return;
+        }
+
+        DiscardNoteDocumentSession(session);
+    }
+
     private void DiscardNoteDocumentSession(NoteWorkspaceDocumentSession session)
     {
-        logger.LogWarning(
-            "Discarding note document session. NotePath={NotePath} IsClosed={IsClosed} HasMountedEditor={HasMountedEditor}",
-            session.NotePath,
-            session.IsClosed,
-            session.HasMountedEditor);
         bool wasActive = ReferenceEquals(activeNoteDocument, session);
 
         session.Closed -= NoteDocumentSession_Closed;
         session.Activated -= NoteDocumentSession_Activated;
         openNoteDocuments.Remove(session.NotePath);
+        if (ReferenceEquals(openingNoteDocument, session))
+        {
+            openingNoteDocument = null;
+        }
+
+        session.Dispose();
 
         if (WorkspaceDocumentPane.Children.Contains(session.LayoutDocument))
         {
             WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);
         }
-
-        session.Dispose();
 
         if (wasActive)
         {
@@ -203,11 +273,11 @@ public partial class MainWindow
 
     private void ActivateNoteDocument(NoteWorkspaceDocumentSession session, bool selectInTree)
     {
-        logger.LogDebug(
-            "Activating note document. NotePath={NotePath} HasMountedEditor={HasMountedEditor} SelectInTree={SelectInTree}",
-            session.NotePath,
-            session.HasMountedEditor,
-            selectInTree);
+        if (session.IsClosed || !session.IsHostReady)
+        {
+            return;
+        }
+
         bool wasActiveDocument = ReferenceEquals(activeNoteDocument, session);
         activeNoteDocument = session;
         if (session.IsDocked)
@@ -222,12 +292,16 @@ public partial class MainWindow
             noteInspectorViewModel.UpdateCurrentContent(session.GetContent());
         }
 
+        session.Focus(focusEditor: !isRestoringWorkspaceSession);
+
         if (selectInTree)
         {
             noteTreeInteractions.RunWithSuppressedTreeSelection(
                 () => SelectNote(session.NotePath),
                 deferRestore: true);
         }
+
+        QueueWorkspaceSessionSave();
     }
 
     private void WorkspaceDockingManager_ActiveContentChanged(object? sender, EventArgs e)
@@ -238,6 +312,16 @@ public partial class MainWindow
         if (session is not null)
         {
             ActivateNoteDocument(session, selectInTree: true);
+            return;
+        }
+
+        FlashcardWorkspaceDocumentSession? flashcardSession = openFlashcardDocuments.Values.FirstOrDefault(candidate =>
+            candidate.HasMountedEditor
+            && candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent));
+        if (flashcardSession is not null)
+        {
+            activeNoteDocument = null;
+            flashcardSession.Focus();
             return;
         }
 
@@ -258,11 +342,17 @@ public partial class MainWindow
             return;
         }
 
-        activeNoteDocument = openNoteDocuments.Values.FirstOrDefault(candidate => !candidate.IsClosed);
+        activeNoteDocument = openNoteDocuments.Values.FirstOrDefault(candidate => !candidate.IsClosed && candidate.IsHostReady);
         if (activeNoteDocument is not null)
         {
             ActivateNoteDocument(activeNoteDocument, selectInTree: false);
         }
+        else
+        {
+            viewModel.ClearActiveWorkspaceNoteIfMatches(session.NotePath);
+        }
+
+        QueueWorkspaceSessionSave();
     }
 
     private async Task CloseActiveNoteDocumentAsync()
@@ -292,9 +382,11 @@ public partial class MainWindow
             return;
         }
 
-        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values
+        NoteWorkspaceDocumentSession[] matchedSessions = openNoteDocuments.Values
             .Where(candidate => deletedPaths.Contains(Path.GetFullPath(candidate.NotePath)))
-            .ToArray())
+            .ToArray();
+
+        foreach (NoteWorkspaceDocumentSession session in matchedSessions)
         {
             await CloseNoteDocumentAsync(session, savePendingChanges: false);
         }
@@ -302,17 +394,14 @@ public partial class MainWindow
 
     private async Task CloseNoteDocumentAsync(NoteWorkspaceDocumentSession session, bool savePendingChanges = true)
     {
-        if (savePendingChanges && viewModel.CanSaveOnClose)
-        {
-            await session.SavePendingChangesAsync();
-        }
+
+        await session.CloseAsync(savePendingChanges);
 
         if (WorkspaceDocumentPane.Children.Contains(session.LayoutDocument))
         {
             WorkspaceDocumentPane.Children.Remove(session.LayoutDocument);
         }
 
-        await session.CloseAsync(savePendingChanges: false);
     }
 
     private void RefreshOpenDocumentMentionTargets()
@@ -341,16 +430,32 @@ public partial class MainWindow
 
     private NoteWorkspaceDocumentSession? GetActiveNoteDocument()
     {
-        if (activeNoteDocument is not null && !activeNoteDocument.IsClosed)
+        if (activeNoteDocument is not null && !activeNoteDocument.IsClosed && activeNoteDocument.IsHostReady)
         {
             return activeNoteDocument;
         }
 
         return openNoteDocuments.Values.FirstOrDefault(candidate =>
-            candidate.HasMountedEditor
+            candidate.IsHostReady
             && (candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent)
                 || candidate.LayoutDocument.IsActive
                 || candidate.LayoutDocument.IsSelected));
+    }
+
+    private string? GetActiveWorkspaceEditorNotePath()
+    {
+        return GetActiveNoteDocument()?.NotePath;
+    }
+
+    private string GetActiveWorkspaceEditorContent()
+    {
+        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
+        if (session is null)
+        {
+            return string.Empty;
+        }
+
+        return session.GetContent();
     }
 
     private static void ShowDockTool(LayoutAnchorable anchorable)
@@ -400,29 +505,24 @@ public partial class MainWindow
 
     private void WorkspaceDockingManager_AnchorableClosing(object? sender, AnchorableClosingEventArgs e)
     {
-        if (IsWorkspaceTool(e.Anchorable))
+        if (RightPaneDockingPolicy.CancelWorkspaceToolClosing(e.Anchorable))
         {
             e.Cancel = true;
-            EnforceRightPaneTabPolicy();
         }
     }
 
     private void WorkspaceDockingManager_AnchorableHiding(object? sender, AnchorableHidingEventArgs e)
     {
-        if (IsWorkspaceTool(e.Anchorable))
+        if (RightPaneDockingPolicy.CancelWorkspaceToolHiding(e.Anchorable))
         {
             e.Cancel = true;
             e.CloseInsteadOfHide = false;
-            EnforceRightPaneTabPolicy();
         }
     }
 
     private void WorkspaceDockingManager_AnchorableHidden(object? sender, AnchorableHiddenEventArgs e)
     {
-        if (IsWorkspaceTool(e.Anchorable))
-        {
-            RestoreWorkspaceTool(e.Anchorable);
-        }
+        RightPaneDockingPolicy.RestoreWorkspaceToolIfOwned(e.Anchorable);
     }
 
     private void WorkspaceDockingManager_LayoutChanging(object? sender, EventArgs e)
@@ -459,193 +559,46 @@ public partial class MainWindow
         {
             session.LayoutDocument.CanFloat = false;
         }
+
+        foreach (FlashcardWorkspaceDocumentSession session in openFlashcardDocuments.Values)
+        {
+            session.LayoutDocument.CanFloat = false;
+        }
     }
 
     private void ConfigureRightPaneTabs()
     {
-        foreach (LayoutAnchorable anchorable in EnumerateRightPaneTabs())
-        {
-            anchorable.Closing -= RightPaneTab_Closing;
-            anchorable.Closing += RightPaneTab_Closing;
-            anchorable.Hiding -= RightPaneTab_Hiding;
-            anchorable.Hiding += RightPaneTab_Hiding;
-        }
-
-        EnforceRightPaneTabPolicy();
+        RightPaneDockingPolicy.ConfigureTabs();
     }
 
     private void EnforceRightPaneTabPolicy()
     {
-        RightToolPaneGroup.DockWidth = new GridLength(RightPaneDockWidth);
-        RightToolPaneGroup.FloatingWidth = RightPaneDockWidth;
-
-        foreach (LayoutAnchorable anchorable in EnumerateRightPaneTabs())
-        {
-            anchorable.CanClose = false;
-            anchorable.CanHide = false;
-            anchorable.CanAutoHide = true;
-            anchorable.AutoHideWidth = RightPaneDockWidth;
-            anchorable.FloatingWidth = RightPaneDockWidth;
-        }
+        RightPaneDockingPolicy.EnforceRightPaneTabs();
     }
 
     private void ApplyDefaultLowerRightToolAutoHide()
     {
-        if (lowerRightToolsAutoHideApplied)
-        {
-            return;
-        }
-
-        lowerRightToolsAutoHideApplied = true;
-        _ = Dispatcher.BeginInvoke(() =>
-        {
-            EnforceRightPaneTabPolicy();
-            EnsureToolAutoHidden(CardsAnchorable);
-            EnsureToolAutoHidden(PdfAnchorable);
-            EnsureToolAutoHidden(BrowserAnchorable);
-
-            if (!InspectorAnchorable.IsAutoHidden)
-            {
-                InspectorAnchorable.Show();
-                InspectorAnchorable.IsSelected = true;
-            }
-
-            if (!GraphAnchorable.IsAutoHidden)
-            {
-                GraphAnchorable.Show();
-            }
-        }, DispatcherPriority.Loaded);
+        RightPaneDockingPolicy.ApplyDefaultLowerRightToolAutoHide();
     }
 
-    private static void EnsureToolAutoHidden(LayoutAnchorable anchorable)
+    private void EnsureToolAutoHidden(LayoutAnchorable anchorable)
     {
-        if (anchorable.IsHidden)
-        {
-            anchorable.Show();
-        }
-
-        if (anchorable.CanAutoHide && !anchorable.IsAutoHidden)
-        {
-            anchorable.ToggleAutoHide();
-        }
-    }
-
-    private void RightPaneTab_Closing(object? sender, CancelEventArgs e)
-    {
-        if (sender is LayoutAnchorable anchorable && IsWorkspaceTool(anchorable))
-        {
-            e.Cancel = true;
-            EnforceRightPaneTabPolicy();
-        }
-    }
-
-    private void RightPaneTab_Hiding(object? sender, CancelEventArgs e)
-    {
-        if (sender is LayoutAnchorable anchorable && IsWorkspaceTool(anchorable))
-        {
-            e.Cancel = true;
-            EnforceRightPaneTabPolicy();
-        }
+        RightPaneDockingPolicy.EnsureToolAutoHidden(anchorable);
     }
 
     private void RestoreHiddenWorkspaceTools()
     {
-        foreach (LayoutAnchorable anchorable in EnumerateRightPaneTabs())
-        {
-            if (anchorable.IsHidden)
-            {
-                RestoreWorkspaceTool(anchorable);
-            }
-        }
-    }
-
-    private void RestoreWorkspaceTool(LayoutAnchorable anchorable)
-    {
-        _ = Dispatcher.BeginInvoke(() =>
-        {
-            if (!IsWorkspaceTool(anchorable))
-            {
-                return;
-            }
-
-            EnforceRightPaneTabPolicy();
-            ShowDockTool(anchorable);
-        }, DispatcherPriority.Background);
+        RightPaneDockingPolicy.RestoreHiddenWorkspaceTools();
     }
 
     private void ProtectToolFloatingWindow(LayoutFloatingWindowControl floatingWindow)
     {
-        if (protectedToolWindowHandlers.ContainsKey(floatingWindow)
-            || !LayoutContainsWorkspaceTool(floatingWindow.Model))
-        {
-            return;
-        }
-
-        CancelEventHandler handler = (_, args) =>
-        {
-            if (!LayoutContainsWorkspaceTool(floatingWindow.Model))
-            {
-                return;
-            }
-
-            args.Cancel = true;
-            EnforceRightPaneTabPolicy();
-        };
-
-        floatingWindow.Closing += handler;
-        protectedToolWindowHandlers[floatingWindow] = handler;
+        RightPaneDockingPolicy.ProtectFloatingWindow(floatingWindow);
     }
 
     private void UnprotectToolFloatingWindow(LayoutFloatingWindowControl floatingWindow)
     {
-        if (protectedToolWindowHandlers.Remove(floatingWindow, out CancelEventHandler? handler))
-        {
-            floatingWindow.Closing -= handler;
-        }
-    }
-
-    private bool LayoutContainsWorkspaceTool(object? layoutElement)
-    {
-        return layoutElement switch
-        {
-            LayoutAnchorable anchorable => IsWorkspaceTool(anchorable),
-            LayoutAnchorableFloatingWindow floatingWindow => AnyLayoutChildContainsWorkspaceTool(floatingWindow.Children),
-            LayoutAnchorablePaneGroup paneGroup => AnyLayoutChildContainsWorkspaceTool(paneGroup.Children),
-            LayoutAnchorablePane pane => AnyLayoutChildContainsWorkspaceTool(pane.Children),
-            LayoutPanel panel => AnyLayoutChildContainsWorkspaceTool(panel.Children),
-            _ => false
-        };
-    }
-
-    private bool AnyLayoutChildContainsWorkspaceTool(IEnumerable children)
-    {
-        foreach (object? child in children)
-        {
-            if (LayoutContainsWorkspaceTool(child))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private IEnumerable<LayoutAnchorable> EnumerateRightPaneTabs()
-    {
-        yield return InspectorAnchorable;
-        yield return GraphAnchorable;
-        yield return CardsAnchorable;
-        yield return PdfAnchorable;
-        yield return BrowserAnchorable;
-    }
-
-    private bool IsWorkspaceTool(LayoutAnchorable anchorable)
-    {
-        return ReferenceEquals(anchorable, InspectorAnchorable)
-            || ReferenceEquals(anchorable, GraphAnchorable)
-            || ReferenceEquals(anchorable, CardsAnchorable)
-            || ReferenceEquals(anchorable, PdfAnchorable)
-            || ReferenceEquals(anchorable, BrowserAnchorable);
+        RightPaneDockingPolicy.UnprotectFloatingWindow(floatingWindow);
     }
 
     private void NoteDocumentHeader_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -824,6 +777,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            logger.LogError(
+                ex,
+                "Note tab rename failed. NotePath={NotePath} ItemId={ItemId} NewTitle={NewTitle}",
+                session.NotePath,
+                itemId,
+                newTitle);
             shellDialogs.ShowWarning("Rename Failed", $"The note could not be renamed:{Environment.NewLine}{ex.Message}");
             RefocusNoteTabRename(renameTextBox);
         }

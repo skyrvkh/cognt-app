@@ -3,6 +3,7 @@ using CogntApp.ViewModels.Navigation;
 using CogntApp.Shell.Workspace;
 using CogntApp.Views;
 using Microsoft.Extensions.Logging;
+using System.Windows.Threading;
 
 namespace CogntApp;
 
@@ -10,17 +11,41 @@ public partial class MainWindow
 {
     private async void ViewModel_OverlayRequested(object? sender, OverlayRequestedEventArgs e)
     {
-        await overlayNavigation.HandleOverlayRequestedAsync(e);
+        try
+        {
+            await overlayNavigation.HandleOverlayRequestedAsync(e);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Overlay request failed. ViewKind={ViewKind}", e.ViewKind);
+            shellDialogs.ShowWarning("Navigation Failed", $"The requested view could not be opened: {ex.Message}");
+        }
     }
 
     private async void DecksView_PracticeRequested(object? sender, EventArgs e)
     {
-        await overlayNavigation.HandlePracticeRequestedAsync();
+        try
+        {
+            await overlayNavigation.HandlePracticeRequestedAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Practice review request failed.");
+            shellDialogs.ShowWarning("Practice Not Ready", $"Practice mode could not start: {ex.Message}");
+        }
     }
 
     private async void DecksView_CramRequested(object? sender, CramRequestedEventArgs e)
     {
-        await overlayNavigation.HandleCramRequestedAsync(e.Scope, e.Settings);
+        try
+        {
+            await overlayNavigation.HandleCramRequestedAsync(e.Scope, e.Settings);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cram review request failed. Scope={Scope}", e.Scope);
+            shellDialogs.ShowWarning("Cram Not Ready", $"Cram mode could not start: {ex.Message}");
+        }
     }
 
     private void DecksView_InfoMessageRequested(object? sender, UserMessageRequestedEventArgs e)
@@ -35,27 +60,72 @@ public partial class MainWindow
 
     private async void ReviewView_ExitReviewRequested(object? sender, EventArgs e)
     {
-        await overlayNavigation.HandleReviewExitRequestedAsync();
+        try
+        {
+            await overlayNavigation.HandleReviewExitRequestedAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Review exit failed.");
+            shellDialogs.ShowWarning("Review Exit Failed", $"The review session could not close cleanly: {ex.Message}");
+        }
     }
 
     private async void ViewModel_ClearEditorRequested(object? sender, EventArgs e)
     {
-        await CloseActiveNoteDocumentAsync();
+        try
+        {
+            await CloseActiveNoteDocumentAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Clear editor request failed.");
+            shellDialogs.ShowWarning("Close Note Failed", $"The active note could not be closed: {ex.Message}");
+        }
     }
 
     private async void ViewModel_OpenNoteRequested(object? sender, OpenNoteRequestedEventArgs e)
     {
-        logger.LogInformation(
-            "Open note requested. NotePath={NotePath} SelectInTree={SelectInTree}",
-            e.NotePath,
-            e.SelectInTree);
-        overlayNavigation.HideOverlay();
-        await QueueOpenNoteDocumentAsync(e.NotePath, e.SelectInTree);
+        try
+        {
+            overlayNavigation.HideOverlay();
+            await QueueOpenNoteDocumentAsync(e.NotePath, e.SelectInTree);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Open note request failed. NotePath={NotePath}", e.NotePath);
+            shellDialogs.ShowWarning("Open Note Failed", $"The note could not be opened: {ex.Message}");
+        }
+    }
+
+    private async void ViewModel_OpenFlashcardRequested(object? sender, OpenFlashcardRequestedEventArgs e)
+    {
+        try
+        {
+            await OpenFlashcardDocumentAsync(e);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Open flashcard request failed. CardId={CardId}", e.CardId);
+            shellDialogs.ShowWarning("Open Card Failed", $"The card could not be opened: {ex.Message}");
+        }
+    }
+
+    private Task ViewModel_NoteDocumentsDeleting(object? sender, NoteDocumentsDeletedEventArgs e)
+    {
+        return CloseDeletedNoteDocumentsAsync(e.NotePaths);
     }
 
     private async void ViewModel_NoteDocumentsDeleted(object? sender, NoteDocumentsDeletedEventArgs e)
     {
-        await CloseDeletedNoteDocumentsAsync(e.NotePaths);
+        try
+        {
+            await CloseDeletedNoteDocumentsAsync(e.NotePaths);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Close deleted note documents failed after delete notification.");
+        }
     }
 
     private void ViewModel_MentionTargetsChanged(object? sender, EventArgs e)
@@ -70,12 +140,45 @@ public partial class MainWindow
 
     private void ViewModel_CurrentNoteTitleChanged(object? sender, string title)
     {
-        GetActiveNoteDocument()?.UpdateTitle(title);
+        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
+        session?.UpdateTitle(title);
     }
 
     private void ViewModel_CurrentNoteContentChanged(object? sender, string content)
     {
         noteInspectorViewModel.UpdateCurrentContent(content);
+    }
+
+    private async void ViewModel_CurrentNoteEditorContentReplacementRequested(object? sender, string content)
+    {
+        try
+        {
+            NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
+            if (session is null)
+            {
+                return;
+            }
+
+            await session.ReplaceContentAsync(content);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Current note editor content replacement failed.");
+            shellDialogs.ShowWarning("Editor Refresh Failed", $"The generated-card cleanup was saved, but the editor could not reload it: {ex.Message}");
+        }
+        finally
+        {
+            AutoHideNoteCardQueuePane();
+        }
+    }
+
+    private void AutoHideNoteCardQueuePane()
+    {
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            EnforceRightPaneTabPolicy();
+            EnsureToolAutoHidden(CardsAnchorable);
+        }, DispatcherPriority.Background);
     }
 
     private async void ViewModel_EditorReadOnlyChanged(object? sender, bool isReadOnly)
@@ -84,6 +187,9 @@ public partial class MainWindow
         if (session is not null)
         {
             await session.SetReadOnlyAsync(isReadOnly);
+        }
+        else
+        {
         }
     }
 
@@ -103,11 +209,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Outline navigation failed. NotePath={NotePath} BlockId={BlockId}", session.NotePath, e.BlockId);
             shellDialogs.ShowWarning("Outline", $"The heading could not be opened: {ex.Message}");
         }
     }
 
-    private async void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
+    private void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
     {
         try
         {
@@ -116,13 +223,22 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "All notes open note request failed. RelativePath={RelativePath}", e.RelativePath);
             shellDialogs.ShowWarning("Open Note Failed", $"The note could not be opened: {ex.Message}");
         }
     }
 
     private async void AllNotesViewModel_ShowCardsRequested(object? sender, OpenNoteCardsRequestedEventArgs e)
     {
-        await overlayNavigation.HandleNoteCardsRequestedAsync(e);
+        try
+        {
+            await overlayNavigation.HandleNoteCardsRequestedAsync(e);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "All notes show cards request failed. RelativePath={RelativePath}", e.RelativePath);
+            shellDialogs.ShowWarning("Open Cards Failed", $"Cards for this note could not be opened: {ex.Message}");
+        }
     }
 
     private void AllNotesViewModel_CreateNoteRequested(object? sender, EventArgs e)
@@ -131,6 +247,9 @@ public partial class MainWindow
         {
             viewModel.AddNoteCommand.Execute(null);
             overlayNavigation.HideOverlay();
+        }
+        else
+        {
         }
     }
 

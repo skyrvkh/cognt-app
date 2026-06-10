@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Shell.Workspace;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -11,7 +12,8 @@ public partial class MainWindow
 {
     private void ViewModel_CardCandidatePreviewRequested(object? sender, CardCandidatePreviewRequestedEventArgs e)
     {
-        CardCandidatePreviewWindow previewWindow = new(e.Preview)
+        CardCandidatePreviewWindow previewWindow = new(
+            e.Preview)
         {
             Owner = this,
         };
@@ -27,29 +29,28 @@ public partial class MainWindow
             return;
         }
 
-        await session.AddSelectedTextToSelectedCardSlotAsync();
-    }
-
-    private async void ViewModel_CreateCardContextFromSelectionRequested(object? sender, EventArgs e)
-    {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
+        try
         {
-            return;
+            await session.AddSelectedTextToSelectedCardSlotAsync();
         }
-
-        await session.CreateCardContextFromSelectionAsync();
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Add selected text to card slot failed. NotePath={NotePath}", session.NotePath);
+            shellDialogs.ShowWarning("Card Slot", $"The selected text could not be added to the card: {ex.Message}");
+        }
     }
 
     private async void NoteCardQueueView_CreateClozeRequested(object? sender, EventArgs e)
     {
-        NoteWorkspaceDocumentSession? session = GetActiveNoteDocument();
-        if (session is null)
+        try
         {
-            return;
+            await CreateClozeFromActiveEditorAsync();
         }
-
-        await session.CreateClozeFromSelectionAsync();
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Create cloze request failed.");
+            shellDialogs.ShowWarning("Create Cloze", $"A cloze could not be created: {ex.Message}");
+        }
     }
 
     private async void NoteCardQueueView_OpenImageOcclusionRequested(object? sender, EventArgs e)
@@ -60,7 +61,15 @@ public partial class MainWindow
             return;
         }
 
-        await session.OpenImageOcclusionForSelectedImageAsync();
+        try
+        {
+            await session.OpenImageOcclusionForSelectedImageAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Open image occlusion request failed. NotePath={NotePath}", session.NotePath);
+            shellDialogs.ShowWarning("Image Occlusion", $"Image occlusion could not be opened: {ex.Message}");
+        }
     }
 
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -76,10 +85,34 @@ public partial class MainWindow
 
         if (Keyboard.Modifiers == ModifierKeys.Alt && key == Key.Z)
         {
-            e.Handled = true;
             if (GetActiveNoteDocument() is { } altClozeSession)
             {
-                await altClozeSession.CreateClozeFromSelectionAsync();
+                e.Handled = true;
+                try
+                {
+                    await altClozeSession.CreateClozeFromSelectionAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Alt+Z cloze shortcut failed for note. NotePath={NotePath}", altClozeSession.NotePath);
+                    shellDialogs.ShowWarning("Create Cloze", $"A cloze could not be created: {ex.Message}");
+                }
+
+                return;
+            }
+
+            if (GetActiveFlashcardDocument() is { } altFlashcardSession)
+            {
+                e.Handled = true;
+                try
+                {
+                    await altFlashcardSession.CreateClozeFromSelectionAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Alt+Z cloze shortcut failed for flashcard. CardId={CardId}", altFlashcardSession.CardId);
+                    shellDialogs.ShowWarning("Create Cloze", $"A cloze could not be created: {ex.Message}");
+                }
             }
 
             return;
@@ -95,20 +128,78 @@ public partial class MainWindow
         switch (key)
         {
             case Key.C:
-                e.Handled = true;
                 if (GetActiveNoteDocument() is { } clozeSession)
                 {
-                    await clozeSession.CreateClozeFromSelectionAsync();
+                    e.Handled = true;
+                    try
+                    {
+                        await clozeSession.CreateClozeFromSelectionAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Ctrl+Shift+C cloze shortcut failed for note. NotePath={NotePath}", clozeSession.NotePath);
+                        shellDialogs.ShowWarning("Create Cloze", $"A cloze could not be created: {ex.Message}");
+                    }
+
+                    return;
                 }
+
+                if (GetActiveFlashcardDocument() is { } flashcardClozeSession)
+                {
+                    e.Handled = true;
+                    try
+                    {
+                        await flashcardClozeSession.CreateClozeFromSelectionAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Ctrl+Shift+C cloze shortcut failed for flashcard. CardId={CardId}", flashcardClozeSession.CardId);
+                        shellDialogs.ShowWarning("Create Cloze", $"A cloze could not be created: {ex.Message}");
+                    }
+                }
+
                 return;
             case Key.I:
-                e.Handled = true;
                 if (GetActiveNoteDocument() is { } imageSession)
                 {
-                    await imageSession.OpenImageOcclusionForSelectedImageAsync();
+                    e.Handled = true;
+                    try
+                    {
+                        await imageSession.OpenImageOcclusionForSelectedImageAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Ctrl+Shift+I image occlusion shortcut failed. NotePath={NotePath}", imageSession.NotePath);
+                        shellDialogs.ShowWarning("Image Occlusion", $"Image occlusion could not be opened: {ex.Message}");
+                    }
                 }
+
                 return;
         }
+    }
+
+    private async Task CreateClozeFromActiveEditorAsync()
+    {
+        if (GetActiveNoteDocument() is { } noteSession)
+        {
+            await noteSession.CreateClozeFromSelectionAsync();
+            return;
+        }
+
+        if (GetActiveFlashcardDocument() is { } flashcardSession)
+        {
+            await flashcardSession.CreateClozeFromSelectionAsync();
+        }
+    }
+
+    private FlashcardWorkspaceDocumentSession? GetActiveFlashcardDocument()
+    {
+        return openFlashcardDocuments.Values.FirstOrDefault(candidate =>
+            !candidate.IsClosed
+            && candidate.HasMountedEditor
+            && (candidate.LayoutDocument.IsActive
+                || candidate.LayoutDocument.IsSelected
+                || candidate.OwnsDockedContent(WorkspaceDockingManager.ActiveContent)));
     }
 
     private static bool IsTextInputFocused()

@@ -36,7 +36,6 @@ public partial class MainWindow
         viewModel.MentionTargetsChanged += ViewModel_MentionTargetsChanged;
         viewModel.UserMessageRequested += ViewModel_UserMessageRequested;
         viewModel.CardCandidatePreviewRequested += ViewModel_CardCandidatePreviewRequested;
-        viewModel.CreateCardContextFromSelectionRequested += ViewModel_CreateCardContextFromSelectionRequested;
         viewModel.AddSelectedTextToSelectedCardSlotRequested += ViewModel_AddSelectedTextToSelectedCardSlotRequested;
         viewModel.CurrentNoteTitleChanged += ViewModel_CurrentNoteTitleChanged;
         viewModel.CurrentNoteContentChanged += ViewModel_CurrentNoteContentChanged;

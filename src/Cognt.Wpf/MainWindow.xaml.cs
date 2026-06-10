@@ -1,17 +1,17 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Threading;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Review;
 using Cognt.Wpf.EditorHost;
+using Cognt.Wpf.EditorHost.Models.Editor;
 using Cognt.Wpf.EditorHost.Views;
 using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
+using CogntApp.Diagnostics;
 using CogntApp.Shell.Attachments;
 using CogntApp.Shell.Collections;
 using CogntApp.Shell.Dialogs;
@@ -44,14 +44,17 @@ public partial class MainWindow : Window
     private readonly AttachmentWorkflowController attachmentWorkflow;
     private readonly CollectionWorkflowController collectionWorkflow;
     private readonly DecksView decksView;
-    private readonly NoteCardQueueView noteCardQueueView = new();
+    private readonly NoteCardQueueView noteCardQueueView;
     private readonly SettingsView settingsView = new();
     private readonly MainViewModel viewModel;
     private readonly EditorView EditorViewControl;
     private readonly IEditorViewFactory editorViewFactory;
     private readonly IImageMaskEditorDialogService imageMaskEditorDialogs;
+    private readonly IFlashcardCardsQuery flashcardCardsQuery;
+    private readonly IUpdateFlashcardContentCommand updateFlashcardContentCommand;
     private readonly ILogger<MainWindow> logger;
     private readonly ILoggerFactory loggerFactory;
+    private readonly IWorkspaceSessionStore workspaceSessionStore;
     private readonly StartupWorkflowController startupWorkflow;
     private readonly BreadcrumbCommandController breadcrumbCommands;
     private readonly NoteTreeInteractionController noteTreeInteractions;
@@ -61,13 +64,20 @@ public partial class MainWindow : Window
     private readonly OverlayNavigationCoordinator overlayNavigation;
     private readonly ReviewOverlayCoordinator reviewOverlay;
     private readonly Dictionary<string, NoteWorkspaceDocumentSession> openNoteDocuments = new(StringComparer.OrdinalIgnoreCase);
-    private readonly NoteDocumentDragController noteDocumentDragController = new();
+    private readonly Dictionary<long, FlashcardWorkspaceDocumentSession> openFlashcardDocuments = new();
+    private readonly NoteDocumentDragController noteDocumentDragController;
     private readonly SemaphoreSlim openNoteDocumentGate = new(1, 1);
+    private readonly Dictionary<string, EditorCaretState?> pendingNoteCaretRestoreStates = new(StringComparer.OrdinalIgnoreCase);
     private NoteWorkspaceDocumentSession? activeNoteDocument;
+    private NoteWorkspaceDocumentSession? openingNoteDocument;
+    private int noteOpenRequestVersion;
     private bool isStartupInitialized;
-    private bool lowerRightToolsAutoHideApplied;
     private bool hasSavedOpenDocumentsForClose;
     private bool isSavingOpenDocumentsForClose;
+    private bool isRestoringWorkspaceSession;
+    private bool isWorkspaceSessionRestoreInterrupted;
+    private bool isSavingWorkspaceSession;
+    private bool isWorkspaceSessionSaveQueued;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -83,8 +93,11 @@ public partial class MainWindow : Window
         ICramSessionEngine cramSessionEngine,
         DecksView decksView,
         IImageMaskEditorDialogService imageMaskEditorDialogs,
+        IFlashcardCardsQuery flashcardCardsQuery,
+        IUpdateFlashcardContentCommand updateFlashcardContentCommand,
         IEditorViewFactory editorViewFactory,
         EditorView editorViewControl,
+        IWorkspaceSessionStore workspaceSessionStore,
         ILogger<MainWindow> logger,
         ILoggerFactory loggerFactory)
     {
@@ -98,26 +111,34 @@ public partial class MainWindow : Window
         this.noteGraphToolView = noteGraphToolView;
         this.decksView = decksView;
         this.imageMaskEditorDialogs = imageMaskEditorDialogs;
+        this.flashcardCardsQuery = flashcardCardsQuery;
+        this.updateFlashcardContentCommand = updateFlashcardContentCommand;
         this.editorViewFactory = editorViewFactory;
         EditorViewControl = editorViewControl;
+        this.workspaceSessionStore = workspaceSessionStore;
         this.logger = logger;
         this.loggerFactory = loggerFactory;
+        noteCardQueueView = new NoteCardQueueView();
+        noteDocumentDragController = new NoteDocumentDragController();
 
-        this.logger.LogInformation("Constructing MainWindow.");
         InitializeComponent();
         ApplyShellTheme();
-        shellDialogs = new WindowShellDialogService(this);
+        shellDialogs = new WindowShellDialogService(
+            this,
+            loggerFactory.CreateLogger<WindowShellDialogService>());
         attachmentWorkflow = new AttachmentWorkflowController(
             viewModel,
             shellDialogs,
             loggerFactory.CreateLogger<AttachmentWorkflowController>(),
             loggerFactory);
-        collectionWorkflow = new CollectionWorkflowController(viewModel, shellDialogs);
+        collectionWorkflow = new CollectionWorkflowController(
+            viewModel,
+            shellDialogs);
         InspectorToolHost.Content = noteInspectorView;
         GraphToolHost.Content = noteGraphToolView;
         CardsToolHost.Content = noteCardQueueView;
         PdfToolHost.Content = GetOrCreatePdfToolView();
-        rightPaneBrowserView ??= new BrowserPaneView();
+        rightPaneBrowserView ??= new BrowserPaneView(loggerFactory.CreateLogger<BrowserPaneView>());
         BrowserToolHost.Content = rightPaneBrowserView;
         InspectorAnchorable.Show();
         InspectorAnchorable.IsSelected = true;
@@ -126,40 +147,23 @@ public partial class MainWindow : Window
         PdfAnchorable.Show();
         BrowserAnchorable.Show();
         noteInspectorViewModel.Activate();
-        overlayHost = new OverlayHostController(OverlayHost, EditorViewControl);
-        reviewOverlay = new ReviewOverlayCoordinator(
-            overlayHost,
-            shellDialogs,
+        ShellCommandRouting commandRouting = CreateShellCommandRouting(
             reviewQueueQuery,
             recordFlashcardReviewCommand,
-            cramSessionEngine,
-            () => this.viewModel.OpenCollectionPath);
-        overlayNavigation = new OverlayNavigationCoordinator(
-            shellDialogs,
-            this.viewModel,
-            this.allNotesViewModel,
-            this.graphViewModel,
-            dashboardView,
-            this.allNotesView,
-            this.graphView,
-            this.decksView,
-            settingsView,
-            overlayHost,
-            EditorViewControl,
-            reviewOverlay);
-        startupWorkflow = new StartupWorkflowController(viewModel, shellDialogs);
-        breadcrumbCommands = new BreadcrumbCommandController(viewModel, shellDialogs);
-        noteTreeInteractions = new NoteTreeInteractionController(
-            NotesTree,
-            viewModel,
-            shellDialogs,
-            loggerFactory.CreateLogger<NoteTreeInteractionController>());
-        noteTreeCommands = new NoteTreeCommandController(viewModel, shellDialogs);
+            cramSessionEngine);
+        overlayHost = commandRouting.OverlayHost;
+        overlayNavigation = commandRouting.OverlayNavigation;
+        reviewOverlay = commandRouting.ReviewOverlay;
+        startupWorkflow = commandRouting.StartupWorkflow;
+        breadcrumbCommands = commandRouting.BreadcrumbCommands;
+        noteTreeInteractions = commandRouting.NoteTreeInteractions;
+        noteTreeCommands = commandRouting.NoteTreeCommands;
         BindViewDataContexts();
         RegisterViewEvents();
         RegisterViewModelEvents();
         RegisterWorkspaceDockingEvents();
-        this.logger.LogInformation("MainWindow constructed.");
+        viewModel.GetCurrentEditorNotePath = GetActiveWorkspaceEditorNotePath;
+        viewModel.GetCurrentEditorContent = GetActiveWorkspaceEditorContent;
     }
 
     protected override async void OnClosing(CancelEventArgs e)
@@ -170,20 +174,33 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!viewModel.CanSaveOnClose)
-        {
-            hasSavedOpenDocumentsForClose = true;
-            return;
-        }
-
         e.Cancel = true;
         isSavingOpenDocumentsForClose = true;
 
         try
         {
-            await SaveOpenDocumentsForCloseAsync();
+            await SaveWorkspaceSessionAsync();
+            if (viewModel.CanSaveOnClose)
+            {
+                await SaveOpenDocumentsForCloseAsync();
+            }
+
             hasSavedOpenDocumentsForClose = true;
-            Close();
+            _ = Dispatcher.BeginInvoke(
+                () =>
+                {
+                    try
+                    {
+                        Close();
+                    }
+                    catch (Exception closeException)
+                    {
+                        CrashSafeLog.RecordFatal("Deferred MainWindow close failed after saving open documents.", closeException);
+                        logger.LogError(closeException, "Deferred MainWindow close failed after saving open documents.");
+                        Application.Current.Shutdown(1);
+                    }
+                },
+                DispatcherPriority.ApplicationIdle);
         }
         catch (Exception ex)
         {
@@ -198,33 +215,64 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        logger.LogInformation("MainWindow closing. OpenDocumentCount={OpenDocumentCount}", openNoteDocuments.Count);
-        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values)
+        foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values.ToArray())
         {
-            if (viewModel.CanSaveOnClose)
+            try
             {
-                try
+                if (viewModel.CanSaveOnClose)
                 {
                     session.SavePendingChanges();
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to save note while closing application. NotePath={NotePath}", session.NotePath);
-                }
-            }
 
-            session.Dispose();
+                session.Dispose();
+            }
+            catch (Exception ex)
+            {
+                CrashSafeLog.RecordFatal(
+                    $"Failed to dispose note session during application close. NotePath={session.NotePath}",
+                    ex);
+                logger.LogError(ex, "Failed to dispose note session while closing application. NotePath={NotePath}", session.NotePath);
+            }
         }
 
-        openNoteDocumentGate.Dispose();
-        viewModel.PropertyChanged -= ViewModel_PropertyChanged;
-        viewModel.Dispose();
+        foreach (FlashcardWorkspaceDocumentSession session in openFlashcardDocuments.Values.ToArray())
+        {
+            try
+            {
+                session.Dispose();
+            }
+            catch (Exception ex)
+            {
+                CrashSafeLog.RecordFatal(
+                    $"Failed to dispose flashcard session during application close. CardId={session.CardId}",
+                    ex);
+                logger.LogError(ex, "Failed to dispose flashcard session while closing application. CardId={CardId}", session.CardId);
+            }
+        }
+
+        try
+        {
+            openNoteDocumentGate.Dispose();
+            viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            viewModel.Dispose();
+        }
+        catch (Exception ex)
+        {
+            CrashSafeLog.RecordFatal("Failed to dispose MainWindow services during application close.", ex);
+            logger.LogError(ex, "Failed to dispose MainWindow services during application close.");
+        }
+
         base.OnClosed(e);
     }
 
     private async Task SaveOpenDocumentsForCloseAsync()
     {
         foreach (NoteWorkspaceDocumentSession session in openNoteDocuments.Values.ToArray())
+        {
+            await session.SavePendingChangesAsync();
+        }
+
+        foreach (FlashcardWorkspaceDocumentSession session in openFlashcardDocuments.Values.ToArray())
         {
             await session.SavePendingChangesAsync();
         }
@@ -256,7 +304,6 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        logger.LogInformation("MainWindow loaded.");
         ApplyDesktopNavigation();
         ApplyDefaultLowerRightToolAutoHide();
 
@@ -267,6 +314,7 @@ public partial class MainWindow : Window
 
         isStartupInitialized = true;
         await startupWorkflow.InitializeAsync();
+        await RestoreWorkspaceSessionForCurrentCollectionAsync();
     }
 
     private void RemoveCollectionButton_Click(object sender, RoutedEventArgs e)
