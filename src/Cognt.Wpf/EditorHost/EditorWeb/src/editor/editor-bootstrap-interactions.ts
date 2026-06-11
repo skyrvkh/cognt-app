@@ -10,6 +10,12 @@ import type {
 import type { ExtractWorkflow } from './extract-workflow';
 import type { LinkedDocWorkflow } from './linked-doc-workflow';
 import type { ContentSaveCoordinator } from './content-save-coordinator';
+import { RichHtmlPasteController } from './rich-html-paste';
+import { insertRichHtmlPasteImages } from './rich-html-paste-image-insertion';
+import {
+  readHostImageSourceAsDataUrl,
+  type RichHtmlPasteHostSourceOptions,
+} from './rich-html-paste-host-source';
 
 type CreateEditorCommandControllerOptions = {
   config: EditorBootstrapConfig;
@@ -89,7 +95,30 @@ export function createEditorEventBindingController({
     editor,
     interactions,
     mentions,
+    runtime,
   } = foundation;
+  const hostImageSource: RichHtmlPasteHostSourceOptions = {
+    getCurrentPath: () => environment.getCurrentPath(),
+    attachImageSource: message => config.options.onAttachImageSource(message),
+    readAttachment: message => config.options.onReadAttachment(message),
+  };
+  const richHtmlPaste = new RichHtmlPasteController({
+    editor,
+    recordUserEdit: environment.recordUserEdit,
+    scheduleContentChanged: (delayMs, refreshMentions) =>
+      environment.scheduleContentChanged(delayMs, refreshMentions),
+    scheduleDocumentChangedNotification: () => contentSave.scheduleDocumentChangedNotification(),
+    showStatus: message => runtime.showStatus(message),
+    readNativeClipboardImage: () => config.options.onReadNativeClipboardImage(),
+    readImageSourceAsDataUrl: (imageSource, fallbackFileName) =>
+      readHostImageSourceAsDataUrl(hostImageSource, imageSource, fallbackFileName),
+    insertImages: images =>
+      insertRichHtmlPasteImages({
+        editor,
+        getCurrentDoc: environment.getCurrentDoc,
+        persistAttachmentMutation: () => attachments.attachmentPlacement.persistAttachmentMutation(),
+      }, images),
+  });
 
   return new EditorEventBindingController({
     editor,
@@ -102,6 +131,9 @@ export function createEditorEventBindingController({
     handleFileDragOver: event => attachments.fileDrops.handleFileDragOver(event),
     handleDroppedFiles: event => attachments.fileDrops.handleDroppedFiles(event),
     cancelNativeFileEvent: event => attachments.fileDrops.cancelNativeFileEvent(event),
+    isReplayingRichHtmlPaste: () => richHtmlPaste.isReplaying,
+    handleRichHtmlPaste: event => richHtmlPaste.handlePaste(event),
+    scheduleRichHtmlPasteSave: () => richHtmlPaste.scheduleSaveAfterPaste(),
     captureNativeTextSelectionForPaste: () => interactions.captureNativeTextSelectionForPaste(),
     scheduleMentionHighlightUpdate: () => mentions.scheduleHighlightUpdate(),
     recordUserEdit: environment.recordUserEdit,

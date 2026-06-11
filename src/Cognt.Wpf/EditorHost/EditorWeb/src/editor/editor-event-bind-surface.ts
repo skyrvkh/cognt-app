@@ -1,4 +1,5 @@
 import type { EditorEventBindingOptions } from './editor-event-types';
+import { handleEditorPasteEvent } from './editor-event-paste';
 
 export function bindEditorSurfaceEvents(options: EditorEventBindingOptions) {
   options.editor.addEventListener(
@@ -48,19 +49,8 @@ export function bindEditorSurfaceEvents(options: EditorEventBindingOptions) {
   }, { signal: options.signal });
 
   options.editor.addEventListener('paste', event => {
-    if (options.isInputLocked()) {
-      event.preventDefault();
-      options.showLockedInputStatus();
-      return;
-    }
-
-    options.recordUserEdit();
-    if (options.isLargeDocument()) {
-      options.scheduleDocumentChangedNotification();
-    } else {
-      options.scheduleContentChanged();
-    }
-  }, { signal: options.signal });
+    handleEditorPasteEvent(options, event, { recordPlainPaste: true });
+  }, { capture: true, signal: options.signal });
 
   options.editor.addEventListener('cut', event => {
     if (options.consumeSuppressedNativeCut()) {

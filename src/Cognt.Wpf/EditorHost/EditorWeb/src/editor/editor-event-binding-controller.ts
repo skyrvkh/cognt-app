@@ -17,12 +17,15 @@ type EditorEventBindingControllerOptions = {
   handleFileDragOver(event: DragEvent): void;
   handleDroppedFiles(event: DragEvent): Promise<void>;
   cancelNativeFileEvent(event: Event): void;
+  isReplayingRichHtmlPaste(): boolean;
+  handleRichHtmlPaste(event: ClipboardEvent): boolean;
+  scheduleRichHtmlPasteSave(): void;
   captureNativeTextSelectionForPaste(): void;
   scheduleMentionHighlightUpdate(): void;
   recordUserEdit(): void;
   isLargeDocument(): boolean;
   scheduleDocumentChangedNotification(): void;
-  scheduleContentChanged(): void;
+  scheduleContentChanged(delayMs?: number, refreshMentions?: boolean): void;
   consumeSuppressedNativeCut(): boolean;
   openLinkedDocReference(reference: LinkedPageReference): Promise<void>;
   getSelectedLinkedDocModelForOpenIntent(event: MouseEvent): unknown;
@@ -51,15 +54,16 @@ export class EditorEventBindingController {
       handleDroppedFiles: event => this.options.handleDroppedFiles(event),
       isEditorEvent: event => this.isEditorEvent(event),
       cancelNativeFileEvent: event => this.options.cancelNativeFileEvent(event),
-      isReplayingRichHtmlPaste: () => false,
-      handleRichHtmlPaste: () => false,
-      scheduleRichHtmlPasteSave: () => {},
+      isReplayingRichHtmlPaste: () => this.options.isReplayingRichHtmlPaste(),
+      handleRichHtmlPaste: event => this.options.handleRichHtmlPaste(event),
+      scheduleRichHtmlPasteSave: () => this.options.scheduleRichHtmlPasteSave(),
       captureNativeTextSelectionForPaste: () => this.options.captureNativeTextSelectionForPaste(),
       scheduleMentionHighlightUpdate: () => this.options.scheduleMentionHighlightUpdate(),
       recordUserEdit: () => this.options.recordUserEdit(),
       isLargeDocument: () => this.options.isLargeDocument(),
       scheduleDocumentChangedNotification: () => this.options.scheduleDocumentChangedNotification(),
-      scheduleContentChanged: () => this.options.scheduleContentChanged(),
+      scheduleContentChanged: (delayMs, refreshMentions) =>
+        this.options.scheduleContentChanged(delayMs, refreshMentions),
       consumeSuppressedNativeCut: () => this.options.consumeSuppressedNativeCut(),
       openLinkedDocReference: reference => this.options.openLinkedDocReference(reference),
       getSelectedLinkedDocModelForOpenIntent: event =>

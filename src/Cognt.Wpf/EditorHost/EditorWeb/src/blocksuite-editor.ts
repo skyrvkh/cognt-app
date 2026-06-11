@@ -24,6 +24,8 @@ import {
 import type { DocumentLinksPayload } from './document-links';
 import type { MentionPreviewResult, MentionTarget } from './mentions';
 import type { CogntSlashMenuEditor } from './editor/slash-menu';
+import { pasteRichHtmlForAutomation as pasteRichHtmlForAutomationInEditor } from './editor/rich-html-paste-automation';
+import { readHostImageSourceAsDataUrl } from './editor/rich-html-paste-host-source';
 
 const saveDebounceMs = 500;
 
@@ -47,8 +49,10 @@ export class MarkdownBlockSuiteEditor {
   private readonly hostElement: HTMLElement;
   private readonly state: EditorSessionState;
   private readonly bootstrap: EditorBootstrapResult;
+  private readonly options: MarkdownEditorOptions;
 
   public constructor(options: MarkdownEditorOptions) {
+    this.options = options;
     this.hostElement = options.hostElement;
     const runtime = createBlockSuiteEditorRuntime(
       options,
@@ -85,6 +89,21 @@ export class MarkdownBlockSuiteEditor {
       () => this.cancelPendingContentChanged(),
       () => this.isLargeDocument()
     );
+  }
+
+  public async pasteRichHtmlForAutomation(html: string, plainText = '') {
+    await pasteRichHtmlForAutomationInEditor({
+      editor: this.bootstrap.editor,
+      getCurrentDoc: () => this.state.doc,
+      readNativeClipboardImage: () => this.options.onReadNativeClipboardImage(),
+      readImageSourceAsDataUrl: (imageSource, fallbackFileName) =>
+        readHostImageSourceAsDataUrl({
+          getCurrentPath: () => this.state.path,
+          attachImageSource: message => this.options.onAttachImageSource(message),
+          readAttachment: message => this.options.onReadAttachment(message),
+        }, imageSource, fallbackFileName),
+      persistMutation: () => this.persistAutomationMutation(),
+    }, html, plainText);
   }
 
   public async focusBlock(blockId: string) {
@@ -192,6 +211,15 @@ export class MarkdownBlockSuiteEditor {
 
   public async insertImageFromSlashMenu(context: AffineSlashMenuContext) {
     await this.bootstrap.commands.insertImageFromSlashMenu(context);
+  }
+
+  private async persistAutomationMutation() {
+    await this.bootstrap.runtime.flushHost();
+    this.bootstrap.mentions.refreshHighlights();
+    this.cancelPendingContentChanged();
+    this.state.incrementUserEditGeneration();
+    this.options.onDocumentChanged();
+    this.options.onContentChanged(await this.exportContentForHost());
   }
 }
 

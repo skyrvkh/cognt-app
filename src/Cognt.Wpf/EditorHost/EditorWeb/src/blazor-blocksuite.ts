@@ -17,6 +17,7 @@ export {
   handleMentionOpenResult,
   handleMentionPreviewResult,
   loadNote,
+  pasteRichHtmlForAutomation,
   restoreCaretState,
   setDocumentLinks,
   setMentionTargets,

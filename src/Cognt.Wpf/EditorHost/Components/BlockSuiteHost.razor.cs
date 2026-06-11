@@ -197,6 +197,26 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
     }
 
     [JSInvokable]
+    public async Task<string?> HandleReadNativeClipboardImage()
+    {
+        try
+        {
+            System.Windows.Threading.Dispatcher? dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher is not null && !dispatcher.CheckAccess())
+            {
+                return await dispatcher.InvokeAsync(ReadNativeClipboardImageCore).Task;
+            }
+
+            return ReadNativeClipboardImageCore();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Native clipboard image read failed.");
+            return null;
+        }
+    }
+
+    [JSInvokable]
     public Task<ReadAttachmentResult> HandleReadAttachment(
         string sourcePath,
         string imageSource)
@@ -388,6 +408,26 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
     private async Task<TResult> InvokeHostAsync<TResult>(string method, params object?[] args)
     {
         return await RequireModule().InvokeAsync<TResult>(method, args);
+    }
+
+    private static string? ReadNativeClipboardImageCore()
+    {
+        if (!System.Windows.Clipboard.ContainsImage())
+        {
+            return null;
+        }
+
+        System.Windows.Media.Imaging.BitmapSource? image = System.Windows.Clipboard.GetImage();
+        if (image is null)
+        {
+            return null;
+        }
+
+        System.Windows.Media.Imaging.PngBitmapEncoder encoder = new();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+        using System.IO.MemoryStream stream = new();
+        encoder.Save(stream);
+        return $"data:image/png;base64,{Convert.ToBase64String(stream.ToArray())}";
     }
 
     private static IReadOnlyList<object> CreateMentionTargetPayloads(

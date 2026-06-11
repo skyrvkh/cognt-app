@@ -3,6 +3,7 @@ import {
 } from './image-attachments';
 import { handleEditorKeyDown } from './editor-event-keyboard';
 import { handleLinkedDocOpenIntent } from './editor-event-linked-doc';
+import { handleEditorPasteEvent } from './editor-event-paste';
 import type { EditorEventBindingOptions } from './editor-event-types';
 
 export function bindGlobalEditorEvents(options: EditorEventBindingOptions) {
@@ -28,6 +29,18 @@ export function bindGlobalEditorEvents(options: EditorEventBindingOptions) {
   document.addEventListener(
     'click',
     event => handleLinkedDocOpenIntent(options, event),
+    { capture: true, signal: options.signal }
+  );
+
+  document.addEventListener(
+    'paste',
+    event => {
+      if (!options.isEditorEvent(event) && !options.getCurrentDoc()) {
+        return;
+      }
+
+      handleEditorPasteEvent(options, event, { recordPlainPaste: false });
+    },
     { capture: true, signal: options.signal }
   );
 

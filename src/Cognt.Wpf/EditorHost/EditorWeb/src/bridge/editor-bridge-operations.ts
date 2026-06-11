@@ -58,6 +58,19 @@ export async function exportContent(instanceId: number) {
   );
 }
 
+export async function pasteRichHtmlForAutomation(
+  instanceId: number,
+  html: string,
+  plainText = ''
+) {
+  await runEditorAction(
+    instanceId,
+    `paste rich html automation (html=${html.length}, text=${plainText.length})`,
+    editor => editor.pasteRichHtmlForAutomation(html, plainText),
+    2
+  );
+}
+
 export async function focusBlock(instanceId: number, blockId: string) {
   await runEditorAction(
     instanceId,
