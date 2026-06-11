@@ -2,6 +2,7 @@ using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -92,6 +93,12 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            logger.LogError(
+                ex,
+                "Tag edit failed. Operation={Operation} ItemCount={ItemCount} Title={Title}",
+                e.Operation,
+                e.ItemIds.Count,
+                e.Title);
             shellDialogs.ShowWarning("Tags", $"Tags could not be updated:{Environment.NewLine}{ex.Message}");
         }
     }

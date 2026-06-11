@@ -8,7 +8,6 @@ using CogntApp.ViewModels.Decks.PresentationModels;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Overlay;
 
@@ -30,37 +29,6 @@ internal sealed partial class OverlayNavigationCoordinator
     private readonly ILoggerFactory loggerFactory;
     private int editorOpenRequestId;
     private PdfReaderView? pdfReaderView;
-
-    internal OverlayNavigationCoordinator(
-        IShellDialogService dialogs,
-        MainViewModel viewModel,
-        AllNotesViewModel allNotesViewModel,
-        GraphViewModel graphViewModel,
-        DashboardView dashboardView,
-        AllNotesView allNotesView,
-        GraphView graphView,
-        DecksView decksView,
-        SettingsView settingsView,
-        OverlayHostController overlayHost,
-        EditorView editorView,
-        ReviewOverlayCoordinator reviewOverlay)
-        : this(
-            dialogs,
-            viewModel,
-            allNotesViewModel,
-            graphViewModel,
-            dashboardView,
-            allNotesView,
-            graphView,
-            decksView,
-            settingsView,
-            overlayHost,
-            editorView,
-            reviewOverlay,
-            NullLogger<OverlayNavigationCoordinator>.Instance,
-            NullLoggerFactory.Instance)
-    {
-    }
 
     internal OverlayNavigationCoordinator(
         IShellDialogService dialogs,

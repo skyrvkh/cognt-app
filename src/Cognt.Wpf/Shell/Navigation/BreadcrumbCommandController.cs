@@ -2,7 +2,6 @@ using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
 using CogntApp.ViewModels.Navigation;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Navigation;
 
@@ -11,11 +10,6 @@ internal sealed class BreadcrumbCommandController
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
     private readonly ILogger<BreadcrumbCommandController> logger;
-
-    internal BreadcrumbCommandController(MainViewModel viewModel, IShellDialogService dialogs)
-        : this(viewModel, dialogs, NullLogger<BreadcrumbCommandController>.Instance)
-    {
-    }
 
     internal BreadcrumbCommandController(
         MainViewModel viewModel,

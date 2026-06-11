@@ -1,7 +1,6 @@
 using CogntApp.Shell.Dialogs;
 using CogntApp.ViewModels;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Navigation;
 
@@ -10,11 +9,6 @@ internal sealed class NoteTreeCommandController
     private readonly MainViewModel viewModel;
     private readonly IShellDialogService dialogs;
     private readonly ILogger<NoteTreeCommandController> logger;
-
-    internal NoteTreeCommandController(MainViewModel viewModel, IShellDialogService dialogs)
-        : this(viewModel, dialogs, NullLogger<NoteTreeCommandController>.Instance)
-    {
-    }
 
     internal NoteTreeCommandController(
         MainViewModel viewModel,
@@ -150,11 +144,6 @@ internal sealed class NoteTreeCommandController
         return node is null
             ? Task.FromResult(false)
             : DeleteNodesAsync([node]);
-    }
-
-    internal void DeleteNode(NoteTreeNodeViewModel? node)
-    {
-        DeleteNodeAsync(node).GetAwaiter().GetResult();
     }
 
     internal async Task<bool> DeleteNodesAsync(IReadOnlyList<NoteTreeNodeViewModel> nodes)

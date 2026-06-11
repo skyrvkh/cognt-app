@@ -101,15 +101,6 @@ internal sealed class CollectionWorkflowController
         popup.IsOpen = false;
     }
 
-    internal void RemoveCurrentCollection(Popup popup)
-    {
-        ArgumentNullException.ThrowIfNull(popup);
-
-        CollectionOptionViewModel? currentCollection = viewModel.AvailableCollections.FirstOrDefault(collection =>
-            string.Equals(collection.Path, viewModel.CurrentCollectionPath, StringComparison.OrdinalIgnoreCase));
-        RemoveCollectionFromList(currentCollection, popup);
-    }
-
     internal void DeleteCollectionFromDisk(CollectionOptionViewModel? collection, Popup popup)
     {
         ArgumentNullException.ThrowIfNull(popup);

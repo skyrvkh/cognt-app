@@ -3,6 +3,7 @@ using System.Windows;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp;
 
@@ -10,7 +11,15 @@ public partial class MainWindow
 {
     private async void ViewModel_OpenPdfRequested(object? sender, OpenPdfRequestedEventArgs e)
     {
-        await OpenPdfInToolWindowAsync(e.Document);
+        try
+        {
+            await OpenPdfInToolWindowAsync(e.Document);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Open PDF in tool window failed. RelativePath={RelativePath}", e.Document.RelativePath);
+            shellDialogs.ShowWarning("Open PDF Failed", $"The PDF could not be opened:{Environment.NewLine}{ex.Message}");
+        }
     }
 
     private async Task OpenPdfInToolWindowAsync(KnowledgePdfDocumentReadModel document)
@@ -32,7 +41,7 @@ public partial class MainWindow
 
     private PdfReaderView GetOrCreatePdfToolView()
     {
-        rightPanePdfView ??= new PdfReaderView();
+        rightPanePdfView ??= new PdfReaderView(loggerFactory.CreateLogger<PdfReaderView>());
         return rightPanePdfView;
     }
 
@@ -61,7 +70,8 @@ public partial class MainWindow
             && document is not null)
         {
             documentPath = viewModel.ResolveDocumentPath(document.RelativePath);
-            return File.Exists(documentPath);
+            bool exists = File.Exists(documentPath);
+            return exists;
         }
 
         return false;

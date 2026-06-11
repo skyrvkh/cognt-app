@@ -86,6 +86,8 @@ public partial class MainWindow
         if (sender is TextBox { DataContext: EditorBreadcrumbItemViewModel item })
         {
             breadcrumbCommands.CommitRename(item);
+            return;
         }
+
     }
 }

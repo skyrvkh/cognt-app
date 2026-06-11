@@ -133,8 +133,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal event EventHandler? AddSelectedTextToSelectedCardSlotRequested;
 
-    internal event EventHandler? CreateCardContextFromSelectionRequested;
-
     internal event EventHandler<string>? CurrentNoteTitleChanged;
 
     internal event EventHandler<string>? CurrentNoteContentChanged;

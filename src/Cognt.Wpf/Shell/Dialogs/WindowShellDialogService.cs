@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using CogntApp.Design;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Dialogs;
 
@@ -11,11 +10,6 @@ internal sealed partial class WindowShellDialogService(Window owner, ILogger<Win
 {
     private readonly Window ownerWindow = owner ?? throw new ArgumentNullException(nameof(owner));
     private readonly ILogger<WindowShellDialogService> logger = dialogLogger ?? throw new ArgumentNullException(nameof(dialogLogger));
-
-    internal WindowShellDialogService(Window owner)
-        : this(owner, NullLogger<WindowShellDialogService>.Instance)
-    {
-    }
 
     public void ShowInfo(string title, string message)
     {

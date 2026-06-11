@@ -9,7 +9,6 @@ using CogntApp.Shell.Overlay;
 using CogntApp.ViewModels.Navigation;
 using CogntApp.Views;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CogntApp.Shell.Review;
 
@@ -29,25 +28,6 @@ internal sealed partial class ReviewOverlayCoordinator
     private FlashcardReviewQueueSummaryReadModel? activeCramSummary;
     private CramSessionState? activeCramState;
     private HashSet<long> activeCramSchedulerRecordedCardIds = [];
-
-    internal ReviewOverlayCoordinator(
-        OverlayHostController overlayHost,
-        IShellDialogService dialogs,
-        IFlashcardReviewQueueQuery reviewQueueQuery,
-        IRecordFlashcardReviewCommand recordFlashcardReviewCommand,
-        ICramSessionEngine cramSessionEngine,
-        Func<string> collectionIdProvider)
-        : this(
-            overlayHost,
-            dialogs,
-            reviewQueueQuery,
-            recordFlashcardReviewCommand,
-            cramSessionEngine,
-            collectionIdProvider,
-            NullLogger<ReviewOverlayCoordinator>.Instance,
-            NullLoggerFactory.Instance)
-    {
-    }
 
     internal ReviewOverlayCoordinator(
         OverlayHostController overlayHost,

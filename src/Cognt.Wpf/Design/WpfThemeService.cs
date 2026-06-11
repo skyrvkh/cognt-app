@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Design;
 
@@ -7,9 +8,11 @@ public sealed class WpfThemeService : IThemeService
 {
     private const string ThemeDictionaryPrefix = "Themes/Theme.";
     private readonly string settingsPath;
+    private readonly ILogger<WpfThemeService> logger;
 
-    public WpfThemeService()
+    public WpfThemeService(ILogger<WpfThemeService> logger)
     {
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         settingsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Cognt",
@@ -96,15 +99,21 @@ public sealed class WpfThemeService : IThemeService
             if (string.Equals(text, "Focus", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(text, "Field", StringComparison.OrdinalIgnoreCase))
             {
+                logger.LogInformation("Theme settings migrated legacy theme value to Light. SettingsPath={SettingsPath} StoredValue={StoredValue}", settingsPath, text);
                 return ApplicationTheme.Light;
             }
 
-            return Enum.TryParse(text, ignoreCase: true, out ApplicationTheme theme)
-                ? theme
-                : ApplicationTheme.Light;
+            if (Enum.TryParse(text, ignoreCase: true, out ApplicationTheme theme))
+            {
+                return theme;
+            }
+
+            logger.LogWarning("Theme settings value was invalid; using default theme. SettingsPath={SettingsPath} StoredValue={StoredValue}", settingsPath, text);
+            return ApplicationTheme.Light;
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Theme settings load failed; using default theme. SettingsPath={SettingsPath}", settingsPath);
             return ApplicationTheme.Light;
         }
     }
@@ -121,8 +130,9 @@ public sealed class WpfThemeService : IThemeService
 
             File.WriteAllText(settingsPath, theme.ToString());
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Theme settings save failed. SettingsPath={SettingsPath} Theme={Theme}", settingsPath, theme);
         }
     }
 }

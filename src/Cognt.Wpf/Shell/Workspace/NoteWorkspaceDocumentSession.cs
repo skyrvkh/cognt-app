@@ -714,12 +714,6 @@ internal sealed class NoteWorkspaceDocumentSession
         await activeEditor.CreateClozeFromSelectionAsync();
     }
 
-    internal async Task CreateCardContextFromSelectionAsync()
-    {
-        await Task.CompletedTask;
-        dialogs.ShowWarning("Card Context", "Card context creation is handled from the note card queue.");
-    }
-
     internal async Task AddSelectedTextToSelectedCardSlotAsync()
     {
         EditorView? activeEditor = editorView;

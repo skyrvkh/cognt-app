@@ -103,11 +103,6 @@ public sealed partial class MainViewModel
         return DeleteNodesCoreAsync([node]);
     }
 
-    public void DeleteNode(NoteTreeNodeViewModel node)
-    {
-        DeleteNodeAsync(node).GetAwaiter().GetResult();
-    }
-
     public Task DeleteNodesAsync(IReadOnlyList<NoteTreeNodeViewModel> nodes)
     {
         ArgumentNullException.ThrowIfNull(nodes);

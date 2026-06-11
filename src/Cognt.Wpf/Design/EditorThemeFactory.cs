@@ -4,11 +4,6 @@ namespace CogntApp.Design;
 
 internal static class EditorThemeFactory
 {
-    internal static EditorTheme Create(ApplicationTheme theme)
-    {
-        return Create(EditorSettings.Default with { Theme = theme });
-    }
-
     internal static EditorTheme Create(EditorSettings settings)
     {
         EditorSettings normalized = settings.Normalize();

@@ -17,14 +17,22 @@ public partial class MainWindow
 
     private EditorTheme CreateEditorTheme()
     {
-        return EditorThemeFactory.Create(viewModel.SelectedThemeOption.Theme);
+        return EditorThemeFactory.Create(viewModel.CreateEditorSettingsSnapshot());
     }
 
     private void ApplyShellTheme()
     {
+        ApplyShellTypography();
         ApplyWorkspaceDockTheme();
         ApplyWindowTitleBarTheme();
         ApplyThemeToEditors();
+    }
+
+    private void ApplyShellTypography()
+    {
+        EditorSettings settings = viewModel.CreateEditorSettingsSnapshot();
+        FontFamily = BundledFontFamilyCatalog.CreateFontFamily(settings.InterfaceFontFamily);
+        FontSize = settings.GlobalTextFontSize;
     }
 
     private void ApplyWindowTitleBarTheme()
@@ -48,13 +56,48 @@ public partial class MainWindow
         {
             session.ApplyTheme(theme);
         }
+
+        foreach (FlashcardWorkspaceDocumentSession session in openFlashcardDocuments.Values.ToArray())
+        {
+            session.ApplyTheme(theme);
+        }
     }
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.SelectedThemeOption))
+        if (e.PropertyName == nameof(MainViewModel.IsCramEnabled))
+        {
+            decksView.SetCramEnabled(viewModel.IsCramEnabled);
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.OpenCollectionPath))
+        {
+            QueueActiveCollectionViewRefresh();
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.CurrentNoteToCardQueue)
+            && viewModel.CurrentNoteToCardQueue is null)
+        {
+            AutoHideNoteCardQueuePane();
+        }
+
+        if (IsThemeOrTypographyProperty(e.PropertyName))
         {
             ApplyShellTheme();
         }
+    }
+
+    private static bool IsThemeOrTypographyProperty(string? propertyName)
+    {
+        return propertyName is nameof(MainViewModel.SelectedThemeOption)
+            or nameof(MainViewModel.GlobalTextFontSize)
+            or nameof(MainViewModel.InterfaceFontFamilyText)
+            or nameof(MainViewModel.DisplayFontFamilyText)
+            or nameof(MainViewModel.ReadingFontFamilyText)
+            or nameof(MainViewModel.CodeFontFamilyText)
+            or nameof(MainViewModel.EditorTextFontSizeText)
+            or nameof(MainViewModel.EditorHeadingFontSizeText)
+            or nameof(MainViewModel.EditorCodeFontSizeText)
+            or nameof(MainViewModel.EditorZoomPercentText);
     }
 }

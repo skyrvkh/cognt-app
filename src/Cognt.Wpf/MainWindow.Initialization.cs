@@ -32,6 +32,8 @@ public partial class MainWindow
         viewModel.OverlayRequested += ViewModel_OverlayRequested;
         viewModel.ClearEditorRequested += ViewModel_ClearEditorRequested;
         viewModel.OpenNoteRequested += ViewModel_OpenNoteRequested;
+        viewModel.OpenFlashcardRequested += ViewModel_OpenFlashcardRequested;
+        viewModel.NoteDocumentsDeleting += ViewModel_NoteDocumentsDeleting;
         viewModel.NoteDocumentsDeleted += ViewModel_NoteDocumentsDeleted;
         viewModel.MentionTargetsChanged += ViewModel_MentionTargetsChanged;
         viewModel.UserMessageRequested += ViewModel_UserMessageRequested;
@@ -39,6 +41,7 @@ public partial class MainWindow
         viewModel.AddSelectedTextToSelectedCardSlotRequested += ViewModel_AddSelectedTextToSelectedCardSlotRequested;
         viewModel.CurrentNoteTitleChanged += ViewModel_CurrentNoteTitleChanged;
         viewModel.CurrentNoteContentChanged += ViewModel_CurrentNoteContentChanged;
+        viewModel.CurrentNoteEditorContentReplacementRequested += ViewModel_CurrentNoteEditorContentReplacementRequested;
         viewModel.EditorReadOnlyChanged += ViewModel_EditorReadOnlyChanged;
         viewModel.OpenPdfRequested += ViewModel_OpenPdfRequested;
         noteInspectorViewModel.OutlineNavigationRequested += NoteInspectorViewModel_OutlineNavigationRequested;
