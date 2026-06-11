@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test:rich-paste": "node scripts/test-rich-html-paste.mjs",
+    "test:rich-paste:e2e": "node scripts/e2e-rich-html-paste.mjs"
   },
   "dependencies": {
     "@blocksuite/blocks": "0.19.5",
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "24.10.1",
+    "esbuild": "0.25.12",
     "typescript": "5.9.3",
     "vite": "7.2.4"
   }
