@@ -19,6 +19,7 @@ export function createAssetHostCallbacks({
   EditorHostCallbacks,
   | 'onAttachFile'
   | 'onAttachImageSource'
+  | 'onReadNativeClipboardImage'
   | 'onReadAttachment'
   | 'onStoreEditorBlob'
   | 'onReadEditorBlob'
@@ -58,6 +59,10 @@ export function createAssetHostCallbacks({
         completeMessage: result =>
           `Bridge event completed: attach image source (instance=${instanceId}, ok=${result.ok}, relativePath=${result.relativePath ?? ''}).`,
       });
+    },
+    onReadNativeClipboardImage: async () => {
+      const result = await invokeHost(dotNet, 'HandleReadNativeClipboardImage');
+      return typeof result === 'string' && result.length > 0 ? result : null;
     },
     onReadAttachment: async message => {
       return invokeLoggedHostRequest({

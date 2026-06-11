@@ -113,6 +113,7 @@ export type MarkdownEditorOptions = {
   onCreateLinkedNote(message: CreateLinkedNoteMessage): Promise<CreateLinkedNoteResult>;
   onAttachFile(message: AttachFileMessage): Promise<AttachFileResult>;
   onAttachImageSource(message: AttachImageSourceMessage): Promise<AttachFileResult>;
+  onReadNativeClipboardImage(): Promise<string | null>;
   onReadAttachment(message: ReadAttachmentMessage): Promise<ReadAttachmentResult>;
   onStoreEditorBlob(message: StoreEditorBlobMessage): Promise<EditorBlobResult>;
   onReadEditorBlob(message: ReadEditorBlobMessage): Promise<EditorBlobReadResult>;
