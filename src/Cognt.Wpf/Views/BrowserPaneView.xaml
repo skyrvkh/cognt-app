@@ -4,12 +4,64 @@
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              Background="{DynamicResource PanelAltBrush}">
     <UserControl.Resources>
-        <Style x:Key="BrowserAddressTextBoxStyle" TargetType="TextBox">
-            <Setter Property="MinHeight" Value="32" />
-            <Setter Property="Padding" Value="10,5" />
+        <Style x:Key="BrowserToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BrowserCommandGroupStyle" TargetType="Border">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+
+        <Style x:Key="BrowserCommandSeparatorStyle" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource LineSoftBrush}" />
+        </Style>
+
+        <Style x:Key="BrowserAddressTextBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -19,7 +71,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7">
+                                CornerRadius="5">
                             <Grid>
                                 <ScrollViewer x:Name="PART_ContentHost"
                                               Margin="{TemplateBinding Padding}"
@@ -55,63 +107,262 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Padding="10"
+                Padding="8,6"
                 Background="{DynamicResource PanelBrush}"
                 BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <TextBox x:Name="AddressTextBox"
-                         Style="{StaticResource BrowserAddressTextBoxStyle}"
-                         Tag="Search or enter address"
-                         ToolTip="Search or enter address"
-                         KeyDown="AddressTextBox_KeyDown" />
-                <Button Grid.Column="2"
-                        Width="36"
-                        Height="32"
-                        Padding="0"
-                        Background="{DynamicResource PanelBrush}"
-                        BorderBrush="{DynamicResource ControlBorderBrush}"
-                        BorderThickness="1"
-                        ToolTip="Open"
-                        AutomationProperties.Name="Open address"
-                        Click="GoButton_Click">
-                    <Path Width="14"
-                          Height="14"
-                          Data="M4,3 L11,9 L4,15"
-                          Stretch="Uniform"
-                          Stroke="{DynamicResource AccentStrongBrush}"
-                          StrokeThickness="1.9"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round" />
-                </Button>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer Grid.Column="0"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="TabsPanel"
+                                    Orientation="Horizontal" />
+                    </ScrollViewer>
+
+                    <Button x:Name="NewTabButton"
+                            Grid.Column="2"
+                            Width="30"
+                            Height="26"
+                            Style="{StaticResource BrowserToolbarButtonStyle}"
+                            Background="{DynamicResource ControlBrush}"
+                            BorderBrush="{DynamicResource ControlBorderBrush}"
+                            BorderThickness="1"
+                            ToolTip="New tab"
+                            AutomationProperties.Name="New tab"
+                            Click="NewTabButton_Click">
+                        <Path Width="12"
+                              Height="12"
+                              Data="M10,3 L10,17 M3,10 L17,10"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource AccentStrongBrush}"
+                              StrokeThickness="1.9"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round" />
+                    </Button>
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Style="{StaticResource BrowserCommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="BackButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Back"
+                                    AutomationProperties.Name="Back"
+                                    Click="BackButton_Click">
+                                <Path Width="13"
+                                      Height="13"
+                                      Data="M11,4 L5,10 L11,16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="ForwardButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Forward"
+                                    AutomationProperties.Name="Forward"
+                                    Click="ForwardButton_Click">
+                                <Path Width="13"
+                                      Height="13"
+                                      Data="M5,4 L11,10 L5,16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="ReloadButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Reload"
+                                    AutomationProperties.Name="Reload"
+                                    Click="ReloadButton_Click">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M14,5 L14,9 L18,9 M14,9 C12.8,6.4 9.8,5.2 7.1,6.3 C3.9,7.7 2.5,11.3 3.9,14.4 C5.2,17.5 8.8,18.9 11.9,17.6 C14,16.8 15.4,15.1 16,13"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="StopButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Stop"
+                                    AutomationProperties.Name="Stop loading"
+                                    Click="StopButton_Click">
+                                <Path Width="12"
+                                      Height="12"
+                                      Data="M4,4 L16,16 M16,4 L4,16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBox x:Name="AddressTextBox"
+                             Grid.Column="2"
+                             Style="{StaticResource BrowserAddressTextBoxStyle}"
+                             Tag="Search or enter address"
+                             ToolTip="Search or enter address"
+                             KeyDown="AddressTextBox_KeyDown" />
+
+                    <Border Grid.Column="4"
+                            Style="{StaticResource BrowserCommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Open"
+                                    AutomationProperties.Name="Open address"
+                                    Click="GoButton_Click">
+                                <Path Width="13"
+                                      Height="13"
+                                      Data="M4,3 L11,9 L4,15"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.9"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="BookmarkButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Bookmark current page"
+                                    AutomationProperties.Name="Bookmark current page"
+                                    Click="BookmarkButton_Click">
+                                <Path x:Name="BookmarkGlyph"
+                                      Width="14"
+                                      Height="14"
+                                      Data="M10,2.8 L12.2,7.2 L17.1,7.9 L13.5,11.3 L14.4,16.1 L10,13.8 L5.6,16.1 L6.5,11.3 L2.9,7.9 L7.8,7.2 Z"
+                                      Stretch="Uniform"
+                                      Fill="Transparent"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="ExtractPageButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Extract page to note"
+                                    AutomationProperties.Name="Extract page to note"
+                                    Click="ExtractPageButton_Click">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M6,3 L13,3 L17,7 L17,17 L6,17 Z M13,3 L13,7 L17,7 M8,10 L15,10 M8,13 L14,13"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="DownloadsButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Open collection downloads"
+                                    AutomationProperties.Name="Open collection downloads"
+                                    Click="DownloadsButton_Click">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M10,3 L10,12 M6,8 L10,12 L14,8 M5,16 L15,16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="BrowserMenuButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="History, bookmarks, downloads, and page actions"
+                                    AutomationProperties.Name="Browser library menu"
+                                    Click="BrowserMenuButton_Click">
+                                <Path Width="15"
+                                      Height="15"
+                                      Data="M5,10 A1,1 0,1 1 5.1,10 M10,10 A1,1 0,1 1 10.1,10 M15,10 A1,1 0,1 1 15.1,10"
+                                      Stretch="Uniform"
+                                      Fill="{DynamicResource AccentStrongBrush}" />
+                            </Button>
+                            <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
+                            <Button x:Name="SettingsMenuButton"
+                                    Style="{StaticResource BrowserToolbarButtonStyle}"
+                                    ToolTip="Sandbox and browser settings"
+                                    AutomationProperties.Name="Sandbox and browser settings"
+                                    Click="SettingsMenuButton_Click">
+                                <Path Width="15"
+                                      Height="15"
+                                      Data="M4,6 L16,6 M7,3 L7,9 M4,14 L16,14 M13,11 L13,17"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource AccentStrongBrush}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <TextBlock x:Name="BrowserStatusText"
+                           Grid.Row="2"
+                           Margin="2,4,0,0"
+                           FontSize="10"
+                           Foreground="{DynamicResource DimBrush}"
+                           Opacity="0.85"
+                           TextTrimming="CharacterEllipsis"
+                           Visibility="Collapsed" />
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Grid x:Name="BrowserHostGrid"
+              Grid.Row="1">
             <wv2:WebView2 x:Name="BrowserWebView"
                           Visibility="Collapsed"
                           NavigationCompleted="BrowserWebView_NavigationCompleted" />
 
             <Border x:Name="StatePanel"
-                    MaxWidth="360"
-                    Padding="22"
+                    MaxWidth="420"
+                    Padding="18"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="{DynamicResource PanelBrush}"
-                    BorderBrush="{DynamicResource LineBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10">
+                    Background="Transparent"
+                    BorderThickness="0">
                 <StackPanel>
                     <TextBlock x:Name="StateTitleText"
                                Text="Browser"
-                               FontSize="17"
+                               FontSize="14"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource InkBrush}"
                                TextAlignment="Center" />
