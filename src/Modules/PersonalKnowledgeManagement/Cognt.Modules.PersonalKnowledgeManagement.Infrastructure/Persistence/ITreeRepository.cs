@@ -73,6 +73,8 @@ internal interface ITreeRepository : IDisposable
 
     IReadOnlyList<NoteAttachmentRow> LoadNoteAttachments();
 
+    IReadOnlyList<NoteAttachmentRow> LoadNoteAttachments(long noteItemId);
+
     AttachmentRow? GetAttachment(string attachmentId);
 
     AttachmentRow? FindAttachmentBySha256(string sha256);
@@ -80,6 +82,8 @@ internal interface ITreeRepository : IDisposable
     void UpsertAttachment(AttachmentRow attachment);
 
     void UpsertNoteAttachment(NoteAttachmentRow attachment);
+
+    void ReplaceNoteAttachments(long noteItemId, IReadOnlyList<NoteAttachmentRow> attachments);
 
     void RenameItem(long itemId, string title);
 

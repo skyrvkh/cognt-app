@@ -95,6 +95,8 @@ internal sealed partial class NoteService
         string root = GetExistingCollectionRoot(collectionId);
         string notePath = ResolveExistingRelativeNotePathInRoot(root, normalizedRelativePath);
         File.WriteAllText(notePath, content, Encoding.UTF8);
+        string resolvedRelativePath = NormalizeRelativePath(Path.GetRelativePath(root, notePath));
+        SyncSavedNoteAttachmentReferences(root, resolvedRelativePath, content);
         InvalidateNoteCatalogCache(root);
         TryRefreshSavedNoteMentionIndex(notePath, content);
     }

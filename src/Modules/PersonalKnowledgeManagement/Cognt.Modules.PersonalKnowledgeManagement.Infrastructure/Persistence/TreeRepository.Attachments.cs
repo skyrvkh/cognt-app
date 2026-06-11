@@ -41,6 +41,26 @@ internal sealed partial class SqliteTreeRepository
         });
     }
 
+    IReadOnlyList<NoteAttachmentRow> ITreeRepository.LoadNoteAttachments(long noteItemId)
+    {
+        return UseConnection(connection =>
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id, collection_id, note_item_id, note_document_id,
+                       attachment_id, display_name, created_at
+                FROM note_attachments
+                WHERE collection_id = $collectionId
+                  AND note_item_id = $noteItemId
+                ORDER BY created_at DESC, attachment_id;
+                """;
+            command.Parameters.AddWithValue("$collectionId", LocalCollectionId);
+            command.Parameters.AddWithValue("$noteItemId", noteItemId);
+
+            return ReadNoteAttachmentRows(command);
+        });
+    }
+
     AttachmentRow? ITreeRepository.GetAttachment(string attachmentId)
     {
         string normalizedAttachmentId = NormalizeRequiredText(attachmentId, nameof(attachmentId));
