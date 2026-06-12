@@ -124,16 +124,34 @@
                         <DataGridTemplateColumn Header="Deck" Width="*" MinWidth="240" IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="12,0"
+                                    <Grid Margin="{Binding TreeIndent}"
                                           VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Name}"
-                                                   Style="{StaticResource GridTextBlockStyle}"
-                                                   FontWeight="SemiBold"
-                                                   TextWrapping="NoWrap" />
+                                        <StackPanel Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       Style="{StaticResource GridTextBlockStyle}"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="NoWrap" />
+                                            <TextBlock Text="{Binding ParentPath}"
+                                                       Margin="0,3,0,0"
+                                                       Foreground="{DynamicResource DimBrush}"
+                                                       FontSize="11"
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="{x:Type TextBlock}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasParent}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
                                         <Border Grid.Column="1"
                                                 Margin="10,0,0,0"
                                                 Padding="7,3"

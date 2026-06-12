@@ -220,21 +220,25 @@ public sealed class DecksSubviewViewModel : ObservableObject
         IReadOnlySet<long> selectedDeckIds,
         IReadOnlyList<DeckRow> existingRows)
     {
-        DeckRow[] rows = new DeckRow[decks.Count];
+        FlashcardDeckSummaryReadModel[] orderedDecks = decks
+            .OrderBy(static deck => CreateDeckSortKey(deck.Name), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        IReadOnlyDictionary<string, int> childCountsByPath = CreateDeckChildCounts(orderedDecks);
+        DeckRow[] rows = new DeckRow[orderedDecks.Length];
         Dictionary<long, DeckRow>? existingRowsById = existingRows.Count == 0
             ? null
             : CreateDeckRowLookup(existingRows);
         Dictionary<long, string>? selectedNamesById = null;
         HashSet<long>? selectedIds = null;
 
-        for (int index = 0; index < decks.Count; index++)
+        for (int index = 0; index < orderedDecks.Length; index++)
         {
-            FlashcardDeckSummaryReadModel deck = decks[index];
+            FlashcardDeckSummaryReadModel deck = orderedDecks[index];
             bool isSelected = selectedDeckIds.Contains(deck.Id);
             DeckRow row = existingRowsById is not null
                 && existingRowsById.TryGetValue(deck.Id, out DeckRow? existingRow)
-                ? UpdateDeckRow(existingRow, deck, isSelected)
-                : ToDeckRow(deck, isSelected);
+                ? UpdateDeckRow(existingRow, deck, isSelected, childCountsByPath)
+                : ToDeckRow(deck, isSelected, childCountsByPath);
             rows[index] = row;
 
             if (!isSelected)
@@ -316,11 +320,19 @@ public sealed class DecksSubviewViewModel : ObservableObject
         return lookup;
     }
 
-    private static DeckRow UpdateDeckRow(DeckRow row, FlashcardDeckSummaryReadModel deck, bool isSelected)
+    private static DeckRow UpdateDeckRow(
+        DeckRow row,
+        FlashcardDeckSummaryReadModel deck,
+        bool isSelected,
+        IReadOnlyDictionary<string, int> childCountsByPath)
     {
+        DeckTreeMetadata metadata = CreateDeckTreeMetadata(deck.Name, childCountsByPath);
         row.Update(
             deck.Name,
-            "Deck",
+            metadata.DisplayName,
+            metadata.ParentPath,
+            metadata.Category,
+            metadata.Depth,
             deck.NewCards + deck.LearningCards,
             deck.DueCards,
             deck.TotalCards,
@@ -329,17 +341,73 @@ public sealed class DecksSubviewViewModel : ObservableObject
         return row;
     }
 
-    private static DeckRow ToDeckRow(FlashcardDeckSummaryReadModel deck, bool isSelected)
+    private static DeckRow ToDeckRow(
+        FlashcardDeckSummaryReadModel deck,
+        bool isSelected,
+        IReadOnlyDictionary<string, int> childCountsByPath)
     {
+        DeckTreeMetadata metadata = CreateDeckTreeMetadata(deck.Name, childCountsByPath);
         return new DeckRow(
             deck.Id,
             deck.Name,
-            "Deck",
+            metadata.DisplayName,
+            metadata.ParentPath,
+            metadata.Category,
+            metadata.Depth,
             deck.NewCards + deck.LearningCards,
             deck.DueCards,
             deck.TotalCards,
             deck.ProgressPercent,
             isSelected);
+    }
+
+    private static DeckTreeMetadata CreateDeckTreeMetadata(
+        string deckName,
+        IReadOnlyDictionary<string, int> childCountsByPath)
+    {
+        string[] parts = SplitDeckPath(deckName);
+        int depth = Math.Max(0, parts.Length - 1);
+        string parentPath = depth == 0 ? string.Empty : string.Join(" / ", parts.Take(depth));
+        string deckKey = string.Join("::", parts);
+        string category = childCountsByPath.TryGetValue(deckKey, out int childCount)
+            ? CountDisplayFormatter.Format(childCount, "child")
+            : depth == 0 ? "Deck" : "Child deck";
+        return new DeckTreeMetadata(
+            parts.Length == 0 ? deckName : parts[^1],
+            parentPath,
+            category,
+            depth);
+    }
+
+    private static IReadOnlyDictionary<string, int> CreateDeckChildCounts(IReadOnlyList<FlashcardDeckSummaryReadModel> decks)
+    {
+        Dictionary<string, int> childCounts = new(StringComparer.OrdinalIgnoreCase);
+        foreach (FlashcardDeckSummaryReadModel deck in decks)
+        {
+            string[] parts = SplitDeckPath(deck.Name);
+            if (parts.Length <= 1)
+            {
+                continue;
+            }
+
+            string parentKey = string.Join("::", parts.Take(parts.Length - 1));
+            childCounts[parentKey] = childCounts.TryGetValue(parentKey, out int count) ? count + 1 : 1;
+        }
+
+        return childCounts;
+    }
+
+    private static string CreateDeckSortKey(string deckName)
+    {
+        return string.Join('\u001f', SplitDeckPath(deckName));
+    }
+
+    private static string[] SplitDeckPath(string deckName)
+    {
+        return deckName
+            .Split(["::", "/"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
     }
 
     private void UpdateDeckSummaries(
@@ -367,4 +435,10 @@ public sealed class DecksSubviewViewModel : ObservableObject
         HashSet<long> Ids,
         Dictionary<long, string> NamesById,
         string Summary);
+
+    private readonly record struct DeckTreeMetadata(
+        string DisplayName,
+        string ParentPath,
+        string Category,
+        int Depth);
 }

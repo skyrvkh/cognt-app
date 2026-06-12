@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Windows;
 using Cognt.Modules.SpacedRepetitionSystem.Application.CardContexts;
 using CogntApp.ViewModels;
 
@@ -7,7 +8,10 @@ namespace CogntApp.ViewModels.Decks.PresentationModels;
 public sealed class DeckRow : ObservableObject
 {
     private string name;
+    private string displayName;
+    private string parentPath;
     private string category;
+    private int depth;
     private int learningQueueCards;
     private int dueCards;
     private int totalCards;
@@ -17,7 +21,10 @@ public sealed class DeckRow : ObservableObject
     internal DeckRow(
         long id,
         string name,
+        string displayName,
+        string parentPath,
         string category,
+        int depth,
         int learningQueueCards,
         int dueCards,
         int totalCards,
@@ -29,7 +36,10 @@ public sealed class DeckRow : ObservableObject
 
         Id = id;
         this.name = name;
+        this.displayName = displayName;
+        this.parentPath = parentPath;
         this.category = category;
+        this.depth = depth;
         this.learningQueueCards = learningQueueCards;
         this.dueCards = dueCards;
         this.totalCards = totalCards;
@@ -45,11 +55,45 @@ public sealed class DeckRow : ObservableObject
         private set => SetProperty(ref name, value);
     }
 
+    public string DisplayName
+    {
+        get => displayName;
+        private set => SetProperty(ref displayName, value);
+    }
+
+    public string ParentPath
+    {
+        get => parentPath;
+        private set
+        {
+            if (SetProperty(ref parentPath, value))
+            {
+                OnPropertyChanged(nameof(HasParent));
+            }
+        }
+    }
+
     public string Category
     {
         get => category;
         private set => SetProperty(ref category, value);
     }
+
+    public int Depth
+    {
+        get => depth;
+        private set
+        {
+            if (SetProperty(ref depth, value))
+            {
+                OnPropertyChanged(nameof(TreeIndent));
+            }
+        }
+    }
+
+    public bool HasParent => !string.IsNullOrWhiteSpace(ParentPath);
+
+    public Thickness TreeIndent => new(Math.Min(Depth, 8) * 18, 0, 0, 0);
 
     public int LearningQueueCards
     {
@@ -91,7 +135,10 @@ public sealed class DeckRow : ObservableObject
 
     internal void Update(
         string name,
+        string displayName,
+        string parentPath,
         string category,
+        int depth,
         int learningQueueCards,
         int dueCards,
         int totalCards,
@@ -101,7 +148,10 @@ public sealed class DeckRow : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(category);
 
         Name = name;
+        DisplayName = displayName;
+        ParentPath = parentPath;
         Category = category;
+        Depth = depth;
         LearningQueueCards = learningQueueCards;
         DueCards = dueCards;
         TotalCards = totalCards;
