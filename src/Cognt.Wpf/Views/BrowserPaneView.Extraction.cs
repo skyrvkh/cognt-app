@@ -92,7 +92,7 @@ public partial class BrowserPaneView
             SetBrowserStatus("Extracting page...");
             BrowserPageExtraction extraction = await ExtractCurrentPageAsync().ConfigureAwait(true);
             string relativePath = await browserPageNoteCreator(extraction).ConfigureAwait(true);
-            SetBrowserStatus($"Extracted page to {relativePath}");
+            SetBrowserStatus($"Extracted page to new note: {relativePath}");
         }
         catch (Exception ex)
         {

@@ -14,6 +14,7 @@ namespace CogntApp.Views;
 
 public partial class BrowserPaneView : UserControl
 {
+    private const string DefaultHomePageUrl = "https://www.google.com/";
     private const int MaxHistoryEntries = 200;
     private readonly ILogger<BrowserPaneView>? logger;
     private readonly CollectionBrowserEnvironmentProvider? environmentProvider;
@@ -93,6 +94,12 @@ public partial class BrowserPaneView : UserControl
             if (IsAllowedBrowserUri(restoredTab?.Url))
             {
                 await NavigateAsync(restoredTab!.Url).ConfigureAwait(true);
+            }
+            else if (browserState.Tabs.Count == 0)
+            {
+                CreateNewActiveTab(DefaultHomePageUrl);
+                RebuildTabStrip();
+                await NavigateAsync(DefaultHomePageUrl).ConfigureAwait(true);
             }
             else
             {
@@ -374,19 +381,12 @@ public partial class BrowserPaneView : UserControl
     private void SettingsMenuButton_Click(object sender, RoutedEventArgs e)
     {
         ContextMenu menu = new();
-        MenuItem storeSessionItem = new()
+        MenuItem sessionItem = new()
         {
-            Header = "Store tabs between launches",
-            IsCheckable = true,
-            IsChecked = browserState.Settings.StoreSession,
+            Header = "Collection saves tabs, cookies, and sessions",
+            IsEnabled = false,
         };
-        storeSessionItem.Click += async (_, _) =>
-        {
-            browserState.Settings.StoreSession = storeSessionItem.IsChecked;
-            await SaveBrowserStateAsync().ConfigureAwait(true);
-            SetBrowserStatus(browserState.Settings.StoreSession ? "Browser session storage enabled" : "Browser session storage disabled");
-        };
-        menu.Items.Add(storeSessionItem);
+        menu.Items.Add(sessionItem);
         menu.Items.Add(new MenuItem
         {
             Header = sandbox is null ? "No collection sandbox loaded" : $"Sandbox: {sandbox.SandboxId}",

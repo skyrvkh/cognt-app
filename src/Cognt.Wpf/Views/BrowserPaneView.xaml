@@ -275,8 +275,8 @@
                             <Border Style="{StaticResource BrowserCommandSeparatorStyle}" />
                             <Button x:Name="ExtractPageButton"
                                     Style="{StaticResource BrowserToolbarButtonStyle}"
-                                    ToolTip="Extract page to note"
-                                    AutomationProperties.Name="Extract page to note"
+                                    ToolTip="Extract page as new note"
+                                    AutomationProperties.Name="Extract page as new note"
                                     Click="ExtractPageButton_Click">
                                 <Path Width="14"
                                       Height="14"

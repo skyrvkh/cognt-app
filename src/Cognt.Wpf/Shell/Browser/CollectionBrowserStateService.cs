@@ -77,10 +77,7 @@ public sealed class CollectionBrowserStateService
 
     private static CollectionBrowserState CreatePersistableState(CollectionBrowserState state)
     {
-        CollectionBrowserState normalized = NormalizeState(state);
-        return normalized.Settings.StoreSession
-            ? normalized
-            : normalized with { ActiveTabId = null, Tabs = [] };
+        return NormalizeState(state);
     }
 
     private static CollectionBrowserState NormalizeState(CollectionBrowserState? state)
