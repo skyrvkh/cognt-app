@@ -4,6 +4,7 @@ using Cognt.Modules.SpacedRepetitionSystem.Application.Commands;
 using Cognt.Modules.SpacedRepetitionSystem.Application.Queries;
 using CogntApp.Design;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
+using CogntApp.Shell.Browser;
 using CogntApp.Shell.Collections;
 using CogntApp.Shell.Workspace;
 using CogntApp.ViewModels;
@@ -28,6 +29,8 @@ internal static class WpfServiceCollectionExtensions
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileSystemKnowledgeCollectionPathResolver>>()));
         services.AddSingleton<IKnownCollectionStore, FileSystemKnownCollectionStore>();
         services.AddSingleton<IWorkspaceSessionStore, FileSystemWorkspaceSessionStore>();
+        services.AddSingleton<CollectionBrowserEnvironmentProvider>();
+        services.AddSingleton<CollectionBrowserStateService>();
         services.AddSingleton<IImageMaskEditorDialogService, ImageMaskEditorDialogService>();
         services.AddSingleton<IDecksWorkspaceDataProvider>(provider =>
             new DecksWorkspaceDataProvider(

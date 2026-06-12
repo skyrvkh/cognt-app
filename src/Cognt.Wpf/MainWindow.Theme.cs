@@ -73,6 +73,7 @@ public partial class MainWindow
         if (e.PropertyName == nameof(MainViewModel.OpenCollectionPath))
         {
             QueueActiveCollectionViewRefresh();
+            _ = rightPaneBrowserView?.UseCollectionAsync(viewModel.OpenCollectionPath);
         }
 
         if (e.PropertyName == nameof(MainViewModel.CurrentNoteToCardQueue)

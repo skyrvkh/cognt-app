@@ -13,6 +13,7 @@ using CogntApp.Features.NoteToCard;
 using CogntApp.Features.NoteToCard.ImageOcclusion;
 using CogntApp.Diagnostics;
 using CogntApp.Shell.Attachments;
+using CogntApp.Shell.Browser;
 using CogntApp.Shell.Collections;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Editor;
@@ -54,6 +55,8 @@ public partial class MainWindow : Window
     private readonly IUpdateFlashcardContentCommand updateFlashcardContentCommand;
     private readonly ILogger<MainWindow> logger;
     private readonly ILoggerFactory loggerFactory;
+    private readonly CollectionBrowserEnvironmentProvider browserEnvironmentProvider;
+    private readonly CollectionBrowserStateService browserStateService;
     private readonly IWorkspaceSessionStore workspaceSessionStore;
     private readonly StartupWorkflowController startupWorkflow;
     private readonly BreadcrumbCommandController breadcrumbCommands;
@@ -98,6 +101,8 @@ public partial class MainWindow : Window
         IEditorViewFactory editorViewFactory,
         EditorView editorViewControl,
         IWorkspaceSessionStore workspaceSessionStore,
+        CollectionBrowserEnvironmentProvider browserEnvironmentProvider,
+        CollectionBrowserStateService browserStateService,
         ILogger<MainWindow> logger,
         ILoggerFactory loggerFactory)
     {
@@ -116,6 +121,8 @@ public partial class MainWindow : Window
         this.editorViewFactory = editorViewFactory;
         EditorViewControl = editorViewControl;
         this.workspaceSessionStore = workspaceSessionStore;
+        this.browserEnvironmentProvider = browserEnvironmentProvider;
+        this.browserStateService = browserStateService;
         this.logger = logger;
         this.loggerFactory = loggerFactory;
         noteCardQueueView = new NoteCardQueueView();
@@ -138,7 +145,11 @@ public partial class MainWindow : Window
         GraphToolHost.Content = noteGraphToolView;
         CardsToolHost.Content = noteCardQueueView;
         PdfToolHost.Content = GetOrCreatePdfToolView();
-        rightPaneBrowserView ??= new BrowserPaneView(loggerFactory.CreateLogger<BrowserPaneView>());
+        rightPaneBrowserView ??= new BrowserPaneView(
+            browserEnvironmentProvider,
+            browserStateService,
+            () => viewModel.OpenCollectionPath,
+            loggerFactory.CreateLogger<BrowserPaneView>());
         BrowserToolHost.Content = rightPaneBrowserView;
         InspectorAnchorable.Show();
         InspectorAnchorable.IsSelected = true;
