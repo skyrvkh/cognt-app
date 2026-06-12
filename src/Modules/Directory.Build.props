@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <AssemblyName>$([System.String]::Copy('$(MSBuildProjectName)').Replace('Cognt.Modules.', 'Cognt.'))</AssemblyName>
+  </PropertyGroup>
+</Project>

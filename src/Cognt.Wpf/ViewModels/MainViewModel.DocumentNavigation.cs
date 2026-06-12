@@ -32,15 +32,7 @@ public sealed partial class MainViewModel
 
     internal void CompleteOpenNote(Navigation.PreparedNote note)
     {
-        currentPdfDocument = null;
-        currentNotePath = note.NotePath;
-        currentNoteItemId = note.ItemId;
-        currentNoteTitle = note.Title;
-        lastSavedContent = note.Content;
-        ClearNoteToCardTags();
-        OnPropertyChanged(nameof(CurrentNotePath));
-        RefreshEditorBreadcrumb();
-        ReloadCurrentNoteToCardQueue(GetRequiredRelativeNotePath(note.NotePath), note.Content);
+        SetActiveWorkspaceNote(note.NotePath, note.Title, note.Content, note.ItemId);
     }
 
     public void ClearCurrentNote()
@@ -217,7 +209,6 @@ public sealed partial class MainViewModel
     {
         if (node is null || node.IsPlaceholder)
         {
-            ClearCurrentNote();
             return;
         }
 
@@ -244,8 +235,6 @@ public sealed partial class MainViewModel
             RequestOpenResolvedNotePath(node.NotePath, selectInTree: false);
             return;
         }
-
-        SelectFolderNode(node);
     }
 
     private void SelectFolderNode(NoteTreeNodeViewModel node)
@@ -278,6 +267,7 @@ public sealed partial class MainViewModel
         currentNoteTitle = title;
         lastSavedContent = string.Empty;
         OnPropertyChanged(nameof(CurrentNotePath));
+        OnPropertyChanged(nameof(CurrentNoteRelativePath));
         RefreshEditorBreadcrumb();
         CurrentNoteToCardQueue = null;
         return isSameFolder;
