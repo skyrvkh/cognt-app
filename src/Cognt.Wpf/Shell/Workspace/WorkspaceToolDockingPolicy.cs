@@ -9,7 +9,9 @@ namespace CogntApp.Shell.Workspace;
 
 internal sealed class WorkspaceToolDockingPolicy
 {
-    private const double RightPaneDockWidth = 420.0d;
+    private const double RightPaneDockWidth = 720.0d;
+    private const double InsightPaneDockWidth = 300.0d;
+    private const double SidePaneDockWidth = 420.0d;
 
     private readonly Dispatcher dispatcher;
     private readonly LayoutAnchorablePaneGroup rightPaneGroup;
@@ -77,10 +79,11 @@ internal sealed class WorkspaceToolDockingPolicy
         foreach (LayoutAnchorable anchorable in workspaceTools)
         {
             anchorable.CanClose = false;
-            anchorable.CanHide = false;
-            anchorable.CanAutoHide = true;
-            anchorable.AutoHideWidth = RightPaneDockWidth;
-            anchorable.FloatingWidth = RightPaneDockWidth;
+            anchorable.CanFloat = false;
+            anchorable.CanHide = CanUserHide(anchorable);
+            anchorable.CanAutoHide = false;
+            anchorable.AutoHideWidth = GetToolWidth(anchorable);
+            anchorable.FloatingWidth = GetToolWidth(anchorable);
         }
     }
 
@@ -95,16 +98,16 @@ internal sealed class WorkspaceToolDockingPolicy
         _ = dispatcher.BeginInvoke(() =>
         {
             EnforceRightPaneTabs();
-            EnsureToolAutoHidden(cardsTool);
-            EnsureToolAutoHidden(pdfTool);
-            EnsureToolAutoHidden(browserTool);
+            ShowDockTool(cardsTool);
+            pdfTool.Show();
+            browserTool.Show();
 
-            if (!inspectorTool.IsAutoHidden)
+            if (!inspectorTool.IsHidden)
             {
                 ShowDockTool(inspectorTool);
             }
 
-            if (!graphTool.IsAutoHidden)
+            if (!graphTool.IsHidden)
             {
                 graphTool.Show();
             }
@@ -118,9 +121,9 @@ internal sealed class WorkspaceToolDockingPolicy
             anchorable.Show();
         }
 
-        if (anchorable.CanAutoHide && !anchorable.IsAutoHidden)
+        if (IsFixedSideTool(anchorable))
         {
-            anchorable.ToggleAutoHide();
+            ShowDockTool(anchorable);
         }
     }
 
@@ -143,7 +146,7 @@ internal sealed class WorkspaceToolDockingPolicy
         }
 
         EnforceRightPaneTabs();
-        return true;
+        return !CanUserHide(anchorable);
     }
 
     internal bool RestoreWorkspaceToolIfOwned(LayoutAnchorable anchorable)
@@ -153,15 +156,20 @@ internal sealed class WorkspaceToolDockingPolicy
             return false;
         }
 
-        RestoreWorkspaceTool(anchorable);
-        return true;
+        if (!CanUserHide(anchorable))
+        {
+            RestoreWorkspaceTool(anchorable);
+            return true;
+        }
+
+        return false;
     }
 
     internal void RestoreHiddenWorkspaceTools()
     {
         foreach (LayoutAnchorable anchorable in workspaceTools)
         {
-            if (anchorable.IsHidden)
+            if (anchorable.IsHidden && !CanUserHide(anchorable))
             {
                 RestoreWorkspaceTool(anchorable);
             }
@@ -262,6 +270,24 @@ internal sealed class WorkspaceToolDockingPolicy
             || ReferenceEquals(anchorable, cardsTool)
             || ReferenceEquals(anchorable, pdfTool)
             || ReferenceEquals(anchorable, browserTool);
+    }
+
+    private bool CanUserHide(LayoutAnchorable anchorable)
+    {
+        return ReferenceEquals(anchorable, inspectorTool)
+            || ReferenceEquals(anchorable, graphTool);
+    }
+
+    private bool IsFixedSideTool(LayoutAnchorable anchorable)
+    {
+        return ReferenceEquals(anchorable, cardsTool)
+            || ReferenceEquals(anchorable, pdfTool)
+            || ReferenceEquals(anchorable, browserTool);
+    }
+
+    private double GetToolWidth(LayoutAnchorable anchorable)
+    {
+        return CanUserHide(anchorable) ? InsightPaneDockWidth : SidePaneDockWidth;
     }
 
     private static void ShowDockTool(LayoutAnchorable anchorable)
