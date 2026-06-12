@@ -45,6 +45,7 @@ public partial class BrowserPaneView : UserControl
         this.browserPageNoteCreator = browserPageNoteCreator;
         this.logger = logger;
         InitializeComponent();
+        ShowEmptySurface();
         RebuildTabStrip();
         UpdateNavigationState();
     }
@@ -73,7 +74,8 @@ public partial class BrowserPaneView : UserControl
 
         if (normalizedCollectionPath is null || environmentProvider is null || stateService is null)
         {
-            ShowState("Browser", "Open a collection to use the browser.");
+            ShowEmptySurface();
+            SetBrowserStatus(normalizedCollectionPath is null ? "Open a collection to use the browser." : null);
             RebuildTabStrip();
             UpdateNavigationState();
             return;
@@ -94,7 +96,7 @@ public partial class BrowserPaneView : UserControl
             }
             else
             {
-                ShowState("Browser", "Enter a web address or search term.");
+                ShowEmptySurface();
                 SetBrowserStatus("Collection browser ready");
             }
         }
@@ -113,7 +115,7 @@ public partial class BrowserPaneView : UserControl
         string? target = NormalizeAddress(address);
         if (target is null)
         {
-            ShowState("Browser", "Enter a web address or search term.");
+            ShowEmptySurface();
             return;
         }
 
@@ -299,8 +301,7 @@ public partial class BrowserPaneView : UserControl
     {
         CreateNewActiveTab(null);
         AddressTextBox.Text = string.Empty;
-        BrowserWebView.Visibility = Visibility.Collapsed;
-        ShowState("New tab", "Enter a web address or search term.");
+        ShowEmptySurface();
         SetBrowserStatus("New tab ready");
         RebuildTabStrip();
         UpdateNavigationState();
@@ -471,8 +472,7 @@ public partial class BrowserPaneView : UserControl
         }
         else
         {
-            BrowserWebView.Visibility = Visibility.Collapsed;
-            ShowState("New tab", "Enter a web address or search term.");
+            ShowEmptySurface();
             FocusAddressBox();
         }
     }
@@ -513,6 +513,12 @@ public partial class BrowserPaneView : UserControl
         StatePanel.Visibility = Visibility.Visible;
         StateTitleText.Text = title;
         StateMessageText.Text = message;
+    }
+
+    private void ShowEmptySurface()
+    {
+        BrowserWebView.Visibility = Visibility.Collapsed;
+        StatePanel.Visibility = Visibility.Collapsed;
     }
 
     private string? GetCurrentPageUrl()

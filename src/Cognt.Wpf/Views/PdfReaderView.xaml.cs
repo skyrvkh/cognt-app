@@ -199,7 +199,10 @@ public partial class PdfReaderView : UserControl
     {
         renderedPages = [];
         PdfTitleText.Text = "PDF Reader";
-        ShowState("No PDF selected", "Select or drop a PDF to read it beside the current note.");
+        PdfStatusText.Text = string.Empty;
+        PageScrollViewer.Visibility = Visibility.Collapsed;
+        StatePanel.Visibility = Visibility.Collapsed;
+        PageHost.Children.Clear();
     }
 
     private void ShowState(string title, string message)

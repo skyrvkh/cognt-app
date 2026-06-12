@@ -353,6 +353,7 @@
                           NavigationCompleted="BrowserWebView_NavigationCompleted" />
 
             <Border x:Name="StatePanel"
+                    Visibility="Collapsed"
                     MaxWidth="420"
                     Padding="18"
                     HorizontalAlignment="Center"

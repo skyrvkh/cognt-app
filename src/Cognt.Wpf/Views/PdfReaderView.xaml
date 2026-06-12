@@ -78,6 +78,7 @@
 
         <Border x:Name="StatePanel"
                 Grid.RowSpan="2"
+                Visibility="Collapsed"
                 MaxWidth="520"
                 Padding="24"
                 HorizontalAlignment="Center"
