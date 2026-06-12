@@ -19,6 +19,7 @@ public partial class BrowserPaneView : UserControl
     private readonly CollectionBrowserEnvironmentProvider? environmentProvider;
     private readonly CollectionBrowserStateService? stateService;
     private readonly Func<string?>? collectionPathProvider;
+    private readonly Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator;
     private CollectionBrowserState browserState = CollectionBrowserState.CreateEmpty();
     private CollectionBrowserSandbox? sandbox;
     private string? activeTabId;
@@ -31,15 +32,17 @@ public partial class BrowserPaneView : UserControl
     {
     }
 
-    public BrowserPaneView(
+    internal BrowserPaneView(
         CollectionBrowserEnvironmentProvider? environmentProvider,
         CollectionBrowserStateService? stateService,
         Func<string?>? collectionPathProvider,
-        ILogger<BrowserPaneView>? logger = null)
+        ILogger<BrowserPaneView>? logger = null,
+        Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator = null)
     {
         this.environmentProvider = environmentProvider;
         this.stateService = stateService;
         this.collectionPathProvider = collectionPathProvider;
+        this.browserPageNoteCreator = browserPageNoteCreator;
         this.logger = logger;
         InitializeComponent();
         RebuildTabStrip();
@@ -336,9 +339,9 @@ public partial class BrowserPaneView : UserControl
         UpdateNavigationState();
     }
 
-    private void ExtractPageButton_Click(object sender, RoutedEventArgs e)
+    private async void ExtractPageButton_Click(object sender, RoutedEventArgs e)
     {
-        SetBrowserStatus("Page extraction will be available after browser capture is connected.");
+        await ExtractCurrentPageToNoteAsync().ConfigureAwait(true);
     }
 
     private void DownloadsButton_Click(object sender, RoutedEventArgs e)
@@ -482,7 +485,7 @@ public partial class BrowserPaneView : UserControl
         ReloadButton.IsEnabled = coreWebView is not null;
         StopButton.IsEnabled = isNavigating;
         BookmarkButton.IsEnabled = GetCurrentPageUrl() is not null;
-        ExtractPageButton.IsEnabled = GetCurrentPageUrl() is not null && !isNavigating;
+        ExtractPageButton.IsEnabled = CanExtractCurrentPage();
         DownloadsButton.IsEnabled = true;
         BrowserMenuButton.IsEnabled = true;
         SettingsMenuButton.IsEnabled = true;
