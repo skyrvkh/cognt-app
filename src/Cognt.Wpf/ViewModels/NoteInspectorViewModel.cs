@@ -255,8 +255,17 @@ public sealed class NoteInspectorViewModel : ObservableObject
             or nameof(MainViewModel.CurrentNotePath)
             or nameof(MainViewModel.OpenCollectionPath))
         {
+            RefreshOutlineForActiveNote();
             NotifyOutlineChanged();
         }
+    }
+
+    private void RefreshOutlineForActiveNote()
+    {
+        string content = string.IsNullOrWhiteSpace(mainViewModel.CurrentNoteRelativePath)
+            ? string.Empty
+            : mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty;
+        QueueOutlineLoad(content);
     }
 
     private void NotifyOutlineChanged()
