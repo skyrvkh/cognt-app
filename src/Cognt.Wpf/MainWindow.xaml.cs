@@ -149,7 +149,8 @@ public partial class MainWindow : Window
             browserEnvironmentProvider,
             browserStateService,
             () => viewModel.OpenCollectionPath,
-            loggerFactory.CreateLogger<BrowserPaneView>());
+            loggerFactory.CreateLogger<BrowserPaneView>(),
+            viewModel.CreateBrowserPageNoteAsync);
         BrowserToolHost.Content = rightPaneBrowserView;
         InspectorAnchorable.Show();
         InspectorAnchorable.IsSelected = true;
