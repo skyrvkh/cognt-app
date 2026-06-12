@@ -7,6 +7,7 @@ import type {
   EditorWorkflowRefs,
 } from './editor-bootstrap-types';
 import { createEditorWorkflowBundle } from './editor-bootstrap-workflows';
+import { EditorOutlineViewportController } from './editor-outline-viewport-controller';
 
 export function createEditorBootstrap(config: EditorBootstrapConfig): EditorBootstrapResult {
   const { options } = config;
@@ -56,13 +57,21 @@ export function createEditorBootstrap(config: EditorBootstrapConfig): EditorBoot
   editor.specs = createEditorSpecs((query, abort, inlineEditor, abortSignal) =>
     mentions.getNativeMentionMenus(query, abort, inlineEditor, abortSignal)
   );
+  const outlineViewport = new EditorOutlineViewportController({
+    editor,
+    selection,
+    signal: config.signal,
+    onCurrentOutlineBlockChanged: blockId => options.onCurrentOutlineBlockChanged(blockId),
+  });
   events.bind();
+  outlineViewport.bind();
 
   return {
     editor,
     runtime,
     selection,
     interactions,
+    outlineViewport,
     mentions,
     ...workflowResult,
   };

@@ -9,6 +9,7 @@ import type { DocumentLoadWorkflow } from './document-load-workflow';
 import type { EditorCommandController } from './editor-command-controller';
 import type { EditorEventBindingController } from './editor-event-binding-controller';
 import type { EditorInteractionController } from './editor-interactions';
+import type { EditorOutlineViewportController } from './editor-outline-viewport-controller';
 import type { EditorRuntimeCoordinator } from './editor-runtime-coordinator';
 import type { EditorSelectionController } from './editor-selection-controller';
 import type { ExtractWorkflow } from './extract-workflow';
@@ -58,6 +59,7 @@ export type EditorBootstrapResult = {
   runtime: EditorRuntimeCoordinator;
   selection: EditorSelectionController;
   interactions: EditorInteractionController;
+  outlineViewport: EditorOutlineViewportController;
   mentions: MentionController;
   documentLinks: DocumentLinksController;
   contentSave: ContentSaveCoordinator;

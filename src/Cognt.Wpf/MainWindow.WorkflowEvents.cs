@@ -214,6 +214,17 @@ public partial class MainWindow
         }
     }
 
+    private void NoteDocumentSession_CurrentOutlineBlockChanged(
+        object? sender,
+        NoteWorkspaceCurrentOutlineBlockChangedEventArgs e)
+    {
+        if (sender is NoteWorkspaceDocumentSession session
+            && ReferenceEquals(session, GetActiveNoteDocument()))
+        {
+            noteInspectorViewModel.UpdateActiveOutlineBlock(e.NotePath, e.BlockId);
+        }
+    }
+
     private void AllNotesViewModel_OpenNoteRequested(object? sender, OpenAllNotesRequestedEventArgs e)
     {
         try

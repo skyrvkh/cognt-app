@@ -37,6 +37,7 @@ public partial class EditorView : UserControl
     private bool isDisposingEditorHost;
 
     public event EventHandler<string>? ContentChanged;
+    public event EventHandler<string>? CurrentOutlineBlockChanged;
     public event EventHandler? DocumentChanged;
     public event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
     public event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;

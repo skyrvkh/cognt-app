@@ -85,7 +85,7 @@ export class EditorSelectionController {
     return getRenderedBlockElement(this.options.editor, blockId);
   }
 
-  private getOutlineHeadingBlockIds() {
+  public getOutlineHeadingBlockIds() {
     if (this.outlineHeadingBlockIds) {
       return this.outlineHeadingBlockIds;
     }

@@ -112,6 +112,12 @@ public partial class BlockSuiteHost : IAsyncDisposable, IBlockSuiteHostClient
     }
 
     [JSInvokable]
+    public void HandleCurrentOutlineBlockChanged(string blockId)
+    {
+        Bridge.RaiseCurrentOutlineBlockChanged(blockId);
+    }
+
+    [JSInvokable]
     public void HandleCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)
     {
         Bridge.RaiseCreateExtract(sourcePath, selectedContent, selectedPlainText);

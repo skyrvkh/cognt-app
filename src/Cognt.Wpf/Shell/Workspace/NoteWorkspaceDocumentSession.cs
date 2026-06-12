@@ -104,6 +104,8 @@ internal sealed class NoteWorkspaceDocumentSession
 
     internal event EventHandler? Activated;
 
+    internal event EventHandler<NoteWorkspaceCurrentOutlineBlockChangedEventArgs>? CurrentOutlineBlockChanged;
+
     internal string NotePath { get; }
 
     internal long? ItemId { get; }
@@ -988,6 +990,7 @@ internal sealed class NoteWorkspaceDocumentSession
     {
         nextEditor.DocumentChanged += EditorView_DocumentChanged;
         nextEditor.ContentChanged += EditorView_ContentChanged;
+        nextEditor.CurrentOutlineBlockChanged += EditorView_CurrentOutlineBlockChanged;
         nextEditor.CreateExtractRequested += EditorView_CreateExtractRequested;
         nextEditor.SaveClozeRequested += EditorView_SaveClozeRequested;
         nextEditor.OpenImageOcclusionRequested += EditorView_OpenImageOcclusionRequested;
@@ -1064,6 +1067,7 @@ internal sealed class NoteWorkspaceDocumentSession
 
         existingEditor.DocumentChanged -= EditorView_DocumentChanged;
         existingEditor.ContentChanged -= EditorView_ContentChanged;
+        existingEditor.CurrentOutlineBlockChanged -= EditorView_CurrentOutlineBlockChanged;
         existingEditor.CreateExtractRequested -= EditorView_CreateExtractRequested;
         existingEditor.SaveClozeRequested -= EditorView_SaveClozeRequested;
         existingEditor.OpenImageOcclusionRequested -= EditorView_OpenImageOcclusionRequested;
@@ -1132,6 +1136,21 @@ internal sealed class NoteWorkspaceDocumentSession
         {
             logger.LogWarning(ex, "Document dirty notification failed. NotePath={NotePath}", NotePath);
         }
+    }
+
+    private void EditorView_CurrentOutlineBlockChanged(object? sender, string blockId)
+    {
+        if (IsClosed
+            || !ReferenceEquals(sender, editorView)
+            || isLoadingEditorNote
+            || string.IsNullOrWhiteSpace(blockId))
+        {
+            return;
+        }
+
+        CurrentOutlineBlockChanged?.Invoke(
+            this,
+            new NoteWorkspaceCurrentOutlineBlockChangedEventArgs(NotePath, blockId));
     }
 
     private async void EditorView_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
@@ -1668,4 +1687,17 @@ internal sealed class NoteWorkspaceDocumentSession
             dialogs.ShowWarning("Image Occlusion", ex.Message);
         }
     }
+}
+
+internal sealed class NoteWorkspaceCurrentOutlineBlockChangedEventArgs : EventArgs
+{
+    internal NoteWorkspaceCurrentOutlineBlockChangedEventArgs(string notePath, string blockId)
+    {
+        NotePath = notePath;
+        BlockId = blockId;
+    }
+
+    internal string NotePath { get; }
+
+    internal string BlockId { get; }
 }

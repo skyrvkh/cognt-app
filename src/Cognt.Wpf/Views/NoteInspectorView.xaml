@@ -102,6 +102,11 @@
                     <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}"
+                             Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
@@ -147,7 +152,9 @@
         </Border>
 
         <Grid Grid.Row="1">
-            <ListBox ItemsSource="{Binding OutlineItems}"
+            <ListBox x:Name="OutlineListBox"
+                     ItemsSource="{Binding OutlineItems}"
+                     SelectedItem="{Binding ActiveOutlineItem, Mode=OneWay}"
                      Margin="6"
                      Background="Transparent"
                      BorderThickness="0"

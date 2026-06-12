@@ -21,6 +21,7 @@ public sealed class BlockSuiteHostBridge
 
     internal event EventHandler? DocumentChanged;
     internal event EventHandler<string>? ContentChanged;
+    internal event EventHandler<string>? CurrentOutlineBlockChanged;
     internal event EventHandler<CreateExtractRequestedEventArgs>? CreateExtractRequested;
     internal event EventHandler<SaveClozeRequestedEventArgs>? SaveClozeRequested;
     internal event EventHandler<OpenImageOcclusionRequestedEventArgs>? OpenImageOcclusionRequested;
@@ -210,6 +211,14 @@ public sealed class BlockSuiteHostBridge
     internal void RaiseDocumentChanged()
     {
         DocumentChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal void RaiseCurrentOutlineBlockChanged(string blockId)
+    {
+        if (!string.IsNullOrWhiteSpace(blockId))
+        {
+            CurrentOutlineBlockChanged?.Invoke(this, blockId);
+        }
     }
 
     internal void RaiseCreateExtract(string sourcePath, string selectedContent, string selectedPlainText)

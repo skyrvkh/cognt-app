@@ -23,6 +23,7 @@ public partial class EditorView
     {
         blockSuiteBridge.DocumentChanged += BlockSuiteBridge_DocumentChanged;
         blockSuiteBridge.ContentChanged += BlockSuiteBridge_ContentChanged;
+        blockSuiteBridge.CurrentOutlineBlockChanged += BlockSuiteBridge_CurrentOutlineBlockChanged;
         blockSuiteBridge.CreateExtractRequested += BlockSuiteBridge_CreateExtractRequested;
         blockSuiteBridge.SaveClozeRequested += BlockSuiteBridge_SaveClozeRequested;
         blockSuiteBridge.OpenImageOcclusionRequested += BlockSuiteBridge_OpenImageOcclusionRequested;

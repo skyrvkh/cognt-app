@@ -77,6 +77,7 @@ export class MarkdownBlockSuiteEditor {
 
   public async load(options: LoadMarkdownOptions) {
     await this.bootstrap.documentLoad.load(options);
+    this.bootstrap.outlineViewport.refresh();
   }
 
   public async focusEditor() {

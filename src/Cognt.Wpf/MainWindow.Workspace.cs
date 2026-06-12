@@ -160,6 +160,7 @@ public partial class MainWindow
             restoreCaretState);
         session.Closed += NoteDocumentSession_Closed;
         session.Activated += NoteDocumentSession_Activated;
+        session.CurrentOutlineBlockChanged += NoteDocumentSession_CurrentOutlineBlockChanged;
 
         openNoteDocuments[note.NotePath] = session;
         openingNoteDocument = session;
@@ -240,6 +241,7 @@ public partial class MainWindow
 
         session.Closed -= NoteDocumentSession_Closed;
         session.Activated -= NoteDocumentSession_Activated;
+        session.CurrentOutlineBlockChanged -= NoteDocumentSession_CurrentOutlineBlockChanged;
         openNoteDocuments.Remove(session.NotePath);
         if (ReferenceEquals(openingNoteDocument, session))
         {
@@ -289,7 +291,7 @@ public partial class MainWindow
         bool activeNoteChanged = session.Activate(selectInTree);
         if (activeNoteChanged || !wasActiveDocument)
         {
-            noteInspectorViewModel.UpdateCurrentContent(session.GetContent());
+            noteInspectorViewModel.UpdateCurrentContent(session.NotePath, session.GetContent());
         }
 
         session.Focus(focusEditor: !isRestoringWorkspaceSession);
@@ -334,6 +336,7 @@ public partial class MainWindow
 
         session.Closed -= NoteDocumentSession_Closed;
         session.Activated -= NoteDocumentSession_Activated;
+        session.CurrentOutlineBlockChanged -= NoteDocumentSession_CurrentOutlineBlockChanged;
         openNoteDocuments.Remove(session.NotePath);
         session.Dispose();
 

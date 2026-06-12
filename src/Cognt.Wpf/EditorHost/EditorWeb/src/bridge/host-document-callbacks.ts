@@ -12,6 +12,7 @@ export function createDocumentHostCallbacks({
   EditorHostCallbacks,
   | 'onDocumentChanged'
   | 'onContentChanged'
+  | 'onCurrentOutlineBlockChanged'
   | 'onCreateExtract'
   | 'onSaveCloze'
   | 'onOpenImageOcclusion'
@@ -27,6 +28,9 @@ export function createDocumentHostCallbacks({
         `Bridge event: content changed (instance=${instanceId}, length=${content.length}).`
       );
       void invokeHost(dotNet, 'HandleContentChanged', content);
+    },
+    onCurrentOutlineBlockChanged: blockId => {
+      void invokeHost(dotNet, 'HandleCurrentOutlineBlockChanged', blockId);
     },
     onCreateExtract: message => {
       reportDiagnostic(

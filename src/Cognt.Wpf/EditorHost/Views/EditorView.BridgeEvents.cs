@@ -31,6 +31,11 @@ public partial class EditorView
         }
     }
 
+    private void BlockSuiteBridge_CurrentOutlineBlockChanged(object? sender, string blockId)
+    {
+        CurrentOutlineBlockChanged?.Invoke(this, blockId);
+    }
+
     private void BlockSuiteBridge_CreateExtractRequested(object? sender, CreateExtractRequestedEventArgs e)
     {
         BlockSuiteBridgeDispatch.TryInvokeHandler(

@@ -105,6 +105,7 @@ export type MarkdownEditorOptions = {
   statusElement: HTMLElement;
   onDocumentChanged(): void;
   onContentChanged(content: string): void;
+  onCurrentOutlineBlockChanged(blockId: string): void;
   onCreateExtract(message: CreateExtractCommandMessage): void;
   onSaveCloze(message: SaveClozeCommandMessage): void;
   onSearchMentionTargets(message: SearchMentionTargetsMessage): Promise<MentionTarget[]>;
