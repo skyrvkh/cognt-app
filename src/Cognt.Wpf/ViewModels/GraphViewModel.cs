@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
@@ -15,6 +17,7 @@ public sealed partial class GraphViewModel : ObservableObject
     private readonly PkmNoteService noteService;
     private readonly MainViewModel mainViewModel;
     private readonly ILogger<GraphViewModel> logger;
+    private readonly Dictionary<string, KnowledgeGraphReadModel> graphCache = new(StringComparer.OrdinalIgnoreCase);
     private KnowledgeGraphReadModel graph = KnowledgeGraphReadModel.Empty(KnowledgeGraphSettingsReadModel.Default);
     private IReadOnlyList<KnowledgeGraphNodeReadModel> orderedGraphSearchNodes = Array.Empty<KnowledgeGraphNodeReadModel>();
     private bool isLoading;
@@ -42,7 +45,7 @@ public sealed partial class GraphViewModel : ObservableObject
         this.mainViewModel = mainViewModel;
         this.logger = logger;
 
-        RefreshCommand = new RelayCommand(RefreshGraph);
+        RefreshCommand = new RelayCommand(_ => RefreshGraph(force: true));
         SaveSettingsCommand = new RelayCommand(SaveSettingsAndRefresh);
         OpenNodeCommand = new RelayCommand(OpenNode);
         FocusSearchResultCommand = new RelayCommand(_ => FocusSearchResult());
@@ -308,11 +311,11 @@ public sealed partial class GraphViewModel : ObservableObject
     internal Task LoadAsync()
     {
         LoadSettings();
-        RefreshGraph();
+        RefreshGraph(force: false);
         return Task.CompletedTask;
     }
 
-    private void RefreshGraph()
+    private void RefreshGraph(bool force)
     {
         int refreshVersion = ++graphRefreshVersion;
         ErrorMessage = string.Empty;
@@ -349,10 +352,22 @@ public sealed partial class GraphViewModel : ObservableObject
 
         try
         {
-            IsLoading = true;
-            mainViewModel.SaveCurrentNoteFromEditor();
             string currentContent = mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty;
             string collectionPath = mainViewModel.OpenCollectionPath;
+            string cacheKey = CreateGraphCacheKey(collectionPath, currentRelativePath, settings, currentContent);
+            if (!force && graphCache.TryGetValue(cacheKey, out KnowledgeGraphReadModel? cachedGraph))
+            {
+                Graph = cachedGraph;
+                lastGraphCollectionPath = collectionPath;
+                lastGraphRelativePath = currentRelativePath;
+                IsLoading = false;
+                OnPropertyChanged(nameof(StateTitle));
+                OnPropertyChanged(nameof(StateMessage));
+                return;
+            }
+
+            IsLoading = true;
+            mainViewModel.SaveCurrentNoteFromEditor();
             _ = Task.Run(() => noteService.ReadDocumentGraph(
                     collectionPath,
                     currentRelativePath,
@@ -363,6 +378,7 @@ public sealed partial class GraphViewModel : ObservableObject
                         refreshVersion,
                         collectionPath,
                         currentRelativePath,
+                        cacheKey,
                         settings,
                         task),
                     CancellationToken.None,
@@ -388,6 +404,7 @@ public sealed partial class GraphViewModel : ObservableObject
         int refreshVersion,
         string collectionPath,
         string relativePath,
+        string cacheKey,
         KnowledgeGraphSettingsReadModel settings,
         Task<KnowledgeGraphReadModel> task)
     {
@@ -407,6 +424,7 @@ public sealed partial class GraphViewModel : ObservableObject
                 if (task.IsCompletedSuccessfully)
                 {
                     Graph = task.Result;
+                    graphCache[cacheKey] = task.Result;
                     lastGraphCollectionPath = collectionPath;
                     lastGraphRelativePath = relativePath;
                 }
@@ -466,7 +484,7 @@ public sealed partial class GraphViewModel : ObservableObject
         try
         {
             noteService.SaveGraphViewSettings(mainViewModel.OpenCollectionPath, settings);
-            RefreshGraph();
+            RefreshGraph(force: true);
             StatusMessage = "Graph settings saved.";
         }
         catch (Exception ex)
@@ -617,11 +635,33 @@ public sealed partial class GraphViewModel : ObservableObject
             selectedSearchResult = null;
             OnPropertyChanged(nameof(SelectedSearchResult));
             LoadSettings();
-            RefreshGraph();
+            RefreshGraph(force: false);
         }
         finally
         {
             isRefreshingForCurrentNote = false;
         }
+    }
+
+    private static string CreateGraphCacheKey(
+        string collectionPath,
+        string relativePath,
+        KnowledgeGraphSettingsReadModel settings,
+        string content)
+    {
+        KnowledgeGraphSettingsReadModel normalized = settings.Normalize();
+        return string.Join(
+            "|",
+            collectionPath.Trim(),
+            relativePath.Trim(),
+            normalized.NeighborDepth.ToString(CultureInfo.InvariantCulture),
+            normalized.MaxNodes.ToString(CultureInfo.InvariantCulture),
+            CreateContentHash(content));
+    }
+
+    private static string CreateContentHash(string content)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(content ?? string.Empty));
+        return Convert.ToHexString(hash);
     }
 }

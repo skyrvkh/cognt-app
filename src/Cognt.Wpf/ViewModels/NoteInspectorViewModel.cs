@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
@@ -12,9 +14,9 @@ public sealed class NoteInspectorViewModel : ObservableObject
     private const int OutlineParseDebounceMilliseconds = 200;
     private readonly MainViewModel mainViewModel;
     private readonly ILogger<NoteInspectorViewModel>? logger;
+    private readonly Dictionary<string, NoteOutlineCacheEntry> outlineCache = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? outlineParseCancellation;
     private ObservableCollection<NoteOutlineItemViewModel> outlineItems = [];
-    private bool isActive;
 
     public NoteInspectorViewModel(
         MainViewModel mainViewModel,
@@ -89,46 +91,27 @@ public sealed class NoteInspectorViewModel : ObservableObject
 
     internal void Activate()
     {
-        isActive = true;
         Refresh();
     }
 
     internal void Deactivate()
     {
-        isActive = false;
     }
 
     internal event EventHandler<NoteOutlineNavigationRequestedEventArgs>? OutlineNavigationRequested;
 
     internal void UpdateCurrentContent(string content)
     {
-        QueueOutlineLoad(content);
-        if (isActive && content.Length < AsyncOutlineParseThreshold)
-        {
-            RefreshGraph();
-        }
+        QueueOutlineLoadForActiveNote(content, force: false);
     }
 
     private void Refresh()
     {
-        if (string.IsNullOrWhiteSpace(mainViewModel.CurrentNoteRelativePath))
-        {
-            QueueOutlineLoad(string.Empty);
-        }
-        else
-        {
-            QueueOutlineLoad(mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty);
-        }
-
-        _ = GraphViewModel.LoadAsync();
-    }
-
-    private void RefreshGraph()
-    {
-        if (GraphViewModel.RefreshCommand.CanExecute(null))
-        {
-            GraphViewModel.RefreshCommand.Execute(null);
-        }
+        QueueOutlineLoadForActiveNote(
+            string.IsNullOrWhiteSpace(mainViewModel.CurrentNoteRelativePath)
+                ? string.Empty
+                : mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty,
+            force: true);
     }
 
     private void NavigateToOutlineItem(object? parameter)
@@ -143,11 +126,32 @@ public sealed class NoteInspectorViewModel : ObservableObject
         OutlineNavigationRequested?.Invoke(this, new NoteOutlineNavigationRequestedEventArgs(item));
     }
 
-    private void QueueOutlineLoad(string content)
+    private void QueueOutlineLoadForActiveNote(string content, bool force)
+    {
+        string cacheKey = CreateActiveOutlineCacheKey();
+        QueueOutlineLoad(cacheKey, content, force);
+    }
+
+    private void QueueOutlineLoad(string cacheKey, string content, bool force)
     {
         outlineParseCancellation?.Cancel();
         outlineParseCancellation?.Dispose();
         outlineParseCancellation = null;
+
+        if (string.IsNullOrWhiteSpace(cacheKey))
+        {
+            ApplyOutlineItems([]);
+            return;
+        }
+
+        string contentHash = CreateContentHash(content);
+        if (!force
+            && outlineCache.TryGetValue(cacheKey, out NoteOutlineCacheEntry? cached)
+            && string.Equals(cached.ContentHash, contentHash, StringComparison.Ordinal))
+        {
+            ApplyOutlineItems(cached.Items);
+            return;
+        }
 
         CancellationTokenSource cancellation = new();
         CancellationToken cancellationToken = cancellation.Token;
@@ -179,6 +183,7 @@ public sealed class NoteInspectorViewModel : ObservableObject
                     }
 
                     ApplyOutlineItemsOnUiThread(task.Result, cancellation, cancellationToken);
+                    outlineCache[cacheKey] = new NoteOutlineCacheEntry(contentHash, task.Result);
                 },
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
@@ -265,7 +270,7 @@ public sealed class NoteInspectorViewModel : ObservableObject
         string content = string.IsNullOrWhiteSpace(mainViewModel.CurrentNoteRelativePath)
             ? string.Empty
             : mainViewModel.GetCurrentEditorContent?.Invoke() ?? string.Empty;
-        QueueOutlineLoad(content);
+        QueueOutlineLoadForActiveNote(content, force: false);
     }
 
     private void NotifyOutlineChanged()
@@ -276,6 +281,25 @@ public sealed class NoteInspectorViewModel : ObservableObject
         OnPropertyChanged(nameof(OutlineStateTitle));
         OnPropertyChanged(nameof(OutlineStateMessage));
     }
+
+    private string CreateActiveOutlineCacheKey()
+    {
+        string? collectionPath = mainViewModel.OpenCollectionPath;
+        string? relativePath = mainViewModel.CurrentNoteRelativePath;
+        return string.IsNullOrWhiteSpace(collectionPath) || string.IsNullOrWhiteSpace(relativePath)
+            ? string.Empty
+            : $"{collectionPath.Trim()}|{relativePath.Trim()}";
+    }
+
+    private static string CreateContentHash(string content)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(content ?? string.Empty));
+        return Convert.ToHexString(hash);
+    }
+
+    private sealed record NoteOutlineCacheEntry(
+        string ContentHash,
+        IReadOnlyList<NoteOutlineItemViewModel> Items);
 }
 
 public sealed class NoteOutlineNavigationRequestedEventArgs : EventArgs
