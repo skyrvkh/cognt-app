@@ -131,7 +131,9 @@ internal sealed partial class OverlayNavigationCoordinator
         {
             editorOpenRequestId++;
             await CloseOverlayWorkflowsAsync();
-            pdfReaderView ??= new PdfReaderView(loggerFactory.CreateLogger<PdfReaderView>());
+            pdfReaderView ??= new PdfReaderView(
+                loggerFactory.CreateLogger<PdfReaderView>(),
+                viewModel.CreatePdfAnnotationsNoteAsync);
             ShowOverlay(pdfReaderView);
             string documentPath = viewModel.ResolveDocumentPath(e.Document.RelativePath);
             await pdfReaderView.LoadPdfAsync(e.Document, documentPath);

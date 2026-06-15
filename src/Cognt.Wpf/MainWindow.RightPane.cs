@@ -41,7 +41,9 @@ public partial class MainWindow
 
     private PdfReaderView GetOrCreatePdfToolView()
     {
-        rightPanePdfView ??= new PdfReaderView(loggerFactory.CreateLogger<PdfReaderView>());
+        rightPanePdfView ??= new PdfReaderView(
+            loggerFactory.CreateLogger<PdfReaderView>(),
+            viewModel.CreatePdfAnnotationsNoteAsync);
         return rightPanePdfView;
     }
 
