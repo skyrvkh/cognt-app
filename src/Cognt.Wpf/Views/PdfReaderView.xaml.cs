@@ -121,57 +121,74 @@ public partial class PdfReaderView : UserControl
                     CreateFrozenBitmap(data.ToArray())));
             }
 
-            pageNumber++;
+            renderedPages[pageNumber] = renderedPage;
+            TrimRenderedPageCache(pageNumber);
         }
 
-        return pages;
+        RenderCurrentPage(renderedPage);
     }
 
-    private static BitmapImage CreateFrozenBitmap(byte[] pngBytes)
+    private static RenderedPdfPage RenderPage(string filePath, int pageNumber, CancellationToken cancellationToken)
     {
-        BitmapImage image = new();
-        using MemoryStream stream = new(pngBytes);
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.StreamSource = stream;
-        image.EndInit();
-        image.Freeze();
-        return image;
+        cancellationToken.ThrowIfCancellationRequested();
+        using PdfDocument document = PdfDocument.Open(filePath);
+        document.AddSkiaPageFactory();
+        using SKBitmap bitmap = document.GetPageAsSKBitmap(pageNumber, RenderScale, SKColors.White);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new RenderedPdfPage(pageNumber, CreateFrozenBitmap(bitmap));
     }
 
-    private void RenderPageHost()
+    private static BitmapImage CreateFrozenBitmap(SKBitmap bitmap)
     {
-        PageHost.Children.Clear();
-        foreach (RenderedPdfPage page in renderedPages)
+        using SKImage image = SKImage.FromBitmap(bitmap);
+        using SKData data = image.Encode(SKEncodedImageFormat.Png, quality: 95);
+        BitmapImage result = new();
+        using MemoryStream stream = new(data.ToArray());
+        result.BeginInit();
+        result.CacheOption = BitmapCacheOption.OnLoad;
+        result.StreamSource = stream;
+        result.EndInit();
+        result.Freeze();
+        return result;
+    }
+
+    private void RenderCurrentPage(RenderedPdfPage renderedPage)
+    {
+        PdfPageStudyData? page = GetCurrentPageData();
+        if (page is null)
         {
-            PageHost.Children.Add(CreatePageElement(page));
+            return;
         }
 
-        ZoomText.Text = $"{zoom:P0}";
-        ZoomOutButton.IsEnabled = zoom > 0.5d;
-        ZoomInButton.IsEnabled = zoom < 2.5d;
-    }
+        double pageWidth = Math.Max(1d, page.Width * PdfPointToDip * zoom);
+        double pageHeight = Math.Max(1d, page.Height * PdfPointToDip * zoom);
+        Canvas canvas = new()
+        {
+            Width = pageWidth,
+            Height = pageHeight,
+            Background = Brushes.White,
+            Cursor = Cursors.IBeam,
+            Tag = page,
+        };
+        canvas.PreviewMouseLeftButtonDown += PageCanvas_PreviewMouseLeftButtonDown;
+        canvas.PreviewMouseMove += PageCanvas_PreviewMouseMove;
+        canvas.PreviewMouseLeftButtonUp += PageCanvas_PreviewMouseLeftButtonUp;
 
-    private FrameworkElement CreatePageElement(RenderedPdfPage page)
-    {
-        StackPanel pagePanel = new();
-        pagePanel.Children.Add(new TextBlock
+        Image image = new()
         {
-            Text = $"Page {page.Number}",
-            Margin = new Thickness(0, 0, 0, 6),
-            FontSize = 10,
-            Foreground = TryFindResource("DimBrush") as Brush ?? Brushes.Gray,
-            HorizontalAlignment = HorizontalAlignment.Center,
-        });
-        pagePanel.Children.Add(new Image
-        {
-            Source = page.Image,
-            Width = page.PixelWidth * DpiScale * zoom,
-            Stretch = Stretch.Uniform,
+            Source = renderedPage.Image,
+            Width = pageWidth,
+            Height = pageHeight,
+            Stretch = Stretch.Fill,
             SnapsToDevicePixels = true,
-        });
+            IsHitTestVisible = false,
+        };
+        canvas.Children.Add(image);
+        RenderAnnotations(canvas, page);
+        RenderSearchHighlight(canvas, page);
+        RenderTextSelection(canvas, page);
 
-        return new Border
+        Border pageBorder = new()
         {
             Padding = new Thickness(8),
             Background = Brushes.White,
