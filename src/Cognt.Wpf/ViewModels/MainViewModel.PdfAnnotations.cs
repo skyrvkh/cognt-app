@@ -88,3 +88,11 @@ public sealed partial class MainViewModel
                 if (!string.IsNullOrWhiteSpace(annotation.Comment))
                 {
                     markdown.AppendLine(annotation.Comment.Trim());
+                    markdown.AppendLine();
+                }
+            }
+        }
+
+        return markdown.ToString();
+    }
+}
