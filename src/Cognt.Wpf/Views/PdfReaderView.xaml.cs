@@ -173,33 +173,81 @@ public partial class PdfReaderView : UserControl
 
         return new Border
         {
-            Margin = new Thickness(0, 0, 0, 18),
             Padding = new Thickness(8),
             Background = Brushes.White,
             BorderBrush = TryFindResource("LineBrush") as Brush ?? Brushes.LightGray,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(4),
-            Child = pagePanel,
+            Child = canvas,
         };
     }
 
     private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
     {
         zoom = Math.Max(0.5d, zoom - 0.1d);
-        RenderPageHost();
+        RefreshCurrentPage();
     }
 
     private void ZoomInButton_Click(object sender, RoutedEventArgs e)
     {
         zoom = Math.Min(2.5d, zoom + 0.1d);
-        RenderPageHost();
+        RefreshCurrentPage();
+    }
+
+    private void RefreshCurrentPage()
+    {
+        if (renderedPages.TryGetValue(currentPageNumber, out RenderedPdfPage? renderedPage))
+        {
+            RenderCurrentPage(renderedPage);
+        }
+        else
+        {
+            _ = ShowPageAsync(currentPageNumber);
+        }
+    }
+
+    private void RefreshControls()
+    {
+        bool hasPage = pages.Count > 0 && currentPageNumber > 0;
+        bool hasSelection = selectedWordIndexes.Count > 0;
+        PreviousPageButton.IsEnabled = hasPage && currentPageNumber > 1;
+        NextPageButton.IsEnabled = hasPage && currentPageNumber < pages.Count;
+        ZoomOutButton.IsEnabled = hasPage && zoom > 0.5d;
+        ZoomInButton.IsEnabled = hasPage && zoom < 2.5d;
+        CopySelectionButton.IsEnabled = hasSelection;
+        HighlightSelectionButton.IsEnabled = hasSelection;
+        AddCommentButton.IsEnabled = hasSelection;
+        RemoveLatestAnnotationButton.IsEnabled = hasPage && annotations.Any(annotation => annotation.PageNumber == currentPageNumber);
+        ExportAnnotationsButton.IsEnabled = exportAnnotations is not null && annotations.Count > 0;
+        ZoomText.Text = $"{zoom:P0}";
+    }
+
+    private bool IsCurrentDocumentLoad(CancellationTokenSource cancellation)
+    {
+        return ReferenceEquals(documentCancellation, cancellation) && !cancellation.IsCancellationRequested;
+    }
+
+    private void ResetDocumentState()
+    {
+        renderedPages.Clear();
+        annotations.Clear();
+        selectedWordIndexes.Clear();
+        searchHits.Clear();
+        pages = [];
+        documentPath = null;
+        annotationStorePath = null;
+        sourceTitle = "PDF Reader";
+        currentPageNumber = 0;
+        currentSearchHitIndex = -1;
+        pageRenderRequestId++;
+        PageHost.Children.Clear();
+        SearchTextBox.Clear();
+        SearchStatusText.Text = string.Empty;
+        CommentTextBox.Clear();
     }
 
     private void ShowEmptyState()
     {
-        renderedPages = [];
-        PdfTitleText.Text = "PDF Reader";
-        PdfStatusText.Text = string.Empty;
         PageScrollViewer.Visibility = Visibility.Collapsed;
         StatePanel.Visibility = Visibility.Collapsed;
         PageHost.Children.Clear();
@@ -212,15 +260,28 @@ public partial class PdfReaderView : UserControl
         StateTitleText.Text = title;
         StateMessageText.Text = message;
         PdfStatusText.Text = message;
-        PageHost.Children.Clear();
+        PdfTitleText.Text = "PDF Reader";
+        PdfStatusText.Text = string.Empty;
+        PageText.Text = "Page 0 / 0";
+        AnnotationCountText.Text = "0 annotations";
+        RefreshControls();
     }
 
-    private void CancelRender()
+    private void CancelDocumentLoad()
     {
-        renderCancellation?.Cancel();
-        renderCancellation?.Dispose();
-        renderCancellation = null;
+        documentCancellation?.Cancel();
+        documentCancellation?.Dispose();
+        documentCancellation = null;
     }
-
-    private sealed record RenderedPdfPage(int Number, int PixelWidth, BitmapImage Image);
 }
+        RefreshControls();
+        PageHost.Children.Clear();
+        PageHost.Children.Add(pageBorder);
+
+        int pageAnnotationCount = annotations.Count(annotation => annotation.PageNumber == page.PageNumber);
+        PageText.Text = $"Page {page.PageNumber} / {pages.Count}";
+        AnnotationCountText.Text = $"{annotations.Count} annotation{(annotations.Count == 1 ? string.Empty : "s")}";
+        PdfStatusText.Text = page.Words.Count == 0
+            ? $"Page {page.PageNumber} has no selectable text."
+            : $"Page {page.PageNumber} · {page.Words.Count:N0} selectable words · {pageAnnotationCount} annotation{(pageAnnotationCount == 1 ? string.Empty : "s")}";
+        RefreshControls();
