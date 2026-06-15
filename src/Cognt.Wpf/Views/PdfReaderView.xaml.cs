@@ -56,28 +56,36 @@ public partial class PdfReaderView : UserControl
             return;
         }
 
-        PdfTitleText.Text = document.Title;
-        ShowState("Loading PDF", "Rendering pages...");
+        this.documentPath = documentPath;
+        sourceTitle = document.Title;
+        annotationStorePath = Path.ChangeExtension(documentPath, ".cognt-annotations.json");
+        PdfTitleText.Text = sourceTitle;
+        ShowState("Loading PDF", "Reading text and page layout...");
 
         using CancellationTokenSource cancellation = new();
-        renderCancellation = cancellation;
+        documentCancellation = cancellation;
 
         try
         {
-            byte[] pdfBytes = await File.ReadAllBytesAsync(documentPath, cancellation.Token).ConfigureAwait(true);
-            IReadOnlyList<RenderedPdfPage> pages = await Task.Run(
-                () => RenderPages(pdfBytes, cancellation.Token),
+            PdfDocumentStudyData studyData = await Task.Run(
+                () => ReadStudyData(documentPath, cancellation.Token),
                 cancellation.Token).ConfigureAwait(true);
-            if (renderCancellation != cancellation)
+            if (!IsCurrentDocumentLoad(cancellation))
             {
                 return;
             }
 
-            renderedPages = pages;
-            RenderPageHost();
+            pages = studyData.Pages;
+            LoadAnnotations();
+            if (pages.Count == 0)
+            {
+                return;
+            }
+
+            currentPageNumber = 1;
             StatePanel.Visibility = Visibility.Collapsed;
             PageScrollViewer.Visibility = Visibility.Visible;
-            PdfStatusText.Text = $"{pages.Count} page{(pages.Count == 1 ? string.Empty : "s")} rendered with PDFium";
+            await ShowPageAsync(currentPageNumber).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -89,9 +97,9 @@ public partial class PdfReaderView : UserControl
         }
         finally
         {
-            if (renderCancellation == cancellation)
+            if (ReferenceEquals(documentCancellation, cancellation))
             {
-                renderCancellation = null;
+                documentCancellation = null;
             }
         }
     }
@@ -104,21 +112,55 @@ public partial class PdfReaderView : UserControl
         return LoadPdfAsync(document, documentPath);
     }
 
-    private IReadOnlyList<RenderedPdfPage> RenderPages(byte[] pdfBytes, CancellationToken cancellationToken)
+    private static PdfDocumentStudyData ReadStudyData(string filePath, CancellationToken cancellationToken)
     {
-        List<RenderedPdfPage> pages = [];
-        int pageNumber = 1;
-
-        foreach (SKBitmap bitmap in Conversion.ToImages(pdfBytes, password: null, options: renderOptions))
+        using PdfDocument document = PdfDocument.Open(filePath);
+        List<PdfPageStudyData> result = new(document.NumberOfPages);
+        for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using (bitmap)
-            using (SKData data = bitmap.Encode(SKEncodedImageFormat.Png, quality: 95))
+            UglyToad.PdfPig.Content.Page page = document.GetPage(pageNumber);
+            PdfTextWord[] words = page.GetWords()
+                .Where(word => !string.IsNullOrWhiteSpace(word.Text))
+                .Select(word => new PdfTextWord(
+                    word.Text,
+                    word.BoundingBox.Left,
+                    word.BoundingBox.Top,
+                    word.BoundingBox.Right,
+                    word.BoundingBox.Bottom))
+                .OrderByDescending(word => word.Top)
+                .ThenBy(word => word.Left)
+                .ToArray();
+            result.Add(new PdfPageStudyData(pageNumber, page.Width, page.Height, words));
+        }
+
+        return new PdfDocumentStudyData(result);
+    }
+                ShowState("No PDF pages", "The selected file did not contain readable pages.");
+
+    private async Task ShowPageAsync(int requestedPageNumber)
+    {
+        if (pages.Count == 0 || documentPath is null)
+        {
+            return;
+        }
+
+        int pageNumber = Math.Clamp(requestedPageNumber, 1, pages.Count);
+        currentPageNumber = pageNumber;
+        selectedWordIndexes.Clear();
+        selectionStart = null;
+
+        if (!renderedPages.TryGetValue(pageNumber, out RenderedPdfPage? renderedPage))
+        {
+            CancellationToken cancellationToken = documentCancellation?.Token ?? CancellationToken.None;
+            int requestId = ++pageRenderRequestId;
+            PdfStatusText.Text = $"Rendering page {pageNumber} of {pages.Count}...";
+            renderedPage = await Task.Run(
+                () => RenderPage(documentPath, pageNumber, cancellationToken),
+                cancellationToken).ConfigureAwait(true);
+            if (requestId != pageRenderRequestId || cancellationToken.IsCancellationRequested)
             {
-                pages.Add(new RenderedPdfPage(
-                    pageNumber,
-                    bitmap.Width,
-                    CreateFrozenBitmap(data.ToArray())));
+                return;
             }
 
             renderedPages[pageNumber] = renderedPage;
