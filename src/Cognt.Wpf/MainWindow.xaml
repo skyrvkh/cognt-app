@@ -1022,48 +1022,41 @@
                                     <xcadLayout:LayoutDocumentPane x:Name="WorkspaceDocumentPane" />
                                 </xcadLayout:LayoutDocumentPaneGroup>
                                 <xcadLayout:LayoutAnchorablePaneGroup x:Name="RightToolPaneGroup"
-                                                                      DockWidth="720"
-                                                                      DockMinWidth="520"
-                                                                      FloatingWidth="720"
-                                                                      Orientation="Horizontal">
-                                    <xcadLayout:LayoutAnchorablePaneGroup x:Name="InsightToolPaneGroup"
-                                                                          DockWidth="300"
-                                                                          DockMinWidth="240"
-                                                                          FloatingWidth="300"
-                                                                          Orientation="Vertical">
-                                        <xcadLayout:LayoutAnchorablePane DockHeight="0.5*">
-                                            <xcadLayout:LayoutAnchorable x:Name="InspectorAnchorable"
+                                                                      DockWidth="420"
+                                                                      DockMinWidth="320"
+                                                                      FloatingWidth="420"
+                                                                      Orientation="Vertical">
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.32*">
+                                        <xcadLayout:LayoutAnchorable x:Name="InspectorAnchorable"
                                                                    Title="Outline"
                                                                    CanClose="False"
-                                                                   CanHide="True"
+                                                                   CanHide="False"
                                                                    CanFloat="False"
-                                                                   CanAutoHide="False"
-                                                                   AutoHideWidth="300"
-                                                                   FloatingWidth="300">
-                                                <ContentControl x:Name="InspectorToolHost" />
-                                            </xcadLayout:LayoutAnchorable>
-                                        </xcadLayout:LayoutAnchorablePane>
-                                        <xcadLayout:LayoutAnchorablePane DockHeight="0.5*">
-                                            <xcadLayout:LayoutAnchorable x:Name="GraphAnchorable"
+                                                                   CanAutoHide="True"
+                                                                   AutoHideWidth="420"
+                                                                   FloatingWidth="420">
+                                            <ContentControl x:Name="InspectorToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                    </xcadLayout:LayoutAnchorablePane>
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.32*">
+                                        <xcadLayout:LayoutAnchorable x:Name="GraphAnchorable"
                                                                    Title="Graph"
                                                                    CanClose="False"
-                                                                   CanHide="True"
+                                                                   CanHide="False"
                                                                    CanFloat="False"
-                                                                   CanAutoHide="False"
-                                                                   AutoHideWidth="300"
-                                                                   FloatingWidth="300">
-                                                <ContentControl x:Name="GraphToolHost" />
-                                            </xcadLayout:LayoutAnchorable>
-                                        </xcadLayout:LayoutAnchorablePane>
-                                    </xcadLayout:LayoutAnchorablePaneGroup>
-                                    <xcadLayout:LayoutAnchorablePane x:Name="SideToolPane"
-                                                                     DockWidth="420">
+                                                                   CanAutoHide="True"
+                                                                   AutoHideWidth="420"
+                                                                   FloatingWidth="420">
+                                            <ContentControl x:Name="GraphToolHost" />
+                                        </xcadLayout:LayoutAnchorable>
+                                    </xcadLayout:LayoutAnchorablePane>
+                                    <xcadLayout:LayoutAnchorablePane DockHeight="0.36*">
                                         <xcadLayout:LayoutAnchorable x:Name="CardsAnchorable"
                                                                Title="Cards from note"
                                                                CanClose="False"
                                                                CanHide="False"
                                                                CanFloat="False"
-                                                               CanAutoHide="False"
+                                                               CanAutoHide="True"
                                                                AutoHideWidth="420"
                                                                FloatingWidth="420">
                                             <ContentControl x:Name="CardsToolHost" />
@@ -1073,7 +1066,7 @@
                                                                CanClose="False"
                                                                CanHide="False"
                                                                CanFloat="False"
-                                                               CanAutoHide="False"
+                                                               CanAutoHide="True"
                                                                AutoHideWidth="420"
                                                                FloatingWidth="420">
                                             <ContentControl x:Name="PdfToolHost" />
@@ -1083,7 +1076,7 @@
                                                                CanClose="False"
                                                                CanHide="False"
                                                                CanFloat="False"
-                                                               CanAutoHide="False"
+                                                               CanAutoHide="True"
                                                                AutoHideWidth="420"
                                                                FloatingWidth="420">
                                             <ContentControl x:Name="BrowserToolHost" />
