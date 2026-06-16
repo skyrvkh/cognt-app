@@ -178,3 +178,67 @@ public partial class PdfReaderView
         try
         {
             PdfAnnotationStoreDocument? document = JsonSerializer.Deserialize<PdfAnnotationStoreDocument>(
+                File.ReadAllText(annotationStorePath, Encoding.UTF8),
+                annotationJsonOptions);
+            if (document is null
+                || !string.Equals(document.Schema, PdfAnnotationStoreDocument.CurrentSchema, StringComparison.Ordinal)
+                || document.Version != PdfAnnotationStoreDocument.CurrentVersion)
+            {
+                logger?.LogWarning("Ignored unsupported PDF annotation store. StorePath={StorePath}", annotationStorePath);
+                return;
+            }
+
+            foreach (PdfStudyAnnotation annotation in document.Annotations ?? [])
+            {
+                if (annotation.PageNumber < 1 || string.IsNullOrWhiteSpace(annotation.Id))
+                {
+                    continue;
+                }
+
+                annotations.Add(annotation with
+                {
+                    Left = Math.Clamp(annotation.Left, 0d, 1d),
+                    Top = Math.Clamp(annotation.Top, 0d, 1d),
+                    Width = Math.Clamp(annotation.Width, 0.002d, 1d),
+                    Height = Math.Clamp(annotation.Height, 0.002d, 1d),
+                });
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            logger?.LogWarning(ex, "Could not load PDF annotation store. StorePath={StorePath}", annotationStorePath);
+        }
+    }
+
+    private void SaveAnnotations()
+    {
+        if (string.IsNullOrWhiteSpace(annotationStorePath))
+        {
+            return;
+        }
+
+        try
+        {
+            string? directory = Path.GetDirectoryName(annotationStorePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            PdfAnnotationStoreDocument document = new(
+                PdfAnnotationStoreDocument.CurrentSchema,
+                PdfAnnotationStoreDocument.CurrentVersion,
+                annotations.OrderBy(annotation => annotation.PageNumber)
+                    .ThenBy(annotation => annotation.CreatedAtUtc)
+                    .ToArray());
+            string temporaryPath = string.Concat(annotationStorePath, ".", Guid.NewGuid().ToString("N"), ".tmp");
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(document, annotationJsonOptions), Encoding.UTF8);
+            File.Move(temporaryPath, annotationStorePath, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            logger?.LogWarning(ex, "Could not save PDF annotations. StorePath={StorePath}", annotationStorePath);
+            PdfStatusText.Text = "The annotation could not be saved to disk.";
+        }
+    }
+}
