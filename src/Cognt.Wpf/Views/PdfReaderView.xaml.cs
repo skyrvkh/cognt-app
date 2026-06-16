@@ -1,33 +1,66 @@
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Microsoft.Extensions.Logging;
-using PDFtoImage;
 using SkiaSharp;
 
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Rendering.Skia;
 namespace CogntApp.Views;
 
 public partial class PdfReaderView : UserControl
 {
-    private const int RenderDpi = 150;
-    private const double DpiScale = 96d / RenderDpi;
+    private const float RenderScale = 2.25f;
+    private const double PdfPointToDip = 96d / 72d;
     private readonly ILogger<PdfReaderView>? logger;
-    private readonly PDFtoImage.RenderOptions renderOptions = new()
+    private readonly Func<PdfAnnotationExport, Task<string>>? exportAnnotations;
+    private readonly Dictionary<int, RenderedPdfPage> renderedPages = [];
+    private readonly List<PdfStudyAnnotation> annotations = [];
+    private readonly HashSet<int> selectedWordIndexes = [];
+    private readonly List<PdfTextSearchHit> searchHits = [];
+    private readonly JsonSerializerOptions annotationJsonOptions = new(JsonSerializerDefaults.Web)
     {
-        Dpi = RenderDpi,
-        WithAnnotations = true,
-        WithFormFill = true,
-        WithAspectRatio = true,
+        WriteIndented = true,
     };
 
-    private CancellationTokenSource? renderCancellation;
-    private IReadOnlyList<RenderedPdfPage> renderedPages = [];
+    private CancellationTokenSource? documentCancellation;
+    private IReadOnlyList<PdfPageStudyData> pages = [];
+    private string? documentPath;
+    private string? annotationStorePath;
+    private string sourceTitle = "PDF Reader";
+    private int currentPageNumber;
+    private int pageRenderRequestId;
+    private int currentSearchHitIndex = -1;
     private double zoom = 1d;
 
-    public PdfReaderView(ILogger<PdfReaderView>? logger = null)
+    private TextBlock PdfTitleText => StudyToolbar.PdfTitleTextControl;
+    private TextBlock PdfStatusText => StudyToolbar.PdfStatusTextControl;
+    private Button PreviousPageButton => StudyToolbar.PreviousPageButtonControl;
+    private TextBlock PageText => StudyToolbar.PageTextControl;
+    private Button NextPageButton => StudyToolbar.NextPageButtonControl;
+    private Button ZoomOutButton => StudyToolbar.ZoomOutButtonControl;
+    private TextBlock ZoomText => StudyToolbar.ZoomTextControl;
+    private Button ZoomInButton => StudyToolbar.ZoomInButtonControl;
+    private TextBox SearchTextBox => StudyToolbar.SearchTextBoxControl;
+    private TextBlock SearchStatusText => StudyToolbar.SearchStatusTextControl;
+    private Button CopySelectionButton => StudyToolbar.CopySelectionButtonControl;
+    private Button HighlightSelectionButton => StudyToolbar.HighlightSelectionButtonControl;
+    private TextBox CommentTextBox => StudyToolbar.CommentTextBoxControl;
+    private Button AddCommentButton => StudyToolbar.AddCommentButtonControl;
+    private Button RemoveLatestAnnotationButton => StudyToolbar.RemoveLatestAnnotationButtonControl;
+    private Button ExportAnnotationsButton => StudyToolbar.ExportAnnotationsButtonControl;
+    private TextBlock AnnotationCountText => StudyToolbar.AnnotationCountTextControl;
+    private Point? selectionStart;
+    private Border? dragSelectionOverlay;
+
+    internal PdfReaderView(
+        ILogger<PdfReaderView>? logger = null,
+        Func<PdfAnnotationExport, Task<string>>? exportAnnotations = null)
     {
         this.logger = logger;
         InitializeComponent();
@@ -36,7 +69,8 @@ public partial class PdfReaderView : UserControl
 
     internal async Task LoadPdfAsync(KnowledgePdfDocumentReadModel? document, string? documentPath)
     {
-        CancelRender();
+        CancelDocumentLoad();
+        ResetDocumentState();
 
         if (document is null || string.IsNullOrWhiteSpace(documentPath))
         {
@@ -62,8 +96,22 @@ public partial class PdfReaderView : UserControl
         PdfTitleText.Text = sourceTitle;
         ShowState("Loading PDF", "Reading text and page layout...");
 
+        this.exportAnnotations = exportAnnotations;
         using CancellationTokenSource cancellation = new();
         documentCancellation = cancellation;
+        StudyToolbar.PreviousPageRequested += PreviousPageButton_Click;
+        StudyToolbar.NextPageRequested += NextPageButton_Click;
+        StudyToolbar.ZoomOutRequested += ZoomOutButton_Click;
+        StudyToolbar.ZoomInRequested += ZoomInButton_Click;
+        StudyToolbar.FindRequested += FindButton_Click;
+        StudyToolbar.PreviousSearchResultRequested += PreviousSearchResultButton_Click;
+        StudyToolbar.NextSearchResultRequested += NextSearchResultButton_Click;
+        StudyToolbar.CopySelectionRequested += CopySelectionButton_Click;
+        StudyToolbar.HighlightSelectionRequested += HighlightSelectionButton_Click;
+        StudyToolbar.AddCommentRequested += AddCommentButton_Click;
+        StudyToolbar.RemoveLatestAnnotationRequested += RemoveLatestAnnotationButton_Click;
+        StudyToolbar.ExportAnnotationsRequested += ExportAnnotationsButton_Click;
+        StudyToolbar.SearchKeyDown += SearchTextBox_KeyDown;
 
         try
         {
