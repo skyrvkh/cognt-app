@@ -1,0 +1,49 @@
+<UserControl x:Class="CogntApp.Views.PdfReaderToolbar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource PanelBrush}">
+    <Border Padding="12,9"
+            BorderBrush="{DynamicResource LineBrush}"
+            BorderThickness="0,0,0,1">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock x:Name="PdfTitleText" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource InkBrush}" Text="PDF Reader" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="PdfStatusText" Margin="0,3,0,0" FontSize="11" Foreground="{DynamicResource DimBrush}" Text="No PDF selected" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="PreviousPageButton" Width="30" Height="30" Margin="0,0,4,0" Content="‹" FontSize="20" ToolTip="Previous page" AutomationProperties.Name="Previous page" Click="PreviousPageButton_Click" />
+                    <TextBlock x:Name="PageText" MinWidth="78" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource MutedBrush}" Text="Page 0 / 0" TextAlignment="Center" />
+                    <Button x:Name="NextPageButton" Width="30" Height="30" Margin="4,0,12,0" Content="›" FontSize="20" ToolTip="Next page" AutomationProperties.Name="Next page" Click="NextPageButton_Click" />
+                    <Button x:Name="ZoomOutButton" Width="30" Height="30" Margin="0,0,4,0" Content="−" FontSize="16" ToolTip="Zoom out" AutomationProperties.Name="Zoom out" Click="ZoomOutButton_Click" />
+                    <TextBlock x:Name="ZoomText" MinWidth="48" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource MutedBrush}" Text="100%" TextAlignment="Center" />
+                    <Button x:Name="ZoomInButton" Width="30" Height="30" Margin="4,0,0,0" Content="+" FontSize="16" ToolTip="Zoom in" AutomationProperties.Name="Zoom in" Click="ZoomInButton_Click" />
+                </WrapPanel>
+            </Grid>
+
+            <WrapPanel Margin="0,10,0,0">
+                <TextBox x:Name="SearchTextBox" Width="260" MinHeight="32" Padding="9,5" VerticalContentAlignment="Center" Background="{DynamicResource PageBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" Foreground="{DynamicResource InkBrush}" ToolTip="Search PDF text" KeyDown="SearchTextBox_KeyDown" />
+                <Button Margin="7,0,0,0" MinHeight="32" Padding="10,4" Content="Find" ToolTip="Find text" Click="FindButton_Click" />
+                <Button Margin="4,0,0,0" MinHeight="32" Padding="9,4" Content="Previous" ToolTip="Previous result" Click="PreviousSearchResultButton_Click" />
+                <Button Margin="4,0,0,0" MinHeight="32" Padding="9,4" Content="Next" ToolTip="Next result" Click="NextSearchResultButton_Click" />
+                <TextBlock x:Name="SearchStatusText" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource MutedBrush}" Text="" />
+            </WrapPanel>
+
+            <WrapPanel Margin="0,8,0,0">
+                <Button x:Name="CopySelectionButton" MinHeight="32" Padding="10,4" Content="Copy selection" ToolTip="Copy selected PDF text" Click="CopySelectionButton_Click" />
+                <Button x:Name="HighlightSelectionButton" Margin="6,0,0,0" MinHeight="32" Padding="10,4" Content="Highlight" ToolTip="Highlight the selected PDF text" Click="HighlightSelectionButton_Click" />
+                <TextBox x:Name="CommentTextBox" Width="300" MinHeight="32" Margin="12,0,0,0" Padding="9,5" VerticalContentAlignment="Center" Background="{DynamicResource PageBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" Foreground="{DynamicResource InkBrush}" ToolTip="Write a comment for the selected text" />
+                <Button x:Name="AddCommentButton" Margin="6,0,0,0" MinHeight="32" Padding="10,4" Content="Add comment" ToolTip="Save a comment on the selected PDF text" Click="AddCommentButton_Click" />
+                <Button x:Name="RemoveLatestAnnotationButton" Margin="6,0,0,0" MinHeight="32" Padding="10,4" Content="Remove latest" ToolTip="Remove the latest annotation on this page" Click="RemoveLatestAnnotationButton_Click" />
+                <Button x:Name="ExportAnnotationsButton" Margin="12,0,0,0" MinHeight="32" Padding="10,4" Content="Export to note" ToolTip="Create a note from all highlights and comments" Click="ExportAnnotationsButton_Click" />
+                <TextBlock x:Name="AnnotationCountText" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource MutedBrush}" Text="0 annotations" />
+            </WrapPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
