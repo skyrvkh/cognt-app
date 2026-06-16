@@ -88,3 +88,93 @@ public partial class PdfReaderView
         catch (Exception ex)
         {
             logger?.LogError(ex, "PDF annotation export failed. SourcePath={SourcePath}", documentPath);
+            PdfStatusText.Text = $"Could not export annotations: {ex.Message}";
+        }
+        finally
+        {
+            RefreshControls();
+        }
+    }
+
+    private bool AddAnnotation(PdfStudyAnnotationKind kind, string? comment)
+    {
+        PdfStudyAnnotation? annotation = CreateAnnotationFromSelection(kind, comment);
+        if (annotation is null)
+        {
+            PdfStatusText.Text = "Select text on the page first.";
+            return false;
+        }
+
+        annotations.Add(annotation);
+        SaveAnnotations();
+        RefreshCurrentPage();
+        PdfStatusText.Text = kind == PdfStudyAnnotationKind.Comment
+            ? "Comment saved with the selected text."
+            : "Highlight saved with the selected text.";
+        return true;
+    }
+
+    private PdfStudyAnnotation? CreateAnnotationFromSelection(PdfStudyAnnotationKind kind, string? comment)
+    {
+        PdfPageStudyData? page = GetCurrentPageData();
+        if (page is null || selectedWordIndexes.Count == 0)
+        {
+            return null;
+        }
+
+        PdfTextWord[] words = selectedWordIndexes
+            .Where(index => index >= 0 && index < page.Words.Count)
+            .OrderBy(index => index)
+            .Select(index => page.Words[index])
+            .ToArray();
+        if (words.Length == 0 || page.Width <= 0 || page.Height <= 0)
+        {
+            return null;
+        }
+
+        double left = words.Min(word => word.Left);
+        double right = words.Max(word => word.Right);
+        double top = words.Max(word => word.Top);
+        double bottom = words.Min(word => word.Bottom);
+        double normalizedLeft = Math.Clamp(left / page.Width, 0d, 1d);
+        double normalizedTop = Math.Clamp((page.Height - top) / page.Height, 0d, 1d);
+        double normalizedRight = Math.Clamp(right / page.Width, normalizedLeft, 1d);
+        double normalizedBottom = Math.Clamp((page.Height - bottom) / page.Height, normalizedTop, 1d);
+
+        return new PdfStudyAnnotation(
+            Guid.NewGuid().ToString("N"),
+            page.PageNumber,
+            string.Join(" ", words.Select(word => word.Text)),
+            normalizedLeft,
+            normalizedTop,
+            Math.Max(0.002d, normalizedRight - normalizedLeft),
+            Math.Max(0.002d, normalizedBottom - normalizedTop),
+            kind,
+            string.IsNullOrWhiteSpace(comment) ? null : comment.Trim(),
+            DateTimeOffset.UtcNow);
+    }
+
+    private string GetSelectedText()
+    {
+        PdfPageStudyData? page = GetCurrentPageData();
+        if (page is null || selectedWordIndexes.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", selectedWordIndexes
+            .Where(index => index >= 0 && index < page.Words.Count)
+            .OrderBy(index => index)
+            .Select(index => page.Words[index].Text));
+    }
+
+    private void LoadAnnotations()
+    {
+        if (string.IsNullOrWhiteSpace(annotationStorePath) || !File.Exists(annotationStorePath))
+        {
+            return;
+        }
+
+        try
+        {
+            PdfAnnotationStoreDocument? document = JsonSerializer.Deserialize<PdfAnnotationStoreDocument>(
