@@ -5,7 +5,12 @@ public sealed record FlashcardProgressAnalyticsReadModel(
     int DueTomorrowDecks,
     IReadOnlyList<FlashcardDeckReviewHistoryReadModel> DeckReviewHistory,
     IReadOnlyList<FlashcardReviewRatingCountReadModel> RecallDistribution,
-    IReadOnlyList<FlashcardWeeklyReviewOutcomeReadModel> WeeklyReviewOutcomes);
+    IReadOnlyList<FlashcardWeeklyReviewOutcomeReadModel> WeeklyReviewOutcomes)
+{
+    public FlashcardWorkloadForecastReadModel WorkloadForecast { get; init; } = FlashcardWorkloadForecastReadModel.Empty;
+
+    public FlashcardLearningDiagnosticsReadModel LearningDiagnostics { get; init; } = FlashcardLearningDiagnosticsReadModel.Empty;
+}
 
 public sealed record FlashcardDeckReviewHistoryReadModel(
     string DeckName,
