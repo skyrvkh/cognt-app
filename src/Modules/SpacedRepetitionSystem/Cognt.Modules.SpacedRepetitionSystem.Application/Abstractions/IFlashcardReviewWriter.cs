@@ -13,6 +13,7 @@ public interface IFlashcardReviewWriter
         string collectionId,
         long cardId,
         FlashcardReviewRatingReadModel rating,
+        int? reviewDurationMilliseconds = null,
         CancellationToken cancellationToken = default);
 
     Task SetCardSuspensionAsync(

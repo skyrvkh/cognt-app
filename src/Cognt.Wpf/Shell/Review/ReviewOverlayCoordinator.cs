@@ -165,7 +165,11 @@ internal sealed partial class ReviewOverlayCoordinator
             else
             {
                 RecordedFlashcardReviewReadModel reviewResult = await recordFlashcardReviewCommand.ExecuteAsync(
-                    new RecordFlashcardReviewRequest(collectionId, e.CardId, e.Rating));
+                    new RecordFlashcardReviewRequest(
+                        collectionId,
+                        e.CardId,
+                        e.Rating,
+                        e.ReviewDurationMilliseconds));
                 if (TryAdvanceScheduledQueueFromCache(reviewResult, out FlashcardReviewQueueReadModel? cachedQueue))
                 {
                     await ShowReviewQueueAsync(cachedQueue, exitWhenUnavailable: true);
@@ -240,7 +244,11 @@ internal sealed partial class ReviewOverlayCoordinator
             && activeCramSchedulerRecordedCardIds.Add(e.CardId))
         {
             _ = await recordFlashcardReviewCommand.ExecuteAsync(
-                new RecordFlashcardReviewRequest(collectionId, e.CardId, e.Rating));
+                new RecordFlashcardReviewRequest(
+                    collectionId,
+                    e.CardId,
+                    e.Rating,
+                    e.ReviewDurationMilliseconds));
         }
 
         if (result.CompletionSummary is not null)

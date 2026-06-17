@@ -24,6 +24,7 @@ public partial class ReviewView : UserControl
     private bool isDisposed;
     private bool isWaitingForDueCard;
     private FlashcardReviewQueueSummaryReadModel? queueSummary;
+    private DateTimeOffset currentCardPresentedAtUtc;
 
     internal event EventHandler? ExitReviewRequested;
     internal event EventHandler<ReviewRatingRequestedEventArgs>? RatingRequested;
@@ -135,20 +136,30 @@ public partial class ReviewView : UserControl
 
         FlashcardReviewCardReadModel card = currentCard
             ?? throw new InvalidOperationException("There is no active review card.");
-        RatingRequested?.Invoke(this, new ReviewRatingRequestedEventArgs(card.Id, rating));
+        int reviewDurationMilliseconds = (int)Math.Clamp(
+            (DateTimeOffset.UtcNow - currentCardPresentedAtUtc).TotalMilliseconds,
+            1d,
+            3_600_000d);
+        RatingRequested?.Invoke(this, new ReviewRatingRequestedEventArgs(card.Id, rating, reviewDurationMilliseconds));
     }
 
 }
 
 internal sealed class ReviewRatingRequestedEventArgs : EventArgs
 {
-    public ReviewRatingRequestedEventArgs(long cardId, FlashcardReviewRatingReadModel rating)
+    public ReviewRatingRequestedEventArgs(
+        long cardId,
+        FlashcardReviewRatingReadModel rating,
+        int reviewDurationMilliseconds)
     {
         CardId = cardId;
         Rating = rating;
+        ReviewDurationMilliseconds = reviewDurationMilliseconds;
     }
 
     public long CardId { get; }
 
     public FlashcardReviewRatingReadModel Rating { get; }
+
+    public int ReviewDurationMilliseconds { get; }
 }

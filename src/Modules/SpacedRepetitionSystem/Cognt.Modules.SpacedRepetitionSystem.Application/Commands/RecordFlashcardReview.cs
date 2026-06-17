@@ -21,6 +21,7 @@ internal sealed class RecordFlashcardReview(
             request.CollectionId,
             request.CardId,
             request.Rating,
+            request.ReviewDurationMilliseconds,
             cancellationToken).ConfigureAwait(false);
         return result;
     }

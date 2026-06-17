@@ -101,6 +101,7 @@ public partial class ReviewView
     {
         queueSummary = summary;
         currentCard = card;
+        currentCardPresentedAtUtc = DateTimeOffset.UtcNow;
         isWaitingForDueCard = false;
         isAnswerVisible = false;
         CompletionSummaryText.Visibility = Visibility.Collapsed;

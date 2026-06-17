@@ -12,4 +12,5 @@ public interface IRecordFlashcardReviewCommand
 public sealed record RecordFlashcardReviewRequest(
     string CollectionId,
     long CardId,
-    FlashcardReviewRatingReadModel Rating);
+    FlashcardReviewRatingReadModel Rating,
+    int? ReviewDurationMilliseconds = null);
