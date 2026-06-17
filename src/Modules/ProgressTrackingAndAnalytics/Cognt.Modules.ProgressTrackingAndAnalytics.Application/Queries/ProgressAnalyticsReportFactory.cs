@@ -25,7 +25,9 @@ internal static partial class ProgressAnalyticsReportFactory
                 ActivityWindowDays),
             ProgressAnalyticsRecallDistributionFactory.CreateRows(collectionSnapshot.Details.RecallDistribution),
             ProgressAnalyticsWeeklyReviewOutcomeFactory.CreateRows(collectionSnapshot.Details.WeeklyReviewOutcomes),
-            ProgressAnalyticsActivityFactory.CreateStudyStreak(today, reviewedActivity.ReviewedByDate));
+            ProgressAnalyticsActivityFactory.CreateStudyStreak(today, reviewedActivity.ReviewedByDate),
+            CreateWorkloadForecast(collectionSnapshot.Details.WorkloadForecast),
+            CreateLearningDiagnostics(collectionSnapshot.Details.LearningDiagnostics));
     }
 
 }

@@ -8,4 +8,6 @@ public sealed record ProgressAnalyticsReport(
     IReadOnlyList<ProgressAnalyticsActivityDayReadModel> DailyStudyActivity,
     IReadOnlyList<RecallDistributionReadModel> RecallDistribution,
     IReadOnlyList<WeeklyReviewOutcomeReadModel> WeeklyReviewOutcomes,
-    IReadOnlyList<ProgressAnalyticsActivityDayReadModel> StudyStreak);
+    IReadOnlyList<ProgressAnalyticsActivityDayReadModel> StudyStreak,
+    WorkloadForecastReadModel WorkloadForecast,
+    LearningDiagnosticsReadModel LearningDiagnostics);

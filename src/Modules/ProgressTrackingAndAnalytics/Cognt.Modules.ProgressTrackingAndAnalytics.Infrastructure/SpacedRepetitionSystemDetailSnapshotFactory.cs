@@ -13,6 +13,8 @@ internal static class SpacedRepetitionSystemDetailSnapshotFactory
             analytics.DueTomorrowDecks,
             SpacedRepetitionSystemSnapshotRows.CreateDeckReviewHistory(analytics.DeckReviewHistory),
             SpacedRepetitionSystemSnapshotRows.CreateRecallDistribution(analytics.RecallDistribution),
-            SpacedRepetitionSystemSnapshotRows.CreateWeeklyReviewOutcomes(analytics.WeeklyReviewOutcomes));
+            SpacedRepetitionSystemSnapshotRows.CreateWeeklyReviewOutcomes(analytics.WeeklyReviewOutcomes),
+            SpacedRepetitionSystemSnapshotRows.CreateWorkloadForecast(analytics.WorkloadForecast),
+            SpacedRepetitionSystemSnapshotRows.CreateLearningDiagnostics(analytics.LearningDiagnostics));
     }
 }
