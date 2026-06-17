@@ -27,7 +27,9 @@ public sealed record ProgressAnalyticsDetailSnapshot(
     int DueTomorrowDecks,
     IReadOnlyList<ProgressAnalyticsDeckReviewHistory> DeckReviewHistory,
     IReadOnlyList<ProgressAnalyticsRecallCount> RecallDistribution,
-    IReadOnlyList<ProgressAnalyticsWeeklyReviewOutcome> WeeklyReviewOutcomes);
+    IReadOnlyList<ProgressAnalyticsWeeklyReviewOutcome> WeeklyReviewOutcomes,
+    ProgressAnalyticsWorkloadForecast WorkloadForecast,
+    ProgressAnalyticsLearningDiagnostics LearningDiagnostics);
 
 public sealed record ProgressAnalyticsDeckReviewHistory(
     string DeckName,
@@ -45,3 +47,35 @@ public sealed record ProgressAnalyticsWeeklyReviewOutcome(
     int Hard,
     int Good,
     int Easy);
+
+public sealed record ProgressAnalyticsWorkloadForecast(
+    IReadOnlyList<ProgressAnalyticsWorkloadForecastDay> Days,
+    int DueIn7Days,
+    int DueIn30Days,
+    int DueIn90Days,
+    int SuggestedDailyCapacity,
+    int SmoothingOpportunityCards,
+    IReadOnlyList<ProgressAnalyticsTomorrowWorkloadContributor> TomorrowContributors);
+
+public sealed record ProgressAnalyticsWorkloadForecastDay(
+    DateOnly Date,
+    int DueCards,
+    double EstimatedMinutes);
+
+public sealed record ProgressAnalyticsTomorrowWorkloadContributor(
+    string DeckName,
+    int CardsScheduledToday);
+
+public sealed record ProgressAnalyticsLearningDiagnostics(
+    double? ActualRetention,
+    double DesiredRetention,
+    int? AverageReviewDurationMilliseconds,
+    int TotalLapses,
+    int CardsWithLapses,
+    int LeechCards,
+    IReadOnlyList<ProgressAnalyticsDistributionBucket> StabilityDistribution,
+    IReadOnlyList<ProgressAnalyticsDistributionBucket> DifficultyDistribution);
+
+public sealed record ProgressAnalyticsDistributionBucket(
+    string Label,
+    int Count);
