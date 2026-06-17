@@ -88,3 +88,77 @@ internal sealed partial class SqliteFlashcardRepository
         IReadOnlyList<string> deckNames)
     {
         return UseConnection(connection =>
+        {
+            List<FlashcardLearningDiagnosticCardRecord> cards = LoadLearningDiagnosticCards(connection, deckNames);
+            List<int> durations = LoadReviewDurations(connection, deckNames);
+            return new FlashcardLearningDiagnosticsRecord(cards, durations);
+        });
+    }
+
+    private static List<FlashcardLearningDiagnosticCardRecord> LoadLearningDiagnosticCards(
+        SqliteConnection connection,
+        IReadOnlyList<string> deckNames)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        string deckNameFilter = AddDeckNameFilter(command, deckNames, "c.deck_id");
+        command.CommandText = $"""
+            SELECT c.stability,
+                   c.difficulty,
+                   c.lapses
+            FROM flashcard_card c
+            WHERE c.is_deleted = 0
+              AND c.back_rel_path IS NULL
+              {deckNameFilter};
+            """;
+
+        List<FlashcardLearningDiagnosticCardRecord> cards = [];
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            cards.Add(new FlashcardLearningDiagnosticCardRecord(
+                reader.IsDBNull(0) ? null : reader.GetDouble(0),
+                reader.IsDBNull(1) ? null : reader.GetDouble(1),
+                reader.GetInt32(2)));
+        }
+
+        return cards;
+    }
+
+    private List<int> LoadReviewDurations(
+        SqliteConnection connection,
+        IReadOnlyList<string> deckNames)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        string deckNameFilter = AddDeckNameFilter(command, deckNames, "c.deck_id");
+        command.CommandText = $"""
+            SELECT h.review_log_json
+            FROM flashcard_review_history h
+            JOIN flashcard_card c ON c.id = h.card_id
+            WHERE c.is_deleted = 0
+              AND c.back_rel_path IS NULL
+              AND h.review_log_json IS NOT NULL
+              {deckNameFilter};
+            """;
+
+        List<int> durations = [];
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            string reviewLogJson = reader.GetString(0);
+            try
+            {
+                FsrsReviewLog reviewLog = FsrsReviewLog.FromJson(reviewLogJson);
+                if (reviewLog.ReviewDuration is > 0)
+                {
+                    durations.Add(reviewLog.ReviewDuration.Value);
+                }
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or FormatException or ArgumentOutOfRangeException)
+            {
+                logger?.LogDebug(ex, "Skipped malformed review duration log. DatabasePath={DatabasePath}", databasePath);
+            }
+        }
+
+        return durations;
+    }
+}
