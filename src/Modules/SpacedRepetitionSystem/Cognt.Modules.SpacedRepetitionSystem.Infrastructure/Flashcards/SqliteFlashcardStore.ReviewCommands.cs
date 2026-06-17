@@ -28,6 +28,7 @@ internal sealed partial class SqliteFlashcardStore
         string collectionId,
         long cardId,
         AppReadModels.FlashcardReviewRatingReadModel rating,
+        int? reviewDurationMilliseconds,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -45,6 +46,7 @@ internal sealed partial class SqliteFlashcardStore
             settings.LearningSteps,
             settings.RelearningSteps,
             parameters,
+            reviewDurationMilliseconds,
             cancellationToken);
 
         repository.ApplyReview(cardId, ToPersistenceRating(rating), schedule);

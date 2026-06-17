@@ -14,5 +14,6 @@ internal interface IFlashcardScheduler
         IReadOnlyList<TimeSpan>? learningSteps,
         IReadOnlyList<TimeSpan>? relearningSteps,
         IReadOnlyList<double>? parameters = null,
+        int? reviewDurationMilliseconds = null,
         CancellationToken cancellationToken = default);
 }

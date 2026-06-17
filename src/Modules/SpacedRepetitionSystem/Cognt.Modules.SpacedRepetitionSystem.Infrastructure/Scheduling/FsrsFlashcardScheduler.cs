@@ -22,6 +22,7 @@ internal sealed partial class FsrsFlashcardScheduler : IFlashcardScheduler
         IReadOnlyList<TimeSpan>? learningSteps,
         IReadOnlyList<TimeSpan>? relearningSteps,
         IReadOnlyList<double>? parameters,
+        int? reviewDurationMilliseconds,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -34,7 +35,8 @@ internal sealed partial class FsrsFlashcardScheduler : IFlashcardScheduler
         (FsrsCard nextCard, FsrsReviewLog reviewLog) = scheduler.ReviewCard(
             previous.Card,
             ToFsrsRating(rating),
-            reviewAt);
+            reviewAt,
+            reviewDurationMilliseconds);
 
         StoredFsrsCard next = CreateReviewedStoredCard(previous, nextCard, rating, elapsedDays, reviewAt);
 
