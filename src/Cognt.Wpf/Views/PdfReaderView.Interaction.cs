@@ -178,3 +178,45 @@ public partial class PdfReaderView
     }
 
     private static Rect CreateSelectionBounds(Point first, Point second)
+    {
+        return new Rect(
+            new Point(Math.Min(first.X, second.X), Math.Min(first.Y, second.Y)),
+            new Point(Math.Max(first.X, second.X), Math.Max(first.Y, second.Y)));
+    }
+
+    private static Rect GetWordBounds(Canvas canvas, PdfPageStudyData page, PdfTextWord word)
+    {
+        double left = Math.Clamp(word.Left / page.Width, 0d, 1d) * canvas.Width;
+        double top = Math.Clamp((page.Height - word.Top) / page.Height, 0d, 1d) * canvas.Height;
+        double width = Math.Max(2d, (word.Right - word.Left) / page.Width * canvas.Width);
+        double height = Math.Max(2d, (word.Top - word.Bottom) / page.Height * canvas.Height);
+        return new Rect(left, top, width, height);
+    }
+
+    private void ShowDragSelectionOverlay(Canvas canvas, Rect bounds)
+    {
+        RemoveDragSelectionOverlay(canvas);
+        dragSelectionOverlay = new Border
+        {
+            Width = Math.Max(1d, bounds.Width),
+            Height = Math.Max(1d, bounds.Height),
+            Background = new SolidColorBrush(Color.FromArgb(35, 2, 132, 199)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(210, 2, 132, 199)),
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false,
+        };
+        Canvas.SetLeft(dragSelectionOverlay, bounds.Left);
+        Canvas.SetTop(dragSelectionOverlay, bounds.Top);
+        Panel.SetZIndex(dragSelectionOverlay, 5);
+        canvas.Children.Add(dragSelectionOverlay);
+    }
+
+    private void RemoveDragSelectionOverlay(Canvas canvas)
+    {
+        if (dragSelectionOverlay is not null)
+        {
+            canvas.Children.Remove(dragSelectionOverlay);
+            dragSelectionOverlay = null;
+        }
+    }
+}
