@@ -88,3 +88,93 @@ public partial class PdfReaderView
         }
 
         for (int start = 0; start <= page.Words.Count - queryTerms.Length; start++)
+        {
+            bool matches = true;
+            for (int offset = 0; offset < queryTerms.Length; offset++)
+            {
+                string word = NormalizeSearchText(page.Words[start + offset].Text);
+                if (!word.Contains(queryTerms[offset], StringComparison.OrdinalIgnoreCase))
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (!matches)
+            {
+                continue;
+            }
+
+            int[] indexes = Enumerable.Range(start, queryTerms.Length).ToArray();
+            destination.Add(new PdfTextSearchHit(page.PageNumber, indexes));
+        }
+    }
+
+    private static string NormalizeSearchText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).Trim();
+    }
+
+    private void PageCanvas_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Canvas canvas || canvas.Tag is not PdfPageStudyData)
+        {
+            return;
+        }
+
+        selectionStart = e.GetPosition(canvas);
+        canvas.CaptureMouse();
+        RemoveDragSelectionOverlay(canvas);
+        e.Handled = true;
+    }
+
+    private void PageCanvas_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (selectionStart is null || sender is not Canvas canvas || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        Point end = e.GetPosition(canvas);
+        Rect bounds = CreateSelectionBounds(selectionStart.Value, end);
+        ShowDragSelectionOverlay(canvas, bounds);
+    }
+
+    private void PageCanvas_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (selectionStart is null || sender is not Canvas canvas || canvas.Tag is not PdfPageStudyData page)
+        {
+            return;
+        }
+
+        Point end = e.GetPosition(canvas);
+        Rect selectionBounds = CreateSelectionBounds(selectionStart.Value, end);
+        selectionStart = null;
+        canvas.ReleaseMouseCapture();
+        RemoveDragSelectionOverlay(canvas);
+
+        selectedWordIndexes.Clear();
+        if (selectionBounds.Width >= 2d || selectionBounds.Height >= 2d)
+        {
+            for (int index = 0; index < page.Words.Count; index++)
+            {
+                Rect wordBounds = GetWordBounds(canvas, page, page.Words[index]);
+                if (wordBounds.IntersectsWith(selectionBounds))
+                {
+                    selectedWordIndexes.Add(index);
+                }
+            }
+        }
+
+        RefreshCurrentPage();
+        if (selectedWordIndexes.Count > 0)
+        {
+            PdfStatusText.Text = $"Selected {selectedWordIndexes.Count} word{(selectedWordIndexes.Count == 1 ? string.Empty : "s")}.";
+        }
+
+        e.Handled = true;
+    }
+
+    private static Rect CreateSelectionBounds(Point first, Point second)
