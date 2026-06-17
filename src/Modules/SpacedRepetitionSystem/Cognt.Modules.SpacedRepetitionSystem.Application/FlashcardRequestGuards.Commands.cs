@@ -150,7 +150,10 @@ internal static partial class FlashcardRequestGuards
         request = EnsureRequest(request);
         EnsureCardCommandTarget(request.CollectionId, request.CardId);
         EnsureReviewRating(request.Rating);
-        return request;
+        int? reviewDurationMilliseconds = request.ReviewDurationMilliseconds is > 0
+            ? Math.Min(request.ReviewDurationMilliseconds.Value, 3_600_000)
+            : null;
+        return request with { ReviewDurationMilliseconds = reviewDurationMilliseconds };
     }
 
     internal static UpdateFlashcardSuspensionRequest EnsureUpdateSuspensionRequest(
