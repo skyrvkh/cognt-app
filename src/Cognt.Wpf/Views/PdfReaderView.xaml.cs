@@ -2,15 +2,15 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
-
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
+
 namespace CogntApp.Views;
 
 public partial class PdfReaderView : UserControl
@@ -63,7 +63,21 @@ public partial class PdfReaderView : UserControl
         Func<PdfAnnotationExport, Task<string>>? exportAnnotations = null)
     {
         this.logger = logger;
+        this.exportAnnotations = exportAnnotations;
         InitializeComponent();
+        StudyToolbar.PreviousPageRequested += PreviousPageButton_Click;
+        StudyToolbar.NextPageRequested += NextPageButton_Click;
+        StudyToolbar.ZoomOutRequested += ZoomOutButton_Click;
+        StudyToolbar.ZoomInRequested += ZoomInButton_Click;
+        StudyToolbar.FindRequested += FindButton_Click;
+        StudyToolbar.PreviousSearchResultRequested += PreviousSearchResultButton_Click;
+        StudyToolbar.NextSearchResultRequested += NextSearchResultButton_Click;
+        StudyToolbar.CopySelectionRequested += CopySelectionButton_Click;
+        StudyToolbar.HighlightSelectionRequested += HighlightSelectionButton_Click;
+        StudyToolbar.AddCommentRequested += AddCommentButton_Click;
+        StudyToolbar.RemoveLatestAnnotationRequested += RemoveLatestAnnotationButton_Click;
+        StudyToolbar.ExportAnnotationsRequested += ExportAnnotationsButton_Click;
+        StudyToolbar.SearchKeyDown += SearchTextBox_KeyDown;
         ShowEmptyState();
     }
 
@@ -96,22 +110,8 @@ public partial class PdfReaderView : UserControl
         PdfTitleText.Text = sourceTitle;
         ShowState("Loading PDF", "Reading text and page layout...");
 
-        this.exportAnnotations = exportAnnotations;
         using CancellationTokenSource cancellation = new();
         documentCancellation = cancellation;
-        StudyToolbar.PreviousPageRequested += PreviousPageButton_Click;
-        StudyToolbar.NextPageRequested += NextPageButton_Click;
-        StudyToolbar.ZoomOutRequested += ZoomOutButton_Click;
-        StudyToolbar.ZoomInRequested += ZoomInButton_Click;
-        StudyToolbar.FindRequested += FindButton_Click;
-        StudyToolbar.PreviousSearchResultRequested += PreviousSearchResultButton_Click;
-        StudyToolbar.NextSearchResultRequested += NextSearchResultButton_Click;
-        StudyToolbar.CopySelectionRequested += CopySelectionButton_Click;
-        StudyToolbar.HighlightSelectionRequested += HighlightSelectionButton_Click;
-        StudyToolbar.AddCommentRequested += AddCommentButton_Click;
-        StudyToolbar.RemoveLatestAnnotationRequested += RemoveLatestAnnotationButton_Click;
-        StudyToolbar.ExportAnnotationsRequested += ExportAnnotationsButton_Click;
-        StudyToolbar.SearchKeyDown += SearchTextBox_KeyDown;
 
         try
         {
@@ -127,6 +127,7 @@ public partial class PdfReaderView : UserControl
             LoadAnnotations();
             if (pages.Count == 0)
             {
+                ShowState("No PDF pages", "The selected file did not contain readable pages.");
                 return;
             }
 
@@ -184,7 +185,6 @@ public partial class PdfReaderView : UserControl
 
         return new PdfDocumentStudyData(result);
     }
-                ShowState("No PDF pages", "The selected file did not contain readable pages.");
 
     private async Task ShowPageAsync(int requestedPageNumber)
     {
@@ -287,6 +287,16 @@ public partial class PdfReaderView : UserControl
             CornerRadius = new CornerRadius(4),
             Child = canvas,
         };
+        PageHost.Children.Clear();
+        PageHost.Children.Add(pageBorder);
+
+        int pageAnnotationCount = annotations.Count(annotation => annotation.PageNumber == page.PageNumber);
+        PageText.Text = $"Page {page.PageNumber} / {pages.Count}";
+        AnnotationCountText.Text = $"{annotations.Count} annotation{(annotations.Count == 1 ? string.Empty : "s")}";
+        PdfStatusText.Text = page.Words.Count == 0
+            ? $"Page {page.PageNumber} has no selectable text."
+            : $"Page {page.PageNumber} · {page.Words.Count:N0} selectable words · {pageAnnotationCount} annotation{(pageAnnotationCount == 1 ? string.Empty : "s")}";
+        RefreshControls();
     }
 
     private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
@@ -357,7 +367,11 @@ public partial class PdfReaderView : UserControl
     {
         PageScrollViewer.Visibility = Visibility.Collapsed;
         StatePanel.Visibility = Visibility.Collapsed;
-        PageHost.Children.Clear();
+        PdfTitleText.Text = "PDF Reader";
+        PdfStatusText.Text = string.Empty;
+        PageText.Text = "Page 0 / 0";
+        AnnotationCountText.Text = "0 annotations";
+        RefreshControls();
     }
 
     private void ShowState(string title, string message)
@@ -367,10 +381,7 @@ public partial class PdfReaderView : UserControl
         StateTitleText.Text = title;
         StateMessageText.Text = message;
         PdfStatusText.Text = message;
-        PdfTitleText.Text = "PDF Reader";
-        PdfStatusText.Text = string.Empty;
-        PageText.Text = "Page 0 / 0";
-        AnnotationCountText.Text = "0 annotations";
+        PageHost.Children.Clear();
         RefreshControls();
     }
 
@@ -381,14 +392,3 @@ public partial class PdfReaderView : UserControl
         documentCancellation = null;
     }
 }
-        RefreshControls();
-        PageHost.Children.Clear();
-        PageHost.Children.Add(pageBorder);
-
-        int pageAnnotationCount = annotations.Count(annotation => annotation.PageNumber == page.PageNumber);
-        PageText.Text = $"Page {page.PageNumber} / {pages.Count}";
-        AnnotationCountText.Text = $"{annotations.Count} annotation{(annotations.Count == 1 ? string.Empty : "s")}";
-        PdfStatusText.Text = page.Words.Count == 0
-            ? $"Page {page.PageNumber} has no selectable text."
-            : $"Page {page.PageNumber} · {page.Words.Count:N0} selectable words · {pageAnnotationCount} annotation{(pageAnnotationCount == 1 ? string.Empty : "s")}";
-        RefreshControls();
