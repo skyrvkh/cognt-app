@@ -102,3 +102,20 @@ internal sealed class FlashcardWeeklyReviewOutcomeSummaryRecord
 
     internal int Easy { get; }
 }
+
+internal sealed record FlashcardScheduledDueRecord(
+    DateTimeOffset DueUtc,
+    string DeckName);
+
+internal sealed record FlashcardTomorrowWorkloadContributorRecord(
+    string DeckName,
+    int CardsScheduledToday);
+
+internal sealed record FlashcardLearningDiagnosticCardRecord(
+    double? Stability,
+    double? Difficulty,
+    int Lapses);
+
+internal sealed record FlashcardLearningDiagnosticsRecord(
+    IReadOnlyList<FlashcardLearningDiagnosticCardRecord> Cards,
+    IReadOnlyList<int> ReviewDurationsMilliseconds);

@@ -35,6 +35,7 @@ internal sealed partial class SqliteFlashcardStore
         using SqliteFlashcardRepository repository = FlashcardCollectionStorage.OpenPrunedRepositoryForCollectionId(collectionId, logger);
         IReadOnlyList<string> selectedDeckNames = deckNames ?? [];
 
+        DateTimeOffset todayStartUtc = ToReviewTimeZoneOffset(today.ToDateTime(TimeOnly.MinValue)).ToUniversalTime();
         DateTimeOffset dueTomorrowStartUtc = ToReviewTimeZoneOffset(today.AddDays(1).ToDateTime(TimeOnly.MinValue)).ToUniversalTime();
         DateTimeOffset dayAfterTomorrowStartUtc = ToReviewTimeZoneOffset(today.AddDays(2).ToDateTime(TimeOnly.MinValue)).ToUniversalTime();
         FlashcardDueCardSummaryRecord dueTomorrow = repository.LoadDueCardSummary(
@@ -44,6 +45,16 @@ internal sealed partial class SqliteFlashcardStore
 
         IReadOnlyList<FlashcardDeckReviewHistorySummaryRecord> deckReviewHistory = repository.LoadDeckReviewHistorySummaries(selectedDeckNames);
         IReadOnlyList<FlashcardReviewRatingCountRecord> recallDistribution = repository.LoadReviewRatingCounts(selectedDeckNames);
+        FlashcardLearningDiagnosticsRecord learningDiagnostics = repository.LoadLearningDiagnostics(selectedDeckNames);
+        var reviewSettings = repository.LoadReviewSettings();
+        int estimatedReviewDurationMilliseconds = GetEstimatedReviewDurationMilliseconds(learningDiagnostics);
+        FlashcardWorkloadForecastReadModel workloadForecast = CreateWorkloadForecast(
+            repository,
+            today,
+            todayStartUtc,
+            dueTomorrowStartUtc,
+            selectedDeckNames,
+            estimatedReviewDurationMilliseconds);
 
         FlashcardProgressAnalyticsReadModel analytics = new(
             dueTomorrow.DueCards,
@@ -59,7 +70,14 @@ internal sealed partial class SqliteFlashcardStore
                     (Cognt.Modules.SpacedRepetitionSystem.Application.ReadModels.FlashcardReviewRatingReadModel)count.Rating,
                     count.Count))
                 .ToArray(),
-            LoadWeeklyReviewOutcomes(repository, today, selectedDeckNames));
+            LoadWeeklyReviewOutcomes(repository, today, selectedDeckNames))
+        {
+            WorkloadForecast = workloadForecast,
+            LearningDiagnostics = CreateLearningDiagnostics(
+                learningDiagnostics,
+                recallDistribution,
+                reviewSettings.DesiredRetention),
+        };
         return analytics;
     }
 }
