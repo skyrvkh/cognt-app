@@ -26,6 +26,7 @@ public partial class MainWindow
         ApplyWorkspaceDockTheme();
         ApplyWindowTitleBarTheme();
         ApplyThemeToEditors();
+        rightPaneBrowserView?.RefreshTheme();
     }
 
     private void ApplyShellTypography()

@@ -35,6 +35,17 @@
     <SolidColorBrush x:Key="ControlHoverBrush" Color="#2C343C" />
     <SolidColorBrush x:Key="ControlBorderBrush" Color="#424954" />
     <SolidColorBrush x:Key="ControlBorderHoverBrush" Color="#5B6572" />
+    <SolidColorBrush x:Key="BrowserTabBackgroundBrush" Color="#202329" />
+    <SolidColorBrush x:Key="BrowserTabBorderBrush" Color="#3A404A" />
+    <SolidColorBrush x:Key="BrowserTabActiveBackgroundBrush" Color="#294B4D" />
+    <SolidColorBrush x:Key="BrowserTabActiveBorderBrush" Color="#69D0C9" />
+    <SolidColorBrush x:Key="BrowserTabInactiveForegroundBrush" Color="#B7C0C9" />
+    <SolidColorBrush x:Key="BrowserTabActiveForegroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="BrowserTabHoverBrush" Color="#303943" />
+    <SolidColorBrush x:Key="BrowserTabPressedBrush" Color="#263B3D" />
+    <SolidColorBrush x:Key="BrowserTabCloseBrush" Color="#B7C0C9" />
+    <SolidColorBrush x:Key="BrowserTabCloseHoverBrush" Color="#3A5052" />
+    <SolidColorBrush x:Key="BrowserTabFocusBrush" Color="#69D0C9" />
     <SolidColorBrush x:Key="ContextMenuBackgroundBrush" Color="#242830" />
     <SolidColorBrush x:Key="ContextMenuForegroundBrush" Color="#F2F5F7" />
     <SolidColorBrush x:Key="ContextMenuBorderBrush" Color="#4A515C" />

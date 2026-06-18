@@ -8,6 +8,7 @@ using System.Windows.Media;
 using CefSharp;
 using CefSharp.Wpf;
 using CogntApp.Shell.Browser;
+using CogntApp.Shell.Dialogs;
 using Microsoft.Extensions.Logging;
 
 namespace CogntApp.Views;
@@ -22,6 +23,7 @@ public partial class BrowserPaneView : UserControl
     private readonly CollectionBrowserStateService? stateService;
     private readonly Func<string?>? collectionPathProvider;
     private readonly Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator;
+    private readonly IShellDialogService? shellDialogs;
     private readonly Dictionary<string, BrowserTabSession> tabSessions = new(StringComparer.Ordinal);
 
     private CollectionBrowserState browserState = CollectionBrowserState.CreateEmpty();
@@ -30,7 +32,7 @@ public partial class BrowserPaneView : UserControl
     private string? loadedCollectionPath;
 
     public BrowserPaneView(ILogger<BrowserPaneView>? logger = null)
-        : this(null, null, null, logger)
+        : this(null, null, null, logger, null, null)
     {
     }
 
@@ -39,12 +41,14 @@ public partial class BrowserPaneView : UserControl
         CollectionBrowserStateService? stateService,
         Func<string?>? collectionPathProvider,
         ILogger<BrowserPaneView>? logger = null,
-        Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator = null)
+        Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator = null,
+        IShellDialogService? shellDialogs = null)
     {
         this.environmentProvider = environmentProvider;
         this.stateService = stateService;
         this.collectionPathProvider = collectionPathProvider;
         this.browserPageNoteCreator = browserPageNoteCreator;
+        this.shellDialogs = shellDialogs;
         this.logger = logger;
         InitializeComponent();
         RebuildTabStrip();
@@ -55,6 +59,13 @@ public partial class BrowserPaneView : UserControl
     {
         AddressTextBox.Focus();
         AddressTextBox.SelectAll();
+    }
+
+    internal void RefreshTheme()
+    {
+        BrowserOverflowMenu.IsOpen = false;
+        RebuildTabStrip();
+        UpdateNavigationState();
     }
 
     internal async Task UseCollectionAsync(string? collectionPath)
@@ -218,11 +229,18 @@ public partial class BrowserPaneView : UserControl
         browser.LoadError += (_, e) => HandleLoadError(session, e);
         browser.LifeSpanHandler = new BrowserPopupHandler(
             targetUrl => Dispatcher.BeginInvoke(() => _ = NavigateInNewTabAsync(targetUrl)));
+        browser.MenuHandler = new BrowserContextMenuHandler(
+            () => browser.Address,
+            command => Dispatcher.BeginInvoke(() => ExecuteBrowserContextMenuCommand(command)));
         if (sandbox is not null)
         {
             browser.DownloadHandler = new CollectionDownloadHandler(
                 sandbox,
-                fileName => Dispatcher.BeginInvoke(() => SetBrowserStatus($"Downloading {fileName}")));
+                () => browser.Address,
+                ConfirmAnnotatedPdfOverwriteAsync,
+                CompleteAnnotatedPdfSaveAsync,
+                fileName => Dispatcher.BeginInvoke(() => SetBrowserStatus($"Downloading {fileName}")),
+                fileName => Dispatcher.BeginInvoke(() => SetBrowserStatus($"Cancelled download for {fileName}")));
         }
 
         tabSessions.Add(tabId, session);
@@ -395,36 +413,34 @@ public partial class BrowserPaneView : UserControl
 
     private void BrowserMenuButton_Click(object sender, RoutedEventArgs e)
     {
-        ContextMenu menu = new();
-        MenuItem extractItem = new() { Header = "Extract page as note", IsEnabled = CanExtractCurrentPage() };
-        extractItem.Click += async (_, _) => await ExtractCurrentPageToNoteAsync().ConfigureAwait(true);
-        menu.Items.Add(extractItem);
-
-        MenuItem downloadsItem = new() { Header = "Open collection downloads", IsEnabled = sandbox is not null };
-        downloadsItem.Click += (_, _) => OpenDownloadsFolder();
-        menu.Items.Add(downloadsItem);
-        menu.Items.Add(new Separator());
-
-        menu.Items.Add(CreateNavigationMenu("Bookmarks", browserState.Bookmarks, item => item.Title, item => item.Url));
-        menu.Items.Add(CreateNavigationMenu("Recent history", browserState.History.Take(12), item => item.Title, item => item.Url));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem
-        {
-            Header = sandbox is null ? "No collection profile loaded" : $"Collection profile: {sandbox.SandboxId}",
-            IsEnabled = false,
-        });
-        menu.PlacementTarget = BrowserMenuButton;
-        menu.Placement = PlacementMode.Bottom;
-        menu.IsOpen = true;
+        BrowserOverflowMenu.PlacementTarget = BrowserMenuButton;
+        BrowserOverflowMenu.IsOpen = true;
     }
 
-    private MenuItem CreateNavigationMenu<T>(
-        string header,
+    private void BrowserOverflowMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        bool isWebPage = IsAllowedWebUri(GetCurrentPageUrl());
+        bool isLocalPdf = TryGetActiveLocalPdfPath(out _);
+        ExtractPageMenuItem.IsEnabled = CanExtractCurrentPage();
+        ExtractPageMenuItem.Visibility = isWebPage ? Visibility.Visible : Visibility.Collapsed;
+        RevealPdfMenuItem.Visibility = isLocalPdf ? Visibility.Visible : Visibility.Collapsed;
+        ReloadPdfMenuItem.Visibility = isLocalPdf ? Visibility.Visible : Visibility.Collapsed;
+        BrowserOverflowActionSeparator.Visibility = isWebPage || isLocalPdf ? Visibility.Visible : Visibility.Collapsed;
+        OpenDownloadsMenuItem.IsEnabled = sandbox is not null;
+        BrowserProfileMenuItem.Header = sandbox is null
+            ? "No collection profile loaded"
+            : $"Collection profile: {sandbox.SandboxId}";
+        PopulateNavigationMenu(BrowserBookmarksMenuItem, browserState.Bookmarks, item => item.Title, item => item.Url);
+        PopulateNavigationMenu(BrowserHistoryMenuItem, browserState.History.Take(12), item => item.Title, item => item.Url);
+    }
+
+    private void PopulateNavigationMenu<T>(
+        MenuItem parent,
         IEnumerable<T> items,
         Func<T, string> titleSelector,
         Func<T, string> urlSelector)
     {
-        MenuItem parent = new() { Header = header };
+        parent.Items.Clear();
         foreach (T item in items)
         {
             string url = urlSelector(item);
@@ -437,8 +453,26 @@ public partial class BrowserPaneView : UserControl
         {
             parent.Items.Add(new MenuItem { Header = "No items yet", IsEnabled = false });
         }
+    }
 
-        return parent;
+    private async void ExtractPageMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await ExtractCurrentPageToNoteAsync().ConfigureAwait(true);
+    }
+
+    private void OpenDownloadsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        OpenDownloadsFolder();
+    }
+
+    private void RevealPdfMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        RevealActiveLocalPdf();
+    }
+
+    private void ReloadPdfMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        ReloadActiveLocalPdf();
     }
 
     private void OpenDownloadsFolder()
@@ -449,6 +483,100 @@ public partial class BrowserPaneView : UserControl
         }
 
         OpenPathWithShell(sandbox.DownloadsPath);
+    }
+
+    private void ExecuteBrowserContextMenuCommand(BrowserContextMenuCommand command)
+    {
+        switch (command)
+        {
+            case BrowserContextMenuCommand.ExtractPage:
+                _ = ExtractCurrentPageToNoteAsync();
+                break;
+            case BrowserContextMenuCommand.RevealLocalPdf:
+                RevealActiveLocalPdf();
+                break;
+            case BrowserContextMenuCommand.ReloadLocalPdf:
+                ReloadActiveLocalPdf();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(command), command, "Unsupported browser context menu command.");
+        }
+    }
+
+    private async Task<bool> ConfirmAnnotatedPdfOverwriteAsync(PdfAnnotationSaveRequest request)
+    {
+        return await Dispatcher.InvokeAsync(() =>
+        {
+            if (shellDialogs is null)
+            {
+                return false;
+            }
+
+            return shellDialogs.ConfirmWarning(
+                "Save PDF annotations",
+                $"Replace the imported PDF \"{Path.GetFileName(request.SourcePath)}\" with the annotated version? This cannot be undone.");
+        }).Task.ConfigureAwait(false);
+    }
+
+    private async Task CompleteAnnotatedPdfSaveAsync(PdfAnnotationSaveRequest request)
+    {
+        PdfAnnotationSaveResult result = await Task.Run(() => PdfAnnotationSaveCoordinator.Complete(request)).ConfigureAwait(false);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (result.ReplacedOriginal)
+            {
+                ReloadPdfSessions(request.SourcePath);
+                SetBrowserStatus($"Saved annotations to {Path.GetFileName(request.SourcePath)}");
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.FallbackPath))
+            {
+                string fallbackName = Path.GetFileName(result.FallbackPath);
+                SetBrowserStatus($"Could not replace the original. Saved annotated PDF to downloads as {fallbackName}.");
+                shellDialogs?.ShowWarning(
+                    "PDF annotations saved separately",
+                    $"Cognt could not replace \"{Path.GetFileName(request.SourcePath)}\". The annotated PDF was saved to the collection downloads folder as \"{fallbackName}\".");
+                return;
+            }
+
+            ShowBrowserError($"Could not save PDF annotations. {result.ErrorMessage}");
+        }).Task.ConfigureAwait(false);
+    }
+
+    private void RevealActiveLocalPdf()
+    {
+        if (TryGetActiveLocalPdfPath(out string? path))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{path}\"",
+                UseShellExecute = true,
+            });
+        }
+    }
+
+    private void ReloadActiveLocalPdf()
+    {
+        if (TryGetActiveLocalPdfPath(out _))
+        {
+            ActiveSession?.Browser.Reload(ignoreCache: true);
+        }
+    }
+
+    private void ReloadPdfSessions(string sourcePath)
+    {
+        foreach (BrowserTabSession session in tabSessions.Values)
+        {
+            CollectionBrowserTabState? tab = FindTab(session.TabId);
+            if (tab is not null
+                && TryGetLocalPdfPath(tab.Url, out string? tabPath)
+                && string.Equals(tabPath, sourcePath, StringComparison.OrdinalIgnoreCase))
+            {
+                session.Browser.Reload(ignoreCache: true);
+            }
+        }
     }
 
     private void DismissErrorButton_Click(object sender, RoutedEventArgs e)
@@ -472,15 +600,15 @@ public partial class BrowserPaneView : UserControl
                 MinWidth = 92,
                 MaxWidth = 190,
                 Margin = new Thickness(0, 0, 4, 0),
-                Background = isActive
-                    ? TryFindResource("AccentSubtleBrush") as Brush ?? Brushes.Transparent
-                    : Brushes.Transparent,
-                BorderBrush = isActive
-                    ? TryFindResource("ControlBorderBrush") as Brush ?? Brushes.Transparent
-                    : Brushes.Transparent,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4, 4, 0, 0),
             };
+            shell.SetResourceReference(
+                BackgroundProperty,
+                isActive ? "BrowserTabActiveBackgroundBrush" : "BrowserTabBackgroundBrush");
+            shell.SetResourceReference(
+                BorderBrushProperty,
+                isActive ? "BrowserTabActiveBorderBrush" : "BrowserTabBorderBrush");
             Grid content = new();
             content.ColumnDefinitions.Add(new ColumnDefinition());
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -491,10 +619,14 @@ public partial class BrowserPaneView : UserControl
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 HorizontalContentAlignment = HorizontalAlignment.Left,
+                Style = FindResource("BrowserTabButtonStyle") as Style,
                 Content = CreateVisibleTabTitle(tabState),
                 ToolTip = tabState.Url,
                 Tag = tabState.Id,
             };
+            activate.SetResourceReference(
+                ForegroundProperty,
+                isActive ? "BrowserTabActiveForegroundBrush" : "BrowserTabInactiveForegroundBrush");
             activate.Click += async (_, _) => await ActivateTabAsync(tabState.Id).ConfigureAwait(true);
             content.Children.Add(activate);
 
@@ -506,6 +638,7 @@ public partial class BrowserPaneView : UserControl
                     Height = 24,
                     Background = Brushes.Transparent,
                     BorderThickness = new Thickness(0),
+                    Style = FindResource("BrowserTabCloseButtonStyle") as Style,
                     ToolTip = "Close tab",
                     Tag = tabState.Id,
                     Content = new System.Windows.Shapes.Path
@@ -514,10 +647,12 @@ public partial class BrowserPaneView : UserControl
                         Height = 8,
                         Data = Geometry.Parse("M4,4 L16,16 M16,4 L4,16"),
                         Stretch = Stretch.Uniform,
-                        Stroke = TryFindResource("MutedBrush") as Brush ?? Brushes.Gray,
                         StrokeThickness = 1.8,
                     },
                 };
+                ((System.Windows.Shapes.Path)close.Content).SetResourceReference(
+                    System.Windows.Shapes.Shape.StrokeProperty,
+                    "BrowserTabCloseBrush");
                 close.Click += async (_, _) => await CloseTabAsync(tabState.Id).ConfigureAwait(true);
                 Grid.SetColumn(close, 1);
                 content.Children.Add(close);
@@ -634,9 +769,14 @@ public partial class BrowserPaneView : UserControl
         StopButton.IsEnabled = session?.IsLoading == true;
         StopButton.Visibility = session?.IsLoading == true ? Visibility.Visible : Visibility.Collapsed;
         BookmarkButton.IsEnabled = GetCurrentPageUrl() is not null;
-        BookmarkGlyph.Fill = IsCurrentPageBookmarked()
-            ? TryFindResource("AccentStrongBrush") as Brush ?? Brushes.Transparent
-            : Brushes.Transparent;
+        if (IsCurrentPageBookmarked())
+        {
+            BookmarkGlyph.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "AccentStrongBrush");
+        }
+        else
+        {
+            BookmarkGlyph.Fill = Brushes.Transparent;
+        }
     }
 
     private void SetBrowserStatus(string? message)
@@ -864,6 +1004,23 @@ public partial class BrowserPaneView : UserControl
     {
         return uri.IsFile
             && string.Equals(Path.GetExtension(uri.LocalPath), ".pdf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryGetActiveLocalPdfPath(out string? path)
+    {
+        return TryGetLocalPdfPath(GetCurrentPageUrl(), out path);
+    }
+
+    private static bool TryGetLocalPdfPath(string? value, out string? path)
+    {
+        path = null;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) || !IsLocalPdfUri(uri))
+        {
+            return false;
+        }
+
+        path = Path.GetFullPath(uri.LocalPath);
+        return File.Exists(path);
     }
 
     private static string? NormalizeCollectionPathOrNull(string? collectionPath)
