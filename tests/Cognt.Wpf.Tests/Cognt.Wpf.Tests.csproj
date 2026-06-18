@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../../src/Cognt.Wpf/Shell/Browser/BrowserPageDocumentBuilder.cs"
+             Link="Shell/Browser/BrowserPageDocumentBuilder.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Shell/Browser/BrowserPageExtraction.cs"
+             Link="Shell/Browser/BrowserPageExtraction.cs" />
     <Compile Include="../../src/Cognt.Wpf/Shell/Browser/PdfAnnotationSaveCoordinator.cs"
              Link="Shell/Browser/PdfAnnotationSaveCoordinator.cs" />
   </ItemGroup>

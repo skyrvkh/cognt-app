@@ -140,6 +140,7 @@ public partial class BrowserPaneView
             NormalizeExtractedMultiline(page.Text),
             NormalizeExtractedMultiline(page.Markdown),
             NormalizeExtractedHtml(page.Html),
+            [],
             images,
             DateTimeOffset.UtcNow);
     }
