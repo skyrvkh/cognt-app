@@ -20,7 +20,7 @@ internal static partial class StatisticsPresentationFactory
         DailyStudyChartData dailyChartData = CreateDailyStudyChartData(report.DailyStudyActivity);
         WeeklyReviewChartData weeklyChartData = CreateWeeklyReviewChartData(report.WeeklyReviewOutcomes);
 
-        return new StatisticsPresentationState(
+        StatisticsPresentationState state = new(
             report.Summary.CardsReviewed.ToString("N0", CultureInfo.InvariantCulture),
             "Persisted review history",
             FormatDays(report.Summary.CurrentStreakDays),
@@ -64,6 +64,7 @@ internal static partial class StatisticsPresentationFactory
             ],
             [CreateCategoryAxis(weeklyChartData.Labels)],
             [CreateValueAxis()]);
+        return ApplyLearningDiagnostics(state, report);
     }
 
     private static IReadOnlyDictionary<DateOnly, int> CreateReviewedByDateMap(

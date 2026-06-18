@@ -88,3 +88,37 @@ internal static partial class StatisticsPresentationFactory
             ? "< 1 min"
             : string.Concat(minutes.ToString("0.0", CultureInfo.InvariantCulture), " min");
     }
+
+    private static string FormatPercent(double value)
+    {
+        return string.Concat(Math.Round(value * 100d).ToString("N0", CultureInfo.InvariantCulture), "%");
+    }
+
+    private static string FormatTomorrowContributors(
+        IReadOnlyList<TomorrowWorkloadContributorReadModel> contributors)
+    {
+        if (contributors.Count == 0)
+        {
+            return "No cards reviewed today are scheduled for tomorrow.";
+        }
+
+        return string.Concat(
+            "Tomorrow created today: ",
+            string.Join(
+                " · ",
+                contributors.Take(3).Select(contributor => string.Concat(
+                    contributor.DeckName,
+                    " ",
+                    contributor.CardsScheduledToday.ToString("N0", CultureInfo.InvariantCulture)))));
+    }
+
+    private static string FormatDistribution(
+        IReadOnlyList<DistributionBucketReadModel> distribution)
+    {
+        string[] labels = distribution
+            .Where(bucket => bucket.Count > 0)
+            .Select(bucket => string.Concat(bucket.Label, ": ", bucket.Count.ToString("N0", CultureInfo.InvariantCulture)))
+            .ToArray();
+        return labels.Length == 0 ? "No cards in this scope." : string.Join(" · ", labels);
+    }
+}
