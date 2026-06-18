@@ -5,10 +5,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using CefSharp;
+using CefSharp.Wpf;
 using CogntApp.Shell.Browser;
 using Microsoft.Extensions.Logging;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
 
 namespace CogntApp.Views;
 
@@ -16,17 +16,18 @@ public partial class BrowserPaneView : UserControl
 {
     private const string DefaultHomePageUrl = "https://www.google.com/";
     private const int MaxHistoryEntries = 200;
+
     private readonly ILogger<BrowserPaneView>? logger;
     private readonly CollectionBrowserEnvironmentProvider? environmentProvider;
     private readonly CollectionBrowserStateService? stateService;
     private readonly Func<string?>? collectionPathProvider;
     private readonly Func<BrowserPageExtraction, Task<string>>? browserPageNoteCreator;
+    private readonly Dictionary<string, BrowserTabSession> tabSessions = new(StringComparer.Ordinal);
+
     private CollectionBrowserState browserState = CollectionBrowserState.CreateEmpty();
     private CollectionBrowserSandbox? sandbox;
     private string? activeTabId;
     private string? loadedCollectionPath;
-    private string? initializedSandboxId;
-    private bool isNavigating;
 
     public BrowserPaneView(ILogger<BrowserPaneView>? logger = null)
         : this(null, null, null, logger)
@@ -46,7 +47,6 @@ public partial class BrowserPaneView : UserControl
         this.browserPageNoteCreator = browserPageNoteCreator;
         this.logger = logger;
         InitializeComponent();
-        ShowEmptySurface();
         RebuildTabStrip();
         UpdateNavigationState();
     }
@@ -66,17 +66,16 @@ public partial class BrowserPaneView : UserControl
         }
 
         await SaveBrowserStateAsync().ConfigureAwait(true);
+        DisposeTabSessions();
         loadedCollectionPath = null;
         sandbox = null;
         browserState = CollectionBrowserState.CreateEmpty();
         activeTabId = null;
         AddressTextBox.Text = string.Empty;
-        ResetBrowserControl();
 
         if (normalizedCollectionPath is null || environmentProvider is null || stateService is null)
         {
-            ShowEmptySurface();
-            SetBrowserStatus(normalizedCollectionPath is null ? "Open a collection to use the browser." : null);
+            ShowState("Browser", "Open a collection to use the browser.");
             RebuildTabStrip();
             UpdateNavigationState();
             return;
@@ -87,31 +86,24 @@ public partial class BrowserPaneView : UserControl
             sandbox = await environmentProvider.GetSandboxAsync(normalizedCollectionPath).ConfigureAwait(true);
             browserState = await stateService.LoadAsync(normalizedCollectionPath).ConfigureAwait(true);
             loadedCollectionPath = sandbox.CollectionPath;
-            activeTabId = browserState.ActiveTabId ?? browserState.Tabs.FirstOrDefault()?.Id;
-            RebuildTabStrip();
 
-            CollectionBrowserTabState? restoredTab = ActiveTab;
-            if (IsAllowedBrowserUri(restoredTab?.Url))
-            {
-                await NavigateAsync(restoredTab!.Url).ConfigureAwait(true);
-            }
-            else if (browserState.Tabs.Count == 0)
+            if (browserState.Tabs.Count == 0)
             {
                 CreateNewActiveTab(DefaultHomePageUrl);
-                RebuildTabStrip();
-                await NavigateAsync(DefaultHomePageUrl).ConfigureAwait(true);
             }
             else
             {
-                ShowEmptySurface();
-                SetBrowserStatus("Collection browser ready");
+                activeTabId = browserState.ActiveTabId ?? browserState.Tabs[0].Id;
+                browserState.ActiveTabId = activeTabId;
             }
+
+            RebuildTabStrip();
+            await ShowActiveTabAsync(loadSavedAddress: true).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             logger?.LogError(ex, "Failed to initialize collection browser. CollectionPath={CollectionPath}", normalizedCollectionPath);
             ShowState("Browser unavailable", ex.Message);
-            SetBrowserStatus(null);
         }
 
         UpdateNavigationState();
@@ -122,13 +114,9 @@ public partial class BrowserPaneView : UserControl
         string? target = NormalizeAddress(address);
         if (target is null)
         {
-            ShowEmptySurface();
+            ShowState("Browser", "Enter a web address or search term.");
             return;
         }
-
-        AddressTextBox.Text = target;
-        ShowState("Loading", target);
-        SetBrowserStatus($"Loading {target}");
 
         try
         {
@@ -137,21 +125,45 @@ public partial class BrowserPaneView : UserControl
                 return;
             }
 
-            EnsureActiveTab(target);
-            isNavigating = true;
-            UpdateNavigationState();
-            await EnsureBrowserWebViewAsync().ConfigureAwait(true);
-            BrowserWebView.CoreWebView2.Navigate(target);
-            BrowserWebView.Visibility = Visibility.Visible;
+            CollectionBrowserTabState tab = EnsureActiveTab(target);
+            BrowserTabSession session = GetOrCreateTabSession(tab.Id);
+            tab.Url = target;
+            tab.LastVisitedUtc = DateTimeOffset.UtcNow;
+            session.LastError = null;
+
+            ShowTabSession(session);
+            AddressTextBox.Text = target;
+            SetBrowserStatus($"Loading {target}");
+            HideBrowserError();
+            session.Browser.Load(target);
         }
         catch (Exception ex)
         {
-            isNavigating = false;
             logger?.LogError(ex, "Browser navigation failed before dispatch. Target={Target}", target);
-            ShowState("Failed to open page", ex.Message);
-            SetBrowserStatus(null);
+            ShowBrowserError($"Could not open this page. {ex.Message}");
             UpdateNavigationState();
         }
+    }
+
+    internal async Task OpenPdfAsync(string? title, string documentPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentPath);
+        string fullPath = Path.GetFullPath(documentPath);
+        if (!File.Exists(fullPath) || !string.Equals(Path.GetExtension(fullPath), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new FileNotFoundException("The PDF file could not be found.", fullPath);
+        }
+
+        if (!await EnsureCollectionReadyAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        string uri = new Uri(fullPath).AbsoluteUri;
+        CollectionBrowserTabState tab = CreateNewActiveTab(uri);
+        tab.Title = string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(fullPath) : title.Trim();
+        RebuildTabStrip();
+        await NavigateAsync(uri).ConfigureAwait(true);
     }
 
     private async Task<bool> EnsureCollectionReadyAsync()
@@ -165,7 +177,6 @@ public partial class BrowserPaneView : UserControl
         if (collectionPath is null)
         {
             ShowState("Browser", "Open a collection to use the browser.");
-            SetBrowserStatus(null);
             UpdateNavigationState();
             return false;
         }
@@ -178,91 +189,154 @@ public partial class BrowserPaneView : UserControl
         return sandbox is not null;
     }
 
-    private async Task EnsureBrowserWebViewAsync()
+    private BrowserTabSession GetOrCreateTabSession(string tabId)
     {
-        if (sandbox is not null && !string.Equals(initializedSandboxId, sandbox.SandboxId, StringComparison.Ordinal))
+        if (tabSessions.TryGetValue(tabId, out BrowserTabSession? existing))
         {
-            ResetBrowserControl();
+            return existing;
         }
 
-        if (BrowserWebView.CoreWebView2 is not null)
+        ChromiumWebBrowser browser = new()
         {
-            return;
-        }
-
-        if (sandbox is null)
-        {
-            await BrowserWebView.EnsureCoreWebView2Async().ConfigureAwait(true);
-        }
-        else
-        {
-            await BrowserWebView.EnsureCoreWebView2Async(sandbox.Environment).ConfigureAwait(true);
-            initializedSandboxId = sandbox.SandboxId;
-        }
-
-        CoreWebView2 coreWebView = BrowserWebView.CoreWebView2
-            ?? throw new InvalidOperationException("WebView2 initialization completed without a CoreWebView2 instance.");
-        ConfigureCoreWebView(coreWebView);
-        coreWebView.DownloadStarting += CoreWebView2_DownloadStarting;
-        coreWebView.NewWindowRequested += CoreWebView2_NewWindowRequested;
-    }
-
-    private void ResetBrowserControl()
-    {
-        if (BrowserWebView.CoreWebView2 is not null)
-        {
-            BrowserWebView.CoreWebView2.DownloadStarting -= CoreWebView2_DownloadStarting;
-            BrowserWebView.CoreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
-        }
-
-        int index = BrowserHostGrid.Children.IndexOf(BrowserWebView);
-        BrowserHostGrid.Children.Remove(BrowserWebView);
-        BrowserWebView.NavigationCompleted -= BrowserWebView_NavigationCompleted;
-        BrowserWebView.Dispose();
-
-        WebView2 replacement = new()
-        {
+            RequestContext = sandbox?.RequestContext,
             Visibility = Visibility.Collapsed,
         };
-        replacement.NavigationCompleted += BrowserWebView_NavigationCompleted;
-        BrowserWebView = replacement;
-        BrowserHostGrid.Children.Insert(index < 0 ? 0 : index, BrowserWebView);
-        initializedSandboxId = null;
+        browser.BrowserSettings = new BrowserSettings
+        {
+            JavascriptAccessClipboard = CefState.Disabled,
+            JavascriptDomPaste = CefState.Disabled,
+            WindowlessFrameRate = 45,
+        };
+
+        BrowserTabSession session = new(tabId, browser);
+        browser.LoadingStateChanged += (_, e) => Dispatcher.BeginInvoke(
+            () => HandleLoadingStateChanged(session, e));
+        browser.AddressChanged += (_, e) => Dispatcher.BeginInvoke(
+            () => HandleAddressChanged(session, e.NewValue as string));
+        browser.TitleChanged += (_, e) => Dispatcher.BeginInvoke(
+            () => HandleTitleChanged(session, e.NewValue as string));
+        browser.LoadError += (_, e) => HandleLoadError(session, e);
+        browser.LifeSpanHandler = new BrowserPopupHandler(
+            targetUrl => Dispatcher.BeginInvoke(() => _ = NavigateInNewTabAsync(targetUrl)));
+        if (sandbox is not null)
+        {
+            browser.DownloadHandler = new CollectionDownloadHandler(
+                sandbox,
+                fileName => Dispatcher.BeginInvoke(() => SetBrowserStatus($"Downloading {fileName}")));
+        }
+
+        tabSessions.Add(tabId, session);
+        BrowserHostGrid.Children.Insert(0, browser);
+        return session;
     }
 
-    private static void ConfigureCoreWebView(CoreWebView2 coreWebView)
+    private void HandleLoadingStateChanged(BrowserTabSession session, LoadingStateChangedEventArgs e)
     {
-        coreWebView.Settings.AreDevToolsEnabled = false;
-        coreWebView.Settings.IsStatusBarEnabled = true;
-        coreWebView.Settings.AreHostObjectsAllowed = false;
-        coreWebView.Settings.IsPasswordAutosaveEnabled = false;
-        coreWebView.Settings.IsGeneralAutofillEnabled = false;
-    }
-
-    private void CoreWebView2_DownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)
-    {
-        if (sandbox is null)
+        if (!tabSessions.TryGetValue(session.TabId, out BrowserTabSession? current) || !ReferenceEquals(current, session))
         {
             return;
         }
 
-        string path = CollectionBrowserEnvironmentProvider.CreateDownloadPath(
-            sandbox,
-            e.ResultFilePath,
-            e.DownloadOperation.Uri);
-        e.ResultFilePath = path;
-        SetBrowserStatus($"Downloading {Path.GetFileName(path)}");
+        session.IsLoading = e.IsLoading;
+        session.CanGoBack = e.CanGoBack;
+        session.CanGoForward = e.CanGoForward;
+
+        if (!e.IsLoading)
+        {
+            string? url = GetSessionPageUrl(session);
+            if (url is not null && session.LastError is null)
+            {
+                StatePanel.Visibility = Visibility.Collapsed;
+                UpdateTabFromSession(session, addHistory: true);
+                _ = SaveBrowserStateAsync();
+            }
+        }
+
+        if (ReferenceEquals(session, ActiveSession))
+        {
+            SetBrowserStatus(e.IsLoading ? $"Loading {session.Browser.Address}" : session.Browser.Title);
+            UpdateNavigationState();
+        }
     }
 
-    private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    private void HandleAddressChanged(BrowserTabSession session, string? address)
     {
-        e.Handled = true;
-        _ = NavigateInNewTabAsync(e.Uri);
+        CollectionBrowserTabState? tab = FindTab(session.TabId);
+        if (tab is not null && IsAllowedNavigationUri(address))
+        {
+            tab.Url = address!;
+            tab.LastVisitedUtc = DateTimeOffset.UtcNow;
+        }
+
+        if (ReferenceEquals(session, ActiveSession) && !AddressTextBox.IsKeyboardFocusWithin)
+        {
+            AddressTextBox.Text = address ?? string.Empty;
+        }
     }
 
-    private async void GoButton_Click(object sender, RoutedEventArgs e)
+    private void HandleTitleChanged(BrowserTabSession session, string? title)
     {
-        await NavigateAsync(AddressTextBox.Text);
+        CollectionBrowserTabState? tab = FindTab(session.TabId);
+        if (tab is null)
+        {
+            return;
+        }
+
+        tab.Title = string.IsNullOrWhiteSpace(title) ? CreateVisibleTabTitle(tab) : title.Trim();
+        if (ReferenceEquals(session, ActiveSession))
+        {
+            SetBrowserStatus(tab.Title);
+        }
+
+        RebuildTabStrip();
+    }
+
+    private void HandleLoadError(BrowserTabSession session, LoadErrorEventArgs e)
+    {
+        if (!e.Frame.IsMain || e.ErrorCode == CefErrorCode.Aborted)
+        {
+            return;
+        }
+
+        string message = string.IsNullOrWhiteSpace(e.ErrorText)
+            ? "The page could not be loaded."
+            : e.ErrorText;
+        session.LastError = message;
+        logger?.LogWarning(
+            "Browser navigation failed. TabId={TabId} Uri={Uri} ErrorCode={ErrorCode} ErrorText={ErrorText}",
+            session.TabId,
+            e.FailedUrl,
+            e.ErrorCode,
+            e.ErrorText);
+
+        if (ReferenceEquals(session, ActiveSession))
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                ShowBrowserError($"Could not load this page. {message}");
+                UpdateNavigationState();
+            });
+        }
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActiveSession?.Browser.Back();
+    }
+
+    private void ForwardButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActiveSession?.Browser.Forward();
+    }
+
+    private void ReloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActiveSession?.Browser.Reload();
+    }
+
+    private void StopButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActiveSession?.Browser.Stop();
     }
 
     private async void AddressTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -273,43 +347,15 @@ public partial class BrowserPaneView : UserControl
         }
 
         e.Handled = true;
-        await NavigateAsync(AddressTextBox.Text);
-    }
-
-    private void BackButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (BrowserWebView.CoreWebView2?.CanGoBack == true)
-        {
-            BrowserWebView.CoreWebView2.GoBack();
-        }
-    }
-
-    private void ForwardButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (BrowserWebView.CoreWebView2?.CanGoForward == true)
-        {
-            BrowserWebView.CoreWebView2.GoForward();
-        }
-    }
-
-    private void ReloadButton_Click(object sender, RoutedEventArgs e)
-    {
-        BrowserWebView.CoreWebView2?.Reload();
-    }
-
-    private void StopButton_Click(object sender, RoutedEventArgs e)
-    {
-        BrowserWebView.CoreWebView2?.Stop();
-        isNavigating = false;
-        UpdateNavigationState();
+        await NavigateAsync(AddressTextBox.Text).ConfigureAwait(true);
     }
 
     private void NewTabButton_Click(object sender, RoutedEventArgs e)
     {
         CreateNewActiveTab(null);
         AddressTextBox.Text = string.Empty;
-        ShowEmptySurface();
-        SetBrowserStatus("New tab ready");
+        ShowState("New tab", "Enter a web address or search term.");
+        SetBrowserStatus(null);
         RebuildTabStrip();
         UpdateNavigationState();
         FocusAddressBox();
@@ -347,108 +393,138 @@ public partial class BrowserPaneView : UserControl
         UpdateNavigationState();
     }
 
-    private async void ExtractPageButton_Click(object sender, RoutedEventArgs e)
+    private void BrowserMenuButton_Click(object sender, RoutedEventArgs e)
     {
-        await ExtractCurrentPageToNoteAsync().ConfigureAwait(true);
+        ContextMenu menu = new();
+        MenuItem extractItem = new() { Header = "Extract page as note", IsEnabled = CanExtractCurrentPage() };
+        extractItem.Click += async (_, _) => await ExtractCurrentPageToNoteAsync().ConfigureAwait(true);
+        menu.Items.Add(extractItem);
+
+        MenuItem downloadsItem = new() { Header = "Open collection downloads", IsEnabled = sandbox is not null };
+        downloadsItem.Click += (_, _) => OpenDownloadsFolder();
+        menu.Items.Add(downloadsItem);
+        menu.Items.Add(new Separator());
+
+        menu.Items.Add(CreateNavigationMenu("Bookmarks", browserState.Bookmarks, item => item.Title, item => item.Url));
+        menu.Items.Add(CreateNavigationMenu("Recent history", browserState.History.Take(12), item => item.Title, item => item.Url));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem
+        {
+            Header = sandbox is null ? "No collection profile loaded" : $"Collection profile: {sandbox.SandboxId}",
+            IsEnabled = false,
+        });
+        menu.PlacementTarget = BrowserMenuButton;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
     }
 
-    private void DownloadsButton_Click(object sender, RoutedEventArgs e)
+    private MenuItem CreateNavigationMenu<T>(
+        string header,
+        IEnumerable<T> items,
+        Func<T, string> titleSelector,
+        Func<T, string> urlSelector)
+    {
+        MenuItem parent = new() { Header = header };
+        foreach (T item in items)
+        {
+            string url = urlSelector(item);
+            MenuItem child = new() { Header = titleSelector(item), ToolTip = url };
+            child.Click += async (_, _) => await NavigateAsync(url).ConfigureAwait(true);
+            parent.Items.Add(child);
+        }
+
+        if (parent.Items.Count == 0)
+        {
+            parent.Items.Add(new MenuItem { Header = "No items yet", IsEnabled = false });
+        }
+
+        return parent;
+    }
+
+    private void OpenDownloadsFolder()
     {
         if (sandbox is null)
         {
-            SetBrowserStatus("Open a collection to use downloads.");
             return;
         }
 
         OpenPathWithShell(sandbox.DownloadsPath);
     }
 
-    private void BrowserMenuButton_Click(object sender, RoutedEventArgs e)
+    private void DismissErrorButton_Click(object sender, RoutedEventArgs e)
     {
-        ContextMenu menu = new();
-        AddBrowserMenuSection(menu, "Bookmarks", browserState.Bookmarks, item => item.Title, item => item.Url);
-        AddBrowserMenuSection(menu, "History", browserState.History.Take(10), item => item.Title, item => item.Url);
-        if (menu.Items.Count == 0)
-        {
-            menu.Items.Add(new MenuItem { Header = "No bookmarks or history yet.", IsEnabled = false });
-        }
-
-        menu.PlacementTarget = BrowserMenuButton;
-        menu.Placement = PlacementMode.Bottom;
-        menu.IsOpen = true;
-    }
-
-    private void SettingsMenuButton_Click(object sender, RoutedEventArgs e)
-    {
-        ContextMenu menu = new();
-        MenuItem sessionItem = new()
-        {
-            Header = "Collection saves tabs, cookies, and sessions",
-            IsEnabled = false,
-        };
-        menu.Items.Add(sessionItem);
-        menu.Items.Add(new MenuItem
-        {
-            Header = sandbox is null ? "No collection sandbox loaded" : $"Sandbox: {sandbox.SandboxId}",
-            IsEnabled = false,
-        });
-        menu.PlacementTarget = SettingsMenuButton;
-        menu.Placement = PlacementMode.Bottom;
-        menu.IsOpen = true;
-    }
-
-    private async void BrowserWebView_NavigationCompleted(
-        object? sender,
-        CoreWebView2NavigationCompletedEventArgs e)
-    {
-        isNavigating = false;
-        if (e.IsSuccess)
-        {
-            StatePanel.Visibility = Visibility.Collapsed;
-            BrowserWebView.Visibility = Visibility.Visible;
-            AddressTextBox.Text = BrowserWebView.CoreWebView2?.Source ?? AddressTextBox.Text;
-            SetBrowserStatus(BrowserWebView.CoreWebView2?.DocumentTitle);
-            UpdateActiveTabFromWebView(addHistory: true);
-            await SaveBrowserStateAsync().ConfigureAwait(true);
-            RebuildTabStrip();
-            UpdateNavigationState();
-            return;
-        }
-
-        logger?.LogWarning("Browser navigation completed with error. Uri={Uri} WebErrorStatus={WebErrorStatus}", BrowserWebView.Source, e.WebErrorStatus);
-        ShowState("Failed to open page", $"WebView2 could not open the page. Error: {e.WebErrorStatus}");
-        SetBrowserStatus(null);
-        UpdateNavigationState();
+        HideBrowserError();
     }
 
     private void RebuildTabStrip()
     {
         TabsPanel.Children.Clear();
-
         IReadOnlyList<CollectionBrowserTabState> tabs = browserState.Tabs.Count == 0
             ? [new CollectionBrowserTabState { Id = "new", Title = "New tab" }]
             : browserState.Tabs;
+
         foreach (CollectionBrowserTabState tabState in tabs)
         {
-            Button tab = new()
+            bool isActive = string.Equals(tabState.Id, activeTabId, StringComparison.Ordinal);
+            Border shell = new()
             {
-                MinWidth = 90,
-                MaxWidth = 220,
-                Height = 24,
+                Height = 26,
+                MinWidth = 92,
+                MaxWidth = 190,
                 Margin = new Thickness(0, 0, 4, 0),
-                Padding = new Thickness(8, 0, 8, 0),
+                Background = isActive
+                    ? TryFindResource("AccentSubtleBrush") as Brush ?? Brushes.Transparent
+                    : Brushes.Transparent,
+                BorderBrush = isActive
+                    ? TryFindResource("ControlBorderBrush") as Brush ?? Brushes.Transparent
+                    : Brushes.Transparent,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4, 4, 0, 0),
+            };
+            Grid content = new();
+            content.ColumnDefinitions.Add(new ColumnDefinition());
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            Button activate = new()
+            {
+                Padding = new Thickness(8, 0, 4, 0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Left,
                 Content = CreateVisibleTabTitle(tabState),
                 ToolTip = tabState.Url,
                 Tag = tabState.Id,
             };
-            if (string.Equals(tabState.Id, activeTabId, StringComparison.Ordinal))
+            activate.Click += async (_, _) => await ActivateTabAsync(tabState.Id).ConfigureAwait(true);
+            content.Children.Add(activate);
+
+            if (tabState.Id != "new")
             {
-                tab.Background = TryFindResource("AccentSubtleBrush") as Brush ?? Brushes.Transparent;
-                tab.BorderBrush = TryFindResource("AccentStrongBrush") as Brush ?? Brushes.Transparent;
+                Button close = new()
+                {
+                    Width = 24,
+                    Height = 24,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    ToolTip = "Close tab",
+                    Tag = tabState.Id,
+                    Content = new System.Windows.Shapes.Path
+                    {
+                        Width = 8,
+                        Height = 8,
+                        Data = Geometry.Parse("M4,4 L16,16 M16,4 L4,16"),
+                        Stretch = Stretch.Uniform,
+                        Stroke = TryFindResource("MutedBrush") as Brush ?? Brushes.Gray,
+                        StrokeThickness = 1.8,
+                    },
+                };
+                close.Click += async (_, _) => await CloseTabAsync(tabState.Id).ConfigureAwait(true);
+                Grid.SetColumn(close, 1);
+                content.Children.Add(close);
             }
 
-            tab.Click += async (_, _) => await ActivateTabAsync(tabState.Id).ConfigureAwait(true);
-            TabsPanel.Children.Add(tab);
+            shell.Child = content;
+            TabsPanel.Children.Add(shell);
         }
     }
 
@@ -460,35 +536,104 @@ public partial class BrowserPaneView : UserControl
             return;
         }
 
-        UpdateActiveTabFromWebView(addHistory: false);
         activeTabId = tabId;
         browserState.ActiveTabId = tabId;
-        CollectionBrowserTabState? tab = ActiveTab;
         RebuildTabStrip();
+        await ShowActiveTabAsync(loadSavedAddress: true).ConfigureAwait(true);
+        await SaveBrowserStateAsync().ConfigureAwait(true);
+    }
 
-        if (IsAllowedBrowserUri(tab?.Url))
+    private async Task CloseTabAsync(string tabId)
+    {
+        int index = browserState.Tabs.FindIndex(tab => string.Equals(tab.Id, tabId, StringComparison.Ordinal));
+        if (index < 0)
         {
-            await NavigateAsync(tab!.Url).ConfigureAwait(true);
+            return;
+        }
+
+        if (tabSessions.Remove(tabId, out BrowserTabSession? session))
+        {
+            BrowserHostGrid.Children.Remove(session.Browser);
+            session.Browser.Dispose();
+        }
+
+        browserState.Tabs.RemoveAt(index);
+        if (string.Equals(activeTabId, tabId, StringComparison.Ordinal))
+        {
+            if (browserState.Tabs.Count == 0)
+            {
+                CreateNewActiveTab(null);
+            }
+            else
+            {
+                activeTabId = browserState.Tabs[Math.Min(index, browserState.Tabs.Count - 1)].Id;
+                browserState.ActiveTabId = activeTabId;
+            }
+        }
+
+        RebuildTabStrip();
+        await ShowActiveTabAsync(loadSavedAddress: true).ConfigureAwait(true);
+        await SaveBrowserStateAsync().ConfigureAwait(true);
+    }
+
+    private Task ShowActiveTabAsync(bool loadSavedAddress)
+    {
+        CollectionBrowserTabState? tab = ActiveTab;
+        if (tab is null || !IsAllowedNavigationUri(tab.Url))
+        {
+            foreach (BrowserTabSession candidate in tabSessions.Values)
+            {
+                candidate.Browser.Visibility = Visibility.Collapsed;
+            }
+
+            AddressTextBox.Text = string.Empty;
+            ShowState("New tab", "Enter a web address or search term.");
+            UpdateNavigationState();
+            return Task.CompletedTask;
+        }
+
+        BrowserTabSession session = GetOrCreateTabSession(tab.Id);
+        ShowTabSession(session);
+        AddressTextBox.Text = session.Browser.Address ?? tab.Url;
+        if (loadSavedAddress && string.IsNullOrWhiteSpace(session.Browser.Address))
+        {
+            session.Browser.Load(tab.Url);
+        }
+
+        UpdateNavigationState();
+        return Task.CompletedTask;
+    }
+
+    private void ShowTabSession(BrowserTabSession activeSession)
+    {
+        foreach (BrowserTabSession session in tabSessions.Values)
+        {
+            session.Browser.Visibility = ReferenceEquals(session, activeSession)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        StatePanel.Visibility = Visibility.Collapsed;
+        if (activeSession.LastError is null)
+        {
+            HideBrowserError();
         }
         else
         {
-            ShowEmptySurface();
-            FocusAddressBox();
+            ShowBrowserError($"Could not load this page. {activeSession.LastError}");
         }
     }
 
     private void UpdateNavigationState()
     {
-        CoreWebView2? coreWebView = BrowserWebView.CoreWebView2;
-        BackButton.IsEnabled = coreWebView?.CanGoBack == true;
-        ForwardButton.IsEnabled = coreWebView?.CanGoForward == true;
-        ReloadButton.IsEnabled = coreWebView is not null;
-        StopButton.IsEnabled = isNavigating;
+        BrowserTabSession? session = ActiveSession;
+        BackButton.IsEnabled = session?.CanGoBack == true;
+        ForwardButton.IsEnabled = session?.CanGoForward == true;
+        ReloadButton.IsEnabled = session is not null;
+        ReloadButton.Visibility = session?.IsLoading == true ? Visibility.Collapsed : Visibility.Visible;
+        StopButton.IsEnabled = session?.IsLoading == true;
+        StopButton.Visibility = session?.IsLoading == true ? Visibility.Visible : Visibility.Collapsed;
         BookmarkButton.IsEnabled = GetCurrentPageUrl() is not null;
-        ExtractPageButton.IsEnabled = CanExtractCurrentPage();
-        DownloadsButton.IsEnabled = true;
-        BrowserMenuButton.IsEnabled = true;
-        SettingsMenuButton.IsEnabled = true;
         BookmarkGlyph.Fill = IsCurrentPageBookmarked()
             ? TryFindResource("AccentStrongBrush") as Brush ?? Brushes.Transparent
             : Brushes.Transparent;
@@ -496,51 +641,69 @@ public partial class BrowserPaneView : UserControl
 
     private void SetBrowserStatus(string? message)
     {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            BrowserStatusText.Text = string.Empty;
-            BrowserStatusText.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        BrowserStatusText.Text = message;
-        BrowserStatusText.Visibility = Visibility.Visible;
+        BrowserStatusText.Text = message ?? string.Empty;
+        BrowserStatusText.Visibility = string.IsNullOrWhiteSpace(message)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     private void ShowState(string title, string message)
     {
-        BrowserWebView.Visibility = Visibility.Collapsed;
+        foreach (BrowserTabSession session in tabSessions.Values)
+        {
+            session.Browser.Visibility = Visibility.Collapsed;
+        }
+
         StatePanel.Visibility = Visibility.Visible;
         StateTitleText.Text = title;
         StateMessageText.Text = message;
+        HideBrowserError();
     }
 
-    private void ShowEmptySurface()
+    private void ShowBrowserError(string message)
     {
-        BrowserWebView.Visibility = Visibility.Collapsed;
-        StatePanel.Visibility = Visibility.Collapsed;
+        ErrorBannerText.Text = message;
+        ErrorBanner.Visibility = Visibility.Visible;
+        SetBrowserStatus(null);
+    }
+
+    private void HideBrowserError()
+    {
+        ErrorBanner.Visibility = Visibility.Collapsed;
+        ErrorBannerText.Text = string.Empty;
     }
 
     private string? GetCurrentPageUrl()
     {
-        string? source = BrowserWebView.CoreWebView2?.Source;
-        return IsAllowedBrowserUri(source) ? source : null;
+        return ActiveSession is { } session
+            ? GetSessionPageUrl(session)
+            : IsAllowedNavigationUri(ActiveTab?.Url) ? ActiveTab!.Url : null;
     }
 
-    private CollectionBrowserTabState? ActiveTab =>
-        browserState.Tabs.FirstOrDefault(tab => string.Equals(tab.Id, activeTabId, StringComparison.Ordinal));
-
-    private void EnsureActiveTab(string url)
+    private static string? GetSessionPageUrl(BrowserTabSession session)
     {
-        CollectionBrowserTabState? tab = ActiveTab;
-        if (tab is null)
-        {
-            tab = CreateNewActiveTab(url);
-        }
+        return IsAllowedNavigationUri(session.Browser.Address) ? session.Browser.Address : null;
+    }
 
+    private BrowserTabSession? ActiveSession =>
+        activeTabId is not null && tabSessions.TryGetValue(activeTabId, out BrowserTabSession? session)
+            ? session
+            : null;
+
+    private CollectionBrowserTabState? ActiveTab => FindTab(activeTabId);
+
+    private CollectionBrowserTabState? FindTab(string? tabId)
+    {
+        return browserState.Tabs.FirstOrDefault(tab => string.Equals(tab.Id, tabId, StringComparison.Ordinal));
+    }
+
+    private CollectionBrowserTabState EnsureActiveTab(string url)
+    {
+        CollectionBrowserTabState tab = ActiveTab ?? CreateNewActiveTab(url);
         tab.Url = url;
         tab.LastVisitedUtc = DateTimeOffset.UtcNow;
         browserState.ActiveTabId = tab.Id;
+        return tab;
     }
 
     private CollectionBrowserTabState CreateNewActiveTab(string? url)
@@ -559,35 +722,78 @@ public partial class BrowserPaneView : UserControl
         return tab;
     }
 
-    private void UpdateActiveTabFromWebView(bool addHistory)
+    private void UpdateTabFromSession(BrowserTabSession session, bool addHistory)
     {
-        string? url = GetCurrentPageUrl();
-        CollectionBrowserTabState? tab = ActiveTab;
+        string? url = GetSessionPageUrl(session);
+        CollectionBrowserTabState? tab = FindTab(session.TabId);
         if (url is null || tab is null)
         {
             return;
         }
 
-        string title = BrowserWebView.CoreWebView2?.DocumentTitle ?? url;
+        string title = string.IsNullOrWhiteSpace(session.Browser.Title) ? url : session.Browser.Title.Trim();
         tab.Url = url;
         tab.Title = title;
         tab.LastVisitedUtc = DateTimeOffset.UtcNow;
-        if (!addHistory)
+        session.LastError = null;
+
+        if (addHistory && !string.Equals(session.LastHistoryUrl, url, StringComparison.OrdinalIgnoreCase))
+        {
+            browserState.History.Insert(0, new CollectionBrowserHistoryEntry
+            {
+                Url = url,
+                Title = title,
+                VisitedUtc = DateTimeOffset.UtcNow,
+            });
+            session.LastHistoryUrl = url;
+            if (browserState.History.Count > MaxHistoryEntries)
+            {
+                browserState.History.RemoveRange(MaxHistoryEntries, browserState.History.Count - MaxHistoryEntries);
+            }
+        }
+
+        if (ReferenceEquals(session, ActiveSession))
+        {
+            AddressTextBox.Text = url;
+            HideBrowserError();
+        }
+
+        RebuildTabStrip();
+    }
+
+    private bool IsCurrentPageBookmarked()
+    {
+        string? url = GetCurrentPageUrl();
+        return url is not null && browserState.Bookmarks.Any(
+            bookmark => string.Equals(bookmark.Url, url, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string CreateVisibleTabTitle()
+    {
+        return ActiveTab is { } tab ? CreateVisibleTabTitle(tab) : "New tab";
+    }
+
+    private static string CreateVisibleTabTitle(CollectionBrowserTabState tab)
+    {
+        string title = string.IsNullOrWhiteSpace(tab.Title) ? tab.Url : tab.Title.Trim();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return "New tab";
+        }
+
+        return title.Length <= 28 ? title : $"{title[..27]}...";
+    }
+
+    private async Task NavigateInNewTabAsync(string? url)
+    {
+        if (!IsAllowedNavigationUri(url))
         {
             return;
         }
 
-        browserState.History.RemoveAll(entry => string.Equals(entry.Url, url, StringComparison.OrdinalIgnoreCase));
-        browserState.History.Insert(0, new CollectionBrowserHistoryEntry
-        {
-            Url = url,
-            Title = title,
-            VisitedUtc = DateTimeOffset.UtcNow,
-        });
-        if (browserState.History.Count > MaxHistoryEntries)
-        {
-            browserState.History.RemoveRange(MaxHistoryEntries, browserState.History.Count - MaxHistoryEntries);
-        }
+        CreateNewActiveTab(url);
+        RebuildTabStrip();
+        await NavigateAsync(url!).ConfigureAwait(true);
     }
 
     private async Task SaveBrowserStateAsync()
@@ -603,125 +809,88 @@ public partial class BrowserPaneView : UserControl
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Failed to save browser state. CollectionPath={CollectionPath}", loadedCollectionPath);
+            logger?.LogWarning(ex, "Failed to save collection browser state. CollectionPath={CollectionPath}", loadedCollectionPath);
         }
     }
 
-    private async Task NavigateInNewTabAsync(string? uri)
+    private void DisposeTabSessions()
     {
-        if (!IsAllowedBrowserUri(uri))
+        foreach (BrowserTabSession session in tabSessions.Values)
         {
-            return;
+            BrowserHostGrid.Children.Remove(session.Browser);
+            session.Browser.Dispose();
         }
 
-        CreateNewActiveTab(uri);
-        RebuildTabStrip();
-        await NavigateAsync(uri!).ConfigureAwait(true);
+        tabSessions.Clear();
     }
 
-    private void AddBrowserMenuSection<T>(
-        ContextMenu menu,
-        string title,
-        IEnumerable<T> items,
-        Func<T, string> getTitle,
-        Func<T, string> getUrl)
+    private static string? NormalizeAddress(string? value)
     {
-        bool addedHeader = false;
-        foreach (T item in items)
-        {
-            if (!addedHeader)
-            {
-                menu.Items.Add(new MenuItem { Header = title, IsEnabled = false });
-                addedHeader = true;
-            }
-
-            string url = getUrl(item);
-            MenuItem menuItem = new()
-            {
-                Header = string.IsNullOrWhiteSpace(getTitle(item)) ? url : getTitle(item),
-                ToolTip = url,
-            };
-            menuItem.Click += async (_, _) => await NavigateAsync(url).ConfigureAwait(true);
-            menu.Items.Add(menuItem);
-        }
-    }
-
-    private bool IsCurrentPageBookmarked()
-    {
-        string? url = GetCurrentPageUrl();
-        return url is not null
-            && browserState.Bookmarks.Any(bookmark => string.Equals(bookmark.Url, url, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private string CreateVisibleTabTitle(CollectionBrowserTabState? tabState = null)
-    {
-        string? title = tabState?.Title ?? BrowserWebView.CoreWebView2?.DocumentTitle;
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            return title.Length <= 28 ? title : string.Concat(title.AsSpan(0, 25), "...");
-        }
-
-        string? currentUrl = tabState?.Url ?? GetCurrentPageUrl();
-        if (Uri.TryCreate(currentUrl, UriKind.Absolute, out Uri? uri) && !string.IsNullOrWhiteSpace(uri.Host))
-        {
-            return uri.Host;
-        }
-
-        return "New tab";
-    }
-
-    private static bool IsAllowedBrowserUri(string? uri)
-    {
-        return Uri.TryCreate(uri, UriKind.Absolute, out Uri? parsed)
-            && parsed.Scheme is "http" or "https";
-    }
-
-    private static string? NormalizeAddress(string address)
-    {
-        string value = address.Trim();
-        if (value.Length == 0)
+        string address = value?.Trim() ?? string.Empty;
+        if (address.Length == 0)
         {
             return null;
         }
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute)
-            && absolute.Scheme is "http" or "https")
+        if (Uri.TryCreate(address, UriKind.Absolute, out Uri? absolute)
+            && (absolute.Scheme is "http" or "https" || IsLocalPdfUri(absolute)))
         {
             return absolute.AbsoluteUri;
         }
 
-        if (!value.Contains(' ', StringComparison.Ordinal)
-            && value.Contains('.', StringComparison.Ordinal))
+        if (!address.Any(char.IsWhiteSpace)
+            && address.Contains('.', StringComparison.Ordinal)
+            && Uri.TryCreate($"https://{address}", UriKind.Absolute, out Uri? hostUri))
         {
-            return $"https://{value.TrimStart('/')}";
+            return hostUri.AbsoluteUri;
         }
 
-        return $"https://www.bing.com/search?q={Uri.EscapeDataString(value)}";
+        return $"https://www.google.com/search?q={Uri.EscapeDataString(address)}";
+    }
+
+    private static bool IsAllowedNavigationUri(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme is "http" or "https" || IsLocalPdfUri(uri));
+    }
+
+    private static bool IsAllowedWebUri(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            && uri.Scheme is "http" or "https";
+    }
+
+    private static bool IsLocalPdfUri(Uri uri)
+    {
+        return uri.IsFile
+            && string.Equals(Path.GetExtension(uri.LocalPath), ".pdf", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeCollectionPathOrNull(string? collectionPath)
     {
-        if (string.IsNullOrWhiteSpace(collectionPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            return CollectionBrowserEnvironmentProvider.NormalizeExistingCollectionPath(collectionPath);
-        }
-        catch (Exception ex) when (ex is DirectoryNotFoundException or NotSupportedException or PathTooLongException)
-        {
-            return null;
-        }
+        return string.IsNullOrWhiteSpace(collectionPath)
+            ? null
+            : Path.TrimEndingDirectorySeparator(Path.GetFullPath(collectionPath));
     }
 
     private static void OpenPathWithShell(string path)
     {
+        Directory.CreateDirectory(path);
         Process.Start(new ProcessStartInfo
         {
             FileName = path,
             UseShellExecute = true,
         });
+    }
+
+    private sealed class BrowserTabSession(string tabId, ChromiumWebBrowser browser)
+    {
+        internal string TabId { get; } = tabId;
+        internal ChromiumWebBrowser Browser { get; } = browser;
+        internal bool IsLoading { get; set; }
+        internal bool CanGoBack { get; set; }
+        internal bool CanGoForward { get; set; }
+        internal string? LastError { get; set; }
+        internal string? LastHistoryUrl { get; set; }
     }
 }

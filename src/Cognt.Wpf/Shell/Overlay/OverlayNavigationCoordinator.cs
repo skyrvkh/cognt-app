@@ -1,5 +1,4 @@
 using System.Windows;
-using Cognt.Modules.PersonalKnowledgeManagement.Application.Notes;
 using Cognt.Wpf.EditorHost.Views;
 using CogntApp.Shell.Dialogs;
 using CogntApp.Shell.Review;
@@ -26,9 +25,7 @@ internal sealed partial class OverlayNavigationCoordinator
     private readonly EditorView editorView;
     private readonly ReviewOverlayCoordinator reviewOverlay;
     private readonly ILogger<OverlayNavigationCoordinator> logger;
-    private readonly ILoggerFactory loggerFactory;
     private int editorOpenRequestId;
-    private PdfReaderView? pdfReaderView;
 
     internal OverlayNavigationCoordinator(
         IShellDialogService dialogs,
@@ -43,8 +40,7 @@ internal sealed partial class OverlayNavigationCoordinator
         OverlayHostController overlayHost,
         EditorView editorView,
         ReviewOverlayCoordinator reviewOverlay,
-        ILogger<OverlayNavigationCoordinator> logger,
-        ILoggerFactory loggerFactory)
+        ILogger<OverlayNavigationCoordinator> logger)
     {
         ArgumentNullException.ThrowIfNull(dialogs);
         ArgumentNullException.ThrowIfNull(viewModel);
@@ -59,7 +55,6 @@ internal sealed partial class OverlayNavigationCoordinator
         ArgumentNullException.ThrowIfNull(editorView);
         ArgumentNullException.ThrowIfNull(reviewOverlay);
         ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(loggerFactory);
 
         this.dialogs = dialogs;
         this.viewModel = viewModel;
@@ -74,7 +69,6 @@ internal sealed partial class OverlayNavigationCoordinator
         this.editorView = editorView;
         this.reviewOverlay = reviewOverlay;
         this.logger = logger;
-        this.loggerFactory = loggerFactory;
     }
 
     internal async Task HandleOverlayRequestedAsync(OverlayRequestedEventArgs e)
@@ -122,26 +116,6 @@ internal sealed partial class OverlayNavigationCoordinator
             logger.LogError(ex, "Overlay navigation failed. ViewKind={ViewKind} RequestId={RequestId}", e.ViewKind, editorOpenRequestId);
             dialogs.ShowWarning("Navigation Failed", $"The view could not be changed: {ex.Message}");
             editorView.AttachBlockSuiteHostToEditor();
-        }
-    }
-
-    internal async Task HandleOpenPdfRequestedAsync(OpenPdfRequestedEventArgs e)
-    {
-        try
-        {
-            editorOpenRequestId++;
-            await CloseOverlayWorkflowsAsync();
-            pdfReaderView ??= new PdfReaderView(
-                loggerFactory.CreateLogger<PdfReaderView>(),
-                viewModel.CreatePdfAnnotationsNoteAsync);
-            ShowOverlay(pdfReaderView);
-            string documentPath = viewModel.ResolveDocumentPath(e.Document.RelativePath);
-            await pdfReaderView.LoadPdfAsync(e.Document, documentPath);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Open PDF overlay failed. RelativePath={RelativePath} RequestId={RequestId}", e.Document.RelativePath, editorOpenRequestId);
-            dialogs.ShowWarning("Open PDF Failed", $"The PDF could not be opened:{Environment.NewLine}{ex.Message}");
         }
     }
 

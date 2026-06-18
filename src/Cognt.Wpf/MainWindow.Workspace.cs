@@ -22,10 +22,11 @@ public partial class MainWindow
     private WorkspaceToolDockingPolicy RightPaneDockingPolicy => rightPaneDockingPolicy ??= new(
         Dispatcher,
         RightToolPaneGroup,
+        CardsToolPaneGroup,
+        BrowserToolPaneGroup,
         InspectorAnchorable,
         GraphAnchorable,
         CardsAnchorable,
-        PdfAnchorable,
         BrowserAnchorable);
 
     private Task QueueOpenNoteDocumentAsync(string notePath, bool selectInTree)

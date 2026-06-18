@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Web.WebView2.Core;
+using CefSharp;
 
 namespace CogntApp.Shell.Browser;
 
@@ -13,12 +13,6 @@ public sealed class CollectionBrowserEnvironmentProvider
     internal const string CollectionBrowserDirectoryName = ".cognt-browser";
     private const string ManifestFileName = "sandbox.json";
     private const string DownloadsDirectoryName = "downloads";
-    private const string BrowserArguments =
-        "--disable-background-networking " +
-        "--disable-sync " +
-        "--no-default-browser-check " +
-        "--no-first-run";
-
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly Dictionary<string, Task<CollectionBrowserSandbox>> sandboxesByCollection =
         new(StringComparer.OrdinalIgnoreCase);
@@ -31,7 +25,7 @@ public sealed class CollectionBrowserEnvironmentProvider
         {
             if (!sandboxesByCollection.TryGetValue(normalizedCollectionPath, out Task<CollectionBrowserSandbox>? task))
             {
-                task = CreateSandboxAsync(normalizedCollectionPath);
+                task = Task.FromResult(CreateSandbox(normalizedCollectionPath));
                 sandboxesByCollection[normalizedCollectionPath] = task;
             }
 
@@ -78,7 +72,7 @@ public sealed class CollectionBrowserEnvironmentProvider
         return candidatePath;
     }
 
-    private static async Task<CollectionBrowserSandbox> CreateSandboxAsync(string normalizedCollectionPath)
+    private static CollectionBrowserSandbox CreateSandbox(string normalizedCollectionPath)
     {
         CollectionBrowserManifest manifest = LoadOrCreateManifest(normalizedCollectionPath);
         string profilePath = Path.Combine(
@@ -95,17 +89,18 @@ public sealed class CollectionBrowserEnvironmentProvider
         Directory.CreateDirectory(profilePath);
         Directory.CreateDirectory(downloadsPath);
 
-        CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(
-            browserExecutableFolder: null,
-            userDataFolder: profilePath,
-            options: new CoreWebView2EnvironmentOptions(BrowserArguments)).ConfigureAwait(true);
+        RequestContext requestContext = new(new RequestContextSettings
+        {
+            CachePath = profilePath,
+            PersistSessionCookies = true,
+        });
 
         return new CollectionBrowserSandbox(
             normalizedCollectionPath,
             manifest.SandboxId,
             profilePath,
             downloadsPath,
-            environment);
+            requestContext);
     }
 
     private static CollectionBrowserManifest LoadOrCreateManifest(string collectionPath)
@@ -192,4 +187,4 @@ internal sealed record CollectionBrowserSandbox(
     string SandboxId,
     string ProfilePath,
     string DownloadsPath,
-    CoreWebView2Environment Environment);
+    IRequestContext RequestContext);

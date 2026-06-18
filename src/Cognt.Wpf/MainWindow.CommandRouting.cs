@@ -50,8 +50,7 @@ public partial class MainWindow
                 createdOverlayHost,
                 EditorViewControl,
                 createdReviewOverlay,
-                loggerFactory.CreateLogger<OverlayNavigationCoordinator>(),
-                loggerFactory),
+                loggerFactory.CreateLogger<OverlayNavigationCoordinator>()),
             createdReviewOverlay,
             new StartupWorkflowController(
                 viewModel,

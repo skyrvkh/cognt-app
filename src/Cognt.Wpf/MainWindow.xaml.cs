@@ -144,7 +144,6 @@ public partial class MainWindow : Window
         InspectorToolHost.Content = noteInspectorView;
         GraphToolHost.Content = noteGraphToolView;
         CardsToolHost.Content = noteCardQueueView;
-        PdfToolHost.Content = GetOrCreatePdfToolView();
         rightPaneBrowserView ??= new BrowserPaneView(
             browserEnvironmentProvider,
             browserStateService,
@@ -156,7 +155,6 @@ public partial class MainWindow : Window
         InspectorAnchorable.IsSelected = true;
         GraphAnchorable.Show();
         CardsAnchorable.Show();
-        PdfAnchorable.Show();
         BrowserAnchorable.Show();
         noteInspectorViewModel.Activate();
         ShellCommandRouting commandRouting = CreateShellCommandRouting(

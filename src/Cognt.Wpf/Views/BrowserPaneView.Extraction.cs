@@ -1,8 +1,7 @@
 using System.Text.Json;
-using System.Windows;
+using CefSharp;
 using CogntApp.Shell.Browser;
 using Microsoft.Extensions.Logging;
-using Microsoft.Web.WebView2.Core;
 
 namespace CogntApp.Views;
 
@@ -10,7 +9,7 @@ public partial class BrowserPaneView
 {
     private const string BrowserPageExtractionScript =
         """
-        (() => {
+        JSON.stringify((() => {
             const resolveUrl = value => {
                 try { return value ? new URL(value, document.baseURI).href : ''; }
                 catch { return String(value || ''); }
@@ -71,7 +70,7 @@ public partial class BrowserPaneView
                     lazySourceSet: image.getAttribute('data-srcset') || image.getAttribute('data-lazy-srcset') || ''
                 }))
             };
-        })()
+        })())
         """;
 
     private static readonly JsonSerializerOptions BrowserExtractionJsonOptions = new()
@@ -104,21 +103,28 @@ public partial class BrowserPaneView
     private async Task<BrowserPageExtraction> ExtractCurrentPageAsync()
     {
         string? currentUrl = GetCurrentPageUrl();
-        CoreWebView2? coreWebView = BrowserWebView.CoreWebView2;
-        if (coreWebView is null
-            || BrowserWebView.Visibility != Visibility.Visible
-            || !IsAllowedBrowserUri(currentUrl))
+        BrowserTabSession? session = ActiveSession;
+        if (session is null
+            || session.IsLoading
+            || !IsAllowedWebUri(currentUrl))
         {
             throw new InvalidOperationException("Open an http or https page before extracting browser content.");
         }
 
         await SaveBrowserStateAsync().ConfigureAwait(true);
-        string scriptResult = await coreWebView.ExecuteScriptAsync(BrowserPageExtractionScript).ConfigureAwait(true);
+        JavascriptResponse response = await session.Browser
+            .EvaluateScriptAsync(BrowserPageExtractionScript)
+            .ConfigureAwait(true);
+        if (!response.Success || response.Result is not string scriptResult)
+        {
+            throw new InvalidOperationException(response.Message ?? "The page extraction script failed.");
+        }
+
         BrowserPageScriptResult page = JsonSerializer.Deserialize<BrowserPageScriptResult>(
             scriptResult,
             BrowserExtractionJsonOptions) ?? throw new InvalidOperationException("The page did not return extractable content.");
 
-        string pageUrl = IsAllowedBrowserUri(page.Url) ? page.Url! : currentUrl!;
+        string pageUrl = IsAllowedWebUri(page.Url) ? page.Url! : currentUrl!;
         IReadOnlyList<BrowserPageImageExtraction> images = NormalizeExtractedImages(page.Images);
         if (string.IsNullOrWhiteSpace(page.Text)
             && string.IsNullOrWhiteSpace(page.Markdown)
@@ -141,10 +147,8 @@ public partial class BrowserPaneView
     private bool CanExtractCurrentPage()
     {
         return browserPageNoteCreator is not null
-            && !isNavigating
-            && BrowserWebView.Visibility == Visibility.Visible
-            && BrowserWebView.CoreWebView2 is not null
-            && GetCurrentPageUrl() is not null;
+            && ActiveSession is { IsLoading: false }
+            && IsAllowedWebUri(GetCurrentPageUrl());
     }
 
     private static IReadOnlyList<BrowserPageImageExtraction> NormalizeExtractedImages(

@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using Cognt.Composition;
 using CogntApp.Diagnostics;
 using CogntApp.DependencyInjection;
+using CogntApp.Shell.Browser;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +28,7 @@ public partial class App : Application
         try
         {
             RegisterExceptionHandlers();
+            CefSharpRuntime.Initialize();
             LiveCharts.Configure(settings => settings.UseDefaults());
             serviceProvider = CreateServiceProvider(diagnosticLogFile.Path);
             logger = serviceProvider.GetRequiredService<ILogger<App>>();
@@ -61,6 +63,8 @@ public partial class App : Application
             {
                 disposable.Dispose();
             }
+
+            CefSharpRuntime.Shutdown();
         }
         catch (Exception ex)
         {

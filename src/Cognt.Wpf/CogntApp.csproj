@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
     <AssemblyName>CogntApp</AssemblyName>
     <RootNamespace>CogntApp</RootNamespace>
@@ -39,6 +42,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="CefSharp.Wpf.NETCore" Version="149.0.60" />
     <PackageReference Include="Dirkster.AvalonDock" Version="5.0.0-preview.86" />
     <PackageReference Include="Dirkster.AvalonDock.Themes.Arc" Version="5.0.0-preview.86" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.4" />
