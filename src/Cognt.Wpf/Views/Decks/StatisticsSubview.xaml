@@ -177,6 +177,96 @@
             </StackPanel>
         </Grid>
 
+        <UniformGrid x:Name="LearningDiagnosticsGrid"
+                     Grid.Row="3"
+                     Columns="2"
+                     Margin="-6,14,-6,0">
+            <Border Margin="6"
+                    Padding="16"
+                    Style="{StaticResource PanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Scheduled Workload"
+                               Style="{StaticResource PanelTitleStyle}" />
+                    <UniformGrid Grid.Row="1"
+                                 Columns="3"
+                                 Margin="-4,12,-4,0">
+                        <StackPanel Margin="4">
+                            <TextBlock Text="Next 7 days" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding Forecast7Value}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding Forecast7Detail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Margin="4">
+                            <TextBlock Text="Next 30 days" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding Forecast30Value}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding Forecast30Detail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Margin="4">
+                            <TextBlock Text="Next 90 days" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding Forecast90Value}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding Forecast90Detail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </UniformGrid>
+                    <lvc:CartesianChart x:Name="WorkloadForecastChart"
+                                        Grid.Row="2"
+                                        Height="230"
+                                        Margin="0,12,0,0"
+                                        AnimationsSpeed="0:0:0.25"
+                                        LegendPosition="Top"
+                                        Series="{Binding WorkloadForecastSeries}"
+                                        TooltipPosition="Top"
+                                        XAxes="{Binding WorkloadForecastXAxes}"
+                                        YAxes="{Binding WorkloadForecastYAxes}" />
+                </Grid>
+            </Border>
+
+            <Border Margin="6"
+                    Padding="16"
+                    Style="{StaticResource PanelStyle}">
+                <StackPanel>
+                    <TextBlock Text="Learning Diagnostics"
+                               Style="{StaticResource PanelTitleStyle}" />
+                    <UniformGrid Columns="2"
+                                 Margin="-4,12,-4,0">
+                        <StackPanel Margin="4">
+                            <TextBlock Text="Actual retention" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding RetentionCalibrationValue}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding RetentionCalibrationDetail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Margin="4">
+                            <TextBlock Text="Review latency" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding ReviewLatencyValue}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding ReviewLatencyDetail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Margin="4,12,4,4">
+                            <TextBlock Text="Lapses / leeches" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding LapseReportValue}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding LapseReportDetail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Margin="4,12,4,4">
+                            <TextBlock Text="Workload smoothing" Style="{StaticResource MutedTextStyle}" />
+                            <TextBlock Text="{Binding SmoothingValue}" Margin="0,5,0,0" Style="{StaticResource PanelTitleStyle}" FontSize="20" />
+                            <TextBlock Text="{Binding SmoothingDetail}" Margin="0,4,0,0" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </UniformGrid>
+                    <TextBlock Text="{Binding TomorrowWorkloadDetail}"
+                               Margin="4,10,4,0"
+                               Style="{StaticResource MutedTextStyle}"
+                               FontSize="11"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Stability distribution"
+                               Margin="4,14,4,0"
+                               Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="{Binding StabilityDistributionLabel}"
+                               Margin="4,4,4,0"
+                               Style="{StaticResource TableTextStyle}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Difficulty distribution"
               Margin="0,14,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
