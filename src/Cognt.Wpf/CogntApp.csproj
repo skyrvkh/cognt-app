@@ -9,6 +9,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
     <AssemblyName>CogntApp</AssemblyName>
     <RootNamespace>CogntApp</RootNamespace>
