@@ -9,66 +9,261 @@ public partial class BrowserPaneView
 {
     private const string BrowserPageExtractionScript =
         """
-        JSON.stringify((() => {
+        return JSON.stringify(await (async () => {
             const resolveUrl = value => {
                 try { return value ? new URL(value, document.baseURI).href : ''; }
                 catch { return String(value || ''); }
             };
-            const clean = value => String(value || '')
+            const cleanInline = value => String(value || '')
                 .replace(/\u00a0/g, ' ')
                 .replace(/\s+/g, ' ')
                 .trim();
-            const escape = value => clean(value).replace(/\]/g, '\\]');
+            const cleanCode = value => String(value || '')
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                .replace(/\u00a0/g, ' ')
+                .replace(/[ \t]+$/gm, '')
+                .replace(/^\n+|\n+$/g, '')
+                .replace(/\n{4,}/g, '\n\n\n');
             const blocks = [];
-            const push = value => { const text = clean(value); if (text) blocks.push(text); };
-            const root = document.querySelector('main') || document.querySelector('article') || document.body;
-            for (const element of Array.from(root ? root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,img,pre,blockquote') : [])) {
-                const tag = element.tagName.toLowerCase();
-                if (tag === 'img') {
-                    const src = resolveUrl(element.currentSrc || element.getAttribute('src') || '');
-                    if (src) blocks.push(`![${escape(element.alt || element.title || 'Image')}](${src})`);
-                    continue;
-                }
+            const images = [];
+            const imageIndexes = new Map();
+            const imageElements = new Map();
+            const excludedSelector = [
+                'script', 'style', 'template', 'noscript', 'nav', '[role="navigation"]',
+                'button', '[role="button"]', '[aria-hidden="true"]', '[hidden]',
+                '.breadcrumbs', '.breadcrumb', '.sidebar', '[class*="sidebar"]',
+                '.pagination', '[class*="pagination"]', '.page-footer', '.site-footer',
+                '.mw-editsection', '.navbox', '.catlinks', '.printfooter', '.metadata',
+                '.toc', '#toc', '[data-testid="table-of-contents"]',
+                'a[rel="next"]', 'a[rel="prev"]', '[aria-label="Next"]', '[aria-label="Previous"]'
+            ].join(',');
+            const semanticSelector = 'h1,h2,h3,h4,h5,h6,p,pre,code,blockquote,ul,ol,table,figure,img,picture,[data-language],[data-code-block]';
+            const pickLargest = selector => Array.from(document.querySelectorAll(selector))
+                .filter(element => !element.matches('[hidden],[aria-hidden="true"]'))
+                .sort((left, right) => cleanInline(right.innerText || right.textContent || '').length - cleanInline(left.innerText || left.textContent || '').length)[0] || null;
+            const root = document.querySelector('#mw-content-text .mw-parser-output')
+                || pickLargest('[itemprop="articleBody"], article[role="main"], main article, article, .main-page-content')
+                || pickLargest('[role="main"], main')
+                || document.body;
 
-                if (tag === 'pre') {
-                    const text = (element.innerText || element.textContent || '').trim();
-                    if (text) blocks.push('```\n' + text + '\n```');
-                    continue;
+            const pushBlock = block => {
+                if (block.kind !== 'image') {
+                    block.text = block.kind === 'code' || block.kind === 'table'
+                        ? cleanCode(block.text)
+                        : cleanInline(block.text);
+                    if (!block.text) return;
                 }
+                const previous = blocks[blocks.length - 1];
+                if (previous
+                    && previous.kind === block.kind
+                    && previous.text === block.text
+                    && previous.level === block.level
+                    && previous.language === block.language
+                    && previous.imageIndex === block.imageIndex) return;
+                blocks.push(block);
+            };
+            const textWithoutNestedBlocks = element => {
+                const clone = element.cloneNode(true);
+                for (const nested of Array.from(clone.querySelectorAll(`ul,ol,pre,table,figure,${excludedSelector}`))) nested.remove();
+                return cleanInline(clone.innerText || clone.textContent || '');
+            };
+            const appendText = (kind, element, level = 0) => {
+                const clone = element.cloneNode(true);
+                for (const excluded of Array.from(clone.querySelectorAll(excludedSelector))) excluded.remove();
+                pushBlock({
+                    kind,
+                    text: clone.innerText || clone.textContent || '',
+                    level,
+                    language: '',
+                    imageIndex: -1
+                });
+            };
+            const appendImage = image => {
+                if (!image || image.matches('[aria-hidden="true"],[role="presentation"]')) return;
+                const source = resolveUrl(image.currentSrc
+                    || image.getAttribute('data-src')
+                    || image.getAttribute('data-original')
+                    || image.getAttribute('data-lazy-src')
+                    || image.getAttribute('src')
+                    || '');
+                if (!source) return;
+                const bounds = image.getBoundingClientRect();
+                const width = image.naturalWidth || Number(image.getAttribute('width')) || Math.round(bounds.width) || 0;
+                const height = image.naturalHeight || Number(image.getAttribute('height')) || Math.round(bounds.height) || 0;
+                const alt = cleanInline(image.getAttribute('alt') || image.getAttribute('title') || '');
+                if (width > 0 && height > 0 && width < 48 && height < 48) return;
+                if (!alt && width > 0 && height > 0 && width <= 64 && height <= 64) return;
 
-                if (tag === 'blockquote') {
-                    const text = (element.innerText || element.textContent || '').trim();
-                    if (text) blocks.push(text.split(/\r?\n/).map(line => `> ${line.trim()}`).join('\n'));
-                    continue;
+                let imageIndex = imageIndexes.get(source);
+                if (imageIndex === undefined) {
+                    imageIndex = images.length;
+                    imageIndexes.set(source, imageIndex);
+                    imageElements.set(imageIndex, image);
+                    images.push({
+                        index: imageIndex,
+                        source: resolveUrl(image.getAttribute('src') || ''),
+                        currentSource: resolveUrl(image.currentSrc || ''),
+                        sourceSet: image.getAttribute('srcset') || '',
+                        alt,
+                        title: cleanInline(image.getAttribute('title') || ''),
+                        naturalWidth: width,
+                        naturalHeight: height,
+                        lazySource: resolveUrl(image.getAttribute('data-src') || image.getAttribute('data-original') || image.getAttribute('data-lazy-src') || ''),
+                        lazySourceSet: image.getAttribute('data-srcset') || image.getAttribute('data-lazy-srcset') || ''
+                    });
                 }
-
-                if (/^h[1-6]$/.test(tag)) {
-                    const text = clean(element.innerText || element.textContent || '');
-                    if (text) blocks.push(`${'#'.repeat(Number(tag.slice(1)))} ${text}`);
-                    continue;
+                pushBlock({ kind: 'image', text: '', level: 0, language: '', imageIndex });
+            };
+            const findCodeLanguage = element => {
+                const candidates = [element, element.querySelector('code'), element.closest('[data-language]'), element.parentElement]
+                    .filter(Boolean);
+                for (const candidate of candidates) {
+                    const dataLanguage = candidate.getAttribute?.('data-language') || candidate.getAttribute?.('data-lang');
+                    if (dataLanguage) return cleanInline(dataLanguage);
+                    const classes = typeof candidate.className === 'string' ? candidate.className : '';
+                    const match = classes.match(/(?:language-|lang-)([\w#+.-]+)/i) || classes.match(/brush:\s*([\w#+.-]+)/i);
+                    if (match) return cleanInline(match[1]);
                 }
+                const label = element.closest('.code-example,.sandpack,.code-block')?.querySelector('[class*="language"],.visually-hidden');
+                const labelText = cleanInline(label?.textContent || '');
+                return /^[\w#+.-]{1,24}$/.test(labelText) ? labelText : '';
+            };
+            const appendCode = element => {
+                const codeElement = element.matches('pre,code') ? element : element.querySelector('pre,code');
+                if (!codeElement) return;
+                const clone = codeElement.cloneNode(true);
+                for (const excluded of Array.from(clone.querySelectorAll(`${excludedSelector},.line-number,.line-numbers,[data-line-numbers-col],[data-line-number]`))) excluded.remove();
+                const content = clone.querySelector('[data-line-numbers-content]') || clone;
+                const lineNodes = Array.from(content.querySelectorAll(':scope > .line,.line[data-line],.token-line'));
+                const code = lineNodes.length > 1
+                    ? lineNodes.map(line => line.textContent || '').join('\n')
+                    : (codeElement.innerText || content.textContent || '');
+                let language = findCodeLanguage(element);
+                if (!language && /(?:^|\n)\s*(?:import|export|const|let|var|function|class)\b|<[A-Z][\w.]*(?:\s|\/?>)/m.test(code)) {
+                    language = 'javascript';
+                }
+                pushBlock({
+                    kind: 'code',
+                    text: code,
+                    level: 0,
+                    language,
+                    imageIndex: -1
+                });
+            };
+            const isCodeContainer = element => element.matches('pre')
+                || (element.matches('code')
+                    && (cleanCode(element.textContent || '').includes('\n')
+                        || getComputedStyle(element).display === 'block'
+                        || /(?:^|[\s_-])(code-example|code-block|example-code)(?:$|[\s_-])/i.test(
+                            typeof element.parentElement?.className === 'string' ? element.parentElement.className : '')))
+                || (element.matches('[data-language],[data-code-block],.sandpack--codeblock,.sp-code-editor,.expressive-code')
+                    && Boolean(element.querySelector('pre,code')));
+            const appendList = list => {
+                const kind = list.tagName.toLowerCase() === 'ol' ? 'numbered-list-item' : 'bulleted-list-item';
+                for (const item of Array.from(list.querySelectorAll(':scope > li'))) {
+                    pushBlock({ kind, text: textWithoutNestedBlocks(item), level: 0, language: '', imageIndex: -1 });
+                    for (const nested of Array.from(item.querySelectorAll(':scope > ul,:scope > ol'))) appendList(nested);
+                }
+            };
+            const appendTable = table => {
+                for (const image of Array.from(table.querySelectorAll('img'))) appendImage(image);
+                const rows = Array.from(table.querySelectorAll('tr'))
+                    .map(row => Array.from(row.querySelectorAll(':scope > th,:scope > td'))
+                        .map(cell => cleanInline(cell.innerText || cell.textContent || ''))
+                        .filter(Boolean))
+                    .filter(row => row.length > 0);
+                if (rows.length > 0) {
+                    pushBlock({
+                        kind: 'table',
+                        text: rows.map(row => row.join('\t')).join('\n'),
+                        level: 0,
+                        language: '',
+                        imageIndex: -1
+                    });
+                }
+            };
+            const walk = element => {
+                for (const child of Array.from(element.children)) {
+                    if (child.matches(excludedSelector)) continue;
+                    const tag = child.tagName.toLowerCase();
+                    if (tag === 'img') { appendImage(child); continue; }
+                    if (tag === 'picture') { appendImage(child.querySelector('img')); continue; }
+                    if (tag === 'figure') {
+                        for (const image of Array.from(child.querySelectorAll('img'))) appendImage(image);
+                        const figureCodeBlocks = [
+                            ...Array.from(child.querySelectorAll('pre')),
+                            ...Array.from(child.querySelectorAll('code'))
+                                .filter(code => !code.closest('pre') && isCodeContainer(code))
+                        ];
+                        for (const codeBlock of figureCodeBlocks) appendCode(codeBlock);
+                        const caption = child.querySelector('figcaption');
+                        if (caption) appendText('paragraph', caption);
+                        continue;
+                    }
+                    if (isCodeContainer(child)) { appendCode(child); continue; }
+                    if (/^h[1-6]$/.test(tag)) { appendText('heading', child, Number(tag.slice(1))); continue; }
+                    if (tag === 'p') {
+                        appendText('paragraph', child);
+                        for (const image of Array.from(child.querySelectorAll('img'))) appendImage(image);
+                        continue;
+                    }
+                    if (tag === 'blockquote') { appendText('quote', child); continue; }
+                    if (tag === 'ul' || tag === 'ol') { appendList(child); continue; }
+                    if (tag === 'table') { appendTable(child); continue; }
+                    if (tag === 'hr') continue;
+                    if (child.querySelector(semanticSelector)) {
+                        walk(child);
+                        continue;
+                    }
+                    appendText('paragraph', child);
+                }
+            };
+            if (root) walk(root);
 
-                push((tag === 'li' ? '- ' : '') + (element.innerText || element.textContent || ''));
-            }
+            await Promise.all(images.map(async image => {
+                const source = image.currentSource || image.lazySource || image.source || '';
+                if (!/(?:\.svg(?:[?#]|$)|^data:image\/svg\+xml)/i.test(source)) return;
+                const element = imageElements.get(image.index);
+                if (!element) return;
+                try {
+                    if (typeof element.decode === 'function') await element.decode();
+                    const sourceWidth = element.naturalWidth || image.naturalWidth || 0;
+                    const sourceHeight = element.naturalHeight || image.naturalHeight || 0;
+                    if (sourceWidth <= 0 || sourceHeight <= 0) return;
+                    const scale = Math.min(1, 1600 / sourceWidth, 1600 / sourceHeight);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+                    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+                    const context = canvas.getContext('2d');
+                    if (!context) return;
+                    context.drawImage(element, 0, 0, canvas.width, canvas.height);
+                    image.currentSource = canvas.toDataURL('image/png');
+                    image.naturalWidth = canvas.width;
+                    image.naturalHeight = canvas.height;
+                } catch {
+                    // Cross-origin SVGs remain source-link fallbacks.
+                }
+            }));
+
+            const markdown = blocks.map(block => {
+                if (block.kind === 'heading') return `${'#'.repeat(block.level)} ${block.text}`;
+                if (block.kind === 'bulleted-list-item') return `- ${block.text}`;
+                if (block.kind === 'numbered-list-item') return `1. ${block.text}`;
+                if (block.kind === 'quote') return `> ${block.text}`;
+                if (block.kind === 'code') return `\`\`\`${block.language}\n${block.text}\n\`\`\``;
+                if (block.kind === 'image') return `COGNT-BROWSER-IMAGE-${block.imageIndex}`;
+                return block.text;
+            }).join('\n\n').trim();
 
             return {
                 title: document.title || '',
                 url: location.href || '',
-                text: document.body ? String(document.body.innerText || document.body.textContent || '') : '',
-                markdown: blocks.join('\n\n').trim(),
-                html: document.documentElement ? document.documentElement.outerHTML : '',
-                images: Array.from(document.images || []).map((image, index) => ({
-                    index,
-                    source: resolveUrl(image.getAttribute('src') || image.src || ''),
-                    currentSource: resolveUrl(image.currentSrc || ''),
-                    sourceSet: image.getAttribute('srcset') || '',
-                    alt: image.getAttribute('alt') || '',
-                    title: image.getAttribute('title') || '',
-                    naturalWidth: image.naturalWidth || 0,
-                    naturalHeight: image.naturalHeight || 0,
-                    lazySource: resolveUrl(image.getAttribute('data-src') || image.getAttribute('data-original') || image.getAttribute('data-lazy-src') || ''),
-                    lazySourceSet: image.getAttribute('data-srcset') || image.getAttribute('data-lazy-srcset') || ''
-                }))
+                text: root ? String(root.innerText || root.textContent || '') : '',
+                markdown,
+                html: '',
+                blocks,
+                images
             };
         })())
         """;
@@ -113,7 +308,7 @@ public partial class BrowserPaneView
 
         await SaveBrowserStateAsync().ConfigureAwait(true);
         JavascriptResponse response = await session.Browser
-            .EvaluateScriptAsync(BrowserPageExtractionScript)
+            .EvaluateScriptAsPromiseAsync(BrowserPageExtractionScript, TimeSpan.FromSeconds(45))
             .ConfigureAwait(true);
         if (!response.Success || response.Result is not string scriptResult)
         {
@@ -125,10 +320,12 @@ public partial class BrowserPaneView
             BrowserExtractionJsonOptions) ?? throw new InvalidOperationException("The page did not return extractable content.");
 
         string pageUrl = IsAllowedWebUri(page.Url) ? page.Url! : currentUrl!;
+        IReadOnlyList<BrowserPageContentBlock> blocks = NormalizeExtractedBlocks(page.Blocks);
         IReadOnlyList<BrowserPageImageExtraction> images = NormalizeExtractedImages(page.Images);
         if (string.IsNullOrWhiteSpace(page.Text)
             && string.IsNullOrWhiteSpace(page.Markdown)
             && string.IsNullOrWhiteSpace(page.Html)
+            && blocks.Count == 0
             && images.Count == 0)
         {
             throw new InvalidOperationException("The browser page did not expose extractable content.");
@@ -140,9 +337,57 @@ public partial class BrowserPaneView
             NormalizeExtractedMultiline(page.Text),
             NormalizeExtractedMultiline(page.Markdown),
             NormalizeExtractedHtml(page.Html),
-            [],
+            blocks,
             images,
             DateTimeOffset.UtcNow);
+    }
+
+    private static IReadOnlyList<BrowserPageContentBlock> NormalizeExtractedBlocks(
+        IReadOnlyList<BrowserPageScriptBlockResult>? blocks)
+    {
+        if (blocks is null || blocks.Count == 0)
+        {
+            return [];
+        }
+
+        HashSet<string> allowedKinds =
+        [
+            BrowserPageContentBlockKinds.Paragraph,
+            BrowserPageContentBlockKinds.Heading,
+            BrowserPageContentBlockKinds.BulletedListItem,
+            BrowserPageContentBlockKinds.NumberedListItem,
+            BrowserPageContentBlockKinds.Quote,
+            BrowserPageContentBlockKinds.Code,
+            BrowserPageContentBlockKinds.Table,
+            BrowserPageContentBlockKinds.Image,
+        ];
+        List<BrowserPageContentBlock> normalized = [];
+        foreach (BrowserPageScriptBlockResult block in blocks)
+        {
+            string kind = NormalizeExtractedSingleLine(block.Kind).ToLowerInvariant();
+            if (!allowedKinds.Contains(kind))
+            {
+                continue;
+            }
+
+            string text = kind is BrowserPageContentBlockKinds.Code or BrowserPageContentBlockKinds.Table
+                ? NormalizeExtractedMultiline(block.Text)
+                : NormalizeExtractedSingleLine(block.Text);
+            int imageIndex = kind == BrowserPageContentBlockKinds.Image ? block.ImageIndex : -1;
+            if (kind != BrowserPageContentBlockKinds.Image && string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            normalized.Add(new BrowserPageContentBlock(
+                kind,
+                text,
+                kind == BrowserPageContentBlockKinds.Heading ? Math.Clamp(block.Level, 1, 6) : 0,
+                kind == BrowserPageContentBlockKinds.Code ? NormalizeExtractedSingleLine(block.Language) : string.Empty,
+                imageIndex));
+        }
+
+        return normalized;
     }
 
     private bool CanExtractCurrentPage()
@@ -233,7 +478,15 @@ public partial class BrowserPaneView
         string? Text,
         string? Markdown,
         string? Html,
+        IReadOnlyList<BrowserPageScriptBlockResult>? Blocks,
         IReadOnlyList<BrowserPageScriptImageResult>? Images);
+
+    private sealed record BrowserPageScriptBlockResult(
+        string? Kind,
+        string? Text,
+        int Level,
+        string? Language,
+        int ImageIndex);
 
     private sealed record BrowserPageScriptImageResult(
         int Index,
