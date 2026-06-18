@@ -39,6 +39,7 @@ public partial class StatisticsSubview : UserControl
 
         StatisticsSummaryGrid.Columns = GetSummaryColumnCount(availableWidth);
         bool useStackedLayout = availableWidth < StackedLayoutBreakpoint;
+        LearningDiagnosticsGrid.Columns = useStackedLayout ? 1 : 2;
 
         ApplyAnalyticsSectionLayout(
             useStackedLayout,
@@ -62,6 +63,7 @@ public partial class StatisticsSubview : UserControl
         RecallDistributionChart.Height = useStackedLayout ? 200 : 220;
         StudyHeatmapChart.Height = useStackedLayout ? 200 : 220;
         WeeklyOutcomeChart.Height = useStackedLayout ? 220 : 245;
+        WorkloadForecastChart.Height = useStackedLayout ? 210 : 230;
     }
 
     private static int GetSummaryColumnCount(double availableWidth)
