@@ -17,6 +17,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid>
@@ -267,6 +268,17 @@
                                Style="{StaticResource TableTextStyle}"
                                TextWrapping="Wrap" />
                     <TextBlock Text="Difficulty distribution"
+                               Margin="4,10,4,0"
+                               Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="{Binding DifficultyDistributionLabel}"
+                               Margin="4,4,4,0"
+                               Style="{StaticResource TableTextStyle}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <Grid Grid.Row="4"
               Margin="0,14,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
