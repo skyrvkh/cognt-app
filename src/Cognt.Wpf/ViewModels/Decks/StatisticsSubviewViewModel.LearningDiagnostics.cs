@@ -88,3 +88,61 @@ public sealed partial class StatisticsSubviewViewModel
 
     public string LapseReportValue
     {
+        get => lapseReportValue;
+        private set => SetProperty(ref lapseReportValue, value);
+    }
+
+    public string LapseReportDetail
+    {
+        get => lapseReportDetail;
+        private set => SetProperty(ref lapseReportDetail, value);
+    }
+
+    public string SmoothingValue
+    {
+        get => smoothingValue;
+        private set => SetProperty(ref smoothingValue, value);
+    }
+
+    public string SmoothingDetail
+    {
+        get => smoothingDetail;
+        private set => SetProperty(ref smoothingDetail, value);
+    }
+
+    public string TomorrowWorkloadDetail
+    {
+        get => tomorrowWorkloadDetail;
+        private set => SetProperty(ref tomorrowWorkloadDetail, value);
+    }
+
+    public string StabilityDistributionLabel
+    {
+        get => stabilityDistributionLabel;
+        private set => SetProperty(ref stabilityDistributionLabel, value);
+    }
+
+    public string DifficultyDistributionLabel
+    {
+        get => difficultyDistributionLabel;
+        private set => SetProperty(ref difficultyDistributionLabel, value);
+    }
+
+    public ISeries[] WorkloadForecastSeries
+    {
+        get => workloadForecastSeries;
+        private set => SetProperty(ref workloadForecastSeries, value);
+    }
+
+    public Axis[] WorkloadForecastXAxes
+    {
+        get => workloadForecastXAxes;
+        private set => SetProperty(ref workloadForecastXAxes, value);
+    }
+
+    public Axis[] WorkloadForecastYAxes
+    {
+        get => workloadForecastYAxes;
+        private set => SetProperty(ref workloadForecastYAxes, value);
+    }
+}
