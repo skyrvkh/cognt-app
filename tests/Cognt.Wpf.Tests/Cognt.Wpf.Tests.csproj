@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <XUnitParallelizeTestCollections>false</XUnitParallelizeTestCollections>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,11 +18,30 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Application\Cognt.Modules.PersonalKnowledgeManagement.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PersonalKnowledgeManagement\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure\Cognt.Modules.PersonalKnowledgeManagement.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="../../src/Cognt.Wpf/Shell/Browser/BrowserPageDocumentBuilder.cs"
              Link="Shell/Browser/BrowserPageDocumentBuilder.cs" />
     <Compile Include="../../src/Cognt.Wpf/Shell/Browser/BrowserPageExtraction.cs"
              Link="Shell/Browser/BrowserPageExtraction.cs" />
     <Compile Include="../../src/Cognt.Wpf/Shell/Browser/PdfAnnotationSaveCoordinator.cs"
              Link="Shell/Browser/PdfAnnotationSaveCoordinator.cs" />
+    <Compile Include="../../src/Cognt.Wpf/ViewModels/RelayCommand.cs"
+             Link="ViewModels/RelayCommand.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Shell/Workspace/NoteDocumentSession.cs"
+             Link="Shell/Workspace/NoteDocumentSession.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Shell/Workspace/NoteDocumentSession.ShellRecovery.cs"
+             Link="Shell/Workspace/NoteDocumentSession.ShellRecovery.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Diagnostics/SupportBundleService.cs"
+             Link="Diagnostics/SupportBundleService.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Features/Notes/TrashViewModel.cs"
+             Link="Features/Notes/TrashViewModel.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Features/Settings/BackupSettingsViewModel.cs"
+             Link="Features/Settings/BackupSettingsViewModel.cs" />
+    <Compile Include="../../src/Cognt.Wpf/Features/Settings/RestoreViewModel.cs"
+             Link="Features/Settings/RestoreViewModel.cs" />
   </ItemGroup>
 </Project>
